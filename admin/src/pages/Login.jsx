@@ -1,7 +1,14 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createClient } from '@supabase/supabase-js';
 import { FaUser, FaLock } from "react-icons/fa";
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export default function Login({ onLogin }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -11,21 +18,24 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    // Aquí deberías integrar Supabase o tu backend de auth
     if (!email || !password) {
       setError("Completa todos los campos.");
       setLoading(false);
       return;
     }
-    // Simulación de login exitoso
-    setTimeout(() => {
-      setLoading(false);
-      if (email === "admin@demo.com" && password === "admin") {
-        onLogin && onLogin();
-      } else {
-        setError("Credenciales incorrectas.");
-      }
-    }, 1000);
+    // Login real con Supabase
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    setLoading(false);
+    if (loginError) {
+      setError("Credenciales incorrectas o usuario no existe.");
+    } else {
+      // Redirigir al dashboard o guardar sesión
+      if (onLogin) onLogin();
+      navigate("/dashboard");
+    }
   };
 
   return (
@@ -44,6 +54,7 @@ export default function Login({ onLogin }) {
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoFocus
+                autoComplete="username"
               />
             </div>
           </div>
@@ -57,6 +68,7 @@ export default function Login({ onLogin }) {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
               />
             </div>
           </div>

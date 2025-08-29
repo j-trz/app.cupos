@@ -1,7 +1,7 @@
 import React from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import clsx from "clsx";
-import { SECCIONES } from "./SidebarSections";
+import { SECCIONES } from "./SidebarSections.jsx";
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSeccion }) {
   return (
@@ -15,16 +15,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
       <div className="flex flex-col items-center mt-8 space-y-4">
         {SECCIONES.map((sec) => (
           <button
-            key={sec.key}
+            key={sec.id}
             className={clsx(
               "sidebar-btn flex items-center w-full px-4 py-2 hover:text-[#cc6200] transition-colors rounded",
-              seccion === sec.key ? "bg-[#1e355e] font-semibold" : ""
+              seccion === sec.id ? "bg-[#1e355e] font-semibold" : ""
             )}
-            onClick={() => setSeccion(sec.key)}
+            onClick={() => setSeccion(sec.id)}
           >
-            <span className="text-xl">{sec.icon}</span>
-            <span className={clsx("ml-4 transition-all duration-200", sidebarOpen ? "opacity-100" : "opacity-0 w-0 hidden md:inline")}>
-              {sec.label}
+            <span className="text-xl">{sec.icono}</span>
+            <span className={clsx("ml-4 transition-all duration-200", sidebarOpen ? "opacity-100" : "opacity-0 w-0 hidden md:inline")}> 
+              {sec.nombre}
             </span>
           </button>
         ))}
