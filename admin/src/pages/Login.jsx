@@ -1,41 +1,77 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createClient } from '@supabase/supabase-js';
 import { FaUser, FaLock } from "react-icons/fa";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import Swal from 'sweetalert2';
+import { supabase } from '../supabaseClient';
 
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
     if (!email || !password) {
-      setError("Completa todos los campos.");
       setLoading(false);
+      await Swal.fire({ icon: 'error', title: 'Campos requeridos', text: 'Completa todos los campos.' });
       return;
     }
-    // Login real con Supabase
-    const { error: loginError } = await supabase.auth.signInWithPassword({
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    setLoading(false);
     if (loginError) {
-      setError("Credenciales incorrectas o usuario no existe.");
-    } else {
-      // Redirigir al dashboard o guardar sesión
-      if (onLogin) onLogin();
-      navigate("/dashboard");
+      setLoading(false);
+      await Swal.fire({ icon: 'error', title: 'Error de acceso', html: `<pre>${JSON.stringify(loginError, null, 2)}</pre>` });
+      return;
     }
+    // Consultar perfil del usuario
+    const user = data?.user;
+    if (!user) {
+      setLoading(false);
+      await Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo obtener el usuario.' });
+      return;
+    }
+    // Buscar perfil
+        let { data: perfil, error: perfilError } = await supabase
+          .from('profiles')
+          .select('admin')
+          .eq('id', user.id)
+          .single();
+        if (perfilError || !perfil) {
+          // Si no existe, crear perfil básico (no admin)
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              nombre: user.user_metadata?.nombre || '',
+              agencia: user.user_metadata?.agencia || '',
+              admin: false
+            });
+          if (insertError) {
+            setLoading(false);
+            await Swal.fire({ icon: 'error', title: 'Sin acceso', html: `<pre>${JSON.stringify(insertError, null, 2)}</pre>` });
+            return;
+          }
+          // Buscar el perfil recién creado
+          const { data: nuevoPerfil } = await supabase
+            .from('profiles')
+            .select('admin')
+            .eq('id', user.id)
+            .single();
+          perfil = nuevoPerfil;
+        }
+        setLoading(false);
+        // Si todo ok, navega
+        if (typeof onLogin === 'function') onLogin();
+        if (perfil.admin) {
+          navigate("/dashboard"); // Panel admin
+        } else {
+          navigate("/disponibilidad"); // Panel usuario
+        }
   };
 
   return (
@@ -72,7 +108,7 @@ export default function Login({ onLogin }) {
               />
             </div>
           </div>
-          {error && <div className="text-red-600 text-center">{error}</div>}
+          {/* Los errores ahora se muestran con SweetAlert2 */}
           <button
             type="submit"
             className="w-full bg-[#2c4b8b] hover:bg-[#1e355e] text-white font-semibold py-2 rounded-lg transition-colors"

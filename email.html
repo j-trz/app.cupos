@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+	<title>Confirmación de correo</title>
+	<style>
+		body { font-family: "Montserrat", sans-serif; background: #f6f8fa; color: #222; margin: 0; padding: 0; }
+		.container { max-width: 480px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 32px; }
+		h2 { color: #2c4b8b; margin-bottom: 16px; }
+		a.button { display: inline-block; background: #2c4b8b; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 16px; }
+		p { margin-bottom: 16px; }
+	</style>
+</head>
+
+<body style="margin:0;padding:0;background:#ffffff;">
+	<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
+		<tr>
+			<td align="center">
+				<table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:0;margin:40px auto;">
+					<tr><td height="32"></td></tr>
+					<tr>
+						<td align="center" style="padding-bottom:26px;">
+							<img src="https://jetmar.com.uy/assets/jetmar-logo.svg" alt="Jetmar" style="height:48px;display:block;margin:auto;" />
+						</td>
+					</tr>
+					<tr>
+						<td align="center" style="font-family:'Montserrat', Arial, sans-serif;font-size:24px;color:#2c4b8b;font-weight:bold;letter-spacing:-0.36px;line-height:33.6px;padding-bottom:8px;">Restablecer contraseña</td>
+					</tr>
+					<tr>
+						<td align="center" style="font-family:'Montserrat', Arial, sans-serif;font-size:16px;color:#222;line-height:1.5;padding-bottom:24px;">Sigue este enlace para restablecer la contraseña de tu usuario:</td>
+					</tr>
+					<tr>
+						<td align="center" style="padding-bottom:20px;">
+							<a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#2c4b8b;color:#fff;padding:14px 32px;border-radius:24px;text-decoration:none;font-family:'Montserrat', Arial, sans-serif;font-size:16px;font-weight:bold;text-transform:uppercase;letter-spacing:0.15px;">Restablecer contraseña</a>
+						</td>
+					</tr>
+					<tr>
+						<td align="center" style="font-size:13px;color:#888;font-family:'Montserrat', Arial, sans-serif;padding-bottom:16px;">Si no solicitaste este registro, puedes ignorar este correo.</td>
+					</tr>
+					<tr><td height="8"></td></tr>
+				</table>
+				<table width="480" cellpadding="0" cellspacing="0" style="margin:0 auto;text-align:center;color:#888;font-size:13px;font-family:'Montserrat', Arial, sans-serif;">
+					<tr><td height="16"></td></tr>
+					<tr>
+						<td><hr style="border:none;border-top:1px solid #eee;margin:16px 0;"></td>
+					</tr>
+					<tr>
+						<td style="padding-bottom: 10px;">Contacto: <a href="mailto:info@jetmar.com.uy" style="color:#2c4b8b;text-decoration:none;">info@jetmar.com.uy</a></td>
+					</tr>
+					<tr >
+						<td style="padding-top: 10px;"><a href="https://www.jetmar.com.uy">Jetmar Viajes</a> &copy; 2025. Todos los derechos reservados.</td>
+					</tr>
+					<tr><td height="8"></td></tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>

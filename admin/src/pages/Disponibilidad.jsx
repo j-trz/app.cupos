@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-// Variables de entorno para mayor seguridad
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+import Layout from '../components/Layout';
 
 function formatearFecha(fecha) {
   if (!fecha) return "";
@@ -16,8 +11,7 @@ function formatearFecha(fecha) {
 }
 
 export default function Disponibilidad() {
-  const [session, setSession] = useState(null);
-  const [loginError, setLoginError] = useState("");
+  const [seccion, setSeccion] = useState('disponibilidad');
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -29,22 +23,10 @@ export default function Disponibilidad() {
   const [contacto, setContacto] = useState({ nombre: "", email: "", telefono: "", agencia: "" });
   const [enviando, setEnviando] = useState(false);
 
-  // Autenticación
+  // Cargar disponibilidad al montar
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    fetchDisponibilidad();
   }, []);
-
-  // Cargar disponibilidad
-  useEffect(() => {
-    if (session) {
-      fetchDisponibilidad();
-    }
-  }, [session]);
 
   async function fetchDisponibilidad() {
     setLoading(true);
@@ -64,20 +46,7 @@ export default function Disponibilidad() {
     setLoading(false);
   }
 
-  // Login
-  async function handleLogin(e) {
-    e.preventDefault();
-    setLoginError("");
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setLoginError("Credenciales incorrectas o error de autenticación");
-  }
-
-  // Logout
-  function handleLogout() {
-    supabase.auth.signOut();
-  }
+  // Eliminado: función de login
 
   // Abrir modal reserva
   function abrirReserva(vuelo) {
@@ -152,73 +121,60 @@ export default function Disponibilidad() {
     alert(`Reservas exitosas: ${exitos}, con error: ${errores}`);
   }
 
-  // Render
-  if (!session) {
-    return (
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 mt-8">
-        <h2 className="text-2xl font-bold text-center text-blue-800 mb-4">Iniciar sesión</h2>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input type="email" name="email" required placeholder="Email" className="w-full px-3 py-2 border rounded" />
-          <input type="password" name="password" required placeholder="Contraseña" className="w-full px-3 py-2 border rounded" />
-          <button type="submit" className="w-full bg-blue-800 text-white py-2 rounded">Entrar</button>
-        </form>
-        {loginError && <div className="text-red-600 mt-2 text-center">{loginError}</div>}
-      </div>
-    );
-  }
+  // Render directo, sin login
 
   return (
-    <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-blue-800">Disponibilidad de Cupos Aéreos</h1>
-        <button onClick={handleLogout} className="bg-gray-500 text-white px-4 py-2 rounded">Salir</button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3">Código Cupo</th>
-              <th className="px-6 py-3">Destino</th>
-              <th className="px-6 py-3">Compañía</th>
-              <th className="px-6 py-3">Disponibilidad</th>
-              <th className="px-6 py-3">Salida</th>
-              <th className="px-6 py-3">Regreso</th>
-              <th className="px-6 py-3">Precio</th>
-              <th className="px-6 py-3">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+    <Layout seccion={seccion} setSeccion={setSeccion}>
+      <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-[#2c4b8b]">Disponibilidad de Cupos Aéreos</h1>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={8} className="text-center py-4 text-gray-500">Cargando datos...</td>
+                <th className="px-6 py-3 text-center">Código Cupo</th>
+                <th className="px-6 py-3 text-center">Destino</th>
+                <th className="px-6 py-3 text-center">Compañía</th>
+                <th className="px-6 py-3 text-center">Disponibilidad</th>
+                <th className="px-6 py-3 text-center">Salida</th>
+                <th className="px-6 py-3 text-center">Regreso</th>
+                <th className="px-6 py-3 text-center">Precio</th>
+                <th className="px-6 py-3 text-center">Acción</th>
               </tr>
-            ) : datos.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="text-center py-4 text-gray-500">No hay datos disponibles</td>
-              </tr>
-            ) : datos.map((item, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="px-6 py-4">{item.codigo_cupo}</td>
-                <td className="px-6 py-4">{item.destino}</td>
-                <td className="px-6 py-4">{item.compania}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    item.disponibilidad > 5 ? "bg-green-100 text-green-800" :
-                    item.disponibilidad > 0 ? "bg-yellow-100 text-yellow-800" :
-                    "bg-red-100 text-red-800"
-                  }`}>
-                    {item.disponibilidad || 0}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{formatearFecha(item.salida)}</td>
-                <td className="px-6 py-4">{formatearFecha(item.regreso)}</td>
-                <td className="px-6 py-4">${item.precio ? parseFloat(item.precio).toFixed(2) : "0.00"}</td>
-                <td className="px-6 py-4">
-                  <button onClick={() => abrirReserva(item)} className="bg-blue-800 text-white px-3 py-1 rounded text-sm">Solicitar</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-4 text-gray-500">Cargando datos...</td>
+                </tr>
+              ) : datos.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-4 text-gray-500">No hay datos disponibles</td>
+                </tr>
+              ) : datos.map((item, idx) => (
+                <tr key={idx} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-center">{item.codigo_cupo}</td>
+                  <td className="px-6 py-4 text-center">{item.destino}</td>
+                  <td className="px-6 py-4 text-center">{item.compania}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      item.disponibilidad > 5 ? "bg-green-100 text-green-800" :
+                      item.disponibilidad > 0 ? "bg-yellow-100 text-yellow-800" :
+                      "bg-red-100 text-red-800"
+                    }`}>
+                      {item.disponibilidad || 0}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">{formatearFecha(item.salida)}</td>
+                  <td className="px-6 py-4 text-center">{formatearFecha(item.regreso)}</td>
+                  <td className="px-6 py-4 text-center">${item.precio ? parseFloat(item.precio).toFixed(2) : "0.00"}</td>
+                  <td className="px-6 py-4 text-center">
+                    <button onClick={() => abrirReserva(item)} className="bg-blue-800 text-white px-3 py-1 rounded text-sm">Solicitar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
         </table>
       </div>
 
@@ -306,5 +262,6 @@ export default function Disponibilidad() {
         </div>
       )}
     </div>
+  </Layout>
   );
 }
