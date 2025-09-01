@@ -1,12 +1,14 @@
 
-import { TbHome, TbPlaneTilt, TbBellBolt, TbTicket, TbChartHistogram } from 'react-icons/tb';
+import { TbPlaneTilt, TbBellBolt, TbTicket, TbChartHistogram } from 'react-icons/tb';
 import { RiUserSettingsLine } from "react-icons/ri";
+import { PiAirplaneInFlightFill } from "react-icons/pi";
+
 
 export const SECCIONES = [
   {
     id: 'disponibilidad',
     nombre: 'Disponibilidad',
-    icono: TbHome,
+    icono: PiAirplaneInFlightFill,
     ruta: '/disponibilidad',
     descripcion: 'Consulta y visualización de disponibilidad.'
   },

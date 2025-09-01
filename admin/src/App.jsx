@@ -1,3 +1,8 @@
+import ConfirmacionExitosa from "./pages/ConfirmacionExitosa";
+        <Route
+          path="/confirmacion-exitosa"
+          element={<ConfirmacionExitosa />}
+        />
 import React, { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 

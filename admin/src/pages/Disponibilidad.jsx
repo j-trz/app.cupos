@@ -133,14 +133,14 @@ export default function Disponibilidad() {
           <table className="min-w-full bg-white border border-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-center">Código Cupo</th>
-                <th className="px-6 py-3 text-center">Destino</th>
-                <th className="px-6 py-3 text-center">Compañía</th>
-                <th className="px-6 py-3 text-center">Disponibilidad</th>
-                <th className="px-6 py-3 text-center">Salida</th>
-                <th className="px-6 py-3 text-center">Regreso</th>
-                <th className="px-6 py-3 text-center">Precio</th>
-                <th className="px-6 py-3 text-center">Acción</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Código Cupo</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Destino</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Compañía</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Disponibilidad</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Salida</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Regreso</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Precio</th>
+                <th className="px-6 py-3 text-center text-[#2c4b8b]">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -170,7 +170,7 @@ export default function Disponibilidad() {
                   <td className="px-6 py-4 text-center">{formatearFecha(item.regreso)}</td>
                   <td className="px-6 py-4 text-center">${item.precio ? parseFloat(item.precio).toFixed(2) : "0.00"}</td>
                   <td className="px-6 py-4 text-center">
-                    <button onClick={() => abrirReserva(item)} className="bg-blue-800 text-white px-3 py-1 rounded text-sm">Solicitar</button>
+                    <button onClick={() => abrirReserva(item)} className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm">Solicitar</button>
                   </td>
                 </tr>
               ))}
@@ -180,71 +180,71 @@ export default function Disponibilidad() {
 
       {/* Modal reserva */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-screen overflow-y-auto">
             <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="text-xl font-semibold">Formulario de Reserva</h2>
-              <button onClick={() => setModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              <h2 className="text-xl font-semibold text-[#2c4b8b]">Formulario de Reserva</h2>
+              <button onClick={() => setModalOpen(false)} className="text-[#2c4b8b] hover:text-gray-600 text-2xl">&times;</button>
             </div>
-            <form onSubmit={enviarReserva} className="p-6 space-y-6">
+            <form onSubmit={enviarReserva} className="p-6 space-y-6 text-[#2c4b8b]">
               <label className="block text-sm font-medium mb-1">Número de Pedido</label>
-              <input type="text" value={pedidoId} readOnly className="w-[200px] px-3 py-2 border rounded bg-gray-100" />
+              <input type="text" value={pedidoId} readOnly className="w-[200px] px-3 py-2 border rounded bg-gray-100 focus:ring-0 focus:border-[#2c4b8b]" />
               {/* Info vuelo */}
-              <div className="bg-blue-50 border rounded-lg p-4 mb-6">
+              <div className="bg-blue-50 border rounded-lg p-4 mb-6 text-[#2c4b8b]">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600">Código</p>
+                    <p className="text-sm text-[#2c4b8b]">Código</p>
                     <p className="font-medium">{vueloSeleccionado.codigo_cupo}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Destino</p>
+                    <p className="text-sm text-[#2c4b8b]">Destino</p>
                     <p className="font-medium">{vueloSeleccionado.destino}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Compañía</p>
+                    <p className="text-sm text-[#2c4b8b]">Compañía</p>
                     <p className="font-medium">{vueloSeleccionado.compania}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Salida</p>
+                    <p className="text-sm text-[#2c4b8b]">Salida</p>
                     <p className="font-medium">{formatearFecha(vueloSeleccionado.salida)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Precio</p>
+                    <p className="text-sm text-[#2c4b8b]">Precio</p>
                     <p className="font-medium">${vueloSeleccionado.precio ? parseFloat(vueloSeleccionado.precio).toFixed(2) : "0.00"}</p>
                   </div>
                 </div>
               </div>
               {/* Contacto */}
-              <div className="bg-gray-50 border rounded-lg p-4">
+              <div className="bg-gray-50 border rounded-lg p-4 text-[#2c4b8b]">
                 <h3 className="text-lg font-semibold mb-4">Datos de Contacto</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" required placeholder="Nombre Contacto" value={contacto.nombre} onChange={e => cambiarContacto("nombre", e.target.value)} className="w-full px-3 py-2 border rounded" />
-                  <input type="email" required placeholder="Email" value={contacto.email} onChange={e => cambiarContacto("email", e.target.value)} className="w-full px-3 py-2 border rounded" />
-                  <input type="tel" required placeholder="Teléfono" value={contacto.telefono} onChange={e => cambiarContacto("telefono", e.target.value)} className="w-full px-3 py-2 border rounded" />
-                  <input type="text" placeholder="Agencia" value={contacto.agencia} onChange={e => cambiarContacto("agencia", e.target.value)} className="w-full px-3 py-2 border rounded" />
+                  <input type="text" required placeholder="Nombre Contacto" value={contacto.nombre} onChange={e => cambiarContacto("nombre", e.target.value)} className="w-full px-3 py-2 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                  <input type="email" required placeholder="Email" value={contacto.email} onChange={e => cambiarContacto("email", e.target.value)} className="w-full px-3 py-2 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                  <input type="tel" required placeholder="Teléfono" value={contacto.telefono} onChange={e => cambiarContacto("telefono", e.target.value)} className="w-full px-3 py-2 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                  <input type="text" placeholder="Agencia" value={contacto.agencia} onChange={e => cambiarContacto("agencia", e.target.value)} className="w-full px-3 py-2 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
                 </div>
               </div>
               {/* Pasajeros */}
-              <div className="bg-white border rounded-lg p-4">
+              <div className="bg-white border rounded-lg p-4 text-[#2c4b8b]">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold">Pasajeros</h3>
-                  <button type="button" onClick={agregarPasajero} className="bg-green-500 text-white px-4 py-2 rounded text-sm">+ Agregar Pasajero</button>
+                  <button type="button" onClick={agregarPasajero} className="bg-green-600 text-white px-4 py-2 rounded text-sm">+ Agregar Pasajero</button>
                 </div>
                 {pasajeros.map((p, idx) => (
-                  <div key={idx} className="pasajero-item bg-gray-50 border rounded-lg p-4 mb-2">
+                  <div key={idx} className="pasajero-item bg-gray-50 border rounded-lg p-4 mb-2 text-[#2c4b8b]">
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-md font-medium">Pasajero {idx + 1}</h4>
                       {pasajeros.length > 1 && (
                         <button type="button" onClick={() => eliminarPasajero(idx)} className="text-red-500 text-sm">Eliminar</button>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      <input type="text" required placeholder="Nombre" value={p.nombre} onChange={e => cambiarPasajero(idx, "nombre", e.target.value)} className="w-full px-2 py-1 border rounded" />
-                      <input type="text" required placeholder="Apellido" value={p.apellido} onChange={e => cambiarPasajero(idx, "apellido", e.target.value)} className="w-full px-2 py-1 border rounded" />
-                      <input type="text" required placeholder="Documento" value={p.documento} onChange={e => cambiarPasajero(idx, "documento", e.target.value)} className="w-full px-2 py-1 border rounded" />
-                      <input type="date" required placeholder="Nacimiento" value={p.nacimiento} onChange={e => cambiarPasajero(idx, "nacimiento", e.target.value)} className="w-full px-2 py-1 border rounded" />
-                      <input type="text" required placeholder="Nacionalidad" value={p.nacionalidad} onChange={e => cambiarPasajero(idx, "nacionalidad", e.target.value)} className="w-full px-2 py-1 border rounded" />
-                      <select value={p.tipo} onChange={e => cambiarPasajero(idx, "tipo", e.target.value)} className="w-full px-2 py-1 border rounded">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-[#2c4b8b]">
+                      <input type="text" required placeholder="Nombre" value={p.nombre} onChange={e => cambiarPasajero(idx, "nombre", e.target.value)} className="w-full px-2 py-1 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                      <input type="text" required placeholder="Apellido" value={p.apellido} onChange={e => cambiarPasajero(idx, "apellido", e.target.value)} className="w-full px-2 py-1 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                      <input type="text" required placeholder="Documento" value={p.documento} onChange={e => cambiarPasajero(idx, "documento", e.target.value)} className="w-full px-2 py-1 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                      <input type="date" required placeholder="Nacimiento" value={p.nacimiento} onChange={e => cambiarPasajero(idx, "nacimiento", e.target.value)} className="w-full px-2 py-1 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                      <input type="text" required placeholder="Nacionalidad" value={p.nacionalidad} onChange={e => cambiarPasajero(idx, "nacionalidad", e.target.value)} className="w-full px-2 py-1 border rounded focus:ring-0 focus:border-[#2c4b8b]" />
+                      <select value={p.tipo} onChange={e => cambiarPasajero(idx, "tipo", e.target.value)} className="w-full px-2 py-1 border rounded focus:ring-0 focus:border-[#2c4b8b]">
                         <option value="Adulto">Adulto</option>
                         <option value="Niño">Niño</option>
                         <option value="Bebé">Bebé</option>
@@ -255,7 +255,7 @@ export default function Disponibilidad() {
               </div>
               <div className="flex justify-center space-x-4">
                 <button type="button" onClick={() => setModalOpen(false)} className="bg-gray-500 text-white py-3 px-8 rounded">Cancelar</button>
-                <button type="submit" disabled={enviando} className="bg-blue-800 text-white py-3 px-8 rounded shadow-md">{enviando ? "Enviando..." : "Enviar Reserva"}</button>
+                <button type="submit" disabled={enviando} className="bg-[#2c4b8b] text-white py-3 px-8 rounded shadow-md">{enviando ? "Enviando..." : "Enviar Reserva"}</button>
               </div>
             </form>
           </div>
