@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import ConnectionService from "../services/connectionService";
-import PowerAutomateManager from "../services/powerAutomateManager";
 import EncryptionService from "../services/encryptionService";
 import { supabase } from "../supabaseClient";
-import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaDownload, FaUpload, FaEye, FaEyeSlash, FaTable, FaMagic } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaDownload, FaUpload, FaEye, FaEyeSlash, FaTable } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import { SiMongodb, SiTableau, SiSupabase } from 'react-icons/si';// eslint-disable-line no-unused-vars
 import { TiVendorMicrosoft } from 'react-icons/ti';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
@@ -20,7 +19,6 @@ export default function GestionConexiones() {
   const [showPassword, setShowPassword] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [userRole, setUserRole] = useState(null);// eslint-disable-line no-unused-vars
-  const [powerAutomateInfo, setPowerAutomateInfo] = useState(null);
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -33,7 +31,6 @@ export default function GestionConexiones() {
   useEffect(() => {
     fetchConexiones();
     checkUserRole();
-    checkPowerAutomateConnection();
   }, []);
 
   // Cerrar dropdown al hacer clic fuera
@@ -68,51 +65,6 @@ export default function GestionConexiones() {
     }
   }
 
-  async function checkPowerAutomateConnection() {
-    try {
-      const info = await PowerAutomateManager.getPowerAutomateInfo();
-      setPowerAutomateInfo(info);
-    } catch (error) {
-      console.error('Error checking Power Automate connection:', error);
-    }
-  }
-
-  async function createPowerAutomateConnection() {
-    try {
-      setLoading(true);
-      const result = await PowerAutomateManager.initializePowerAutomateConnection();
-      
-      if (result.success) {
-        await fetchConexiones();
-        await checkPowerAutomateConnection();
-        
-        if (!result.exists) {
-          Swal.fire({
-            icon: 'success',
-            title: 'Conexión Power Automate Creada',
-            text: 'La conexión se ha configurado automáticamente con tus configuraciones actuales.',
-            timer: 4000,
-            showConfirmButton: true
-          });
-        }
-      } else if (!result.cancelled) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: result.message || 'No se pudo crear la conexión Power Automate'
-        });
-      }
-    } catch (error) {
-      console.error('Error creating Power Automate connection:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Error inesperado al crear la conexión'
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function fetchConexiones() {
     setLoading(true);
@@ -449,17 +401,6 @@ export default function GestionConexiones() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Conexiones API</h1>
           <div className="flex gap-2">
-            {/* Botón especial para Power Automate */}
-            {(!powerAutomateInfo?.exists) && (
-              <button
-                onClick={createPowerAutomateConnection}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-                disabled={loading}
-              >
-                <FaMagic />
-                Configurar Power Automate
-              </button>
-            )}
             <button
               onClick={importConnection}
               className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
@@ -477,20 +418,6 @@ export default function GestionConexiones() {
           </div>
         </div>
 
-        {/* Información de Power Automate si no está configurado */}
-        {(!powerAutomateInfo?.exists) && (
-          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <TiVendorMicrosoft className="text-blue-600 text-2xl" />
-              <div className="flex-1">
-                <h3 className="font-medium text-blue-900">Configuración Automática Disponible</h3>
-                <p className="text-sm text-blue-700">
-                  Detectamos que usas Power Automate. Puedes crear automáticamente una conexión con tu configuración actual.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {loading ? (
           <div className="text-center py-10">

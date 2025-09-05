@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ConfirmacionExitosa from "./pages/ConfirmacionExitosa";
 
@@ -11,6 +11,7 @@ import Disponibilidad from "./pages/Disponibilidad";
 import Solicitudes from "./pages/Solicitudes";
 import Confirmaciones from "./pages/Confirmaciones";
 import AdminRoute from "./components/AdminRoute";
+import { ensurePowerAutomateConnection } from "./utils/ensurePowerAutomateConnection";
 
 function PrivateRoute({ children, isAuth }) {
   return isAuth ? children : <Navigate to="/login" replace />;
@@ -18,6 +19,16 @@ function PrivateRoute({ children, isAuth }) {
 
 export default function App() {
   const [isAuth, setIsAuth] = useState(false);
+
+  // Ejecutar una vez al montar la aplicación
+  useEffect(() => {
+    // Pequeño delay para asegurar que Supabase esté inicializado
+    const timer = setTimeout(() => {
+      ensurePowerAutomateConnection();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <BrowserRouter>
