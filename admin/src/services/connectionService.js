@@ -929,38 +929,69 @@ class ConnectionService {
         name: "Power Automate",
         description: "Microsoft Power Automate Flow",
         icon: "TiVendorMicrosoft",
+        docs: "https://docs.microsoft.com/en-us/power-automate/",
         fields: [
           {
             name: "flowUrl",
-            label: "URL del Flow",
+            label: "URL del Flow HTTP Request",
             type: "url",
             required: true,
+            placeholder:
+              "https://prod-xx.westeurope.logic.azure.com:443/workflows/...",
+            tooltip:
+              "URL completa del trigger HTTP de tu Flow en Power Automate",
           },
           {
             name: "apiKey",
             label: "Clave API (opcional)",
             type: "password",
             required: false,
+            placeholder: "Bearer token o API key si está configurado",
+            tooltip: "Opcional: Token de autenticación si tu Flow lo requiere",
           },
         ],
       },
       {
         type: "supabase",
         name: "Supabase",
-        description: "Base de datos PostgreSQL con API REST",
+        description: "Base de datos PostgreSQL con API REST autogenerada",
         icon: "SiSupabase",
+        docs: "https://supabase.com/docs/guides/api",
         fields: [
           {
-            name: "url",
+            name: "projectUrl",
             label: "URL del Proyecto",
             type: "url",
             required: true,
+            placeholder: "https://xyzcompany.supabase.co",
+            tooltip:
+              "URL base de tu proyecto Supabase (Project Settings > API)",
           },
           {
-            name: "apiKey",
-            label: "API Key (anon)",
+            name: "anonKey",
+            label: "API Key (anon/public)",
             type: "password",
             required: true,
+            placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            tooltip:
+              "Clave pública anónima para acceso a la API REST (Project Settings > API)",
+          },
+          {
+            name: "serviceRoleKey",
+            label: "Service Role Key (opcional)",
+            type: "password",
+            required: false,
+            placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            tooltip:
+              "Opcional: Clave de servicio para operaciones administrativas sin RLS",
+          },
+          {
+            name: "tableName",
+            label: "Nombre de la Tabla",
+            type: "text",
+            required: true,
+            placeholder: "reservas",
+            tooltip: "Nombre de la tabla donde se almacenarán los datos",
           },
         ],
       },
@@ -969,12 +1000,33 @@ class ConnectionService {
         name: "Smartsheet",
         description: "Plataforma de gestión de trabajo colaborativo",
         icon: "FaTable",
+        docs: "https://developers.smartsheet.com/api/smartsheet/openapi",
         fields: [
           {
-            name: "apiToken",
-            label: "Token de API",
+            name: "accessToken",
+            label: "Access Token",
             type: "password",
             required: true,
+            placeholder: "ll352u9jujauoqz4gstvsae05",
+            tooltip:
+              "Personal Access Token generado en Account > Personal Settings > API Access",
+          },
+          {
+            name: "sheetId",
+            label: "Sheet ID",
+            type: "text",
+            required: true,
+            placeholder: "1234567890123456",
+            tooltip: "ID de la hoja (visible en la URL cuando abres la hoja)",
+          },
+          {
+            name: "baseUrl",
+            label: "Base URL (opcional)",
+            type: "url",
+            required: false,
+            placeholder: "https://api.smartsheet.com/2.0",
+            tooltip:
+              "URL base de la API (usar por defecto: https://api.smartsheet.com/2.0)",
           },
         ],
       },
@@ -983,18 +1035,44 @@ class ConnectionService {
         name: "MongoDB",
         description: "Base de datos NoSQL orientada a documentos",
         icon: "SiMongodb",
+        docs: "https://www.mongodb.com/docs/api/",
         fields: [
           {
             name: "connectionString",
-            label: "Connection String",
+            label: "MongoDB Connection String",
             type: "password",
             required: true,
+            placeholder:
+              "mongodb+srv://username:password@cluster.mongodb.net/database",
+            tooltip:
+              "String de conexión completo incluyendo credenciales (MongoDB Atlas > Connect > Drivers)",
           },
           {
-            name: "database",
+            name: "databaseName",
             label: "Nombre de la Base de Datos",
             type: "text",
             required: true,
+            placeholder: "travel_bookings",
+            tooltip:
+              "Nombre de la base de datos donde se almacenarán las colecciones",
+          },
+          {
+            name: "collectionName",
+            label: "Nombre de la Colección",
+            type: "text",
+            required: true,
+            placeholder: "reservations",
+            tooltip:
+              "Nombre de la colección (equivalente a tabla en SQL) para los datos",
+          },
+          {
+            name: "apiKey",
+            label: "MongoDB Data API Key (opcional)",
+            type: "password",
+            required: false,
+            placeholder: "mongodb-data-api-key",
+            tooltip:
+              "Opcional: API Key para usar MongoDB Data API en lugar de conexión directa",
           },
         ],
       },
@@ -1003,30 +1081,48 @@ class ConnectionService {
         name: "Tableau",
         description: "Plataforma de análisis y visualización de datos",
         icon: "SiTableau",
+        docs: "https://tableau.github.io/document-api-python/docs/api-ref",
         fields: [
           {
             name: "serverUrl",
-            label: "URL del Servidor Tableau",
+            label: "Tableau Server URL",
             type: "url",
             required: true,
+            placeholder: "https://your-server.tableau.com",
+            tooltip: "URL base de tu servidor Tableau Server o Tableau Online",
           },
           {
             name: "username",
             label: "Nombre de Usuario",
             type: "text",
             required: true,
+            placeholder: "usuario@empresa.com",
+            tooltip: "Tu nombre de usuario para acceder a Tableau Server",
           },
           {
             name: "password",
             label: "Contraseña",
             type: "password",
             required: true,
+            placeholder: "••••••••",
+            tooltip: "Contraseña de tu cuenta Tableau",
           },
           {
             name: "siteName",
             label: "Nombre del Sitio",
             type: "text",
             required: false,
+            placeholder: "default",
+            tooltip:
+              "Nombre del sitio en Tableau Server (opcional, usar 'default' si no tienes uno específico)",
+          },
+          {
+            name: "apiVersion",
+            label: "Versión de la API",
+            type: "text",
+            required: false,
+            placeholder: "3.19",
+            tooltip: "Versión de la API REST de Tableau (por defecto: 3.19)",
           },
         ],
       },

@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import ConnectionService from "../services/connectionService";
 import EncryptionService from "../services/encryptionService";
+import DataMappingModal from "../components/DataMappingModal";
 import { supabase } from "../supabaseClient";
-import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaDownload, FaUpload, FaEye, FaEyeSlash, FaTable } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaDownload, FaUpload, FaEye, FaEyeSlash, FaTable, FaCog } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import { SiMongodb, SiTableau, SiSupabase } from 'react-icons/si';// eslint-disable-line no-unused-vars
 import { TiVendorMicrosoft } from 'react-icons/ti';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
@@ -19,6 +20,8 @@ export default function GestionConexiones() {
   const [showPassword, setShowPassword] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [userRole, setUserRole] = useState(null);// eslint-disable-line no-unused-vars
+  const [mappingModalOpen, setMappingModalOpen] = useState(false);
+  const [selectedConnectionForMapping, setSelectedConnectionForMapping] = useState(null);
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -392,6 +395,26 @@ export default function GestionConexiones() {
     }
   }
 
+  function openMappingModal(connection) {
+    setSelectedConnectionForMapping(connection);
+    setMappingModalOpen(true);
+  }
+
+  function closeMappingModal() {
+    setMappingModalOpen(false);
+    setSelectedConnectionForMapping(null);
+  }
+
+  async function saveMappingConfiguration(connectionId, mappingData) {
+    try {
+      await ConnectionService.updateConnection(connectionId, mappingData);
+      await fetchConexiones(); // Refresh the list
+    } catch (error) {
+      console.error('Error saving mapping configuration:', error);
+      throw error;
+    }
+  }
+
   const supportedTypes = ConnectionService.getSupportedConnectionTypes();
 
   const getStatusColor = (status) => {
@@ -520,6 +543,15 @@ export default function GestionConexiones() {
                         >
                           <FaDownload />
                         </button>
+                        {connection.type !== 'powerautomate' && (
+                          <button
+                            onClick={() => openMappingModal(connection)}
+                            className="p-2 text-orange-600 hover:bg-orange-100 rounded transition-colors"
+                            title="Configurar mapeo de datos"
+                          >
+                            <FaCog />
+                          </button>
+                        )}
                         <button
                           onClick={() => deleteConnection(connection)}
                           className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
@@ -631,10 +663,35 @@ export default function GestionConexiones() {
                 {/* Campos específicos del tipo */}
                 {formData.type && (
                   <div className="bg-gray-50 p-4 rounded">
-                    <h3 className="font-medium mb-3">Credenciales</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium">Configuración de {supportedTypes.find(t => t.type === formData.type)?.name}</h3>
+                      {supportedTypes.find(t => t.type === formData.type)?.docs && (
+                        <a
+                          href={supportedTypes.find(t => t.type === formData.type)?.docs}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 text-sm hover:underline flex items-center gap-1"
+                        >
+                          📖 Ver documentación
+                        </a>
+                      )}
+                    </div>
                     {supportedTypes.find(t => t.type === formData.type)?.fields.map(field => (
-                      <div key={field.name} className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{field.label}</label>
+                      <div key={field.name} className="mb-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <label className="block text-sm font-medium">
+                            {field.label}
+                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          {field.tooltip && (
+                            <div className="group relative">
+                              <span className="text-gray-400 text-sm cursor-help">ℹ️</span>
+                              <div className="absolute bottom-6 left-0 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                                {field.tooltip}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <input
                           type={field.type}
                           value={formData.credentials[field.name] || ''}
@@ -645,10 +702,13 @@ export default function GestionConexiones() {
                               [field.name]: e.target.value
                             }
                           })}
-                          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-[#2c4b8b]"
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-[#2c4b8b] text-sm"
                           required={field.required}
-                          placeholder={field.label}
+                          placeholder={field.placeholder || field.label}
                         />
+                        {!field.required && (
+                          <p className="text-xs text-gray-500 mt-1">Opcional</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -703,6 +763,14 @@ export default function GestionConexiones() {
             </div>
           </div>
         )}
+
+        {/* Modal de mapeo de datos */}
+        <DataMappingModal
+          isOpen={mappingModalOpen}
+          onClose={closeMappingModal}
+          connection={selectedConnectionForMapping}
+          onSave={saveMappingConfiguration}
+        />
       </div>
     </Layout>
   );
