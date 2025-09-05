@@ -1,4 +1,5 @@
-import { supabase } from '../supabaseClient';
+import { supabase } from "../supabaseClient";
+import AuthorizationService from "./authorizationService";
 
 class UserService {
   /**
@@ -6,35 +7,39 @@ class UserService {
    */
   static async createUser(userData) {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        body: {
-          action: 'create',
-          userData: {
-            email: userData.email,
-            password: userData.password,
-            nombre: userData.nombre,
-            agencia: userData.agencia,
-            admin: userData.admin || false
-          }
+      const { data, error } = await supabase.functions.invoke(
+        "user-management",
+        {
+          body: {
+            action: "create",
+            userData: {
+              email: userData.email,
+              password: userData.password,
+              nombre: userData.nombre,
+              agencia: userData.agencia,
+              role: userData.role || AuthorizationService.ROLES.AGENCY_USER,
+              admin: userData.admin || false, // Mantener por compatibilidad
+            },
+          },
         }
-      });
+      );
 
       if (error) {
-        throw new Error(error.message || 'Error al crear usuario');
+        throw new Error(error.message || "Error al crear usuario");
       }
 
       if (!data.success) {
-        throw new Error(data.error || 'Error desconocido al crear usuario');
+        throw new Error(data.error || "Error desconocido al crear usuario");
       }
 
       return {
         success: true,
         userId: data.userId,
-        message: data.message
+        message: data.message,
       };
     } catch (error) {
-      console.error('Error in createUser:', error);
-      throw new Error(error.message || 'Error al crear usuario');
+      console.error("Error in createUser:", error);
+      throw new Error(error.message || "Error al crear usuario");
     }
   }
 
@@ -43,33 +48,39 @@ class UserService {
    */
   static async updateUser(userData) {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        body: {
-          action: 'update',
-          userData: {
-            id: userData.id,
-            nombre: userData.nombre,
-            agencia: userData.agencia,
-            admin: userData.admin
-          }
+      const { data, error } = await supabase.functions.invoke(
+        "user-management",
+        {
+          body: {
+            action: "update",
+            userData: {
+              id: userData.id,
+              nombre: userData.nombre,
+              agencia: userData.agencia,
+              role: userData.role || AuthorizationService.ROLES.AGENCY_USER,
+              admin: userData.admin, // Mantener por compatibilidad
+            },
+          },
         }
-      });
+      );
 
       if (error) {
-        throw new Error(error.message || 'Error al actualizar usuario');
+        throw new Error(error.message || "Error al actualizar usuario");
       }
 
       if (!data.success) {
-        throw new Error(data.error || 'Error desconocido al actualizar usuario');
+        throw new Error(
+          data.error || "Error desconocido al actualizar usuario"
+        );
       }
 
       return {
         success: true,
-        message: data.message
+        message: data.message,
       };
     } catch (error) {
-      console.error('Error in updateUser:', error);
-      throw new Error(error.message || 'Error al actualizar usuario');
+      console.error("Error in updateUser:", error);
+      throw new Error(error.message || "Error al actualizar usuario");
     }
   }
 
@@ -78,28 +89,31 @@ class UserService {
    */
   static async deleteUser(userId) {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        body: {
-          action: 'delete',
-          userData: { id: userId }
+      const { data, error } = await supabase.functions.invoke(
+        "user-management",
+        {
+          body: {
+            action: "delete",
+            userData: { id: userId },
+          },
         }
-      });
+      );
 
       if (error) {
-        throw new Error(error.message || 'Error al eliminar usuario');
+        throw new Error(error.message || "Error al eliminar usuario");
       }
 
       if (!data.success) {
-        throw new Error(data.error || 'Error desconocido al eliminar usuario');
+        throw new Error(data.error || "Error desconocido al eliminar usuario");
       }
 
       return {
         success: true,
-        message: data.message
+        message: data.message,
       };
     } catch (error) {
-      console.error('Error in deleteUser:', error);
-      throw new Error(error.message || 'Error al eliminar usuario');
+      console.error("Error in deleteUser:", error);
+      throw new Error(error.message || "Error al eliminar usuario");
     }
   }
 
@@ -108,52 +122,66 @@ class UserService {
    */
   static async listUsers() {
     try {
-      const { data, error } = await supabase.functions.invoke('user-management', {
-        body: {
-          action: 'list'
+      const { data, error } = await supabase.functions.invoke(
+        "user-management",
+        {
+          body: {
+            action: "list",
+          },
         }
-      });
+      );
 
       if (error) {
-        throw new Error(error.message || 'Error al obtener usuarios');
+        throw new Error(error.message || "Error al obtener usuarios");
       }
 
       if (!data.success) {
-        throw new Error(data.error || 'Error desconocido al obtener usuarios');
+        throw new Error(data.error || "Error desconocido al obtener usuarios");
       }
 
       return {
         success: true,
-        users: data.users || []
+        users: data.users || [],
       };
     } catch (error) {
-      console.error('Error in listUsers:', error);
-      throw new Error(error.message || 'Error al obtener usuarios');
+      console.error("Error in listUsers:", error);
+      throw new Error(error.message || "Error al obtener usuarios");
     }
   }
 
   /**
    * Verificar si el usuario actual es administrador
+   * @deprecated Usar AuthorizationService.isAdmin() en su lugar
    */
   static async isCurrentUserAdmin() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return false;
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('admin')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error checking admin status:', error);
-        return false;
-      }
-
-      return profile?.admin || false;
+      return await AuthorizationService.isAdmin();
     } catch (error) {
-      console.error('Error in isCurrentUserAdmin:', error);
+      console.error("Error in isCurrentUserAdmin:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Obtener el rol del usuario actual
+   */
+  static async getCurrentUserRole() {
+    try {
+      return await AuthorizationService.getCurrentUserRole();
+    } catch (error) {
+      console.error("Error getting user role:", error);
+      return AuthorizationService.ROLES.AGENCY_USER;
+    }
+  }
+
+  /**
+   * Verificar si el usuario tiene permisos específicos
+   */
+  static async hasPermission(permission) {
+    try {
+      return await AuthorizationService.hasPermission(permission);
+    } catch (error) {
+      console.error("Error checking permission:", error);
       return false;
     }
   }
@@ -163,23 +191,9 @@ class UserService {
    */
   static async getCurrentUserProfile() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error getting user profile:', error);
-        return null;
-      }
-
-      return profile;
+      return await AuthorizationService.getCurrentUserProfile();
     } catch (error) {
-      console.error('Error in getCurrentUserProfile:', error);
+      console.error("Error in getCurrentUserProfile:", error);
       return null;
     }
   }
@@ -192,24 +206,32 @@ class UserService {
 
     // Validar email
     if (!userData.email) {
-      errors.push('Email es requerido');
+      errors.push("Email es requerido");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
-      errors.push('Email no válido');
+      errors.push("Email no válido");
     }
 
     // Validar nombre
     if (!userData.nombre || userData.nombre.length < 2) {
-      errors.push('Nombre debe tener al menos 2 caracteres');
+      errors.push("Nombre debe tener al menos 2 caracteres");
     }
 
     // Validar agencia
     if (!userData.agencia) {
-      errors.push('Agencia es requerida');
+      errors.push("Agencia es requerida");
+    }
+
+    // Validar rol
+    if (
+      userData.role &&
+      !Object.values(AuthorizationService.ROLES).includes(userData.role)
+    ) {
+      errors.push("Rol no válido");
     }
 
     // Validar contraseña solo para creación
     if (!isEdit && (!userData.password || userData.password.length < 6)) {
-      errors.push('Contraseña debe tener al menos 6 caracteres');
+      errors.push("Contraseña debe tener al menos 6 caracteres");
     }
 
     return errors;
@@ -221,13 +243,13 @@ class UserService {
   static getValidAgencies() {
     return [
       "Jetmar Viajes",
-      "Guamatur", 
+      "Guamatur",
       "Hiperviajes",
       "Freeway",
       "T&T",
       "Tienda Viajes",
       "TravelOz",
-      "Destinico"
+      "Destinico",
     ];
   }
 }

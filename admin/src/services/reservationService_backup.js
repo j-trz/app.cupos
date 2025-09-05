@@ -116,12 +116,6 @@ class ReservationService {
 
   static async _fetchRequests() {
     try {
-      // Obtener filtros según el rol del usuario
-      const filters = await AuthorizationService.getDataFilters();
-      if (!filters.canView) {
-        throw new Error("No tienes permisos para ver solicitudes");
-      }
-
       // Obtener datos específicos de pedidos
       const result = await ConnectionService.getDataFromActiveConnection(
         "pedidos"
@@ -134,48 +128,17 @@ class ReservationService {
       }
 
       console.log("Datos para solicitudes:", result.data.slice(0, 3));
-      console.log("Filtros aplicados:", filters);
 
-      // Filtrar solo solicitudes (Estado === "Solicitado")
-      let requestsData = result.data.filter((item) => {
-        return item.Estado === "Solicitado";
-      });
-
-      // Aplicar filtros según el rol
-      switch (filters.filterType) {
-        case "all":
-          // Admin: ve todas las solicitudes
-          break;
-
-        case "agency":
-          // Agency Admin: solo solicitudes de su agencia
-          requestsData = requestsData.filter(
-            (item) => item.Agencia === filters.agencia
-          );
-          break;
-
-        case "user": {
-          // Agency User: solo sus propias solicitudes
-          // Necesitamos obtener el email del usuario para filtrar
-          const profile = await AuthorizationService.getCurrentUserProfile();
-          if (profile?.email) {
-            requestsData = requestsData.filter(
-              (item) =>
-                item.Agencia === filters.agencia &&
-                item.Usuario_Email === profile.email
-            );
-          } else {
-            requestsData = [];
-          }
-          break;
-        }
-
-        default:
-          requestsData = [];
-      }
+      // La estructura real de "Tabla pedidos" usa Estado específico
+      // Filtrar solicitudes por Estado: "Solicitado"
+      const requestsData = result.data.filter(
+        (item) =>
+          item.Pedido_ID !== undefined && // Campo específico de pedidos
+          item.Estado === "Solicitado" // Estado específico para solicitudes
+      );
 
       console.log(
-        `✅ Filtradas ${requestsData.length} solicitudes según rol (${filters.filterType}) de ${result.data.length} pedidos totales`
+        `Filtradas ${requestsData.length} solicitudes de ${result.data.length} pedidos totales`
       );
 
       return {
@@ -210,18 +173,6 @@ class ReservationService {
 
   static async _fetchConfirmations() {
     try {
-      // Verificar permisos para ver confirmaciones
-      const canViewConfirmations =
-        (await AuthorizationService.hasPermission("view_agency_data")) ||
-        (await AuthorizationService.hasPermission("view_all_data"));
-
-      if (!canViewConfirmations) {
-        throw new Error("No tienes permisos para ver confirmaciones");
-      }
-
-      // Obtener filtros según el rol del usuario
-      const filters = await AuthorizationService.getDataFilters();
-
       // Obtener datos específicos de pedidos
       const result = await ConnectionService.getDataFromActiveConnection(
         "pedidos"
@@ -234,46 +185,17 @@ class ReservationService {
       }
 
       console.log("Datos para confirmaciones:", result.data.slice(0, 3));
-      console.log("Filtros aplicados:", filters);
 
-      // Filtrar solo confirmaciones (Estado === "Confirmado")
-      let confirmationsData = result.data.filter((item) => {
-        return item.Estado === "Confirmado";
-      });
-
-      // Aplicar filtros según el rol
-      switch (filters.filterType) {
-        case "all":
-          // Admin: ve todas las confirmaciones
-          break;
-
-        case "agency":
-          // Agency Admin: solo confirmaciones de su agencia
-          confirmationsData = confirmationsData.filter(
-            (item) => item.Agencia === filters.agencia
-          );
-          break;
-
-        case "user":
-          // Agency User: no debería llegar aquí (sin permisos), pero por seguridad filtrar solo sus datos
-          const profile = await AuthorizationService.getCurrentUserProfile();
-          if (profile?.email) {
-            confirmationsData = confirmationsData.filter(
-              (item) =>
-                item.Agencia === filters.agencia &&
-                item.Usuario_Email === profile.email
-            );
-          } else {
-            confirmationsData = [];
-          }
-          break;
-
-        default:
-          confirmationsData = [];
-      }
+      // La estructura real de "Tabla pedidos" usa Estado específico
+      // Filtrar confirmaciones por Estado: "Confirmado"
+      const confirmationsData = result.data.filter(
+        (item) =>
+          item.Pedido_ID !== undefined && // Campo específico de pedidos
+          item.Estado === "Confirmado" // Estado específico para confirmaciones
+      );
 
       console.log(
-        `✅ Filtradas ${confirmationsData.length} confirmaciones según rol (${filters.filterType}) de ${result.data.length} pedidos totales`
+        `Filtradas ${confirmationsData.length} confirmaciones de ${result.data.length} pedidos totales`
       );
 
       return {

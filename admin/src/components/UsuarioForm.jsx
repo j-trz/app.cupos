@@ -1,18 +1,28 @@
 
 import React, { useState, useEffect, Fragment } from "react";
-import { Dialog, Transition, Listbox, ListboxButton, ListboxOptions, ListboxOption, Switch } from '@headlessui/react';
-import { FaCheck, FaTimes } from "react-icons/fa";
+import { Dialog, Transition, Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/react';
+import { FaCheck, FaTimes, FaUserShield, FaUsers, FaUser } from "react-icons/fa";
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import AuthorizationService from '../services/authorizationService';
 
 const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
   const agencias = ["Jetmar Viajes", "Guamatur", "Hiperviajes", "Freeway", "T&T", "Tienda Viajes", "TravelOz","Destinico"];
+  const roles = AuthorizationService.getAvailableRoles();
+  
   const [email, setEmail] = useState(usuario?.email || "");
   const [nombre, setNombre] = useState(usuario?.nombre || "");
   const [agencia, setAgencia] = useState(usuario?.agencia || agencias[0]);
   const [agenciaPersonalizada, setAgenciaPersonalizada] = useState("");
-  const [admin, setAdmin] = useState(usuario?.admin || false);
+  const [role, setRole] = useState(usuario?.role || AuthorizationService.ROLES.AGENCY_USER);
   const [password, setPassword] = useState("");
   const isEdit = !!usuario;
+
+  // Mapeo de iconos para roles
+  const roleIcons = {
+    [AuthorizationService.ROLES.ADMIN]: FaUserShield,
+    [AuthorizationService.ROLES.AGENCY_ADMIN]: FaUsers,
+    [AuthorizationService.ROLES.AGENCY_USER]: FaUser
+  };
 
   // Sincronizar estados cuando cambia la prop usuario
   useEffect(() => {
@@ -20,7 +30,14 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
       setEmail(usuario.email || "");
       setNombre(usuario.nombre || "");
       setAgencia(usuario.agencia || agencias[0]);
-      setAdmin(usuario.admin || false);
+      // Migrar admin boolean a role para compatibilidad
+      if (usuario.role) {
+        setRole(usuario.role);
+      } else if (usuario.admin) {
+        setRole(AuthorizationService.ROLES.ADMIN);
+      } else {
+        setRole(AuthorizationService.ROLES.AGENCY_USER);
+      }
       
       // Si la agencia no está en la lista, establecer como "Otra"
       if (usuario.agencia && !agencias.includes(usuario.agencia)) {
@@ -35,15 +52,23 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
       setNombre("");
       setAgencia(agencias[0]);
       setAgenciaPersonalizada("");
-      setAdmin(false);
+      setRole(AuthorizationService.ROLES.AGENCY_USER);
       setPassword("");
     }
   }, [usuario]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  const agenciaFinal = agencia === "Otra" ? agenciaPersonalizada : agencia;
-  await onSave({ email, nombre, agencia: agenciaFinal, admin, password });
+    const agenciaFinal = agencia === "Otra" ? agenciaPersonalizada : agencia;
+    await onSave({
+      email,
+      nombre,
+      agencia: agenciaFinal,
+      role,
+      // Mantener admin para compatibilidad con código existente
+      admin: role === AuthorizationService.ROLES.ADMIN,
+      password
+    });
   };
 
   return (
@@ -102,16 +127,35 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
                 <input type="password" className="w-full border px-3 py-2 rounded" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
             )}
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={admin}
-                  onChange={setAdmin}
-                  className={`${admin ? 'bg-blue-600' : 'bg-gray-300'} relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none`}
-                >
-                  <span className="sr-only">¿Es administrador?</span>
-                  <span className={`${admin ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform bg-white rounded-full transition-transform`} />
-                </Switch>
-                <span className="text-sm">¿Es administrador?</span>
+              <div>
+                <label className="block text-sm font-medium mb-1">Rol del Usuario</label>
+                <div className="mx-auto" style={{ width: '415px' }}>
+                  <Listbox value={role} onChange={setRole}>
+                    <div className="relative mt-1">
+                      <ListboxButton className="w-full border px-3 py-2 rounded bg-white text-left flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {React.createElement(roleIcons[role], { className: "w-4 h-4" })}
+                          <span>{AuthorizationService.getRoleDescription(role)}</span>
+                        </div>
+                        <ChevronDownIcon className="w-5 h-5 text-gray-400 ml-2" aria-hidden="true" />
+                      </ListboxButton>
+                      <ListboxOptions anchor="bottom" className="absolute mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none z-10" style={{ width: '415px' }}>
+                        {roles.map((roleOption) => (
+                          <ListboxOption
+                            key={roleOption.value}
+                            value={roleOption.value}
+                            className="cursor-pointer select-none relative py-2 pl-4 pr-4 hover:bg-blue-100"
+                          >
+                            <div className="flex items-center gap-2">
+                              {React.createElement(roleIcons[roleOption.value], { className: "w-4 h-4" })}
+                              <span>{roleOption.label}</span>
+                            </div>
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </div>
+                  </Listbox>
+                </div>
               </div>
               <div className="flex justify-between items-center mt-6">
                 <button type="button" className="bg-gray-200 text-[#2c4b8b] px-6 py-2 rounded font-semibold flex items-center gap-2 hover:bg-gray-300 transition" onClick={onClose}>

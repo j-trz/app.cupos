@@ -476,13 +476,12 @@ class ConnectionService {
       // Fallback a variables de entorno si no hay conexión activa
       if (!targetUrl) {
         console.log("Usando variables de entorno como fallback");
-        if (dataType === "productos") {
-          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL; // Para productos/disponibilidad
-          console.log("🔍 DISPONIBILIDAD usará URL:", targetUrl);
-        } else {
-          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS; // Para pedidos (solicitudes/confirmaciones)
-          console.log("🔍 PEDIDOS usará URL:", targetUrl);
-        }
+        // CORRECCIÓN: Ambos tipos usan la misma URL porque la disponibilidad se deriva de los datos de pedidos
+        targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
+        console.log(
+          `🔍 ${dataType.toUpperCase()} usará URL (datos unificados):`,
+          targetUrl
+        );
       }
 
       if (!targetUrl) {

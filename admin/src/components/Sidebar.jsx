@@ -3,38 +3,61 @@ import React from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";// eslint-disable-line no-unused-vars
 import clsx from "clsx";
 import { SECCIONES } from "./SidebarSections.jsx";
-import { supabase } from '../supabaseClient';
+import AuthorizationService from '../services/authorizationService';
 import { useNavigate } from "react-router-dom";
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSeccion }) {
-  const [isAdmin, setIsAdmin] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
+  const [userRole, setUserRole] = React.useState('agency_user');
+  const [availableSections, setAvailableSections] = React.useState([]);
   const navigate = useNavigate();
   
+  // Filtrar secciones según el rol
+  const filterSectionsByRole = (role) => {
+    return SECCIONES.filter(sec => {
+      // Si no tiene restricción de rol, mostrar siempre
+      if (!sec.soloAdmin && !sec.roles) return true;
+      
+      // Si tiene roles específicos definidos, verificar
+      if (sec.roles && Array.isArray(sec.roles)) {
+        return sec.roles.includes(role);
+      }
+      
+      // Compatibilidad con soloAdmin (solo para admin)
+      if (sec.soloAdmin) {
+        return role === AuthorizationService.ROLES.ADMIN;
+      }
+      
+      return true;
+    });
+  };
+
+  // Inicializar con secciones básicas (sin restricciones)
   React.useEffect(() => {
-    const getProfile = async () => {
+    const basicSections = SECCIONES.filter(sec => !sec.soloAdmin && !sec.roles);
+    setAvailableSections(basicSections);
+  }, []);
+  
+  // Obtener rol del usuario y actualizar secciones dinámicamente
+  React.useEffect(() => {
+    const getUserRoleAndSections = async () => {
       try {
-        setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setIsAdmin(false);
-          setLoading(false);
-          return;
-        }
-        const { data: perfil } = await supabase
-          .from('profiles')
-          .select('admin')
-          .eq('id', user.id)
-          .single();
-        setIsAdmin(perfil?.admin === true);
+        // Obtener rol del usuario
+        const role = await AuthorizationService.getCurrentUserRole();
+        setUserRole(role);
+        
+        // Actualizar secciones filtradas según el rol
+        const filteredSections = filterSectionsByRole(role);
+        setAvailableSections(filteredSections);
       } catch (error) {
-        console.error('Error obteniendo perfil:', error);
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
+        console.error('Error obteniendo rol:', error);
+        // Mantener rol por defecto y secciones básicas
+        setUserRole('agency_user');
+        const basicSections = SECCIONES.filter(sec => !sec.soloAdmin && !sec.roles);
+        setAvailableSections(basicSections);
       }
     };
-    getProfile();
+    
+    getUserRoleAndSections();
   }, []);
   return (
     <aside
@@ -45,7 +68,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
       )}
     >
       <div className="flex flex-col items-center mt-8 space-y-4">
-        {SECCIONES.filter(sec => !sec.soloAdmin || (isAdmin && !loading)).map((sec) => {
+        {availableSections.map((sec) => {
           const Icon = sec.icono;
           return (
             <button
@@ -69,6 +92,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
             </button>
           );
         })}
+        
+        {/* Mostrar rol actual en modo debug cuando sidebar esté abierto */}
+        {sidebarOpen && import.meta.env.MODE === 'development' && (
+          <div className="text-xs text-gray-300 mt-4 px-4">
+            Rol: {AuthorizationService.getRoleDescription(userRole)}
+          </div>
+        )}
       </div>
       <div className="flex-1"></div>
       {/* Flecha tipo tab */}
