@@ -1,28 +1,24 @@
 import React, { useEffect, useState, Fragment } from "react";
 import Swal from 'sweetalert2';
 import { FaUserShield, FaUserPlus, FaEllipsisV } from "react-icons/fa";
-import { Listbox, ListboxButton, ListboxOptions, Transition } from '@headlessui/react';
+import { Listbox, ListboxButton, ListboxOptions, ListboxOption, Transition } from '@headlessui/react';
 import { supabase } from '../supabaseClient';
 import Layout from '../components/Layout';
 import UsuarioForm from '../components/UsuarioForm';
 
 // Mueve la lógica y el estado aquí fuera del UsuarioForm
 export default function GestionUsuarios() {
+  const [seccion, setSeccion] = useState("gestion-usuarios");
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
-  const [seccion, setSeccion] = useState("usuarios");
 
   useEffect(() => {
     const fetchUsuarios = async () => {
-      setLoading(true);
       const { data, error } = await supabase.from('profiles').select('*');
       if (!error) setUsuarios(data || []);
-      setLoading(false);
     };
     fetchUsuarios();
   }, []);
@@ -81,7 +77,7 @@ export default function GestionUsuarios() {
         setLoading(false);
         return;
       }
-      const userId = signUpData?.user?.id;
+      const userId = signUpData && signUpData.user ? signUpData.user.id : null;
       if (!userId) {
         Swal.fire('Error', 'No se obtuvo el ID del usuario creado.', 'error');
         setLoading(false);
@@ -94,12 +90,29 @@ export default function GestionUsuarios() {
         agencia: data.agencia,
         admin: data.admin
       };
-      const { error: perfilError } = await supabase.from('profiles').insert([perfil]);
-      if (!perfilError) {
-        setUsuarios([...usuarios, perfil]);
-        Swal.fire('Creado', 'Perfil creado correctamente.', 'success');
+      // Verificar si ya existe el perfil
+      const { data: existing, error: selectError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      if (selectError && selectError.code !== 'PGRST116') {
+        Swal.fire('Error', 'No se pudo consultar el perfil: ' + selectError.message, 'error');
+        setLoading(false);
+        return;
+      }
+      if (existing) {
+        Swal.fire('Info', 'El perfil ya existe, no se creó duplicado.', 'info');
       } else {
-        Swal.fire('Error', 'No se pudo crear el perfil: ' + perfilError.message, 'error');
+        const { error: perfilError } = await supabase.from('profiles').insert([perfil]);
+        if (!perfilError) {
+          setUsuarios([...usuarios, perfil]);
+          Swal.fire('Creado', 'Perfil creado correctamente.', 'success');
+        } else if (perfilError.code === '23505') {
+          Swal.fire('Info', 'El perfil ya existe, no se creó duplicado.', 'info');
+        } else {
+          Swal.fire('Error', 'No se pudo crear el perfil: ' + perfilError.message, 'error');
+        }
       }
     }
     setModalOpen(false);
@@ -109,19 +122,20 @@ export default function GestionUsuarios() {
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
-      <div className="mx-auto p-6">
+      <div className="p-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Usuarios</h2>
-          <button className="bg-[#2c4b8b] text-white px-4 py-2 rounded flex items-center gap-2" onClick={handleCrear}>
-            <FaUserPlus className="w-5 h-5" /> Nuevo Usuario
+          <h1 className="text-3xl font-bold text-[#2c4b8b]">Gestión de Usuarios</h1>
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-[#2c4b8b] text-white rounded-lg shadow hover:bg-[#1e355e] transition-colors"
+            onClick={handleCrear}
+          >
+            <FaUserPlus className="w-5 h-5" />
+            Crear Usuario
           </button>
         </div>
-        {loading ? (
-          <div className="text-center py-8">Cargando usuarios...</div>
-        ) : (
+        <div>
           <div>
-            <div>
-              <table className="w-full min-w-[900px] bg-white border-0 rounded-2xl shadow-xl">
+            <table className="w-full min-w-[900px] bg-white border-0 rounded-2xl shadow-xl">
                 <thead>
                   <tr className="bg-[#2c4b8b] text-white">
                     <th className="px-6 py-4 text-lg font-semibold rounded-tl-2xl">Email</th>
@@ -132,7 +146,7 @@ export default function GestionUsuarios() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.slice((currentPage-1)*rowsPerPage, currentPage*rowsPerPage).map(u => (
+                  {usuarios.map(u => (
                     <tr
                       key={u.id || u.email}
                       className={`last:border-b-0 cursor-pointer transition-all duration-150 ${selectedRow === u.id ? 'bg-[#e6f0fa]' : 'hover:bg-[#e6f0fa]'} group`}
@@ -165,14 +179,8 @@ export default function GestionUsuarios() {
                 </tbody>
               </table>
             </div>
-              {/* Paginación debajo de la tabla, centrada */}
-              <div className="flex justify-center items-center mt-6 gap-2">
-                <button className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 transition" disabled={currentPage===1} onClick={()=>setCurrentPage(currentPage-1)}>Anterior</button>
-                <span className="px-3 text-base font-medium">Página {currentPage} de {Math.max(1, Math.ceil(usuarios.length/rowsPerPage))}</span>
-                <button className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 transition" disabled={currentPage===Math.ceil(usuarios.length/rowsPerPage) || usuarios.length===0} onClick={()=>setCurrentPage(currentPage+1)}>Siguiente</button>
-              </div>
+            {/* Sin paginación, muestra todos los usuarios */}
           </div>
-        )}
         <UsuarioForm open={modalOpen} onClose={() => { setModalOpen(false); setEditUser(null); }} onSave={handleSave} usuario={editUser} />
       </div>
     </Layout>

@@ -1,21 +1,49 @@
 
-import React, { useState, Fragment } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import { Dialog, Transition, Listbox, ListboxButton, ListboxOptions, ListboxOption, Switch } from '@headlessui/react';
 import { FaCheck, FaTimes } from "react-icons/fa";
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
 const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
-  const agencias = ["Avianca", "Latam", "Wingo", "Ultra", "Otra"];
+  const agencias = ["Jetmar Viajes", "Guamatur", "Hiperviajes", "Freeway", "T&T", "Tienda Viajes", "TravelOz","Destinico"];
   const [email, setEmail] = useState(usuario?.email || "");
   const [nombre, setNombre] = useState(usuario?.nombre || "");
   const [agencia, setAgencia] = useState(usuario?.agencia || agencias[0]);
+  const [agenciaPersonalizada, setAgenciaPersonalizada] = useState("");
   const [admin, setAdmin] = useState(usuario?.admin || false);
   const [password, setPassword] = useState("");
   const isEdit = !!usuario;
 
+  // Sincronizar estados cuando cambia la prop usuario
+  useEffect(() => {
+    if (usuario) {
+      setEmail(usuario.email || "");
+      setNombre(usuario.nombre || "");
+      setAgencia(usuario.agencia || agencias[0]);
+      setAdmin(usuario.admin || false);
+      
+      // Si la agencia no está en la lista, establecer como "Otra"
+      if (usuario.agencia && !agencias.includes(usuario.agencia)) {
+        setAgencia("Otra");
+        setAgenciaPersonalizada(usuario.agencia);
+      } else {
+        setAgenciaPersonalizada("");
+      }
+    } else {
+      // Resetear formulario para crear nuevo usuario
+      setEmail("");
+      setNombre("");
+      setAgencia(agencias[0]);
+      setAgenciaPersonalizada("");
+      setAdmin(false);
+      setPassword("");
+    }
+  }, [usuario]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await onSave({ email, nombre, agencia, admin, password });
+  const agenciaFinal = agencia === "Otra" ? agenciaPersonalizada : agencia;
+  await onSave({ email, nombre, agencia: agenciaFinal, admin, password });
   };
 
   return (
@@ -33,11 +61,11 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Nombre</label>
-                <input type="text" className="w-full border px-3 py-2 rounded" value={nombre} onChange={e => setNombre(e.target.value)} required />
+                  <input type="text" className="w-full border px-3 py-2 rounded" value={nombre} onChange={e => setNombre(e.target.value)} required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Agencia</label>
-                  <div className="mx-auto" style={{ width: '415px' }}>
+                <div className="mx-auto" style={{ width: '415px' }}>
                   <Listbox value={agencia} onChange={setAgencia}>
                     <div className="relative mt-1">
                       <ListboxButton className="w-full border px-3 py-2 rounded bg-white text-left flex items-center justify-between">
@@ -50,20 +78,30 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
                             {ag}
                           </ListboxOption>
                         ))}
+                        <ListboxOption value="Otra" className="cursor-pointer select-none relative py-2 pl-4 pr-4 hover:bg-blue-100">
+                          Otra (escribir manualmente)
+                        </ListboxOption>
                       </ListboxOptions>
                     </div>
                   </Listbox>
+                  {agencia === "Otra" && (
+                    <input
+                      type="text"
+                      className="w-full border px-3 py-2 rounded mt-2"
+                      placeholder="Escribe el nombre de la agencia"
+                      value={agenciaPersonalizada}
+                      onChange={e => setAgenciaPersonalizada(e.target.value)}
+                      required
+                    />
+                  )}
                 </div>
+                </div>
+            {!isEdit && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Contraseña</label>
+                <input type="password" className="w-full border px-3 py-2 rounded" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
-            <button type="button" className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 bg-white rounded-full p-1 shadow flex items-center justify-center" onClick={onClose} aria-label="Cerrar">
-              <FaTimes className="w-6 h-6" />
-            </button>
-              {!isEdit && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contraseña</label>
-                  <input type="password" className="w-full border px-3 py-2 rounded" value={password} onChange={e => setPassword(e.target.value)} required />
-                </div>
-              )}
+            )}
               <div className="flex items-center gap-2">
                 <Switch
                   checked={admin}

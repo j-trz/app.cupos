@@ -1,15 +1,12 @@
-import ConfirmacionExitosa from "./pages/ConfirmacionExitosa";
-        <Route
-          path="/confirmacion-exitosa"
-          element={<ConfirmacionExitosa />}
-        />
 import React, { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import ConfirmacionExitosa from "./pages/ConfirmacionExitosa";
 
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import CrearUsuario from "./pages/CrearUsuario";
 import GestionUsuarios from "./pages/GestionUsuarios";
+import GestionConexiones from "./pages/GestionConexiones";
 import Disponibilidad from "./pages/Disponibilidad";
 import Solicitudes from "./pages/Solicitudes";
 import Confirmaciones from "./pages/Confirmaciones";
@@ -25,6 +22,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route
+          path="/"
+          element={<Navigate to={isAuth ? "/admin/disponibilidad" : "/login"} replace />}
+        />
         <Route
           path="/admin"
           element={
@@ -43,7 +44,11 @@ export default function App() {
         />
         <Route path="/login" element={<Login onLogin={() => setIsAuth(true)} />} />
         <Route
-          path="/disponibilidad"
+          path="/confirmacion-exitosa"
+          element={<ConfirmacionExitosa />}
+        />
+        <Route
+          path="/admin/disponibilidad"
           element={
             <PrivateRoute isAuth={isAuth}>
               <Disponibilidad />
@@ -51,7 +56,7 @@ export default function App() {
           }
         />
         <Route
-          path="/solicitudes"
+          path="/admin/solicitudes"
           element={
             <PrivateRoute isAuth={isAuth}>
               <Solicitudes />
@@ -59,7 +64,7 @@ export default function App() {
           }
         />
         <Route
-          path="/confirmaciones"
+          path="/admin/confirmaciones"
           element={
             <PrivateRoute isAuth={isAuth}>
               <Confirmaciones />
@@ -82,7 +87,19 @@ export default function App() {
             </AdminRoute>
           }
         />
-  <Route path="*" element={<Navigate to={isAuth ? "/disponibilidad" : "/login"} replace />} />
+        <Route
+          path="/admin/gestion-conexiones"
+          element={
+            <AdminRoute>
+              <GestionConexiones />
+            </AdminRoute>
+          }
+        />
+        {/* Rutas de compatibilidad para redireccionar rutas antiguas */}
+        <Route path="/disponibilidad" element={<Navigate to="/admin/disponibilidad" replace />} />
+        <Route path="/solicitudes" element={<Navigate to="/admin/solicitudes" replace />} />
+        <Route path="/confirmaciones" element={<Navigate to="/admin/confirmaciones" replace />} />
+        <Route path="*" element={<Navigate to={isAuth ? "/admin/disponibilidad" : "/login"} replace />} />
       </Routes>
     </BrowserRouter>
   );

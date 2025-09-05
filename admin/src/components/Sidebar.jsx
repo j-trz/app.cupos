@@ -1,6 +1,6 @@
 
 import React from "react";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";// eslint-disable-line no-unused-vars
 import clsx from "clsx";
 import { SECCIONES } from "./SidebarSections.jsx";
 import { supabase } from '../supabaseClient';
@@ -8,17 +8,31 @@ import { useNavigate } from "react-router-dom";
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSeccion }) {
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
   const navigate = useNavigate();
+  
   React.useEffect(() => {
     const getProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: perfil } = await supabase
-        .from('profiles')
-        .select('admin')
-        .eq('id', user.id)
-        .single();
-      setIsAdmin(perfil?.admin === true);
+      try {
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsAdmin(false);
+          setLoading(false);
+          return;
+        }
+        const { data: perfil } = await supabase
+          .from('profiles')
+          .select('admin')
+          .eq('id', user.id)
+          .single();
+        setIsAdmin(perfil?.admin === true);
+      } catch (error) {
+        console.error('Error obteniendo perfil:', error);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
     };
     getProfile();
   }, []);
@@ -31,7 +45,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
       )}
     >
       <div className="flex flex-col items-center mt-8 space-y-4">
-        {SECCIONES.filter(sec => !sec.soloAdmin || isAdmin).map((sec) => {
+        {SECCIONES.filter(sec => !sec.soloAdmin || (isAdmin && !loading)).map((sec) => {
           const Icon = sec.icono;
           return (
             <button
@@ -45,8 +59,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
                 navigate(sec.ruta);
               }}
             >
-              <span className="text-3xl"><Icon /></span>
-              <span className={clsx("ml-4 transition-all duration-200", sidebarOpen ? "opacity-100" : "opacity-0 w-0 hidden md:inline")}> 
+              <span className="text-3xl flex-shrink-0">{Icon && <Icon />}</span>
+              <span className={clsx(
+                "ml-4 transition-all duration-300 whitespace-nowrap",
+                sidebarOpen ? "opacity-100 max-w-full" : "opacity-0 max-w-0 overflow-hidden"
+              )}>
                 {sec.nombre}
               </span>
             </button>

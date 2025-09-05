@@ -34,58 +34,44 @@ export default function Login({ onLogin }) {
       await Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo obtener el usuario.' });
       return;
     }
-    // Buscar perfil
-        let { data: perfil, error: perfilError } = await supabase
-          .from('profiles')
-          .select('admin')
-          .eq('id', user.id)
-          .single();
-        if (perfilError || !perfil) {
-          // Si no existe, crear perfil básico (no admin)
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              email: user.email,
-              nombre: user.user_metadata?.nombre || '',
-              agencia: user.user_metadata?.agencia || '',
-              admin: false
-            });
-          if (insertError) {
-            setLoading(false);
-            await Swal.fire({ icon: 'error', title: 'Sin acceso', html: `<pre>${JSON.stringify(insertError, null, 2)}</pre>` });
-            return;
-          }
-          // Buscar el perfil recién creado
-          const { data: nuevoPerfil } = await supabase
-            .from('profiles')
-            .select('admin')
-            .eq('id', user.id)
-            .single();
-          perfil = nuevoPerfil;
-        }
-        setLoading(false);
-        // Si todo ok, navega
-        if (typeof onLogin === 'function') onLogin();
-        if (perfil.admin) {
-          navigate("/dashboard"); // Panel admin
-        } else {
-          navigate("/disponibilidad"); // Panel usuario
-        }
+
+    // Obtener perfil del usuario desde la base de datos
+    const { data: perfilData, error: perfilError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (perfilError || !perfilData) {
+      setLoading(false);
+      await Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo obtener el perfil del usuario.' });
+      return;
+    }
+
+    const perfil = perfilData;
+
+    // Si todo ok, navega
+    if (typeof onLogin === 'function') onLogin();
+    if (perfil.admin) {
+      navigate("/dashboard"); // Panel admin
+    } else {
+      navigate("/disponibilidad"); // Panel usuario
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2c4b8b] to-[#cc6200] font-montserrat">
-      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-center text-[#2c4b8b] mb-6">Iniciar sesión</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2c4b8b] to-[#93d5e8] font-montserrat">
+      <div className="bg-white/80 rounded-xl shadow-lg p-8 w-full max-w-md">
+        <div className="flex justify-center mb-6"><img className="h-[100px] w-[100px]" src="https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/media/Je_logo-01.png" alt="Logo" /></div>
+        <h2 className="text-xl font-bold text-center text-[#2c4b8b] mb-6">Iniciar sesión</h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-bold text-[#2c4b8b] mb-1">Email</label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-gray-400"><FaUser /></span>
+              <span className="absolute left-3 top-2.5 text-[#2c4b8b]"><FaUser /></span>
               <input
                 type="email"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2c4b8b]"
+                className="w-full pl-10 pr-3 py-2 border text-[#2c4b8b] rounded-md focus:outline-none focus:ring-2 focus:ring-[#2c4b8b]"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -95,12 +81,12 @@ export default function Login({ onLogin }) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+            <label className="block text-sm font-bold text-[#2c4b8b] mb-1">Contraseña</label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-gray-400"><FaLock /></span>
+              <span className="absolute left-3 top-2.5 text-[#2c4b8b]"><FaLock /></span>
               <input
                 type="password"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2c4b8b]"
+                className="w-full pl-10 pr-3 py-2 border text-[#2c4b8b] rounded-md focus:outline-none focus:ring-2 focus:ring-[#2c4b8b]"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required

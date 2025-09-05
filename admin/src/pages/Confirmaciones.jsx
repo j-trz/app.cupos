@@ -1,13 +1,18 @@
-import React, { useEffect, useState } from "react";
-import Layout from "../components/Layout";
+import { useEffect, useState } from "react";
+import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
+import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import { supabase } from '../supabaseClient';
+import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import Swal from 'sweetalert2';
   
 
 export default function Confirmaciones() {
   const [seccion, setSeccion] = useState("confirmaciones");
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(true);
-  // const [perfil, setPerfil] = useState(null);
+  const [refrescando, setRefrescando] = useState(false);
+  const [popupItinerarioOpen, setPopupItinerarioOpen] = useState(false);
+  const [itinerarioSeleccionado, setItinerarioSeleccionado] = useState(null);
 
   // Filtros
   const [filtroAgencia, setFiltroAgencia] = useState("");
@@ -37,9 +42,15 @@ export default function Confirmaciones() {
   });
 
   useEffect(() => {
-    let intervalId;
-    async function fetchPerfilYDatos() {
-      setLoading(true);
+    fetchConfirmaciones();
+    // Actualizar cada 30 segundos
+    const intervalId = setInterval(() => fetchConfirmaciones(), 30000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  async function fetchConfirmaciones(_forceRefresh = false) {
+    setLoading(true);
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setDatos([]);
@@ -51,31 +62,75 @@ export default function Confirmaciones() {
         .select('admin, agencia')
         .eq('id', user.id)
         .single();
-      try {
-        const response = await fetch(import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" }
-        });
-        let all = response.ok ? await response.json() : [];
+
+      const response = await fetch(import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      if (response.ok) {
+        let all = await response.json();
         all = all.filter(item => item.Estado === "Confirmado");
         if (!perfilData?.admin && perfilData?.agencia) {
           all = all.filter(item => item.Agencia === perfilData.agencia);
         }
         setDatos(all);
-      } catch {
+      } else {
         setDatos([]);
       }
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching confirmations:', error);
+      setDatos([]);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de conexión',
+        text: 'No se pudieron cargar las confirmaciones. Verifica tu conexión e intenta nuevamente.',
+        confirmButtonText: 'Entendido'
+      });
     }
-    fetchPerfilYDatos();
-    intervalId = setInterval(fetchPerfilYDatos, 5000);
-    return () => clearInterval(intervalId);
-  }, []);
+    setLoading(false);
+  }
+
+  async function refrescarDatos() {
+    setRefrescando(true);
+    try {
+      await fetchConfirmaciones(true);
+      Swal.fire({
+        icon: 'success',
+        title: 'Datos actualizados',
+        text: 'Las confirmaciones se han actualizado correctamente.',
+        timer: 2000,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+    setRefrescando(false);
+  }
+
+  function mostrarItinerario(itinerario) {
+    setItinerarioSeleccionado(itinerario);
+    setPopupItinerarioOpen(true);
+  }
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
       <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-[#2c4b8b] mb-4">Confirmaciones</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-[#2c4b8b]">Confirmaciones</h1>
+          <button
+            onClick={refrescarDatos}
+            disabled={loading || refrescando}
+            className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] disabled:opacity-50 transition-colors"
+          >
+            <FaSync className={`${refrescando ? 'animate-spin' : ''}`} />
+            {refrescando ? 'Actualizando...' : 'Refrescar'}
+          </button>
+        </div>
+        
+        {/* Información de fuente de datos - Solo para admins */}
+        <DataSourceInfo />
+        
         {/* Filtros avanzados */}
         <div className="mb-6 flex flex-wrap gap-4 items-end">
           <div>
@@ -110,39 +165,128 @@ export default function Confirmaciones() {
           </div>
         </div>
         {loading ? (
-          <div className="text-center py-8">Cargando confirmaciones...</div>
+          <div className="text-center py-8">
+            <div className="flex items-center justify-center gap-2 text-gray-500">
+              <FaSync className="animate-spin" />
+              <span>Cargando confirmaciones...</span>
+            </div>
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Pedido ID</th>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Agencia</th>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Contacto</th>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Vuelo Destino</th>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Nombre Pasajero</th>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Estado</th>
-                  <th className="px-4 py-2 text-center text-[#2c4b8b]">Fecha Registro</th>
+            <table className="w-full min-w-[1200px] bg-white border-0 rounded-2xl shadow-xl">
+              <thead>
+                <tr className="bg-[#2c4b8b] text-white">
+                  <th className="px-6 py-4 text-lg font-semibold rounded-tl-2xl">Pedido ID</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Agencia</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Contacto</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Vuelo Destino</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Nombre Pasajero</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Temporada</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Fecha Salida</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Estado</th>
+                  <th className="px-6 py-4 text-lg font-semibold">Itinerario</th>
+                  <th className="px-6 py-4 text-lg font-semibold rounded-tr-2xl">Fecha Registro</th>
                 </tr>
               </thead>
               <tbody>
                 {datosFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-4 text-gray-500">No hay confirmaciones registradas</td>
+                    <td colSpan={10} className="text-center py-8 text-gray-500">No hay confirmaciones registradas</td>
                   </tr>
                 ) : datosFiltrados.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-center">{item.Pedido_ID}</td>
-                    <td className="px-4 py-2 text-center">{item.Agencia}</td>
-                    <td className="px-4 py-2 text-center">{item.Contacto_Nombre}</td>
-                    <td className="px-4 py-2 text-center">{item.Vuelo_Destino}</td>
-                    <td className="px-4 py-2 text-center">{item.Nombre_Pasajero} {item.Apellido_Pasajero}</td>
-                    <td className="px-4 py-2 text-center">{item.Estado}</td>
-                    <td className="px-4 py-2 text-center">{item.Fecha_Registro ? new Date(item.Fecha_Registro).toLocaleDateString("es-ES") : ""}</td>
+                  <tr key={idx} className="last:border-b-0 cursor-pointer transition-all duration-150 hover:bg-[#e6f0fa] group" style={{ height: '64px' }}>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Pedido_ID}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Agencia}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Contacto_Nombre}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Vuelo_Destino}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Nombre_Pasajero} {item.Apellido_Pasajero}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Temporada || "-"}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Vuelo_Salida ? new Date(item.Vuelo_Salida).toLocaleDateString("es-ES") : "-"}</td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Estado}</td>
+                    <td className="px-6 py-4 text-center">
+                      {item.Ruta ? (
+                        <button
+                          className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
+                          onClick={() => mostrarItinerario(item.Ruta)}
+                        >
+                          Ver Itinerario
+                        </button>
+                      ) : "-"}
+                    </td>
+                    <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Fecha_Registro ? new Date(item.Fecha_Registro).toLocaleDateString("es-ES") : ""}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Popup Itinerario */}
+        {popupItinerarioOpen && (
+          <div className="fixed inset-0 bg-black/60 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-[800px] h-auto overflow-y-auto p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-[#2c4b8b]">Itinerario Aéreo</h2>
+                <button onClick={() => setPopupItinerarioOpen(false)} className="text-[#2c4b8b] hover:text-gray-600 text-2xl">&times;</button>
+              </div>
+              {itinerarioSeleccionado ? (
+                (() => {
+                  // Parsear itinerario similar a como se hace en Disponibilidad
+                  const tokens = String(itinerarioSeleccionado)
+                    .replace(/\n/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .split(' ');
+                  const vuelos = [];
+                  for (let i = 0; i < tokens.length; i += 7) {
+                    if (tokens.length - i >= 7) {
+                      vuelos.push({
+                        compania: tokens[i],
+                        vuelo: tokens[i+1],
+                        fecha: tokens[i+2],
+                        origen: tokens[i+3],
+                        destino: tokens[i+4],
+                        salida: tokens[i+5],
+                        llegada: tokens[i+6]
+                      });
+                    }
+                  }
+                  if (vuelos.length === 0) {
+                    return <div className="text-gray-500">No hay datos de itinerario disponibles.</div>;
+                  }
+                  return (
+                    <table className="w-full bg-white border-0 rounded-2xl shadow-xl">
+                      <thead>
+                        <tr className="bg-[#2c4b8b] text-white">
+                          <th className="px-4 py-3 text-sm font-semibold rounded-tl-2xl">Compañía</th>
+                          <th className="px-4 py-3 text-sm font-semibold">Nro Vuelo</th>
+                          <th className="px-4 py-3 text-sm font-semibold">Fecha</th>
+                          <th className="px-4 py-3 text-sm font-semibold">Origen</th>
+                          <th className="px-4 py-3 text-sm font-semibold">Destino</th>
+                          <th className="px-4 py-3 text-sm font-semibold">Salida</th>
+                          <th className="px-4 py-3 text-sm font-semibold rounded-tr-2xl">Llegada</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vuelos.map((v, i) => (
+                          <tr key={i} className="last:border-b-0 transition-all duration-150 hover:bg-[#e6f0fa]" style={{ height: '48px' }}>
+                            <td className="px-4 py-2 text-sm text-center">{v.compania}</td>
+                            <td className="px-4 py-2 text-sm text-center">{v.vuelo}</td>
+                            <td className="px-4 py-2 text-sm text-center">{v.fecha}</td>
+                            <td className="px-4 py-2 text-sm text-center">{v.origen}</td>
+                            <td className="px-4 py-2 text-sm text-center">{v.destino}</td>
+                            <td className="px-4 py-2 text-sm text-center">{v.salida}</td>
+                            <td className="px-4 py-2 text-sm text-center">{v.llegada}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()
+              ) : (
+                <div className="text-gray-500">No hay datos de itinerario disponibles.</div>
+              )}
+            </div>
           </div>
         )}
       </div>

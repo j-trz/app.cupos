@@ -1,9 +1,21 @@
-import React, { useState } from "react";
-import Topbar from "./Topbar";
-import Sidebar from "./Sidebar";
+import React, { useState, useEffect } from "react";// eslint-disable-line no-unused-vars
+import Topbar from "./Topbar";// eslint-disable-line no-unused-vars
+import Sidebar from "./Sidebar";// eslint-disable-line no-unused-vars
 
 export default function Layout({ children, seccion, setSeccion }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Persistir estado del sidebar en localStorage
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarOpen');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
+
+  // Guardar estado en localStorage cuando cambie
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', JSON.stringify(sidebarOpen));
+  }, [sidebarOpen]);
 
   return (
     <div className="min-h-screen bg-gray-100 font-['Montserrat'] flex flex-col">
