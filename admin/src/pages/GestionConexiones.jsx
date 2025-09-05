@@ -31,7 +31,26 @@ export default function GestionConexiones() {
   useEffect(() => {
     fetchConexiones();
     checkUserRole();
+    
+    // Listener para refrescar cuando se crea la conexión Power Automate automáticamente
+    const handlePowerAutomateCreated = () => {
+      console.log("Evento recibido: Power Automate connection created, refrescando lista...");
+      fetchConexiones();
+    };
+    
+    window.addEventListener('powerAutomateConnectionCreated', handlePowerAutomateCreated);
+    
+    return () => {
+      window.removeEventListener('powerAutomateConnectionCreated', handlePowerAutomateCreated);
+    };
   }, []);
+
+  // Refrescar datos cuando cambia la sección (se navega a la página)
+  useEffect(() => {
+    if (seccion === "gestion-conexiones") {
+      fetchConexiones();
+    }
+  }, [seccion]);
 
   // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
@@ -450,8 +469,8 @@ export default function GestionConexiones() {
                     <td className="px-6 py-4 text-center">
                       {getTypeIcon(connection.type)}
                     </td>
-                    <td className="px-6 py-4 text-base font-medium">{connection.name}</td>
-                    <td className="px-6 py-4 text-base text-gray-600">{connection.description}</td>
+                    <td className="px-6 py-4 text-base font-medium text-center">{connection.name}</td>
+                    <td className="px-6 py-4 text-base text-gray-600 text-center">{connection.description}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(connection.connection_status)}`}>
                         {connection.connection_status || 'unknown'}
@@ -472,7 +491,7 @@ export default function GestionConexiones() {
                         </button>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-base text-gray-600">
+                    <td className="px-6 py-4 text-base text-gray-600 text-center">
                       {connection.last_tested_at
                         ? new Date(connection.last_tested_at).toLocaleDateString('es-ES')
                         : 'Nunca'

@@ -72,6 +72,13 @@ export async function ensurePowerAutomateConnection() {
       // Activar la conexión automáticamente
       await ConnectionService.setActiveConnection(createResult.connection.id);
       console.log("✅ Conexión Power Automate activada automáticamente");
+
+      // Disparar evento personalizado para que la página se actualice
+      window.dispatchEvent(
+        new CustomEvent("powerAutomateConnectionCreated", {
+          detail: { connection: createResult.connection },
+        })
+      );
     } else {
       console.error(
         "❌ Error creando conexión Power Automate:",
