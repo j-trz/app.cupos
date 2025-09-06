@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
-import { supabase } from '../supabaseClient';
+import ReservationService from '../services/reservationService';
 import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
   
@@ -48,33 +48,12 @@ export default function Confirmaciones() {
     return () => clearInterval(intervalId);
   }, []);
 
-  async function fetchConfirmaciones(_forceRefresh = false) {
+  async function fetchConfirmaciones(forceRefresh = false) {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setDatos([]);
-        setLoading(false);
-        return;
-      }
-      const { data: perfilData } = await supabase
-        .from('profiles')
-        .select('admin, agencia')
-        .eq('id', user.id)
-        .single();
-
-      const response = await fetch(import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-      });
-      
-      if (response.ok) {
-        let all = await response.json();
-        all = all.filter(item => item.Estado === "Confirmado");
-        if (!perfilData?.admin && perfilData?.agencia) {
-          all = all.filter(item => item.Agencia === perfilData.agencia);
-        }
-        setDatos(all);
+      const result = await ReservationService.getConfirmations(!forceRefresh);
+      if (result.success) {
+        setDatos(result.data);
       } else {
         setDatos([]);
       }
@@ -94,6 +73,7 @@ export default function Confirmaciones() {
   async function refrescarDatos() {
     setRefrescando(true);
     try {
+      ReservationService.refreshCache();
       await fetchConfirmaciones(true);
       Swal.fire({
         icon: 'success',
@@ -185,7 +165,7 @@ export default function Confirmaciones() {
                   <th className="px-6 py-4 text-lg font-semibold">Fecha Salida</th>
                   <th className="px-6 py-4 text-lg font-semibold">Estado</th>
                   <th className="px-6 py-4 text-lg font-semibold">Itinerario</th>
-                  <th className="px-6 py-4 text-lg font-semibold rounded-tr-2xl">Fecha Registro</th>
+                  <th className="px-6 py-4 text-lg font-semibold rounded-tr-2xl">Fecha de solicitud</th>
                 </tr>
               </thead>
               <tbody>

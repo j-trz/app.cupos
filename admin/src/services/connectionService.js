@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import EncryptionService from "./encryptionService";
 import DataValidator from "./dataValidator";
+import AuthorizationService from "./authorizationService";
 
 /**
  * Servicio para gestionar conexiones a APIs externas de forma segura
@@ -383,28 +384,29 @@ class ConnectionService {
 
   /**
    * Obtener datos de la conexión activa con mapeo de campos
+   * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos mapeados al formato estándar
    */
-  static async getDataFromActiveConnection() {
+  static async getDataFromActiveConnection(dataType = "pedidos") {
     try {
       const activeConnection = await this.getActiveConnection();
       if (!activeConnection) {
         // Si no hay conexión activa, usar Power Automate como fallback
-        return await this.getDataFromPowerAutomate();
+        return await this.getDataFromPowerAutomate(dataType);
       }
 
       let rawData;
 
       switch (activeConnection.type) {
         case "powerautomate":
-          rawData = await this.getDataFromPowerAutomate();
+          rawData = await this.getDataFromPowerAutomate(dataType);
           break;
         default:
           // Por ahora, otras fuentes usan fallback
           console.log(
             `Tipo ${activeConnection.type} no implementado aún, usando Power Automate`
           );
-          rawData = await this.getDataFromPowerAutomate();
+          rawData = await this.getDataFromPowerAutomate(dataType);
           break;
       }
 
@@ -418,16 +420,52 @@ class ConnectionService {
             validation.errors
           );
 
-          // Si hay errores pero algunos registros son válidos, usar solo los válidos
+          // Si hay errores pero algunos registros son válidos, verificar rol del usuario
           if (validation.validRecords > 0) {
-            const validData = rawData.data.filter(
-              (record) => DataValidator.validateSingleRecord(record).valid
-            );
-            return {
-              ...rawData,
-              data: validData,
-              validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
-            };
+            // Obtener rol del usuario para determinar si mostrar todos los datos o solo los válidos
+            try {
+              const userRole = await AuthorizationService.getCurrentUserRole();
+              const isAdmin = userRole === AuthorizationService.ROLES.ADMIN;
+
+              if (isAdmin) {
+                // Los administradores ven todos los registros, incluso los inválidos
+                console.log(
+                  `[ConnectionService] Admin detectado - mostrando todos los ${rawData.data.length} registros (incluyendo inválidos)`
+                );
+                return {
+                  ...rawData,
+                  data: rawData.data,
+                  validationWarning: `Admin view: ${validation.validRecords}/${validation.totalRecords} registros válidos`,
+                };
+              } else {
+                // Usuarios no-admin solo ven registros válidos
+                const validData = rawData.data.filter(
+                  (record) => DataValidator.validateSingleRecord(record).valid
+                );
+                console.log(
+                  `[ConnectionService] Usuario no-admin - mostrando solo ${validData.length} registros válidos`
+                );
+                return {
+                  ...rawData,
+                  data: validData,
+                  validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
+                };
+              }
+            } catch (roleError) {
+              console.error(
+                "[ConnectionService] Error obteniendo rol del usuario:",
+                roleError
+              );
+              // En caso de error, usar comportamiento por defecto (solo registros válidos)
+              const validData = rawData.data.filter(
+                (record) => DataValidator.validateSingleRecord(record).valid
+              );
+              return {
+                ...rawData,
+                data: validData,
+                validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
+              };
+            }
           }
         }
       }
@@ -436,7 +474,7 @@ class ConnectionService {
     } catch (error) {
       console.error("Error getting data from active connection:", error);
       // Fallback a Power Automate en caso de error
-      return await this.getDataFromPowerAutomate();
+      return await this.getDataFromPowerAutomate(dataType);
     }
   }
 
@@ -453,17 +491,12 @@ class ConnectionService {
 
       if (activeConnection && activeConnection.type === "powerautomate") {
         try {
-          // Intentar usar credenciales de la conexión activa
-          // Por ahora usar fallback si no se puede desencriptar
-          const credentials = JSON.parse(
-            activeConnection.encrypted_credentials || "{}"
+          // Las credenciales están encriptadas y necesitan ser desencriptadas
+          // Por ahora usar directamente las variables de entorno como fallback más confiable
+          console.log(
+            "Conexión Power Automate encontrada, usando variables de entorno para estabilidad"
           );
-
-          if (dataType === "productos") {
-            targetUrl = credentials.productosUrl || credentials.flowUrl;
-          } else {
-            targetUrl = credentials.pedidosUrl || credentials.flowUrl;
-          }
+          // Saltar directamente al fallback para evitar errores de desencriptación
         } catch (error) {
           console.warn(
             "No se pudieron obtener credenciales de conexión activa:",

@@ -169,7 +169,7 @@ export default function Solicitudes() {
                 <th className="px-6 py-4 text-lg font-semibold">Fecha Salida</th>
                 <th className="px-6 py-4 text-lg font-semibold">Estado</th>
                 <th className="px-6 py-4 text-lg font-semibold">Itinerario</th>
-                <th className="px-6 py-4 text-lg font-semibold rounded-tr-2xl">Fecha Registro</th>
+                <th className="px-6 py-4 text-lg font-semibold rounded-tr-2xl">Fecha de solicitud</th>
               </tr>
             </thead>
             <tbody>

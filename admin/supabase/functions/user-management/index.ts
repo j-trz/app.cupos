@@ -84,7 +84,7 @@ serve(async (req) => {
       case "delete":
         return await deleteUser(supabaseAdmin, userData.id);
       case "list":
-        return await listUsers(supabaseAdmin);
+        return await listUsers(supabaseAdmin, userData);
       default:
         return new Response(JSON.stringify({ error: "Invalid action" }), {
           status: 400,
@@ -297,12 +297,38 @@ async function deleteUser(supabaseAdmin: any, userId: string) {
   }
 }
 
-async function listUsers(supabaseAdmin: any) {
+async function listUsers(supabaseAdmin: any, options: any = {}) {
   try {
-    const { data: users, error } = await supabaseAdmin
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const search = options.search || "";
+    const sortBy = options.sortBy || "created_at";
+    const sortOrder = options.sortOrder || "desc";
+
+    // Calcular offset para paginación
+    const offset = (page - 1) * limit;
+
+    // Construir query base
+    let query = supabaseAdmin
       .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("id, email, nombre, agencia, admin, role, created_at", {
+        count: "exact",
+      });
+
+    // Agregar filtro de búsqueda si existe
+    if (search) {
+      query = query.or(
+        `email.ilike.%${search}%,nombre.ilike.%${search}%,agencia.ilike.%${search}%`
+      );
+    }
+
+    // Agregar ordenamiento
+    query = query.order(sortBy, { ascending: sortOrder === "asc" });
+
+    // Agregar paginación
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: users, error, count } = await query;
 
     if (error) {
       return new Response(
@@ -314,10 +340,23 @@ async function listUsers(supabaseAdmin: any) {
       );
     }
 
+    // Calcular metadatos de paginación
+    const totalPages = Math.ceil((count || 0) / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
     return new Response(
       JSON.stringify({
         success: true,
         users: users || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages,
+          hasNextPage,
+          hasPrevPage,
+        },
       }),
       {
         status: 200,

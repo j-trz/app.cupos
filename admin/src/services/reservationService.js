@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { cacheService } from "./cacheService";
 import ConnectionService from "./connectionService";
 import AuthorizationService from "./authorizationService";
+import NotificationService from "./notificationService";
 
 class ReservationService {
   /**
@@ -54,13 +55,14 @@ class ReservationService {
           const key = `${pedido.Vuelo_Codigo}-${pedido.Vuelo_Destino}-${pedido.Vuelo_Compania}-${pedido.Vuelo_Salida}`;
 
           if (!vuelosUnicos.has(key)) {
-            vuelosUnicos.set(key, {
+            const disponibilidad = Math.floor(Math.random() * 15) + 1; // Disponibilidad aleatoria entre 1-15
+            const productData = {
               "@odata.etag": pedido["@odata.etag"] || "",
               ItemInternalId: pedido.ItemInternalId || "",
               codigo_cupo: pedido.Vuelo_Codigo,
               destino: pedido.Vuelo_Destino,
               compania: pedido.Vuelo_Compania,
-              disponibilidad: "10", // Disponibilidad ficticia
+              disponibilidad: disponibilidad.toString(),
               salida: pedido.Vuelo_Salida || "",
               regreso: "", // No disponible en estructura de pedidos
               precio: pedido.Vuelo_Precio || "0",
@@ -68,12 +70,20 @@ class ReservationService {
               pnr: pedido.Pnr || "",
               ficha: pedido.Ficha || "",
               temporada: pedido.Temporada || "",
-            });
+            };
+
+            vuelosUnicos.set(key, productData);
+
+            // Notificar si hay pocos lugares disponibles
+            if (disponibilidad <= 5) {
+              NotificationService.notifyLowAvailability(productData, 5);
+            }
 
             console.log("✅ Vuelo único creado:", {
               codigo: pedido.Vuelo_Codigo,
               destino: pedido.Vuelo_Destino,
               compania: pedido.Vuelo_Compania,
+              disponibilidad,
             });
           }
         }
@@ -136,12 +146,64 @@ class ReservationService {
       console.log("Datos para solicitudes:", result.data.slice(0, 3));
       console.log("Filtros aplicados:", filters);
 
-      // Filtrar solo solicitudes (Estado === "Solicitado")
-      let requestsData = result.data.filter((item) => {
-        return item.Estado === "Solicitado";
+      // DEBUG: Mostrar campos disponibles y valores de Estado
+      console.log("🔍 DEBUG - Campos disponibles en los datos:");
+      if (result.data.length > 0) {
+        console.log("Primer registro completo:", result.data[0]);
+        console.log("Valores únicos de Estado:", [
+          ...new Set(result.data.map((item) => item.Estado)),
+        ]);
+      }
+
+      // Filtrar solo solicitudes (Estado !== "Confirmado")
+      const filteredByStatus = result.data.filter((item) => {
+        const estado = item.Estado || item.estado || "";
+        return estado !== "Confirmado";
       });
 
-      // Aplicar filtros según el rol
+      console.log(
+        `🔍 Filtrados ${filteredByStatus.length} registros con estado Solicitado de ${result.data.length} totales`
+      );
+
+      // Transformar datos de pedidos a estructura de solicitudes
+      let requestsData = filteredByStatus.map((item) => {
+        const estado = item.Estado || item.estado || "";
+        console.log(
+          `Procesando solicitud ${item.ItemInternalId}: Estado="${estado}"`
+        );
+
+        // Mapear campos de pedidos a estructura esperada por Solicitudes.jsx
+        return {
+          "@odata.etag": item["@odata.etag"] || "",
+          ItemInternalId: item.ItemInternalId || "",
+          Pedido_ID:
+            item.Pedido_ID || item.Numero_Pedido || item.ItemInternalId || "",
+          Agencia: item.Agencia || "",
+          Contacto_Nombre: item.Contacto_Nombre || item.Usuario_Nombre || "",
+          Vuelo_Destino: item.Vuelo_Destino || item.Destino || "",
+          Nombre_Pasajero: item.Nombre_Pasajero || item.Pasajero_Nombre || "",
+          Apellido_Pasajero:
+            item.Apellido_Pasajero || item.Pasajero_Apellido || "",
+          Temporada: item.Temporada || "",
+          Vuelo_Salida: item.Vuelo_Salida || item.Fecha_Salida || "",
+          Estado: "Solicitado", // Forzar estado para solicitudes
+          Ruta: item.Ruta || "",
+          Fecha_Registro: item.Fecha_Registro || item.Created || "",
+          // Campos adicionales de contexto
+          Vuelo_Codigo: item.Vuelo_Codigo || "",
+          Vuelo_Compania: item.Vuelo_Compania || "",
+          Vuelo_Precio: item.Vuelo_Precio || "",
+          Usuario_Email: item.Usuario_Email || "",
+          Pnr: item.Pnr || "",
+          Ficha: item.Ficha || "",
+        };
+      });
+
+      console.log(
+        `✅ Transformados ${requestsData.length} pedidos con estado Solicitado a estructura de solicitudes`
+      );
+
+      // SEGUNDO: Aplicar filtros según el rol
       switch (filters.filterType) {
         case "all":
           // Admin: ve todas las solicitudes
@@ -254,7 +316,7 @@ class ReservationService {
           );
           break;
 
-        case "user":
+        case "user": {
           // Agency User: no debería llegar aquí (sin permisos), pero por seguridad filtrar solo sus datos
           const profile = await AuthorizationService.getCurrentUserProfile();
           if (profile?.email) {
@@ -267,6 +329,7 @@ class ReservationService {
             confirmationsData = [];
           }
           break;
+        }
 
         default:
           confirmationsData = [];
@@ -347,6 +410,22 @@ class ReservationService {
       // Invalidar cache después de enviar reserva
       cacheService.invalidatePattern("availability");
       cacheService.invalidatePattern("requests");
+
+      // Notificar nueva solicitud a los administradores
+      try {
+        await NotificationService.notifyNewRequest({
+          ItemInternalId: result.referenceId || reservationData.pedidoId,
+          Contacto_Nombre: reservationData.contacto?.nombre || "Usuario",
+          Vuelo_Destino: reservationData.vuelo?.destino || "Destino",
+          Agencia: reservationData.contacto?.agencia || "Agencia",
+        });
+      } catch (notificationError) {
+        console.warn(
+          "Error enviando notificación de nueva solicitud:",
+          notificationError
+        );
+        // No fallar la reserva por error de notificación
+      }
 
       return result;
     } catch (error) {
@@ -543,6 +622,153 @@ class ReservationService {
       "México",
       "Otra",
     ];
+  }
+
+  /**
+   * Confirmar un pedido (cambiar estado de "Solicitud" a "Confirmado")
+   * @param {string} pedidoId - ID del pedido a confirmar
+   * @param {Object} adminUser - Usuario que confirma (para notificación)
+   * @returns {Promise<Object>} Resultado de la confirmación
+   */
+  static async confirmRequest(pedidoId, adminUser = {}) {
+    try {
+      // En un sistema real, aquí actualizaríamos el estado en la fuente de datos
+      // Por ahora, simulamos la confirmación y enviamos la notificación
+
+      // Obtener datos del pedido para la notificación
+      const requestsData = await this.getRequests();
+      const pedido = requestsData.find(
+        (item) =>
+          item.ItemInternalId === pedidoId || item.Pedido_ID === pedidoId
+      );
+
+      if (!pedido) {
+        throw new Error("Pedido no encontrado");
+      }
+
+      // Notificar confirmación del pedido
+      try {
+        await NotificationService.notifyRequestConfirmed({
+          ItemInternalId: pedido.ItemInternalId || pedido.Pedido_ID,
+          Contacto_Nombre: pedido.Contacto_Nombre || "Usuario",
+          Vuelo_Destino: pedido.Vuelo_Destino || "Destino",
+          Agencia: pedido.Agencia || "Agencia",
+          adminName: adminUser.name || "Administrador",
+        });
+      } catch (notificationError) {
+        console.warn(
+          "Error enviando notificación de confirmación:",
+          notificationError
+        );
+        // No fallar la confirmación por error de notificación
+      }
+
+      // Invalidar cache
+      cacheService.invalidatePattern("requests");
+      cacheService.invalidatePattern("confirmations");
+
+      return {
+        success: true,
+        message: "Pedido confirmado exitosamente",
+        pedidoId: pedidoId,
+      };
+    } catch (error) {
+      console.error("Error confirmando pedido:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detectar y notificar nuevos productos disponibles
+   * Esta función compara los datos actuales con los anteriores para detectar nuevos vuelos
+   * @returns {Promise<void>}
+   */
+  static async checkForNewProducts() {
+    try {
+      // Obtener datos actuales de disponibilidad
+      const currentData = await this.getAvailability(false); // Sin cache para datos frescos
+
+      if (!currentData.success || !currentData.data) {
+        return;
+      }
+
+      // Obtener datos anteriores del cache si existen
+      const cacheKey = "previous-availability-check";
+      const previousData = cacheService.get(cacheKey) || [];
+
+      // Si es la primera vez, solo guardar los datos actuales
+      if (previousData.length === 0) {
+        cacheService.set(cacheKey, currentData.data, 3600000); // 1 hora
+        return;
+      }
+
+      // Comparar para detectar nuevos productos
+      const previousCodes = new Set(
+        previousData.map(
+          (item) => `${item.codigo_cupo}-${item.destino}-${item.compania}`
+        )
+      );
+
+      // Encontrar nuevos productos
+      const newProducts = currentData.data.filter((item) => {
+        const key = `${item.codigo_cupo}-${item.destino}-${item.compania}`;
+        return !previousCodes.has(key);
+      });
+
+      // Notificar cada nuevo producto
+      for (const product of newProducts) {
+        try {
+          await NotificationService.notifyNewProduct({
+            codigo_cupo: product.codigo_cupo,
+            destino: product.destino,
+            compania: product.compania,
+            disponibilidad: product.disponibilidad,
+            precio: product.precio,
+            salida: product.salida,
+            temporada: product.temporada,
+          });
+
+          console.log(
+            `✅ Notificación enviada para nuevo producto: ${product.codigo_cupo} - ${product.destino}`
+          );
+        } catch (notificationError) {
+          console.warn(
+            "Error enviando notificación de nuevo producto:",
+            notificationError
+          );
+        }
+      }
+
+      // Actualizar cache con datos actuales
+      cacheService.set(cacheKey, currentData.data, 3600000); // 1 hora
+
+      if (newProducts.length > 0) {
+        console.log(
+          `🆕 Detectados ${newProducts.length} nuevos productos disponibles`
+        );
+      }
+    } catch (error) {
+      console.error("Error verificando nuevos productos:", error);
+      // No lanzar error para no afectar otras funcionalidades
+    }
+  }
+
+  /**
+   * Iniciar verificación periódica de nuevos productos
+   * @param {number} intervalMinutes - Intervalo en minutos para verificar
+   */
+  static startNewProductsMonitoring(intervalMinutes = 30) {
+    // Verificar inmediatamente
+    this.checkForNewProducts();
+
+    // Configurar verificación periódica
+    setInterval(() => {
+      this.checkForNewProducts();
+    }, intervalMinutes * 60 * 1000);
+
+    console.log(
+      `🔄 Monitoreo de nuevos productos iniciado (cada ${intervalMinutes} minutos)`
+    );
   }
 }
 

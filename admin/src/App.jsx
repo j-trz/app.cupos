@@ -12,6 +12,7 @@ import Solicitudes from "./pages/Solicitudes";
 import Confirmaciones from "./pages/Confirmaciones";
 import AdminRoute from "./components/AdminRoute";
 import { ensurePowerAutomateConnection } from "./utils/ensurePowerAutomateConnection";
+import ReservationService from "./services/reservationService";
 
 function PrivateRoute({ children, isAuth }) {
   return isAuth ? children : <Navigate to="/login" replace />;
@@ -25,10 +26,15 @@ export default function App() {
     // Pequeño delay para asegurar que Supabase esté inicializado
     const timer = setTimeout(() => {
       ensurePowerAutomateConnection();
+      
+      // Iniciar monitoreo de nuevos productos (cada 30 minutos)
+      if (isAuth) {
+        ReservationService.startNewProductsMonitoring(30);
+      }
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isAuth]);
 
   return (
     <BrowserRouter>

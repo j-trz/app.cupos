@@ -118,15 +118,22 @@ class UserService {
   }
 
   /**
-   * Listar todos los usuarios (solo para administradores)
+   * Listar usuarios con paginación y filtros (solo para administradores)
    */
-  static async listUsers() {
+  static async listUsers(options = {}) {
     try {
       const { data, error } = await supabase.functions.invoke(
         "user-management",
         {
           body: {
             action: "list",
+            userData: {
+              page: options.page || 1,
+              limit: options.limit || 10,
+              search: options.search || "",
+              sortBy: options.sortBy || "created_at",
+              sortOrder: options.sortOrder || "desc",
+            },
           },
         }
       );
@@ -142,6 +149,14 @@ class UserService {
       return {
         success: true,
         users: data.users || [],
+        pagination: data.pagination || {
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
       };
     } catch (error) {
       console.error("Error in listUsers:", error);
