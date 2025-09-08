@@ -213,14 +213,18 @@ class DataValidator {
         );
       }
 
-      // Validar nacionalidad si está presente
-      if (
-        record.Nacionalidad_Pasajero &&
-        !this.validNationalityCodes.includes(record.Nacionalidad_Pasajero)
-      ) {
-        errors.push(
-          `Código de nacionalidad no reconocido: ${record.Nacionalidad_Pasajero}`
-        );
+      // Validar nacionalidad si está presente (más flexible)
+      if (record.Nacionalidad_Pasajero) {
+        const nationality = record.Nacionalidad_Pasajero.trim();
+        // Aceptar códigos ISO y nombres de países comunes
+        const isValidNationality =
+          this.validNationalityCodes.includes(nationality) ||
+          this.isValidNationalityName(nationality);
+
+        if (!isValidNationality) {
+          // Solo advertir, no rechazar el registro
+          console.warn(`Nacionalidad no estándar encontrada: ${nationality}`);
+        }
       }
     }
 
@@ -415,6 +419,69 @@ class DataValidator {
       valid: errors.length === 0,
       errors,
     };
+  }
+
+  /**
+   * Validar nombres de nacionalidad comunes (más flexible)
+   * @param {string} nationality - Nombre de nacionalidad
+   * @returns {boolean} Si es una nacionalidad válida
+   */
+  static isValidNationalityName(nationality) {
+    const validNames = [
+      "Uruguayo",
+      "Uruguaya",
+      "Uruguay",
+      "Argentino",
+      "Argentina",
+      "Argentina",
+      "Brasileño",
+      "Brasileña",
+      "Brasil",
+      "Brazil",
+      "Chileno",
+      "Chilena",
+      "Chile",
+      "Paraguayo",
+      "Paraguaya",
+      "Paraguay",
+      "Boliviano",
+      "Boliviana",
+      "Bolivia",
+      "Peruano",
+      "Peruana",
+      "Perú",
+      "Peru",
+      "Colombiano",
+      "Colombiana",
+      "Colombia",
+      "Venezolano",
+      "Venezolana",
+      "Venezuela",
+      "Ecuatoriano",
+      "Ecuatoriana",
+      "Ecuador",
+      "Español",
+      "Española",
+      "España",
+      "Spain",
+      "Estadounidense",
+      "Americano",
+      "Americana",
+      "Estados Unidos",
+      "USA",
+      "US",
+      "Canadiense",
+      "Canadá",
+      "Canada",
+      "Mexicano",
+      "Mexicana",
+      "México",
+      "Mexico",
+    ];
+
+    return validNames.some(
+      (name) => name.toLowerCase() === nationality.toLowerCase()
+    );
   }
 }
 

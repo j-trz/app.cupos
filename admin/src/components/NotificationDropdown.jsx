@@ -29,26 +29,34 @@ export default function NotificationDropdown() {
     loadNotifications();
     
     // Suscribirse a notificaciones en tiempo real
-    const unsubscribe = NotificationService.subscribeToNotifications((newNotification) => {
-      // Agregar nueva notificación al inicio de la lista
-      setNotifications(prev => [
-        {
-          ...newNotification,
-          data: typeof newNotification.data === 'string'
-            ? (newNotification.data ? JSON.parse(newNotification.data) : {})
-            : (newNotification.data || {})
-        },
-        ...prev.slice(0, 49) // Mantener solo las últimas 50
-      ]);
-      
-      // Incrementar contador si no está leída
-      if (!newNotification.read) {
-        setUnreadCount(prev => prev + 1);
-      }
+    let unsubscribe = () => {};
+    
+    const setupSubscription = async () => {
+      try {
+        unsubscribe = await NotificationService.subscribeToNotifications((newNotification) => {
+          // Agregar nueva notificación al inicio de la lista
+          setNotifications(prev => [
+            {
+              ...newNotification,
+              data: NotificationService.safeParseJSON(newNotification.data)
+            },
+            ...prev.slice(0, 49) // Mantener solo las últimas 50
+          ]);
+          
+          // Incrementar contador si no está leída (usar is_read del nuevo sistema)
+          if (!newNotification.is_read) {
+            setUnreadCount(prev => prev + 1);
+          }
 
-      // Mostrar notificación visual (opcional)
-      showBrowserNotification(newNotification);
-    });
+          // Mostrar notificación visual (opcional)
+          showBrowserNotification(newNotification);
+        });
+      } catch (error) {
+        console.warn("Error setting up notification subscription:", error);
+      }
+    };
+    
+    setupSubscription();
 
     return () => unsubscribe();
   }, []);
@@ -81,11 +89,11 @@ export default function NotificationDropdown() {
    */
   const markAsRead = async (notificationId) => {
     try {
-      const result = await NotificationService.markAsRead(notificationId);
+      const result = await NotificationService.markAsRead(notificationId, true);
       if (result.success) {
         setNotifications(prev =>
           prev.map(n =>
-            n.id === notificationId ? { ...n, read: true, read_at: new Date().toISOString() } : n
+            n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
           )
         );
         setUnreadCount(prev => Math.max(0, prev - 1));
@@ -100,18 +108,26 @@ export default function NotificationDropdown() {
    */
   const toggleReadStatus = async (notificationId, currentReadStatus) => {
     try {
-      if (currentReadStatus) {
-        // Marcar como no leída (esto requeriría una función específica en el servicio)
-        // Por ahora, solo actualizar localmente
+      const newReadStatus = !currentReadStatus;
+      const result = await NotificationService.markAsRead(notificationId, newReadStatus);
+      
+      if (result.success) {
         setNotifications(prev =>
           prev.map(n =>
-            n.id === notificationId ? { ...n, read: false, read_at: null } : n
+            n.id === notificationId ? {
+              ...n,
+              is_read: newReadStatus,
+              read_at: newReadStatus ? new Date().toISOString() : null
+            } : n
           )
         );
-        setUnreadCount(prev => prev + 1);
-      } else {
-        // Marcar como leída
-        await markAsRead(notificationId);
+        
+        // Actualizar contador según el nuevo estado
+        if (newReadStatus) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        } else {
+          setUnreadCount(prev => prev + 1);
+        }
       }
     } catch (err) {
       console.error("Error toggling notification read status:", err);
@@ -126,7 +142,7 @@ export default function NotificationDropdown() {
       const result = await NotificationService.markAllAsRead();
       if (result.success) {
         setNotifications(prev =>
-          prev.map(n => ({ ...n, read: true, read_at: new Date().toISOString() }))
+          prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
         );
         setUnreadCount(0);
       }
@@ -136,21 +152,22 @@ export default function NotificationDropdown() {
   };
 
   /**
-   * Eliminar notificación
+   * Ocultar notificación (eliminar para el usuario actual)
    */
-  const deleteNotification = async (notificationId) => {
+  const hideNotification = async (notificationId) => {
     try {
-      const result = await NotificationService.deleteNotification(notificationId);
+      const result = await NotificationService.hideNotification(notificationId, true);
       if (result.success) {
         const notification = notifications.find(n => n.id === notificationId);
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
         
-        if (notification && !notification.read) {
+        // Si la notificación no estaba leída, decrementar contador
+        if (notification && !notification.is_read) {
           setUnreadCount(prev => Math.max(0, prev - 1));
         }
       }
     } catch (err) {
-      console.error("Error deleting notification:", err);
+      console.error("Error hiding notification:", err);
     }
   };
 
@@ -290,8 +307,8 @@ export default function NotificationDropdown() {
                   key={notification.id}
                   className={`px-4 py-3 border-l-4 hover:bg-gray-50 cursor-pointer transition-colors ${
                     getNotificationColor(notification.color, notification.priority)
-                  } ${!notification.read ? "font-medium" : ""}`}
-                  onClick={() => !notification.read && markAsRead(notification.id)}
+                  } ${!notification.is_read ? "font-medium" : ""}`}
+                  onClick={() => !notification.is_read && markAsRead(notification.id)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
@@ -300,7 +317,7 @@ export default function NotificationDropdown() {
                         <h4 className="text-sm font-medium text-gray-900 truncate">
                           {notification.title}
                         </h4>
-                        {!notification.read && (
+                        {!notification.is_read && (
                           <div className="w-2 h-2 bg-[#2c4b8b] rounded-full flex-shrink-0"></div>
                         )}
                       </div>
@@ -316,30 +333,28 @@ export default function NotificationDropdown() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              toggleReadStatus(notification.id, notification.read);
+                              toggleReadStatus(notification.id, notification.is_read);
                             }}
                             className="text-xs text-gray-400 hover:text-[#2c4b8b]"
-                            title={notification.read ? "Marcar como no leída" : "Marcar como leída"}
+                            title={notification.is_read ? "Marcar como no leída" : "Marcar como leída"}
                           >
-                            {notification.read ? (
+                            {notification.is_read ? (
                               <FaEyeSlash className="w-3 h-3" />
                             ) : (
                               <FaEye className="w-3 h-3" />
                             )}
                           </button>
-                          {/* Delete button (solo para leídas) */}
-                          {notification.read && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteNotification(notification.id);
-                              }}
-                              className="text-xs text-gray-400 hover:text-red-500"
-                              title="Eliminar notificación"
-                            >
-                              <FaTimes className="w-3 h-3" />
-                            </button>
-                          )}
+                          {/* Hide button (personal delete) */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              hideNotification(notification.id);
+                            }}
+                            className="text-xs text-gray-400 hover:text-red-500"
+                            title="Ocultar notificación"
+                          >
+                            <FaTimes className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     </div>

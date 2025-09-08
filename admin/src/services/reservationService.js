@@ -27,9 +27,9 @@ class ReservationService {
 
   static async _fetchAvailability() {
     try {
-      // CORRECCIÓN: Los datos de disponibilidad se derivan de pedidos únicos por vuelo
+      // CORRECCIÓN: Ahora obtenemos productos directamente desde Power Automate
       const result = await ConnectionService.getDataFromActiveConnection(
-        "pedidos"
+        "productos"
       );
 
       if (!result.success) {
@@ -39,59 +39,30 @@ class ReservationService {
       }
 
       console.log(
-        "Datos para crear disponibilidad (desde pedidos):",
+        "Datos de productos recibidos directamente:",
         result.data.slice(0, 3)
       );
 
-      // Crear disponibilidad única por combinación de vuelo desde pedidos
-      const vuelosUnicos = new Map();
-
-      result.data.forEach((pedido) => {
-        if (
-          pedido.Vuelo_Codigo &&
-          pedido.Vuelo_Destino &&
-          pedido.Vuelo_Compania
-        ) {
-          const key = `${pedido.Vuelo_Codigo}-${pedido.Vuelo_Destino}-${pedido.Vuelo_Compania}-${pedido.Vuelo_Salida}`;
-
-          if (!vuelosUnicos.has(key)) {
-            const disponibilidad = Math.floor(Math.random() * 15) + 1; // Disponibilidad aleatoria entre 1-15
-            const productData = {
-              "@odata.etag": pedido["@odata.etag"] || "",
-              ItemInternalId: pedido.ItemInternalId || "",
-              codigo_cupo: pedido.Vuelo_Codigo,
-              destino: pedido.Vuelo_Destino,
-              compania: pedido.Vuelo_Compania,
-              disponibilidad: disponibilidad.toString(),
-              salida: pedido.Vuelo_Salida || "",
-              regreso: "", // No disponible en estructura de pedidos
-              precio: pedido.Vuelo_Precio || "0",
-              ruta: pedido.Ruta || "",
-              pnr: pedido.Pnr || "",
-              ficha: pedido.Ficha || "",
-              temporada: pedido.Temporada || "",
-            };
-
-            vuelosUnicos.set(key, productData);
-
-            // Notificar si hay pocos lugares disponibles
-            if (disponibilidad <= 5) {
-              NotificationService.notifyLowAvailability(productData, 5);
-            }
-
-            console.log("✅ Vuelo único creado:", {
-              codigo: pedido.Vuelo_Codigo,
-              destino: pedido.Vuelo_Destino,
-              compania: pedido.Vuelo_Compania,
-              disponibilidad,
-            });
-          }
+      // Los datos ya vienen como productos, solo necesitamos procesar notificaciones
+      const availabilityData = result.data.map((producto) => {
+        // Notificar si hay pocos lugares disponibles
+        const disponibilidad = parseInt(producto.disponibilidad || 0);
+        if (disponibilidad <= 5 && disponibilidad > 0) {
+          NotificationService.notifyLowAvailability(producto, 5);
         }
+
+        console.log("✅ Producto procesado:", {
+          codigo: producto.codigo_cupo,
+          destino: producto.destino,
+          compania: producto.compania,
+          disponibilidad: producto.disponibilidad,
+        });
+
+        return producto;
       });
 
-      const availabilityData = Array.from(vuelosUnicos.values());
       console.log(
-        `✅ Creados ${availabilityData.length} vuelos únicos para disponibilidad de ${result.data.length} pedidos`
+        `✅ Procesados ${availabilityData.length} productos de disponibilidad`
       );
 
       return {
@@ -207,27 +178,37 @@ class ReservationService {
       switch (filters.filterType) {
         case "all":
           // Admin: ve todas las solicitudes
+          console.log("🔓 Admin - mostrando todas las solicitudes");
           break;
 
         case "agency":
-          // Agency Admin: solo solicitudes de su agencia
+          // Agency Admin: solo solicitudes de su agencia actual
           requestsData = requestsData.filter(
             (item) => item.Agencia === filters.agencia
+          );
+          console.log(
+            `🏢 Agency Admin - filtradas ${requestsData.length} solicitudes de agencia "${filters.agencia}"`
           );
           break;
 
         case "user": {
-          // Agency User: solo sus propias solicitudes
-          // Necesitamos obtener el email del usuario para filtrar
+          // Agency User: solo sus propias solicitudes Y de su agencia actual
+          // AMBAS condiciones deben cumplirse:
+          // 1. La solicitud pertenece a su agencia actual
+          // 2. La solicitud fue creada por él (mismo email)
           const profile = await AuthorizationService.getCurrentUserProfile();
-          if (profile?.email) {
+          if (profile?.email && filters.agencia) {
             requestsData = requestsData.filter(
               (item) =>
-                item.Agencia === filters.agencia &&
-                item.Usuario_Email === profile.email
+                item.Agencia === filters.agencia && // Agencia actual
+                item.Usuario_Email === profile.email // Su email
+            );
+            console.log(
+              `🔒 Agency User - filtradas ${requestsData.length} solicitudes de agencia="${filters.agencia}" y email="${profile.email}"`
             );
           } else {
             requestsData = [];
+            console.warn("🚫 Agency User sin email o agencia definida");
           }
           break;
         }
@@ -273,9 +254,11 @@ class ReservationService {
   static async _fetchConfirmations() {
     try {
       // Verificar permisos para ver confirmaciones
+      // CORRECCIÓN: agency_user SÍ puede ver sus propias confirmaciones
       const canViewConfirmations =
         (await AuthorizationService.hasPermission("view_agency_data")) ||
-        (await AuthorizationService.hasPermission("view_all_data"));
+        (await AuthorizationService.hasPermission("view_all_data")) ||
+        (await AuthorizationService.hasPermission("view_own_data")); // Agregar permiso para datos propios
 
       if (!canViewConfirmations) {
         throw new Error("No tienes permisos para ver confirmaciones");
@@ -283,6 +266,7 @@ class ReservationService {
 
       // Obtener filtros según el rol del usuario
       const filters = await AuthorizationService.getDataFilters();
+      console.log("🔍 Permisos para confirmaciones - Filtros:", filters);
 
       // Obtener datos específicos de pedidos
       const result = await ConnectionService.getDataFromActiveConnection(
@@ -307,26 +291,56 @@ class ReservationService {
       switch (filters.filterType) {
         case "all":
           // Admin: ve todas las confirmaciones
+          console.log("🔓 Admin - mostrando todas las confirmaciones");
           break;
 
         case "agency":
-          // Agency Admin: solo confirmaciones de su agencia
+          // Agency Admin: solo confirmaciones de su agencia actual
           confirmationsData = confirmationsData.filter(
             (item) => item.Agencia === filters.agencia
+          );
+          console.log(
+            `🏢 Agency Admin - filtradas ${confirmationsData.length} confirmaciones de agencia "${filters.agencia}"`
           );
           break;
 
         case "user": {
-          // Agency User: no debería llegar aquí (sin permisos), pero por seguridad filtrar solo sus datos
+          // Agency User: solo sus propias confirmaciones Y de su agencia actual
+          // AMBAS condiciones deben cumplirse:
+          // 1. La confirmación pertenece a su agencia actual
+          // 2. La confirmación fue creada por él (mismo email)
           const profile = await AuthorizationService.getCurrentUserProfile();
-          if (profile?.email) {
+          if (profile?.email && filters.agencia) {
+            // Log antes del filtrado para debugging
+            console.log(
+              `🔍 Agency User confirmaciones - Datos antes del filtro:`,
+              {
+                totalConfirmaciones: confirmationsData.length,
+                agenciaFiltro: filters.agencia,
+                emailFiltro: profile.email,
+                primerasConfirmaciones: confirmationsData
+                  .slice(0, 3)
+                  .map((item) => ({
+                    id: item.ItemInternalId,
+                    agencia: item.Agencia,
+                    email: item.Usuario_Email,
+                  })),
+              }
+            );
+
             confirmationsData = confirmationsData.filter(
               (item) =>
-                item.Agencia === filters.agencia &&
-                item.Usuario_Email === profile.email
+                item.Agencia === filters.agencia && // Agencia actual
+                item.Usuario_Email === profile.email // Su email
+            );
+            console.log(
+              `🔒 Agency User - filtradas ${confirmationsData.length} confirmaciones de agencia="${filters.agencia}" y email="${profile.email}"`
             );
           } else {
             confirmationsData = [];
+            console.warn(
+              "🚫 Agency User sin email o agencia definida para confirmaciones"
+            );
           }
           break;
         }

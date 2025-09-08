@@ -412,7 +412,10 @@ class ConnectionService {
 
       // Validar que los datos cumplan con la estructura estándar
       if (rawData.success && rawData.data) {
-        const validation = DataValidator.validateRecords(rawData.data);
+        const validation = DataValidator.validateRecords(
+          rawData.data,
+          dataType
+        );
 
         if (!validation.valid) {
           console.warn(
@@ -509,12 +512,20 @@ class ConnectionService {
       // Fallback a variables de entorno si no hay conexión activa
       if (!targetUrl) {
         console.log("Usando variables de entorno como fallback");
-        // CORRECCIÓN: Ambos tipos usan la misma URL porque la disponibilidad se deriva de los datos de pedidos
-        targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
-        console.log(
-          `🔍 ${dataType.toUpperCase()} usará URL (datos unificados):`,
-          targetUrl
-        );
+
+        // Para productos (disponibilidad) usar URL específica para productos
+        if (dataType === "productos") {
+          // Usar variable de entorno específica para productos/disponibilidad
+          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL;
+          console.log(
+            `🎯 PRODUCTOS (disponibilidad) usará URL de productos:`,
+            targetUrl
+          );
+        } else {
+          // Para pedidos usar URL original
+          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
+          console.log(`📋 PEDIDOS usará URL de solicitudes:`, targetUrl);
+        }
       }
 
       if (!targetUrl) {

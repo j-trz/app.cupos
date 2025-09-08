@@ -116,49 +116,45 @@ class NotificationService {
   }
 
   /**
-   * Obtener notificaciones para el usuario actual
+   * Obtener notificaciones para el usuario actual con estados personales
    * @param {number} limit - Límite de notificaciones a obtener
    * @param {boolean} onlyUnread - Solo notificaciones no leídas
-   * @returns {Promise<Array>} Lista de notificaciones
+   * @param {boolean} includeHidden - Incluir notificaciones ocultas
+   * @returns {Promise<Array>} Lista de notificaciones con estados personales
    */
-  static async getNotifications(limit = 50, onlyUnread = false) {
+  static async getNotifications(
+    limit = 50,
+    onlyUnread = false,
+    includeHidden = false
+  ) {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Obtener rol del usuario
-      const userProfile = await AuthorizationService.getCurrentUserProfile();
-      const userRole = userProfile?.role || "agency_user";
-
-      let query = supabase
-        .from("notifications")
-        .select("*")
-        .or(
-          `target_user_id.eq.${user.id},target_role.eq.${userRole},and(target_user_id.is.null,target_role.is.null)`
-        )
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-      if (onlyUnread) {
-        query = query.eq("read", false);
-      }
-
-      const { data, error } = await query;
+      // Usar función SQL para obtener notificaciones con estados personales
+      const { data, error } = await supabase.rpc("get_user_notifications", {
+        user_uuid: user.id,
+        limit_count: limit,
+        only_unread: onlyUnread,
+        include_hidden: includeHidden,
+      });
 
       if (error) throw error;
 
-      // Parsear datos JSON
+      // Parsear datos JSON de forma segura y mapear notification_id a id
       const notifications = data.map((notification) => ({
         ...notification,
-        data: notification.data ? JSON.parse(notification.data) : {},
+        id: notification.notification_id, // Mapear para compatibilidad con frontend
+        data: this.safeParseJSON(notification.data),
       }));
 
       return {
         success: true,
         notifications,
-        unreadCount: notifications.filter((n) => !n.read).length,
+        unreadCount: notifications.filter((n) => !n.is_read && !n.is_hidden)
+          .length,
       };
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -172,16 +168,26 @@ class NotificationService {
   }
 
   /**
-   * Marcar notificación como leída
+   * Marcar notificación como leída para el usuario actual
    * @param {string} notificationId - ID de la notificación
+   * @param {boolean} readStatus - Estado de lectura (true = leída, false = no leída)
    * @returns {Promise<Object>} Resultado de la actualización
    */
-  static async markAsRead(notificationId) {
+  static async markAsRead(notificationId, readStatus = true) {
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true, read_at: new Date().toISOString() })
-        .eq("id", notificationId);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { data: _data, error } = await supabase.rpc(
+        "mark_notification_read",
+        {
+          user_uuid: user.id,
+          notification_uuid: notificationId,
+          read_status: readStatus,
+        }
+      );
 
       if (error) throw error;
 
@@ -193,7 +199,7 @@ class NotificationService {
   }
 
   /**
-   * Marcar todas las notificaciones como leídas
+   * Marcar todas las notificaciones como leídas para el usuario actual
    * @returns {Promise<Object>} Resultado de la actualización
    */
   static async markAllAsRead() {
@@ -203,20 +209,17 @@ class NotificationService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      const userProfile = await AuthorizationService.getCurrentUserProfile();
-      const userRole = userProfile?.role || "agency_user";
-
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true, read_at: new Date().toISOString() })
-        .or(
-          `target_user_id.eq.${user.id},target_role.eq.${userRole},and(target_user_id.is.null,target_role.is.null)`
-        )
-        .eq("read", false);
+      const { data, error } = await supabase.rpc(
+        "mark_all_user_notifications_read",
+        {
+          user_uuid: user.id,
+        }
+      );
 
       if (error) throw error;
 
-      return { success: true };
+      console.log(`✅ Marcadas ${data || 0} notificaciones como leídas`);
+      return { success: true, updatedCount: data || 0 };
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       return { success: false, error: error.message };
@@ -224,12 +227,58 @@ class NotificationService {
   }
 
   /**
-   * Eliminar notificación
+   * Ocultar notificación para el usuario actual (equivalente a eliminar personalmente)
+   * @param {string} notificationId - ID de la notificación
+   * @param {boolean} hiddenStatus - Estado de ocultamiento (true = oculta, false = visible)
+   * @returns {Promise<Object>} Resultado de la ocultación
+   */
+  static async hideNotification(notificationId, hiddenStatus = true) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { data: _data, error } = await supabase.rpc("hide_notification", {
+        user_uuid: user.id,
+        notification_uuid: notificationId,
+        hidden_status: hiddenStatus,
+      });
+
+      if (error) throw error;
+
+      console.log(
+        `✅ Notificación ${
+          hiddenStatus ? "ocultada" : "restaurada"
+        } para el usuario`
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("Error hiding notification:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Eliminar notificación completamente (solo administradores)
    * @param {string} notificationId - ID de la notificación
    * @returns {Promise<Object>} Resultado de la eliminación
    */
   static async deleteNotification(notificationId) {
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      // Verificar permisos de administrador
+      const userProfile = await AuthorizationService.getCurrentUserProfile();
+      if (!userProfile || userProfile.role !== "admin") {
+        throw new Error(
+          "Solo los administradores pueden eliminar notificaciones completamente"
+        );
+      }
+
       const { error } = await supabase
         .from("notifications")
         .delete()
@@ -237,6 +286,7 @@ class NotificationService {
 
       if (error) throw error;
 
+      console.log("✅ Notificación eliminada completamente por administrador");
       return { success: true };
     } catch (error) {
       console.error("Error deleting notification:", error);
@@ -326,11 +376,11 @@ class NotificationService {
    * @param {Function} callback - Función a ejecutar cuando llegue una notificación
    * @returns {Function} Función para cancelar la suscripción
    */
-  static subscribeToNotifications(callback) {
+  static async subscribeToNotifications(callback) {
     try {
       const {
         data: { user },
-      } = supabase.auth.getUser();
+      } = await supabase.auth.getUser();
 
       if (!user) {
         console.warn(
@@ -371,7 +421,7 @@ class NotificationService {
   }
 
   /**
-   * Obtener estadísticas de notificaciones
+   * Obtener estadísticas de notificaciones personales del usuario
    */
   static async getNotificationStats() {
     try {
@@ -380,30 +430,25 @@ class NotificationService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      const userProfile = await AuthorizationService.getCurrentUserProfile();
-      const userRole = userProfile?.role || "agency_user";
-
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("type, read")
-        .or(
-          `target_user_id.eq.${user.id},target_role.eq.${userRole},and(target_user_id.is.null,target_role.is.null)`
-        );
-
-      if (error) throw error;
+      // Obtener todas las notificaciones del usuario (incluyendo ocultas para estadísticas)
+      const { notifications } = await this.getNotifications(1000, false, true);
 
       const stats = {
-        total: data.length,
-        unread: data.filter((n) => !n.read).length,
+        total: notifications.filter((n) => !n.is_hidden).length,
+        unread: notifications.filter((n) => !n.is_read && !n.is_hidden).length,
+        hidden: notifications.filter((n) => n.is_hidden).length,
         byType: {},
       };
 
-      // Agrupar por tipo
+      // Agrupar por tipo (solo notificaciones no ocultas)
+      const visibleNotifications = notifications.filter((n) => !n.is_hidden);
       Object.values(this.NOTIFICATION_TYPES).forEach((type) => {
-        const typeNotifications = data.filter((n) => n.type === type);
+        const typeNotifications = visibleNotifications.filter(
+          (n) => n.type === type
+        );
         stats.byType[type] = {
           total: typeNotifications.length,
-          unread: typeNotifications.filter((n) => !n.read).length,
+          unread: typeNotifications.filter((n) => !n.is_read).length,
         };
       });
 
@@ -415,10 +460,68 @@ class NotificationService {
       console.error("Error fetching notification stats:", error);
       return {
         success: false,
-        stats: { total: 0, unread: 0, byType: {} },
+        stats: { total: 0, unread: 0, hidden: 0, byType: {} },
         error: error.message,
       };
     }
+  }
+
+  /**
+   * Obtener conteo rápido de notificaciones no leídas
+   * @returns {Promise<number>} Número de notificaciones no leídas
+   */
+  static async getUnreadCount() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { data, error } = await supabase.rpc(
+        "get_user_unread_notifications_count",
+        {
+          user_uuid: user.id,
+        }
+      );
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        unreadCount: data || 0,
+      };
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      return {
+        success: false,
+        unreadCount: 0,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Parsear JSON de forma segura
+   * @param {string|object} data - Datos a parsear
+   * @returns {object} Objeto parseado o vacío
+   */
+  static safeParseJSON(data) {
+    if (!data) return {};
+
+    // Si ya es un objeto, devolverlo tal como está
+    if (typeof data === "object") return data;
+
+    // Si es string, intentar parsearlo
+    if (typeof data === "string") {
+      try {
+        return JSON.parse(data);
+      } catch (error) {
+        console.warn("Error parsing JSON data:", error, "Data:", data);
+        return {};
+      }
+    }
+
+    return {};
   }
 }
 
