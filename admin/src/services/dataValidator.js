@@ -37,6 +37,8 @@ class DataValidator {
     "Ruta",
     "Ficha",
     "Pnr",
+    "Neto_1",
+    "Op",
   ];
 
   /**

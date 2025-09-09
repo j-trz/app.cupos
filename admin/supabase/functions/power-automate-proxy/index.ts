@@ -26,6 +26,8 @@ interface ReservationData {
   vuelo_compania: string;
   vuelo_salida: string;
   vuelo_precio: string;
+  neto_1: string;
+  op: string;
   temporada: string;
   pnr: string;
   ficha: string;
@@ -306,6 +308,8 @@ async function submitReservation(payload: any, profile: any, user: any) {
       vuelo_compania: payload.vuelo.compania,
       vuelo_salida: payload.vuelo.salida,
       vuelo_precio: payload.vuelo.precio,
+      neto_1: payload.vuelo.neto_1 || "0",
+      op: payload.vuelo.op || "0",
       temporada: payload.vuelo.temporada,
       pnr: payload.vuelo.pnr,
       ficha: payload.vuelo.ficha,

@@ -167,6 +167,8 @@ class ReservationService {
           Usuario_Email: item.Usuario_Email || "",
           Pnr: item.Pnr || "",
           Ficha: item.Ficha || "",
+          Neto_1: item.Neto_1 || "",
+          Op: item.Op || "",
         };
       });
 

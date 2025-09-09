@@ -673,13 +673,48 @@ class ConnectionService {
     try {
       console.log(`🔗 Obteniendo datos de Supabase para ${dataType}`);
 
-      // Necesitamos desencriptar las credenciales
-      // Por simplicidad, asumiremos que ya están desencriptadas en connection.credentials
-      const credentials = connection.credentials;
+      // Las credenciales están encriptadas y necesitan ser desencriptadas
+      let credentials = connection.credentials;
+
+      // Si no hay credenciales ya desencriptadas, intentar desencriptar
+      if (!credentials && connection.encrypted_credentials) {
+        try {
+          // Para obtener datos de lectura, intentar sin contraseña (usando clave por defecto)
+          const EncryptionService = (await import("./encryptionService"))
+            .default;
+
+          // Intentar desencriptar con contraseña vacía o por defecto
+          try {
+            credentials = await EncryptionService.decryptCredentials(
+              connection.encrypted_credentials,
+              "" // Contraseña vacía para casos de lectura pública
+            );
+          } catch (_emptyPasswordError) {
+            // Si falla con contraseña vacía, intentar con un patrón común
+            try {
+              credentials = await EncryptionService.decryptCredentials(
+                connection.encrypted_credentials,
+                "default" // Contraseña por defecto
+              );
+            } catch (_defaultPasswordError) {
+              console.warn(
+                "No se pudo desencriptar credenciales de Supabase sin contraseña del usuario"
+              );
+              credentials = null;
+            }
+          }
+        } catch (decryptError) {
+          console.warn(
+            "Error al desencriptar credenciales:",
+            decryptError.message
+          );
+          credentials = null;
+        }
+      }
 
       if (!credentials) {
         console.warn(
-          "Credenciales de Supabase no disponibles, usando fallback"
+          "⚠️ Credenciales de Supabase no disponibles, usando fallback"
         );
         return await this.getDataFromPowerAutomate(dataType);
       }
@@ -812,6 +847,8 @@ class ConnectionService {
         Ruta: item.route || item.ruta || "",
         Ficha: item.ticket_number || item.ficha || "",
         Pnr: item.pnr_code || item.pnr || "",
+        Neto_1: item.Neto_1 || "",
+        Op: item.Op || "",
         Fecha_Registro:
           item.created_at || item.fecha_registro || new Date().toISOString(),
       };
@@ -867,6 +904,8 @@ class ConnectionService {
         Ruta: item.route || item.ruta || "",
         Ficha: item.ticketNumber || item.ficha || "",
         Pnr: item.pnr || "",
+        Neto_1: item.Neto_1 || "",
+        Op: item.Op || "",
         Fecha_Registro:
           item.createdAt || item.fecha_registro || new Date().toISOString(),
       };
@@ -1048,10 +1087,7 @@ class ConnectionService {
         return await this._submitToTableau(reservationData, connection);
 
       case "powerautomate":
-        // Este caso se maneja en reservationService directamente
-        throw new Error(
-          "Power Automate submissions should be handled directly"
-        );
+        return await this._submitToPowerAutomate(reservationData, connection);
 
       default:
         throw new Error(`Tipo de conexión no soportado: ${connection.type}`);
@@ -1127,6 +1163,44 @@ class ConnectionService {
       return result;
     } catch (error) {
       throw new Error(`Error enviando a Tableau: ${error.message}`);
+    }
+  }
+
+  /**
+   * Enviar a Power Automate
+   */
+  static async _submitToPowerAutomate(reservationData, _connection) {
+    try {
+      // Usar el edge function para enviar a Power Automate
+      const { data, error } = await supabase.functions.invoke(
+        "power-automate-proxy",
+        {
+          body: {
+            action: "submit-reservation",
+            payload: reservationData,
+          },
+        }
+      );
+
+      if (error) {
+        throw new Error(
+          error.message || "Error al enviar reserva a Power Automate"
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(
+          data.error || "Error desconocido al enviar reserva a Power Automate"
+        );
+      }
+
+      return {
+        success: true,
+        results: data.results || "Reserva enviada exitosamente",
+        referenceId: data.referenceId || `PA-${Date.now()}`,
+      };
+    } catch (error) {
+      throw new Error(`Error enviando a Power Automate: ${error.message}`);
     }
   }
 
