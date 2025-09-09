@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { FaBell, FaTimes, FaCheckDouble, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaTimes, FaCheckDouble, FaEye, FaEyeSlash } from "react-icons/fa";
+import { GoBell } from "react-icons/go";
+
 import NotificationService from "../services/notificationService";
 
 /**
@@ -239,7 +241,7 @@ export default function NotificationDropdown() {
         className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none  rounded-lg transition-colors"
         aria-label="Notificaciones"
       >
-        <FaBell className="w-6 h-6" />
+        <GoBell className="w-6 h-6" />
         
         {/* Badge de notificaciones no leídas */}
         {unreadCount > 0 && (

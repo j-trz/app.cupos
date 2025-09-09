@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import ConnectionService from "../services/connectionService";
 import EncryptionService from "../services/encryptionService";
-import DataMappingModal from "../components/DataMappingModal";
+import DataMappingModal from "../components/DataMappingModal"; // eslint-disable-line no-unused-vars
+import DataTypeConnectionManager from "../components/DataTypeConnectionManager";
 import { supabase } from "../supabaseClient";
-import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaDownload, FaUpload, FaEye, FaEyeSlash, FaTable, FaCog } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaDownload, FaUpload, FaEye, FaEyeSlash, FaTable, FaCog, FaDatabase } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import { SiMongodb, SiTableau, SiSupabase } from 'react-icons/si';// eslint-disable-line no-unused-vars
 import { TiVendorMicrosoft } from 'react-icons/ti';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
@@ -22,6 +23,7 @@ export default function GestionConexiones() {
   const [userRole, setUserRole] = useState(null);// eslint-disable-line no-unused-vars
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
   const [selectedConnectionForMapping, setSelectedConnectionForMapping] = useState(null);
+  const [dataTypeManagerOpen, setDataTypeManagerOpen] = useState(false);
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -223,11 +225,36 @@ export default function GestionConexiones() {
       const result = await ConnectionService.testConnection(connection.id, password);
       
       if (result.success) {
-        Swal.fire({
+        // Si el test es exitoso, preguntar si desea activar la conexión
+        const activateResult = await Swal.fire({
           icon: 'success',
           title: 'Conexión exitosa',
-          text: result.message
+          text: result.message,
+          showCancelButton: true,
+          confirmButtonText: 'Activar conexión',
+          cancelButtonText: 'Solo probar',
+          confirmButtonColor: '#2c4b8b'
         });
+
+        // Si el usuario confirma, activar la conexión
+        if (activateResult.isConfirmed) {
+          try {
+            await ConnectionService.setActiveConnection(connection.id);
+            Swal.fire({
+              icon: 'success',
+              title: 'Conexión activada',
+              text: 'La conexión se ha activado correctamente. Los datos ahora se obtendrán de esta fuente.',
+              timer: 3000,
+              showConfirmButton: false
+            });
+          } catch (activateError) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Error al activar',
+              text: activateError.message || 'No se pudo activar la conexión'
+            });
+          }
+        }
       } else {
         Swal.fire({
           icon: 'error',
@@ -443,6 +470,14 @@ export default function GestionConexiones() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Conexiones API</h1>
           <div className="flex gap-2">
+            <button
+              onClick={() => setDataTypeManagerOpen(true)}
+              className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
+              title="Gestionar conexiones por tipo de datos"
+            >
+              <FaDatabase />
+              Multi-Conexión
+            </button>
             <button
               onClick={importConnection}
               className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
@@ -770,6 +805,12 @@ export default function GestionConexiones() {
           onClose={closeMappingModal}
           connection={selectedConnectionForMapping}
           onSave={saveMappingConfiguration}
+        />
+
+        {/* Modal de gestión de tipos de datos */}
+        <DataTypeConnectionManager
+          isOpen={dataTypeManagerOpen}
+          onClose={() => setDataTypeManagerOpen(false)}
         />
       </div>
     </Layout>

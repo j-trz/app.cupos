@@ -1,13 +1,13 @@
-
 import React from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";// eslint-disable-line no-unused-vars
 import clsx from "clsx";
 import { SECCIONES } from "./SidebarSections.jsx";
 import AuthorizationService from '../services/authorizationService';
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSeccion }) {
-  const [userRole, setUserRole] = React.useState('agency_user');
+  const { userRole } = useAuth();
   const [availableSections, setAvailableSections] = React.useState([]);
   const navigate = useNavigate();
   
@@ -31,34 +31,19 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
     });
   };
 
-  // Inicializar con secciones básicas (sin restricciones)
+  // Actualizar secciones cuando cambie el rol del usuario
   React.useEffect(() => {
-    const basicSections = SECCIONES.filter(sec => !sec.soloAdmin && !sec.roles);
-    setAvailableSections(basicSections);
-  }, []);
-  
-  // Obtener rol del usuario y actualizar secciones dinámicamente
-  React.useEffect(() => {
-    const getUserRoleAndSections = async () => {
-      try {
-        // Obtener rol del usuario
-        const role = await AuthorizationService.getCurrentUserRole();
-        setUserRole(role);
-        
-        // Actualizar secciones filtradas según el rol
-        const filteredSections = filterSectionsByRole(role);
-        setAvailableSections(filteredSections);
-      } catch (error) {
-        console.error('Error obteniendo rol:', error);
-        // Mantener rol por defecto y secciones básicas
-        setUserRole('agency_user');
-        const basicSections = SECCIONES.filter(sec => !sec.soloAdmin && !sec.roles);
-        setAvailableSections(basicSections);
-      }
-    };
-    
-    getUserRoleAndSections();
-  }, []);
+    if (userRole) {
+      console.log('🔄 Sidebar: Actualizando secciones para rol:', userRole);
+      const filteredSections = filterSectionsByRole(userRole);
+      setAvailableSections(filteredSections);
+    } else {
+      // Mostrar solo secciones básicas si no hay rol
+      const basicSections = SECCIONES.filter(sec => !sec.soloAdmin && !sec.roles);
+      setAvailableSections(basicSections);
+    }
+  }, [userRole]);
+
   return (
     <aside
       className={clsx(

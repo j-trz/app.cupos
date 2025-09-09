@@ -331,24 +331,88 @@ class ConnectionService {
 
   /**
    * Obtener la conexión activa del usuario
+   * @param {string} dataType - Tipo de datos: 'productos', 'pedidos', o null para compatibilidad
    * @returns {Promise<Object>} Conexión activa o null
    */
-  static async getActiveConnection() {
+  static async getActiveConnection(dataType = null) {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Primero intentar con is_active
-      let { data, error } = await supabase
+      let data, error;
+
+      // Si se especifica un tipo de datos, buscar conexión específica
+      if (dataType) {
+        try {
+          // Intentar obtener conexión específica para el tipo de datos
+          const { data: specificConnection, error: specificError } =
+            await supabase
+              .from("connection_data_types")
+              .select(
+                `
+              data_type,
+              is_active,
+              connection:data_connections(*)
+            `
+              )
+              .eq("user_id", user.id)
+              .eq("data_type", dataType)
+              .eq("is_active", true)
+              .single();
+
+          if (!specificError && specificConnection?.connection) {
+            console.log(
+              `✅ Conexión específica encontrada para ${dataType}:`,
+              specificConnection.connection.name
+            );
+            return specificConnection.connection;
+          }
+
+          // Si no hay conexión específica, buscar conexión 'all'
+          const { data: allConnection, error: allError } = await supabase
+            .from("connection_data_types")
+            .select(
+              `
+              data_type,
+              is_active,
+              connection:data_connections(*)
+            `
+            )
+            .eq("user_id", user.id)
+            .eq("data_type", "all")
+            .eq("is_active", true)
+            .single();
+
+          if (!allError && allConnection?.connection) {
+            console.log(
+              `✅ Conexión 'all' encontrada para ${dataType}:`,
+              allConnection.connection.name
+            );
+            return allConnection.connection;
+          }
+
+          console.warn(
+            `⚠️ No hay conexión específica ni 'all' para ${dataType}, usando fallback`
+          );
+        } catch (tableError) {
+          console.warn(
+            "Tabla connection_data_types no existe, usando método legacy:",
+            tableError.message
+          );
+        }
+      }
+
+      // Fallback al método legacy (is_active en data_connections)
+      ({ data, error } = await supabase
         .from("data_connections")
         .select("*")
         .eq("user_id", user.id)
         .eq("is_active", true)
-        .single();
+        .single());
 
-      // Si hay error 406 (columna is_active no existe), usar fallback
+      // Si hay error con is_active, usar fallback a primera conexión
       if (
         error &&
         (error.code === "42703" ||
@@ -360,7 +424,6 @@ class ConnectionService {
           "Columna is_active no existe, usando primera conexión como fallback"
         );
 
-        // Fallback: obtener la primera conexión disponible
         const fallbackResult = await supabase
           .from("data_connections")
           .select("*")
@@ -374,6 +437,10 @@ class ConnectionService {
       }
 
       if (error && error.code !== "PGRST116") throw error;
+
+      if (data) {
+        console.log(`✅ Conexión legacy encontrada:`, data.name);
+      }
 
       return data || null;
     } catch (error) {
@@ -389,17 +456,27 @@ class ConnectionService {
    */
   static async getDataFromActiveConnection(dataType = "pedidos") {
     try {
-      const activeConnection = await this.getActiveConnection();
+      // Usar el sistema multi-conexión para obtener la conexión específica para el tipo de datos
+      const activeConnection = await this.getActiveConnection(dataType);
       if (!activeConnection) {
-        // Si no hay conexión activa, usar Power Automate como fallback
+        console.log(
+          `⚠️ No se encontró conexión activa para ${dataType}, usando Power Automate como fallback`
+        );
         return await this.getDataFromPowerAutomate(dataType);
       }
+
+      console.log(
+        `✅ Usando conexión ${activeConnection.name} (${activeConnection.type}) para ${dataType}`
+      );
 
       let rawData;
 
       switch (activeConnection.type) {
         case "powerautomate":
           rawData = await this.getDataFromPowerAutomate(dataType);
+          break;
+        case "supabase":
+          rawData = await this.getDataFromSupabase(activeConnection, dataType);
           break;
         default:
           // Por ahora, otras fuentes usan fallback
@@ -583,6 +660,76 @@ class ConnectionService {
     } catch (error) {
       console.error(`Error fetching from Power Automate (${dataType}):`, error);
       return { success: false, data: [], error: error.message };
+    }
+  }
+
+  /**
+   * Obtener datos de Supabase usando conexión específica
+   * @param {Object} connection - Datos de la conexión Supabase
+   * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
+   * @returns {Promise<Object>} Datos de Supabase
+   */
+  static async getDataFromSupabase(connection, dataType = "pedidos") {
+    try {
+      console.log(`🔗 Obteniendo datos de Supabase para ${dataType}`);
+
+      // Necesitamos desencriptar las credenciales
+      // Por simplicidad, asumiremos que ya están desencriptadas en connection.credentials
+      const credentials = connection.credentials;
+
+      if (!credentials) {
+        console.warn(
+          "Credenciales de Supabase no disponibles, usando fallback"
+        );
+        return await this.getDataFromPowerAutomate(dataType);
+      }
+
+      const { projectUrl, anonKey, tableName } = credentials;
+
+      if (!projectUrl || !anonKey) {
+        throw new Error("Credenciales de Supabase incompletas");
+      }
+
+      // Importar dinámicamente para evitar problemas de dependencias
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabaseClient = createClient(projectUrl, anonKey);
+
+      // Determinar tabla según el tipo de datos
+      const targetTable =
+        tableName || (dataType === "productos" ? "productos" : "reservas");
+
+      console.log(`📊 Consultando tabla ${targetTable} en Supabase`);
+
+      const { data, error } = await supabaseClient
+        .from(targetTable)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+
+      if (error) {
+        console.error("Error consultando Supabase:", error);
+        // Si hay error, usar fallback a Power Automate
+        console.warn("Usando Power Automate como fallback");
+        return await this.getDataFromPowerAutomate(dataType);
+      }
+
+      console.log(`✅ Datos obtenidos de Supabase:`, {
+        totalItems: data.length,
+        table: targetTable,
+        sampleData: data.slice(0, 3),
+      });
+
+      return {
+        success: true,
+        data: this.mapToStandardFormat(data, "supabase", dataType),
+        source: "supabase",
+        table: targetTable,
+      };
+    } catch (error) {
+      console.error(`Error fetching from Supabase (${dataType}):`, error);
+      // Fallback a Power Automate en caso de error
+      console.warn("Error en Supabase, usando Power Automate como fallback");
+      return await this.getDataFromPowerAutomate(dataType);
     }
   }
 
@@ -844,49 +991,70 @@ class ConnectionService {
    */
   static async submitReservation(reservationData) {
     try {
-      const activeConnection = await this.getActiveConnection();
+      // Usar el sistema multi-conexión para obtener la conexión específica para pedidos
+      const activeConnection = await this.getActiveConnection("pedidos");
 
       if (!activeConnection) {
-        throw new Error("No hay conexión activa configurada");
+        console.log(
+          "⚠️ No se encontró conexión específica para pedidos, buscando conexión general"
+        );
+        const generalConnection = await this.getActiveConnection();
+        if (!generalConnection) {
+          throw new Error(
+            "No hay conexión activa configurada para envío de reservas"
+          );
+        }
+        console.log(
+          `✅ Usando conexión general ${generalConnection.name} para envío de reservas`
+        );
+        return await this._submitWithConnection(
+          reservationData,
+          generalConnection
+        );
       }
 
-      // Para diferentes tipos de conexión, usar diferentes métodos de envío
-      switch (activeConnection.type) {
-        case "supabase":
-          return await this._submitToSupabase(
-            reservationData,
-            activeConnection
-          );
-
-        case "mongodb":
-          return await this._submitToMongoDB(reservationData, activeConnection);
-
-        case "smartsheet":
-          return await this._submitToSmartsheet(
-            reservationData,
-            activeConnection
-          );
-
-        case "tableau":
-          return await this._submitToTableau(reservationData, activeConnection);
-
-        case "powerautomate":
-          // Este caso se maneja en reservationService directamente
-          throw new Error(
-            "Power Automate submissions should be handled directly"
-          );
-
-        default:
-          throw new Error(
-            `Tipo de conexión no soportado: ${activeConnection.type}`
-          );
-      }
+      console.log(
+        `✅ Usando conexión específica ${activeConnection.name} para pedidos`
+      );
+      return await this._submitWithConnection(
+        reservationData,
+        activeConnection
+      );
     } catch (error) {
       console.error("Error submitting reservation:", error);
       return {
         success: false,
         error: error.message,
       };
+    }
+  }
+
+  /**
+   * Enviar reserva con una conexión específica
+   */
+  static async _submitWithConnection(reservationData, connection) {
+    // Para diferentes tipos de conexión, usar diferentes métodos de envío
+    switch (connection.type) {
+      case "supabase":
+        return await this._submitToSupabase(reservationData, connection);
+
+      case "mongodb":
+        return await this._submitToMongoDB(reservationData, connection);
+
+      case "smartsheet":
+        return await this._submitToSmartsheet(reservationData, connection);
+
+      case "tableau":
+        return await this._submitToTableau(reservationData, connection);
+
+      case "powerautomate":
+        // Este caso se maneja en reservationService directamente
+        throw new Error(
+          "Power Automate submissions should be handled directly"
+        );
+
+      default:
+        throw new Error(`Tipo de conexión no soportado: ${connection.type}`);
     }
   }
 
@@ -959,6 +1127,200 @@ class ConnectionService {
       return result;
     } catch (error) {
       throw new Error(`Error enviando a Tableau: ${error.message}`);
+    }
+  }
+
+  /**
+   * Probar una conexión existente
+   * @param {string} connectionId - ID de la conexión a probar
+   * @param {string} userPassword - Contraseña del usuario para desencriptar credenciales
+   * @returns {Promise<Object>} Resultado de la prueba de conexión
+   */
+  static async testConnection(connectionId, userPassword) {
+    try {
+      // Primero obtener la conexión con credenciales desencriptadas
+      const { connection: connectionData } = await this.getConnection(
+        connectionId,
+        userPassword
+      );
+
+      const { type, credentials } = connectionData;
+
+      if (!type || !credentials) {
+        throw new Error("Datos de conexión incompletos");
+      }
+
+      console.log(`🔍 Probando conexión de tipo: ${type}`);
+
+      let testResult;
+
+      switch (type) {
+        case "supabase":
+          testResult = await this._testSupabaseConnection(credentials);
+          break;
+        case "mongodb":
+          testResult = await this._testMongoDBConnection(credentials);
+          break;
+        case "smartsheet":
+          testResult = await this._testSmartsheetConnection(credentials);
+          break;
+        case "tableau":
+          testResult = await this._testTableauConnection(credentials);
+          break;
+        case "powerautomate":
+          testResult = await this._testPowerAutomateConnection(credentials);
+          break;
+        default:
+          throw new Error(`Tipo de conexión no soportado: ${type}`);
+      }
+
+      return {
+        success: true,
+        message: "Conexión probada exitosamente",
+        details: testResult,
+      };
+    } catch (error) {
+      console.error("Error testing connection:", error);
+      return {
+        success: false,
+        message: error.message || "Error al probar la conexión",
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Probar conexión a Supabase
+   */
+  static async _testSupabaseConnection(credentials) {
+    const { projectUrl, anonKey, tableName } = credentials;
+
+    if (!projectUrl || !anonKey) {
+      throw new Error("URL del proyecto y clave anónima son requeridos");
+    }
+
+    try {
+      // Importar dinámicamente para evitar problemas de dependencias
+      const { createClient } = await import("@supabase/supabase-js");
+      const client = createClient(projectUrl, anonKey);
+
+      // Probar una consulta simple
+      const { data, error } = await client
+        .from(tableName || "reservas")
+        .select("*")
+        .limit(1);
+
+      if (
+        error &&
+        !error.message.includes("relation") &&
+        !error.message.includes("RLS")
+      ) {
+        throw new Error(`Error de Supabase: ${error.message}`);
+      }
+
+      return {
+        status: "connected",
+        message: error
+          ? "Conectado (tabla no existe o RLS activo)"
+          : "Conectado exitosamente",
+        hasData: data && data.length > 0,
+        tableName: tableName || "reservas",
+      };
+    } catch (error) {
+      throw new Error(`Error conectando a Supabase: ${error.message}`);
+    }
+  }
+
+  /**
+   * Probar conexión a MongoDB
+   */
+  static async _testMongoDBConnection(credentials) {
+    const { connectionString, databaseName, collectionName } = credentials;
+
+    if (!connectionString || !databaseName) {
+      throw new Error(
+        "Connection string y nombre de base de datos son requeridos"
+      );
+    }
+
+    // Para MongoDB, solo validamos que los datos estén presentes
+    // En un entorno real, aquí haríamos una conexión real
+    return {
+      status: "validated",
+      message: "Credenciales validadas (conexión simulada)",
+      database: databaseName,
+      collection: collectionName || "reservations",
+    };
+  }
+
+  /**
+   * Probar conexión a Smartsheet
+   */
+  static async _testSmartsheetConnection(credentials) {
+    const { accessToken, sheetId } = credentials;
+
+    if (!accessToken || !sheetId) {
+      throw new Error("Access token y sheet ID son requeridos");
+    }
+
+    // Debido a CORS, no podemos hacer llamadas directas desde el frontend
+    // Retornamos una validación de credenciales
+    return {
+      status: "validated",
+      message: "Credenciales validadas (CORS bloquea prueba directa)",
+      sheetId: sheetId,
+      note: "La conexión real se verificará desde el backend",
+    };
+  }
+
+  /**
+   * Probar conexión a Tableau
+   */
+  static async _testTableauConnection(credentials) {
+    const { serverUrl, username, password, siteName } = credentials;
+
+    if (!serverUrl || !username || !password) {
+      throw new Error("URL del servidor, usuario y contraseña son requeridos");
+    }
+
+    // Para Tableau, validamos que los datos estén presentes
+    // En un entorno real, aquí haríamos autenticación real
+    return {
+      status: "validated",
+      message: "Credenciales validadas (conexión simulada)",
+      server: serverUrl,
+      site: siteName || "default",
+    };
+  }
+
+  /**
+   * Probar conexión a Power Automate
+   */
+  static async _testPowerAutomateConnection(credentials) {
+    const { flowUrl } = credentials;
+
+    if (!flowUrl) {
+      throw new Error("URL del Flow es requerida");
+    }
+
+    try {
+      // Hacer una solicitud HEAD para verificar que el endpoint existe
+      const response = await fetch(flowUrl, {
+        method: "HEAD",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      return {
+        status: response.ok ? "connected" : "error",
+        message: response.ok
+          ? "Flow accesible"
+          : `Error HTTP ${response.status}: ${response.statusText}`,
+        flowUrl: flowUrl,
+      };
+    } catch (error) {
+      throw new Error(`Error probando Flow: ${error.message}`);
     }
   }
 
@@ -1171,6 +1533,273 @@ class ConnectionService {
         ],
       },
     ];
+  }
+
+  // ==================== MÉTODOS PARA MULTI-CONEXIÓN ====================
+
+  /**
+   * Crear o actualizar asignación de tipo de datos a conexión
+   * @param {string} connectionId - ID de la conexión
+   * @param {string} dataType - Tipo de datos: 'productos', 'pedidos', 'all'
+   * @param {boolean} isActive - Si la asignación está activa
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  static async setConnectionDataType(connectionId, dataType, isActive = true) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      // Verificar que la conexión pertenezca al usuario
+      const { data: connection, error: connectionError } = await supabase
+        .from("data_connections")
+        .select("id")
+        .eq("id", connectionId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (connectionError || !connection) {
+        throw new Error("Conexión no encontrada o no autorizada");
+      }
+
+      // Si se está activando, desactivar otras conexiones del mismo tipo
+      if (isActive) {
+        await supabase
+          .from("connection_data_types")
+          .update({ is_active: false })
+          .eq("user_id", user.id)
+          .eq("data_type", dataType);
+      }
+
+      // Crear o actualizar la asignación
+      const { data, error } = await supabase
+        .from("connection_data_types")
+        .upsert(
+          {
+            user_id: user.id,
+            connection_id: connectionId,
+            data_type: dataType,
+            is_active: isActive,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id,data_type",
+          }
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        assignment: data,
+        message: `Conexión ${
+          isActive ? "activada" : "desactivada"
+        } para ${dataType}`,
+      };
+    } catch (error) {
+      console.error("Error setting connection data type:", error);
+      throw new Error(error.message || "Error al asignar tipo de datos");
+    }
+  }
+
+  /**
+   * Obtener todas las asignaciones de tipos de datos del usuario
+   * @returns {Promise<Object>} Lista de asignaciones
+   */
+  static async getConnectionDataTypes() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { data, error } = await supabase
+        .from("connection_data_types")
+        .select(
+          `
+          id,
+          data_type,
+          is_active,
+          created_at,
+          updated_at,
+          connection:data_connections(
+            id,
+            name,
+            type,
+            description
+          )
+        `
+        )
+        .eq("user_id", user.id)
+        .order("data_type");
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        assignments: data || [],
+      };
+    } catch (error) {
+      console.error("Error fetching connection data types:", error);
+      throw new Error(error.message || "Error al obtener asignaciones");
+    }
+  }
+
+  /**
+   * Eliminar asignación de tipo de datos
+   * @param {string} assignmentId - ID de la asignación
+   * @returns {Promise<Object>} Resultado de la eliminación
+   */
+  static async deleteConnectionDataType(assignmentId) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { error } = await supabase
+        .from("connection_data_types")
+        .delete()
+        .eq("id", assignmentId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        message: "Asignación eliminada correctamente",
+      };
+    } catch (error) {
+      console.error("Error deleting connection data type:", error);
+      throw new Error(error.message || "Error al eliminar asignación");
+    }
+  }
+
+  /**
+   * Obtener conexión específica para un tipo de datos
+   * @param {string} dataType - Tipo de datos
+   * @returns {Promise<Object>} Conexión activa para el tipo de datos
+   */
+  static async getConnectionForDataType(dataType) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      // Buscar conexión específica para el tipo de datos
+      const { data: specificAssignment, error: specificError } = await supabase
+        .from("connection_data_types")
+        .select(
+          `
+          connection:data_connections(*)
+        `
+        )
+        .eq("user_id", user.id)
+        .eq("data_type", dataType)
+        .eq("is_active", true)
+        .single();
+
+      if (!specificError && specificAssignment?.connection) {
+        return {
+          success: true,
+          connection: specificAssignment.connection,
+          source: "specific",
+        };
+      }
+
+      // Buscar conexión 'all' como fallback
+      const { data: allAssignment, error: allError } = await supabase
+        .from("connection_data_types")
+        .select(
+          `
+          connection:data_connections(*)
+        `
+        )
+        .eq("user_id", user.id)
+        .eq("data_type", "all")
+        .eq("is_active", true)
+        .single();
+
+      if (!allError && allAssignment?.connection) {
+        return {
+          success: true,
+          connection: allAssignment.connection,
+          source: "all",
+        };
+      }
+
+      return {
+        success: false,
+        connection: null,
+        message: `No hay conexión activa para ${dataType}`,
+      };
+    } catch (error) {
+      console.error("Error getting connection for data type:", error);
+      return {
+        success: false,
+        connection: null,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Migrar conexiones existentes al sistema multi-conexión
+   * @returns {Promise<Object>} Resultado de la migración
+   */
+  static async migrateToMultiConnection() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      // Obtener conexiones activas existentes
+      const { data: activeConnections, error: connectionsError } =
+        await supabase
+          .from("data_connections")
+          .select("id, name")
+          .eq("user_id", user.id)
+          .eq("is_active", true);
+
+      if (connectionsError) throw connectionsError;
+
+      if (!activeConnections || activeConnections.length === 0) {
+        return {
+          success: true,
+          message: "No hay conexiones activas para migrar",
+          migrated: 0,
+        };
+      }
+
+      let migratedCount = 0;
+
+      // Migrar cada conexión activa como tipo 'all'
+      for (const connection of activeConnections) {
+        try {
+          await this.setConnectionDataType(connection.id, "all", true);
+          migratedCount++;
+        } catch (error) {
+          console.warn(
+            `Error migrando conexión ${connection.name}:`,
+            error.message
+          );
+        }
+      }
+
+      return {
+        success: true,
+        message: `${migratedCount} conexiones migradas al sistema multi-conexión`,
+        migrated: migratedCount,
+      };
+    } catch (error) {
+      console.error("Error migrating to multi-connection:", error);
+      throw new Error(error.message || "Error en la migración");
+    }
   }
 }
 

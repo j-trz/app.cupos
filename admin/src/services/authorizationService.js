@@ -11,6 +11,13 @@ class AuthorizationService {
   };
 
   /**
+   * Cache para perfiles de usuario y roles
+   */
+  static _profileCache = new Map();
+  static _cacheExpiry = new Map();
+  static CACHE_DURATION = 5 * 60 * 1000; // 5 minutos en ms
+
+  /**
    * Permisos por rol
    */
   static PERMISSIONS = {
@@ -35,7 +42,31 @@ class AuthorizationService {
   };
 
   /**
-   * Obtener el perfil completo del usuario actual
+   * Verificar si el cache es válido para un usuario
+   */
+  static _isCacheValid(userId) {
+    const expiry = this._cacheExpiry.get(userId);
+    return expiry && Date.now() < expiry;
+  }
+
+  /**
+   * Limpiar cache del usuario
+   */
+  static _clearUserCache(userId) {
+    this._profileCache.delete(userId);
+    this._cacheExpiry.delete(userId);
+  }
+
+  /**
+   * Limpiar todo el cache
+   */
+  static clearCache() {
+    this._profileCache.clear();
+    this._cacheExpiry.clear();
+  }
+
+  /**
+   * Obtener el perfil completo del usuario actual (con cache)
    */
   static async getCurrentUserProfile() {
     try {
@@ -44,6 +75,15 @@ class AuthorizationService {
       } = await supabase.auth.getUser();
       if (!user) return null;
 
+      // Verificar cache primero
+      if (this._isCacheValid(user.id)) {
+        const cached = this._profileCache.get(user.id);
+        if (cached) {
+          return cached;
+        }
+      }
+
+      // Obtener perfil fresco de la base de datos
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("*")
@@ -54,6 +94,10 @@ class AuthorizationService {
         console.error("Error getting user profile:", error);
         return null;
       }
+
+      // Guardar en cache
+      this._profileCache.set(user.id, profile);
+      this._cacheExpiry.set(user.id, Date.now() + this.CACHE_DURATION);
 
       return profile;
     } catch (error) {

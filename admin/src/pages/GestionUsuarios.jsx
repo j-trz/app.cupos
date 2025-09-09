@@ -249,7 +249,7 @@ export default function GestionUsuarios() {
             <p className="text-gray-500">Cargando usuarios...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-[800px]">
             <table className="w-full min-w-[900px] bg-white border-0 rounded-2xl shadow-xl">
               <thead>
                 <tr className="bg-[#2c4b8b] text-white">

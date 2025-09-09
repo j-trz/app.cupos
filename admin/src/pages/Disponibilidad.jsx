@@ -186,7 +186,7 @@ export default function Disponibilidad() {
     <Layout seccion={seccion} setSeccion={setSeccion}>
       <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-brand-primary">Disponibilidad de Cupos Aéreos</h1>
+          <h1 className="text-2xl font-bold text-brand-primary text-[#2c4b8b]">Disponibilidad</h1>
           <button
             onClick={refrescarDatos}
             disabled={loading || refrescando}

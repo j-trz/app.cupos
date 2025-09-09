@@ -1,37 +1,11 @@
-import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom"; // eslint-disable-line no-unused-vars
-import UserService from '../services/userService';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AdminRoute({ children }) {
-  const [isAdmin, setIsAdmin] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { isLoading, isInitialized, hasAdminAccess, isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      try {
-        setError(null);
-        
-        // Verificar permisos de administrador usando el servicio seguro
-        const adminStatus = await UserService.isCurrentUserAdmin();
-        setIsAdmin(adminStatus);
-
-        if (!adminStatus) {
-          console.warn('User does not have admin privileges');
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-        setIsAdmin(false);
-        setError('Error al verificar permisos');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAdminStatus();
-  }, []);
-
-  if (loading) {
+  // Mostrar loading solo durante la inicialización
+  if (!isInitialized || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -42,11 +16,14 @@ export default function AdminRoute({ children }) {
     );
   }
 
-  if (error) {
-    return <Navigate to="/" replace />;
+  // Redirigir si no está autenticado
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (!isAdmin) {
+  // Redirigir si no tiene acceso de admin
+  if (!hasAdminAccess()) {
+    console.warn('User does not have admin privileges');
     return <Navigate to="/" replace />;
   }
 
