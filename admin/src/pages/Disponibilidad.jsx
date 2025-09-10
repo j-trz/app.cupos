@@ -3,7 +3,6 @@ import Swal from 'sweetalert2';
 import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import ReservationService from '../services/reservationService';
-import { useCredentials } from "../contexts/CredentialsContext";
 import UserService from '../services/userService';
 import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 
@@ -42,8 +41,6 @@ export default function Disponibilidad() {
   const [enviando, setEnviando] = useState(false);
   const [refrescando, setRefrescando] = useState(false);
 
-  const { getDecryptedCredentials } = useCredentials();
-
   // Cargar disponibilidad al montar
   useEffect(() => {
     fetchDisponibilidad();
@@ -52,7 +49,7 @@ export default function Disponibilidad() {
   async function fetchDisponibilidad(forceRefresh = false) {
     setLoading(true);
     try {
-      const result = await ReservationService.getAvailability(getDecryptedCredentials, !forceRefresh);
+      const result = await ReservationService.getAvailability(!forceRefresh);
       if (result.success) {
         setDatos(result.data);
       } else {

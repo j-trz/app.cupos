@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";// eslint-disable-line no-unu
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import ReservationService from '../services/reservationService';
-import { useCredentials } from '../contexts/CredentialsContext';
 import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
 
@@ -22,16 +21,17 @@ export default function Solicitudes() {
   const [filtroFechaDesde] = useState("");
   const [filtroFechaHasta, setFiltroFechaHasta] = useState("");
 
-  const { getDecryptedCredentials } = useCredentials();
-
   useEffect(() => {
     fetchSolicitudes();
+    // Actualizar cada 30 segundos
+    const intervalId = setInterval(() => fetchSolicitudes(), 30000);
+    return () => clearInterval(intervalId);
   }, []);
 
   async function fetchSolicitudes(forceRefresh = false) {
     setLoading(true);
     try {
-      const result = await ReservationService.getRequests(getDecryptedCredentials, !forceRefresh);
+      const result = await ReservationService.getRequests(!forceRefresh);
       if (result.success) {
         setDatos(result.data);
       } else {

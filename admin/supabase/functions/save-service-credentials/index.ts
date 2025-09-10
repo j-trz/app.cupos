@@ -7,19 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Helper to convert strings to ArrayBuffer
-function str2ab(str: string) {
-  const buf = new ArrayBuffer(str.length);
-  const bufView = new Uint8Array(buf);
-  for (let i = 0, strLen = str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i);
-  }
-  return buf;
-}
-
-// Helper to get the encryption key
+// Helper to get the encryption key. It must be a 32-byte string.
 async function getEncryptionKey(secret: string) {
-  const keyData = str2ab(secret);
+  const keyData = new TextEncoder().encode(secret.slice(0, 32));
   return await crypto.subtle.importKey(
     "raw",
     keyData,
@@ -32,15 +22,12 @@ async function getEncryptionKey(secret: string) {
 // Encrypt credentials
 async function encryptCredentials(credentials: object, secretKey: string) {
   const key = await getEncryptionKey(secretKey);
-  const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV is recommended for AES-GCM
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
   const credentialsString = JSON.stringify(credentials);
   const encodedData = new TextEncoder().encode(credentialsString);
 
   const encryptedData = await crypto.subtle.encrypt(
-    {
-      name: "AES-GCM",
-      iv: iv,
-    },
+    { name: "AES-GCM", iv: iv },
     key,
     encodedData
   );
@@ -65,11 +52,10 @@ serve(async (req) => {
 
     const masterKey = Deno.env.get("MASTER_ENCRYPTION_KEY");
     if (!masterKey || masterKey.length < 32) {
-      console.error("MASTER_ENCRYPTION_KEY is not set or is too short.");
-      throw new Error("Server configuration error: Master encryption key is missing or invalid.");
+      throw new Error("Server configuration error: MASTER_ENCRYPTION_KEY is missing or is not 32 characters long.");
     }
 
-    // Create a Supabase client with the user's auth token
+    // Create a Supabase client with the user's auth token to verify ownership
     const userSupabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -78,10 +64,7 @@ serve(async (req) => {
 
     const { data: { user } } = await userSupabaseClient.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Security Check: Verify the user owns the connection
@@ -91,15 +74,8 @@ serve(async (req) => {
       .eq("id", connection_id)
       .single();
 
-    if (connError || !connection) {
-       throw new Error("Connection not found.");
-    }
-
-    if (connection.user_id !== user.id) {
-       return new Response(JSON.stringify({ error: "Forbidden" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 403,
-      });
+    if (connError || !connection || connection.user_id !== user.id) {
+       return new Response(JSON.stringify({ error: "Forbidden: Connection not found or you do not own it." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Encrypt the credentials

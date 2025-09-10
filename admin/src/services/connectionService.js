@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
-import EncryptionService from "./encryptionService";
+// No longer using client-side encryption for this service's core logic
+// import EncryptionService from "./encryptionService";
 import DataValidator from "./dataValidator";
 import AuthorizationService from "./authorizationService";
 
@@ -8,76 +9,53 @@ import AuthorizationService from "./authorizationService";
  */
 class ConnectionService {
   /**
-   * Crear una nueva conexión API
-   * @param {Object} connectionData - Datos de la conexión
-   * @param {string} userPassword - Contraseña del usuario para encriptar
+   * Crear una nueva conexión API.
+   * Las credenciales se envían al backend para ser encriptadas y almacenadas de forma segura.
+   * @param {Object} connectionData - Datos de la conexión (incluye credenciales en crudo)
    * @returns {Promise<Object>} Conexión creada
    */
-  static async createConnection(connectionData, userPassword) {
+  static async createConnection(connectionData) {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Validar datos requeridos
       const { name, type, description, credentials } = connectionData;
       if (!name || !type || !credentials) {
         throw new Error("Datos de conexión incompletos");
       }
 
-      // Encriptar credenciales
-      const encryptedCredentials = await EncryptionService.encryptCredentials(
-        credentials,
-        userPassword
-      );
-
-      // Crear registro en la base de datos
+      // Crear registro de metadatos en la base de datos
       const { data, error } = await supabase
         .from("data_connections")
-        .insert([
-          {
-            user_id: user.id,
-            name,
-            type,
-            description,
-            encrypted_credentials: encryptedCredentials,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ])
+        .insert([{
+          user_id: user.id,
+          name,
+          type,
+          description,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }])
         .select()
         .single();
 
       if (error) throw error;
 
-      // Ahora, guarda las credenciales en la bóveda segura para el backend
-      try {
-        const { error: vaultError } = await supabase.functions.invoke(
-          "save-service-credentials",
-          {
-            body: {
-              connection_id: data.id,
-              credentials,
-            },
-          }
-        );
-        if (vaultError) {
-          console.error("Failed to save credentials to secure vault:", vaultError);
-          // Opcional: notificar al usuario que las tareas de fondo pueden fallar
-        }
-      } catch (e) {
-        console.error("Error invoking save-service-credentials:", e);
+      // Ahora, guarda las credenciales en la bóveda segura del backend
+      const { error: vaultError } = await supabase.functions.invoke(
+        "save-service-credentials",
+        { body: { connection_id: data.id, credentials } }
+      );
+
+      if (vaultError) {
+        // Si falla el guardado en la bóveda, revertir la creación de la conexión
+        await supabase.from("data_connections").delete().eq("id", data.id);
+        console.error("Failed to save credentials to secure vault, rolling back.", vaultError);
+        throw new Error("No se pudieron guardar las credenciales de forma segura. La conexión no fue creada.");
       }
 
-      return {
-        success: true,
-        connection: {
-          ...data,
-          encrypted_credentials: "[ENCRYPTED]", // No devolver datos encriptados
-        },
-      };
+      return { success: true, connection: data };
     } catch (error) {
       console.error("Error creating connection:", error);
       throw new Error(error.message || "Error al crear la conexión");
@@ -145,55 +123,30 @@ class ConnectionService {
   }
 
   /**
-   * Obtener una conexión específica con credenciales desencriptadas
-   * @param {string} connectionId - ID de la conexión
-   * @param {string} userPassword - Contraseña del usuario para desencriptar
-   * @returns {Promise<Object>} Conexión con credenciales desencriptadas
+   * Obtiene las credenciales desencriptadas para una conexión desde el backend.
+   * @param {string} connectionId - El ID de la conexión.
+   * @returns {Promise<Object>} Las credenciales desencriptadas.
    */
-  static async getConnection(connectionId, userPassword) {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
+  static async getDecryptedCredentials(connectionId) {
+    const { data, error } = await supabase.functions.invoke(
+      "get-decrypted-credentials",
+      { body: { connection_id: connectionId } }
+    );
 
-      const { data, error } = await supabase
-        .from("data_connections")
-        .select("*")
-        .eq("id", connectionId)
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error("Conexión no encontrada");
-
-      // Desencriptar credenciales
-      const credentials = await EncryptionService.decryptCredentials(
-        data.encrypted_credentials,
-        userPassword
-      );
-
-      return {
-        success: true,
-        connection: {
-          ...data,
-          credentials,
-        },
-      };
-    } catch (error) {
-      console.error("Error fetching connection:", error);
-      throw new Error(error.message || "Error al obtener la conexión");
+    if (error) {
+      console.error("Error fetching decrypted credentials:", error);
+      throw new Error(error.message || "No se pudieron obtener las credenciales.");
     }
+    return data;
   }
 
   /**
-   * Actualizar una conexión existente
+   * Actualizar una conexión existente.
    * @param {string} connectionId - ID de la conexión
-   * @param {Object} updateData - Datos a actualizar
-   * @param {string} userPassword - Contraseña del usuario (si se actualizan credenciales)
+   * @param {Object} updateData - Datos a actualizar (puede incluir `credentials`)
    * @returns {Promise<Object>} Conexión actualizada
    */
-  static async updateConnection(connectionId, updateData, userPassword = null) {
+  static async updateConnection(connectionId, updateData) {
     try {
       const {
         data: { user },
@@ -204,46 +157,27 @@ class ConnectionService {
         updated_at: new Date().toISOString(),
       };
 
-      // Campos que se pueden actualizar sin encriptación
-      const allowedFields = [
-        "name",
-        "description",
-        "is_active",
-        "column_mapping",
-      ];
+      // Campos de metadatos que se pueden actualizar
+      const allowedFields = ["name", "description"];
       allowedFields.forEach((field) => {
         if (updateData[field] !== undefined) {
           updates[field] = updateData[field];
         }
       });
 
-      // Si se actualizan credenciales, encriptarlas y guardarlas en la bóveda
-      if (updateData.credentials && userPassword) {
-        updates.encrypted_credentials =
-          await EncryptionService.encryptCredentials(
-            updateData.credentials,
-            userPassword
-          );
-
-        // Ahora, actualiza las credenciales en la bóveda segura para el backend
-        try {
-            const { error: vaultError } = await supabase.functions.invoke(
-              "save-service-credentials",
-              {
-                body: {
-                  connection_id: connectionId,
-                  credentials: updateData.credentials,
-                },
-              }
-            );
-            if (vaultError) {
-              console.error("Failed to update credentials in secure vault:", vaultError);
-            }
-        } catch (e) {
-            console.error("Error invoking save-service-credentials for update:", e);
+      // Si se proporcionan nuevas credenciales, guardarlas en la bóveda segura.
+      if (updateData.credentials && Object.keys(updateData.credentials).length > 0) {
+        const { error: vaultError } = await supabase.functions.invoke(
+          "save-service-credentials",
+          { body: { connection_id: connectionId, credentials: updateData.credentials } }
+        );
+        if (vaultError) {
+          console.error("Failed to update credentials in secure vault:", vaultError);
+          throw new Error("No se pudieron actualizar las credenciales de forma segura.");
         }
       }
 
+      // Actualizar solo los metadatos en la tabla principal
       const { data, error } = await supabase
         .from("data_connections")
         .update(updates)
@@ -256,10 +190,7 @@ class ConnectionService {
 
       return {
         success: true,
-        connection: {
-          ...data,
-          encrypted_credentials: "[ENCRYPTED]",
-        },
+        connection: data,
       };
     } catch (error) {
       console.error("Error updating connection:", error);
@@ -279,6 +210,20 @@ class ConnectionService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
+      // La eliminación de la fila en `data_connections` disparará un `CASCADE DELETE`
+      // en `encrypted_service_credentials` gracias a la configuración de la Foreign Key.
+      // Sin embargo, para estar seguros y manejar la lógica explícitamente, llamamos a la función.
+      const { error: vaultError } = await supabase.functions.invoke(
+        "delete-service-credentials",
+        { body: { connection_id: connectionId } }
+      );
+
+      if (vaultError) {
+          // No lanzar un error si la bóveda falla, pero sí loggearlo.
+          // La conexión principal ya habrá sido eliminada.
+          console.error("Failed to delete credentials from secure vault:", vaultError);
+      }
+
       const { error } = await supabase
         .from("data_connections")
         .delete()
@@ -286,23 +231,6 @@ class ConnectionService {
         .eq("user_id", user.id);
 
       if (error) throw error;
-
-      // Ahora, elimina las credenciales de la bóveda segura
-      try {
-        const { error: vaultError } = await supabase.functions.invoke(
-          "delete-service-credentials",
-          {
-            body: {
-              connection_id: connectionId,
-            },
-          }
-        );
-        if (vaultError) {
-          console.error("Failed to delete credentials from secure vault:", vaultError);
-        }
-      } catch (e) {
-        console.error("Error invoking delete-service-credentials:", e);
-      }
 
       return {
         success: true,
@@ -508,36 +436,29 @@ class ConnectionService {
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos mapeados al formato estándar
    */
-  static async getDataFromActiveConnection(dataType = "pedidos", getDecryptedCredentials) {
+  static async getDataFromActiveConnection(dataType = "pedidos") {
     try {
-      // Usar el sistema multi-conexión para obtener la conexión específica para el tipo de datos
       const activeConnection = await this.getActiveConnection(dataType);
       if (!activeConnection) {
-        console.log(
-          `⚠️ No se encontró conexión activa para ${dataType}, usando Power Automate como fallback`
-        );
-        return await this.getDataFromPowerAutomate(dataType, getDecryptedCredentials);
+        console.warn(`No active connection found for data type: ${dataType}. Falling back to environment variables for Power Automate.`);
+        return await this.getDataFromPowerAutomate(null); // Pass null to signify fallback
       }
 
-      console.log(
-        `✅ Usando conexión ${activeConnection.name} (${activeConnection.type}) para ${dataType}`
-      );
+      console.log(`✅ Using connection ${activeConnection.name} (${activeConnection.type}) for ${dataType}`);
 
+      const credentials = await this.getDecryptedCredentials(activeConnection.id);
       let rawData;
 
       switch (activeConnection.type) {
         case "powerautomate":
-          rawData = await this.getDataFromPowerAutomate(dataType, getDecryptedCredentials);
+          rawData = await this.getDataFromPowerAutomate(credentials);
           break;
         case "supabase":
-          rawData = await this.getDataFromSupabase(activeConnection, dataType, getDecryptedCredentials);
+          rawData = await this.getDataFromSupabase(credentials);
           break;
         default:
-          // Por ahora, otras fuentes usan fallback
-          console.log(
-            `Tipo ${activeConnection.type} no implementado aún, usando Power Automate`
-          );
-          rawData = await this.getDataFromPowerAutomate(dataType, getDecryptedCredentials);
+          console.warn(`Connection type ${activeConnection.type} not fully implemented for data fetching. Falling back.`);
+          rawData = await this.getDataFromPowerAutomate(null); // Fallback
           break;
       }
 
@@ -617,20 +538,14 @@ class ConnectionService {
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos de Power Automate
    */
-  static async getDataFromPowerAutomate(dataType = "pedidos", getDecryptedCredentials) {
+  static async getDataFromPowerAutomate(credentials, dataType = "pedidos") {
     try {
-      const activeConnection = await this.getActiveConnection(dataType);
       let targetUrl;
-
-      if (activeConnection && activeConnection.type === "powerautomate") {
-        console.log(`[PA] Conexión Power Automate activa encontrada: ${activeConnection.name}`);
-        if (!getDecryptedCredentials) {
-            throw new Error("getDecryptedCredentials function is required for Power Automate connection.");
-        }
-        const credentials = await getDecryptedCredentials(activeConnection);
+      if (credentials) {
         targetUrl = credentials.flowUrl;
       } else {
-        console.log("[PA] No se encontró conexión Power Automate activa, usando variables de entorno como fallback.");
+        // Fallback a variables de entorno si no hay credenciales activas
+        console.log("[PA] No active connection. Falling back to environment variables.");
 
         // Para productos (disponibilidad) usar URL específica para productos
         if (dataType === "productos") {
@@ -711,15 +626,9 @@ class ConnectionService {
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos de Supabase
    */
-  static async getDataFromSupabase(connection, dataType = "pedidos", getDecryptedCredentials) {
+  static async getDataFromSupabase(credentials, dataType = "pedidos") {
     try {
       console.log(`🔗 Obteniendo datos de Supabase para ${dataType}`);
-
-      if (!getDecryptedCredentials) {
-        throw new Error("getDecryptedCredentials function is required for Supabase connection.");
-      }
-
-      const credentials = await getDecryptedCredentials(connection);
 
       const { projectUrl, anonKey, tableName } = credentials;
 
@@ -764,9 +673,8 @@ class ConnectionService {
       };
     } catch (error) {
       console.error(`Error fetching from Supabase (${dataType}):`, error);
-      // Fallback a Power Automate en caso de error
       console.warn("Error en Supabase, usando Power Automate como fallback");
-      return await this.getDataFromPowerAutomate(dataType);
+      return await this.getDataFromPowerAutomate(null, dataType);
     }
   }
 
@@ -1212,14 +1120,9 @@ class ConnectionService {
    * @param {string} userPassword - Contraseña del usuario para desencriptar credenciales
    * @returns {Promise<Object>} Resultado de la prueba de conexión
    */
-  static async testConnection(connection, getDecryptedCredentials) {
+  static async testConnection(connection) {
     try {
-      if (!getDecryptedCredentials) {
-        throw new Error("getDecryptedCredentials function is required to test connection.");
-      }
-
-      // 1. Obtener la conexión con credenciales desencriptadas a través del nuevo vault
-      const credentials = await getDecryptedCredentials(connection);
+      const credentials = await this.getDecryptedCredentials(connection.id);
 
       const { type, name } = connection;
 
@@ -1229,7 +1132,7 @@ class ConnectionService {
 
       console.log(`[Edge Test] 🚀 Probando conexión '${name}' de tipo: ${type}`);
 
-      // 2. Invocar la Edge Function con las credenciales
+      // Invocar la Edge Function con las credenciales
       const { data, error } = await supabase.functions.invoke(
         "test-api-connection",
         {
@@ -1241,32 +1144,18 @@ class ConnectionService {
       );
 
       if (error) {
-        // Manejar errores de la función (e.g., network error, function crash)
         console.error("Error invoking test-api-connection function:", error);
         return {
           success: false,
           message: `Error al invocar la función de prueba: ${error.message}`,
-          details: {
-            error: error.message,
-            timestamp: new Date().toISOString(),
-          },
+          details: { error: error.message, timestamp: new Date().toISOString() },
         };
       }
 
-      // La función retorna un objeto con { success, message, details }
-      // Lo retornamos directamente al cliente.
       return data;
 
     } catch (error) {
       console.error("Error general en testConnection:", error);
-      // Capturar error de contraseña incorrecta del vault
-      if (error.message.toLowerCase().includes("invalid password")) {
-        return {
-          success: false,
-          message: "Contraseña incorrecta. No se pudieron desencriptar las credenciales.",
-          details: { error: error.message },
-        }
-      }
       return {
         success: false,
         message: error.message || "Error fatal al probar la conexión.",
@@ -1274,6 +1163,7 @@ class ConnectionService {
       };
     }
   }
+
 
   /**
    * Obtener tipos de conexión soportados
