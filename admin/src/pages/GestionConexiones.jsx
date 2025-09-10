@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
-import { useCredentials } from "../contexts/CredentialsContext";
 import ConnectionService from "../services/connectionService";
-import EncryptionService from "../services/encryptionService";
 import DataMappingModal from "../components/DataMappingModal"; // eslint-disable-line no-unused-vars
 import DataTypeConnectionManager from "../components/DataTypeConnectionManager";
 import { supabase } from "../supabaseClient";
@@ -18,8 +16,6 @@ export default function GestionConexiones() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create', 'edit', 'test'
   const [selectedConnection, setSelectedConnection] = useState(null);
-  const [userPassword, setUserPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [userRole, setUserRole] = useState(null);// eslint-disable-line no-unused-vars
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
@@ -112,7 +108,6 @@ export default function GestionConexiones() {
   function abrirModal(type, connection = null) {
     setModalType(type);
     setSelectedConnection(connection);
-    setUserPassword('');
     
     if (connection && type === 'edit') {
       setFormData({
@@ -136,7 +131,6 @@ export default function GestionConexiones() {
   function cerrarModal() {
     setModalOpen(false);
     setSelectedConnection(null);
-    setUserPassword('');
     setFormData({
       name: '',
       type: '',
@@ -148,31 +142,11 @@ export default function GestionConexiones() {
   async function handleSubmit(e) {
     e.preventDefault();
     
-    if (!userPassword) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'La contraseña es requerida para encriptar las credenciales'
-      });
-      return;
-    }
-
-    // Validar contraseña
-    const passwordValidation = EncryptionService.validatePassword(userPassword);
-    if (!passwordValidation.valid) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Contraseña no válida',
-        html: passwordValidation.errors.map(error => `• ${error}`).join('<br>')
-      });
-      return;
-    }
-
     try {
       setLoading(true);
       
       if (modalType === 'create') {
-        await ConnectionService.createConnection(formData, userPassword);
+        await ConnectionService.createConnection(formData);
         Swal.fire({
           icon: 'success',
           title: 'Conexión creada',
@@ -181,8 +155,7 @@ export default function GestionConexiones() {
       } else if (modalType === 'edit') {
         await ConnectionService.updateConnection(
           selectedConnection.id,
-          formData,
-          userPassword
+          formData
         );
         Swal.fire({
           icon: 'success',
@@ -205,13 +178,10 @@ export default function GestionConexiones() {
     }
   }
 
-  const { getDecryptedCredentials } = useCredentials();
-
   async function testConnection(connection) {
     try {
       setLoading(true);
-      // The getDecryptedCredentials function will trigger the password prompt if needed
-      const result = await ConnectionService.testConnection(connection, getDecryptedCredentials);
+      const result = await ConnectionService.testConnection(connection);
       
       if (result.success) {
         // Si el test es exitoso, preguntar si desea activar la conexión
@@ -738,34 +708,6 @@ export default function GestionConexiones() {
                   </div>
                 )}
 
-                {/* Contraseña para encriptar */}
-                <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
-                  <h3 className="font-medium mb-2 text-yellow-800">🔒 Encriptación Zero-Knowledge</h3>
-                  <p className="text-sm text-yellow-700 mb-3">
-                    Tu contraseña se usa para encriptar las credenciales localmente. 
-                    Nunca se envía al servidor.
-                  </p>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={userPassword}
-                      onChange={(e) => setUserPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border rounded focus:outline-none focus:border-[#2c4b8b]"
-                      required
-                      placeholder="Contraseña para encriptar credenciales"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                    >
-                      {showPassword ? <FaEyeSlash /> : <FaEye />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-yellow-600 mt-1">
-                    Mínimo 12 caracteres, incluye mayúsculas, minúsculas y números
-                  </p>
-                </div>
 
                 <div className="flex gap-4 pt-4">
                   <button

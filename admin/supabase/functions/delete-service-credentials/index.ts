@@ -27,29 +27,23 @@ serve(async (req) => {
 
     const { data: { user } } = await userSupabaseClient.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Security Check: Verify the user owns the connection before deleting
-    // We can check the ownership on the row we are about to delete
-    // Create an admin client to perform the delete
+    // Create an admin client to perform the delete, but first check ownership
     const adminSupabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // The RLS on `data_connections` already prevents users from seeing connections they don't own.
-    // But for a delete operation on a table without RLS select, we must check ownership manually.
+    // Security Check: Verify the user owns the credentials before deleting.
     const { data: credential_to_delete, error: selectError } = await adminSupabaseClient
       .from("encrypted_service_credentials")
       .select("user_id")
       .eq("connection_id", connection_id)
       .single();
 
-    if (selectError || !credential_to_delete) {
+    if (selectError) {
       // If it doesn't exist, that's fine, the job is done.
       return new Response(JSON.stringify({ success: true, message: "No credentials to delete or already deleted." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,10 +52,7 @@ serve(async (req) => {
     }
 
     if (credential_to_delete.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 403,
-      });
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Perform the delete

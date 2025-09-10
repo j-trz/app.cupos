@@ -8,29 +8,28 @@ class ReservationService {
   /**
    * Obtener disponibilidad de cupos aéreos
    */
-  static async getAvailability(getDecryptedCredentials, useCache = true) {
+  static async getAvailability(useCache = true) {
     try {
       const cacheKey = "availability-data";
 
       if (useCache) {
         return await cacheService.getWithCache(cacheKey, async () => {
-          return await this._fetchAvailability(getDecryptedCredentials);
+          return await this._fetchAvailability();
         });
       }
 
-      return await this._fetchAvailability(getDecryptedCredentials);
+      return await this._fetchAvailability();
     } catch (error) {
       console.error("Error in getAvailability:", error);
       throw new Error(error.message || "Error al obtener disponibilidad");
     }
   }
 
-  static async _fetchAvailability(getDecryptedCredentials) {
+  static async _fetchAvailability() {
     try {
       // CORRECCIÓN: Ahora obtenemos productos directamente desde Power Automate
       const result = await ConnectionService.getDataFromActiveConnection(
-        "productos",
-        getDecryptedCredentials
+        "productos"
       );
 
       if (!result.success) {
@@ -79,24 +78,24 @@ class ReservationService {
   /**
    * Obtener solicitudes (filtradas según el usuario)
    */
-  static async getRequests(getDecryptedCredentials, useCache = true) {
+  static async getRequests(useCache = true) {
     try {
       const cacheKey = "requests-data";
 
       if (useCache) {
         return await cacheService.getWithCache(cacheKey, async () => {
-          return await this._fetchRequests(getDecryptedCredentials);
+          return await this._fetchRequests();
         });
       }
 
-      return await this._fetchRequests(getDecryptedCredentials);
+      return await this._fetchRequests();
     } catch (error) {
       console.error("Error in getRequests:", error);
       throw new Error(error.message || "Error al obtener solicitudes");
     }
   }
 
-  static async _fetchRequests(getDecryptedCredentials) {
+  static async _fetchRequests() {
     try {
       // Obtener filtros según el rol del usuario
       const filters = await AuthorizationService.getDataFilters();
@@ -106,8 +105,7 @@ class ReservationService {
 
       // Obtener datos específicos de pedidos
       const result = await ConnectionService.getDataFromActiveConnection(
-        "pedidos",
-        getDecryptedCredentials
+        "pedidos"
       );
 
       if (!result.success) {
@@ -238,24 +236,24 @@ class ReservationService {
   /**
    * Obtener confirmaciones (filtradas según el usuario)
    */
-  static async getConfirmations(getDecryptedCredentials, useCache = true) {
+  static async getConfirmations(useCache = true) {
     try {
       const cacheKey = "confirmations-data";
 
       if (useCache) {
         return await cacheService.getWithCache(cacheKey, async () => {
-          return await this._fetchConfirmations(getDecryptedCredentials);
+          return await this._fetchConfirmations();
         });
       }
 
-      return await this._fetchConfirmations(getDecryptedCredentials);
+      return await this._fetchConfirmations();
     } catch (error) {
       console.error("Error in getConfirmations:", error);
       throw new Error(error.message || "Error al obtener confirmaciones");
     }
   }
 
-  static async _fetchConfirmations(getDecryptedCredentials) {
+  static async _fetchConfirmations() {
     try {
       // Verificar permisos para ver confirmaciones
       // CORRECCIÓN: agency_user SÍ puede ver sus propias confirmaciones
@@ -274,8 +272,7 @@ class ReservationService {
 
       // Obtener datos específicos de pedidos
       const result = await ConnectionService.getDataFromActiveConnection(
-        "pedidos",
-        getDecryptedCredentials
+        "pedidos"
       );
 
       if (!result.success) {
