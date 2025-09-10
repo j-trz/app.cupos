@@ -52,6 +52,25 @@ class ConnectionService {
 
       if (error) throw error;
 
+      // Ahora, guarda las credenciales en la bóveda segura para el backend
+      try {
+        const { error: vaultError } = await supabase.functions.invoke(
+          "save-service-credentials",
+          {
+            body: {
+              connection_id: data.id,
+              credentials,
+            },
+          }
+        );
+        if (vaultError) {
+          console.error("Failed to save credentials to secure vault:", vaultError);
+          // Opcional: notificar al usuario que las tareas de fondo pueden fallar
+        }
+      } catch (e) {
+        console.error("Error invoking save-service-credentials:", e);
+      }
+
       return {
         success: true,
         connection: {
@@ -198,13 +217,31 @@ class ConnectionService {
         }
       });
 
-      // Si se actualizan credenciales, encriptarlas
+      // Si se actualizan credenciales, encriptarlas y guardarlas en la bóveda
       if (updateData.credentials && userPassword) {
         updates.encrypted_credentials =
           await EncryptionService.encryptCredentials(
             updateData.credentials,
             userPassword
           );
+
+        // Ahora, actualiza las credenciales en la bóveda segura para el backend
+        try {
+            const { error: vaultError } = await supabase.functions.invoke(
+              "save-service-credentials",
+              {
+                body: {
+                  connection_id: connectionId,
+                  credentials: updateData.credentials,
+                },
+              }
+            );
+            if (vaultError) {
+              console.error("Failed to update credentials in secure vault:", vaultError);
+            }
+        } catch (e) {
+            console.error("Error invoking save-service-credentials for update:", e);
+        }
       }
 
       const { data, error } = await supabase
@@ -249,6 +286,23 @@ class ConnectionService {
         .eq("user_id", user.id);
 
       if (error) throw error;
+
+      // Ahora, elimina las credenciales de la bóveda segura
+      try {
+        const { error: vaultError } = await supabase.functions.invoke(
+          "delete-service-credentials",
+          {
+            body: {
+              connection_id: connectionId,
+            },
+          }
+        );
+        if (vaultError) {
+          console.error("Failed to delete credentials from secure vault:", vaultError);
+        }
+      } catch (e) {
+        console.error("Error invoking delete-service-credentials:", e);
+      }
 
       return {
         success: true,
