@@ -40,7 +40,18 @@ async function decryptCredentials(encryptedBlob: string, secretKey: string) {
 
 // =========== Main Cron Job Logic ===========
 
-serve(async (_req) => {
+serve(async (req) => {
+  // This is needed to handle CORS preflight requests, though this function is not typically called from a browser.
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    });
+  }
+
   console.log("🚀 Cron job 'check-for-new-products-cron' started.");
 
   try {

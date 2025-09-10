@@ -42,8 +42,12 @@ async function decryptCredentials(encryptedBlob: string, secretKey: string) {
 }
 
 serve(async (req) => {
+  // This is needed to handle CORS preflight requests.
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   try {
