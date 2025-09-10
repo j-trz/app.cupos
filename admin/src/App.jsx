@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"; // eslint-disable-line no-unused-vars
 import { AuthProvider, useAuth } from "./contexts/AuthContext"; // eslint-disable-line no-unused-vars
+import { CredentialsProvider } from "./contexts/CredentialsContext";
+import PasswordPromptModal from "./components/PasswordPromptModal";
 import ConfirmacionExitosa from "./pages/ConfirmacionExitosa"; // eslint-disable-line no-unused-vars
 
 import Dashboard from "./pages/Dashboard"; // eslint-disable-line no-unused-vars
@@ -68,7 +70,7 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
 
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isInitialized]);
+  }, [isInitialized]);
 
   // Mostrar loader mientras se inicializa
   if (!isInitialized || isLoading) {
@@ -193,7 +195,10 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <CredentialsProvider>
+        <AppRoutes />
+        <PasswordPromptModal />
+      </CredentialsProvider>
     </AuthProvider>
   );
 }

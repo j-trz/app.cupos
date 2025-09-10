@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
+import { useCredentials } from "../contexts/CredentialsContext";
 import ConnectionService from "../services/connectionService";
 import EncryptionService from "../services/encryptionService";
 import DataMappingModal from "../components/DataMappingModal"; // eslint-disable-line no-unused-vars
@@ -204,25 +205,13 @@ export default function GestionConexiones() {
     }
   }
 
+  const { getDecryptedCredentials } = useCredentials();
+
   async function testConnection(connection) {
-    const { value: password } = await Swal.fire({
-      title: 'Probar Conexión',
-      text: 'Ingresa tu contraseña para desencriptar y probar la conexión:',
-      input: 'password',
-      inputPlaceholder: 'Contraseña',
-      showCancelButton: true,
-      confirmButtonText: 'Probar',
-      cancelButtonText: 'Cancelar',
-      inputValidator: (value) => {
-        if (!value) return 'La contraseña es requerida';
-      }
-    });
-
-    if (!password) return;
-
     try {
       setLoading(true);
-      const result = await ConnectionService.testConnection(connection.id, password);
+      // The getDecryptedCredentials function will trigger the password prompt if needed
+      const result = await ConnectionService.testConnection(connection, getDecryptedCredentials);
       
       if (result.success) {
         // Si el test es exitoso, preguntar si desea activar la conexión

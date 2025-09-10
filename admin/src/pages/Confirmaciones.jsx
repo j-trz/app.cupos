@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import ReservationService from '../services/reservationService';
+import { useCredentials } from "../contexts/CredentialsContext";
 import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
   
@@ -41,17 +42,16 @@ export default function Confirmaciones() {
     return true;
   });
 
+  const { getDecryptedCredentials } = useCredentials();
+
   useEffect(() => {
     fetchConfirmaciones();
-    // Actualizar cada 30 segundos
-    const intervalId = setInterval(() => fetchConfirmaciones(), 30000);
-    return () => clearInterval(intervalId);
   }, []);
 
   async function fetchConfirmaciones(forceRefresh = false) {
     setLoading(true);
     try {
-      const result = await ReservationService.getConfirmations(!forceRefresh);
+      const result = await ReservationService.getConfirmations(getDecryptedCredentials, !forceRefresh);
       if (result.success) {
         setDatos(result.data);
       } else {
