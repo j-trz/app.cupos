@@ -1,0 +1,4 @@
+# Supabase project configuration
+
+[functions.check-for-new-products-cron]
+cron = "*/30 * * * *"

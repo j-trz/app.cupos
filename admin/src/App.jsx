@@ -64,11 +64,6 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
     if (isInitialized) {
       const timer = setTimeout(() => {
         ensurePowerAutomateConnection();
-        
-        // Iniciar monitoreo de nuevos productos si está autenticado
-        if (isAuthenticated) {
-          ReservationService.startNewProductsMonitoring(30);
-        }
       }, 1000);
 
       return () => clearTimeout(timer);
