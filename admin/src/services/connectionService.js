@@ -508,7 +508,7 @@ class ConnectionService {
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos mapeados al formato estándar
    */
-  static async getDataFromActiveConnection(dataType = "pedidos") {
+  static async getDataFromActiveConnection(dataType = "pedidos", getDecryptedCredentials) {
     try {
       // Usar el sistema multi-conexión para obtener la conexión específica para el tipo de datos
       const activeConnection = await this.getActiveConnection(dataType);
@@ -516,7 +516,7 @@ class ConnectionService {
         console.log(
           `⚠️ No se encontró conexión activa para ${dataType}, usando Power Automate como fallback`
         );
-        return await this.getDataFromPowerAutomate(dataType);
+        return await this.getDataFromPowerAutomate(dataType, getDecryptedCredentials);
       }
 
       console.log(
@@ -527,17 +527,17 @@ class ConnectionService {
 
       switch (activeConnection.type) {
         case "powerautomate":
-          rawData = await this.getDataFromPowerAutomate(dataType);
+          rawData = await this.getDataFromPowerAutomate(dataType, getDecryptedCredentials);
           break;
         case "supabase":
-          rawData = await this.getDataFromSupabase(activeConnection, dataType);
+          rawData = await this.getDataFromSupabase(activeConnection, dataType, getDecryptedCredentials);
           break;
         default:
           // Por ahora, otras fuentes usan fallback
           console.log(
             `Tipo ${activeConnection.type} no implementado aún, usando Power Automate`
           );
-          rawData = await this.getDataFromPowerAutomate(dataType);
+          rawData = await this.getDataFromPowerAutomate(dataType, getDecryptedCredentials);
           break;
       }
 
@@ -617,45 +617,38 @@ class ConnectionService {
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos de Power Automate
    */
-  static async getDataFromPowerAutomate(dataType = "pedidos") {
+  static async getDataFromPowerAutomate(dataType = "pedidos", getDecryptedCredentials) {
     try {
       const activeConnection = await this.getActiveConnection(dataType);
       let targetUrl;
-      let credentials;
 
       if (activeConnection && activeConnection.type === "powerautomate") {
         console.log(`[PA] Conexión Power Automate activa encontrada: ${activeConnection.name}`);
-        try {
-          // Intentar desencriptar credenciales sin contraseña del usuario (para operaciones de fondo)
-          credentials = await EncryptionService.decryptCredentials(
-            activeConnection.encrypted_credentials,
-            "" // Intentar con contraseña vacía primero
-          );
-          targetUrl = credentials.flowUrl;
-          console.log("[PA] ✅ Credenciales desencriptadas exitosamente para lectura automática.");
-        } catch (e) {
-          console.warn(
-            `[PA] ⚠️ No se pudieron desencriptar las credenciales para '${activeConnection.name}' (esto es normal si requiere contraseña). Usando fallback a variables de entorno.`
-          );
-          // Fallback a variables de entorno si la desencriptación falla
-          credentials = null;
+        if (!getDecryptedCredentials) {
+            throw new Error("getDecryptedCredentials function is required for Power Automate connection.");
         }
-      }
+        const credentials = await getDecryptedCredentials(activeConnection);
+        targetUrl = credentials.flowUrl;
+      } else {
+        console.log("[PA] No se encontró conexión Power Automate activa, usando variables de entorno como fallback.");
 
-      // Fallback a variables de entorno si no hay conexión activa o falla la desencriptación
-      if (!targetUrl) {
-        console.log("[PA] Usando variables de entorno como fallback para URL de Power Automate.");
-        targetUrl = dataType === "productos"
-          ? import.meta.env.VITE_POWERAUTOMATE_GET_URL
-          : import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
-
-        if(targetUrl) {
-            console.log(`[PA] URL de fallback para '${dataType}': ${targetUrl}`);
+        // Para productos (disponibilidad) usar URL específica para productos
+        if (dataType === "productos") {
+          // Usar variable de entorno específica para productos/disponibilidad
+          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL;
+          console.log(
+            `🎯 PRODUCTOS (disponibilidad) usará URL de productos:`,
+            targetUrl
+          );
+        } else {
+          // Para pedidos usar URL original
+          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
+          console.log(`📋 PEDIDOS usará URL de solicitudes:`, targetUrl);
         }
       }
 
       if (!targetUrl) {
-        throw new Error(`[PA] No se encontró URL de Power Automate para el tipo de datos: ${dataType}`);
+        throw new Error(`No se encontró URL para tipo de datos: ${dataType}`);
       }
 
       console.log(
@@ -718,55 +711,15 @@ class ConnectionService {
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
    * @returns {Promise<Object>} Datos de Supabase
    */
-  static async getDataFromSupabase(connection, dataType = "pedidos") {
+  static async getDataFromSupabase(connection, dataType = "pedidos", getDecryptedCredentials) {
     try {
       console.log(`🔗 Obteniendo datos de Supabase para ${dataType}`);
 
-      // Las credenciales están encriptadas y necesitan ser desencriptadas
-      let credentials = connection.credentials;
-
-      // Si no hay credenciales ya desencriptadas, intentar desencriptar
-      if (!credentials && connection.encrypted_credentials) {
-        try {
-          // Para obtener datos de lectura, intentar sin contraseña (usando clave por defecto)
-          const EncryptionService = (await import("./encryptionService"))
-            .default;
-
-          // Intentar desencriptar con contraseña vacía o por defecto
-          try {
-            credentials = await EncryptionService.decryptCredentials(
-              connection.encrypted_credentials,
-              "" // Contraseña vacía para casos de lectura pública
-            );
-          } catch (_emptyPasswordError) {
-            // Si falla con contraseña vacía, intentar con un patrón común
-            try {
-              credentials = await EncryptionService.decryptCredentials(
-                connection.encrypted_credentials,
-                "default" // Contraseña por defecto
-              );
-            } catch (_defaultPasswordError) {
-              console.warn(
-                "No se pudo desencriptar credenciales de Supabase sin contraseña del usuario"
-              );
-              credentials = null;
-            }
-          }
-        } catch (decryptError) {
-          console.warn(
-            "Error al desencriptar credenciales:",
-            decryptError.message
-          );
-          credentials = null;
-        }
+      if (!getDecryptedCredentials) {
+        throw new Error("getDecryptedCredentials function is required for Supabase connection.");
       }
 
-      if (!credentials) {
-        console.warn(
-          "⚠️ Credenciales de Supabase no disponibles, usando fallback"
-        );
-        return await this.getDataFromPowerAutomate(dataType);
-      }
+      const credentials = await getDecryptedCredentials(connection);
 
       const { projectUrl, anonKey, tableName } = credentials;
 
@@ -1254,20 +1207,21 @@ class ConnectionService {
   }
 
   /**
-   * Probar una conexión existente usando la Edge Function 'test-api-connection'
+   * Probar una conexión existente
    * @param {string} connectionId - ID de la conexión a probar
    * @param {string} userPassword - Contraseña del usuario para desencriptar credenciales
    * @returns {Promise<Object>} Resultado de la prueba de conexión
    */
-  static async testConnection(connectionId, userPassword) {
+  static async testConnection(connection, getDecryptedCredentials) {
     try {
-      // 1. Obtener la conexión con credenciales desencriptadas
-      const { connection: connectionData } = await this.getConnection(
-        connectionId,
-        userPassword
-      );
+      if (!getDecryptedCredentials) {
+        throw new Error("getDecryptedCredentials function is required to test connection.");
+      }
 
-      const { type, credentials, name } = connectionData;
+      // 1. Obtener la conexión con credenciales desencriptadas a través del nuevo vault
+      const credentials = await getDecryptedCredentials(connection);
+
+      const { type, name } = connection;
 
       if (!type || !credentials) {
         throw new Error("Datos de conexión incompletos para la prueba.");
@@ -1305,8 +1259,8 @@ class ConnectionService {
 
     } catch (error) {
       console.error("Error general en testConnection:", error);
-      // Capturar error de contraseña incorrecta de `getConnection`
-      if (error.message.toLowerCase().includes("could not decrypt")) {
+      // Capturar error de contraseña incorrecta del vault
+      if (error.message.toLowerCase().includes("invalid password")) {
         return {
           success: false,
           message: "Contraseña incorrecta. No se pudieron desencriptar las credenciales.",
