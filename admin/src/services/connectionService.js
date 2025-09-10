@@ -565,48 +565,43 @@ class ConnectionService {
    */
   static async getDataFromPowerAutomate(dataType = "pedidos") {
     try {
-      // Primero intentar obtener la conexión activa
-      const activeConnection = await this.getActiveConnection();
+      const activeConnection = await this.getActiveConnection(dataType);
       let targetUrl;
+      let credentials;
 
       if (activeConnection && activeConnection.type === "powerautomate") {
+        console.log(`[PA] Conexión Power Automate activa encontrada: ${activeConnection.name}`);
         try {
-          // Las credenciales están encriptadas y necesitan ser desencriptadas
-          // Por ahora usar directamente las variables de entorno como fallback más confiable
-          console.log(
-            "Conexión Power Automate encontrada, usando variables de entorno para estabilidad"
+          // Intentar desencriptar credenciales sin contraseña del usuario (para operaciones de fondo)
+          credentials = await EncryptionService.decryptCredentials(
+            activeConnection.encrypted_credentials,
+            "" // Intentar con contraseña vacía primero
           );
-          // Saltar directamente al fallback para evitar errores de desencriptación
-        } catch (error) {
+          targetUrl = credentials.flowUrl;
+          console.log("[PA] ✅ Credenciales desencriptadas exitosamente para lectura automática.");
+        } catch (e) {
           console.warn(
-            "No se pudieron obtener credenciales de conexión activa:",
-            error
+            `[PA] ⚠️ No se pudieron desencriptar las credenciales para '${activeConnection.name}' (esto es normal si requiere contraseña). Usando fallback a variables de entorno.`
           );
-          // Continuar con fallback a variables de entorno
+          // Fallback a variables de entorno si la desencriptación falla
+          credentials = null;
         }
       }
 
-      // Fallback a variables de entorno si no hay conexión activa
+      // Fallback a variables de entorno si no hay conexión activa o falla la desencriptación
       if (!targetUrl) {
-        console.log("Usando variables de entorno como fallback");
+        console.log("[PA] Usando variables de entorno como fallback para URL de Power Automate.");
+        targetUrl = dataType === "productos"
+          ? import.meta.env.VITE_POWERAUTOMATE_GET_URL
+          : import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
 
-        // Para productos (disponibilidad) usar URL específica para productos
-        if (dataType === "productos") {
-          // Usar variable de entorno específica para productos/disponibilidad
-          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL;
-          console.log(
-            `🎯 PRODUCTOS (disponibilidad) usará URL de productos:`,
-            targetUrl
-          );
-        } else {
-          // Para pedidos usar URL original
-          targetUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL_SS;
-          console.log(`📋 PEDIDOS usará URL de solicitudes:`, targetUrl);
+        if(targetUrl) {
+            console.log(`[PA] URL de fallback para '${dataType}': ${targetUrl}`);
         }
       }
 
       if (!targetUrl) {
-        throw new Error(`No se encontró URL para tipo de datos: ${dataType}`);
+        throw new Error(`[PA] No se encontró URL de Power Automate para el tipo de datos: ${dataType}`);
       }
 
       console.log(
@@ -1205,196 +1200,70 @@ class ConnectionService {
   }
 
   /**
-   * Probar una conexión existente
+   * Probar una conexión existente usando la Edge Function 'test-api-connection'
    * @param {string} connectionId - ID de la conexión a probar
    * @param {string} userPassword - Contraseña del usuario para desencriptar credenciales
    * @returns {Promise<Object>} Resultado de la prueba de conexión
    */
   static async testConnection(connectionId, userPassword) {
     try {
-      // Primero obtener la conexión con credenciales desencriptadas
+      // 1. Obtener la conexión con credenciales desencriptadas
       const { connection: connectionData } = await this.getConnection(
         connectionId,
         userPassword
       );
 
-      const { type, credentials } = connectionData;
+      const { type, credentials, name } = connectionData;
 
       if (!type || !credentials) {
-        throw new Error("Datos de conexión incompletos");
+        throw new Error("Datos de conexión incompletos para la prueba.");
       }
 
-      console.log(`🔍 Probando conexión de tipo: ${type}`);
+      console.log(`[Edge Test] 🚀 Probando conexión '${name}' de tipo: ${type}`);
 
-      let testResult;
+      // 2. Invocar la Edge Function con las credenciales
+      const { data, error } = await supabase.functions.invoke(
+        "test-api-connection",
+        {
+          body: {
+            type,
+            credentials,
+          },
+        }
+      );
 
-      switch (type) {
-        case "supabase":
-          testResult = await this._testSupabaseConnection(credentials);
-          break;
-        case "mongodb":
-          testResult = await this._testMongoDBConnection(credentials);
-          break;
-        case "smartsheet":
-          testResult = await this._testSmartsheetConnection(credentials);
-          break;
-        case "tableau":
-          testResult = await this._testTableauConnection(credentials);
-          break;
-        case "powerautomate":
-          testResult = await this._testPowerAutomateConnection(credentials);
-          break;
-        default:
-          throw new Error(`Tipo de conexión no soportado: ${type}`);
+      if (error) {
+        // Manejar errores de la función (e.g., network error, function crash)
+        console.error("Error invoking test-api-connection function:", error);
+        return {
+          success: false,
+          message: `Error al invocar la función de prueba: ${error.message}`,
+          details: {
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          },
+        };
       }
 
-      return {
-        success: true,
-        message: "Conexión probada exitosamente",
-        details: testResult,
-      };
+      // La función retorna un objeto con { success, message, details }
+      // Lo retornamos directamente al cliente.
+      return data;
+
     } catch (error) {
-      console.error("Error testing connection:", error);
+      console.error("Error general en testConnection:", error);
+      // Capturar error de contraseña incorrecta de `getConnection`
+      if (error.message.toLowerCase().includes("could not decrypt")) {
+        return {
+          success: false,
+          message: "Contraseña incorrecta. No se pudieron desencriptar las credenciales.",
+          details: { error: error.message },
+        }
+      }
       return {
         success: false,
-        message: error.message || "Error al probar la conexión",
-        error: error.message,
+        message: error.message || "Error fatal al probar la conexión.",
+        details: { error: error.toString() },
       };
-    }
-  }
-
-  /**
-   * Probar conexión a Supabase
-   */
-  static async _testSupabaseConnection(credentials) {
-    const { projectUrl, anonKey, tableName } = credentials;
-
-    if (!projectUrl || !anonKey) {
-      throw new Error("URL del proyecto y clave anónima son requeridos");
-    }
-
-    try {
-      // Importar dinámicamente para evitar problemas de dependencias
-      const { createClient } = await import("@supabase/supabase-js");
-      const client = createClient(projectUrl, anonKey);
-
-      // Probar una consulta simple
-      const { data, error } = await client
-        .from(tableName || "reservas")
-        .select("*")
-        .limit(1);
-
-      if (
-        error &&
-        !error.message.includes("relation") &&
-        !error.message.includes("RLS")
-      ) {
-        throw new Error(`Error de Supabase: ${error.message}`);
-      }
-
-      return {
-        status: "connected",
-        message: error
-          ? "Conectado (tabla no existe o RLS activo)"
-          : "Conectado exitosamente",
-        hasData: data && data.length > 0,
-        tableName: tableName || "reservas",
-      };
-    } catch (error) {
-      throw new Error(`Error conectando a Supabase: ${error.message}`);
-    }
-  }
-
-  /**
-   * Probar conexión a MongoDB
-   */
-  static async _testMongoDBConnection(credentials) {
-    const { connectionString, databaseName, collectionName } = credentials;
-
-    if (!connectionString || !databaseName) {
-      throw new Error(
-        "Connection string y nombre de base de datos son requeridos"
-      );
-    }
-
-    // Para MongoDB, solo validamos que los datos estén presentes
-    // En un entorno real, aquí haríamos una conexión real
-    return {
-      status: "validated",
-      message: "Credenciales validadas (conexión simulada)",
-      database: databaseName,
-      collection: collectionName || "reservations",
-    };
-  }
-
-  /**
-   * Probar conexión a Smartsheet
-   */
-  static async _testSmartsheetConnection(credentials) {
-    const { accessToken, sheetId } = credentials;
-
-    if (!accessToken || !sheetId) {
-      throw new Error("Access token y sheet ID son requeridos");
-    }
-
-    // Debido a CORS, no podemos hacer llamadas directas desde el frontend
-    // Retornamos una validación de credenciales
-    return {
-      status: "validated",
-      message: "Credenciales validadas (CORS bloquea prueba directa)",
-      sheetId: sheetId,
-      note: "La conexión real se verificará desde el backend",
-    };
-  }
-
-  /**
-   * Probar conexión a Tableau
-   */
-  static async _testTableauConnection(credentials) {
-    const { serverUrl, username, password, siteName } = credentials;
-
-    if (!serverUrl || !username || !password) {
-      throw new Error("URL del servidor, usuario y contraseña son requeridos");
-    }
-
-    // Para Tableau, validamos que los datos estén presentes
-    // En un entorno real, aquí haríamos autenticación real
-    return {
-      status: "validated",
-      message: "Credenciales validadas (conexión simulada)",
-      server: serverUrl,
-      site: siteName || "default",
-    };
-  }
-
-  /**
-   * Probar conexión a Power Automate
-   */
-  static async _testPowerAutomateConnection(credentials) {
-    const { flowUrl } = credentials;
-
-    if (!flowUrl) {
-      throw new Error("URL del Flow es requerida");
-    }
-
-    try {
-      // Hacer una solicitud HEAD para verificar que el endpoint existe
-      const response = await fetch(flowUrl, {
-        method: "HEAD",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      return {
-        status: response.ok ? "connected" : "error",
-        message: response.ok
-          ? "Flow accesible"
-          : `Error HTTP ${response.status}: ${response.statusText}`,
-        flowUrl: flowUrl,
-      };
-    } catch (error) {
-      throw new Error(`Error probando Flow: ${error.message}`);
     }
   }
 
