@@ -27,6 +27,7 @@ export default function GestionConexiones() {
     name: '',
     type: '',
     description: '',
+    is_global: false,
     credentials: {}
   });
 
@@ -141,10 +142,38 @@ export default function GestionConexiones() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    
+
+    // Validación de campos requeridos de credenciales
+    const typeDef = supportedTypes.find(t => t.type === formData.type);
+    if (typeDef) {
+      const missingFields = typeDef.fields
+        .filter(f => f.required && (!formData.credentials[f.name] || formData.credentials[f.name].trim() === ""))
+        .map(f => f.label);
+
+      if (missingFields.length > 0) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Campos obligatorios faltantes',
+          text: `Completa los siguientes campos: ${missingFields.join(", ")}`
+        });
+        return;
+      }
+    }
+
+    // Log exhaustivo del payload antes de enviar
+    console.log("🔎 Payload de creación de conexión:", JSON.stringify(formData, null, 2));
+    Object.entries(formData.credentials).forEach(([key, value]) => {
+      if (typeof value !== "string") {
+        console.warn(`⚠️ El campo de credencial '${key}' no es string:`, value);
+      }
+      if (value === null || value === undefined) {
+        console.warn(`⚠️ El campo de credencial '${key}' es nulo o indefinido`);
+      }
+    });
+
     try {
       setLoading(true);
-      
+
       if (modalType === 'create') {
         await ConnectionService.createConnection(formData);
         Swal.fire({
@@ -163,7 +192,7 @@ export default function GestionConexiones() {
           text: 'La conexión se ha actualizado correctamente'
         });
       }
-      
+
       cerrarModal();
       await fetchConexiones();
     } catch (error) {
@@ -359,15 +388,53 @@ export default function GestionConexiones() {
     try {
       setLoading(true);
       await ConnectionService.setActiveConnection(connectionId);
-      
-      Swal.fire({
-        icon: 'success',
-        title: 'Conexión activada',
-        text: 'La conexión se ha activado correctamente. Los datos ahora se obtendrán de esta fuente.',
-        timer: 3000,
-        showConfirmButton: false
+
+      // Preguntar si debe asignarse a un tipo de datos
+      const { value: dataType } = await Swal.fire({
+        title: '¿Asignar esta conexión a un tipo de datos?',
+        text: 'Selecciona el tipo de datos para asignar esta conexión como activa:',
+        input: 'select',
+        inputOptions: {
+          products: 'Productos/Disponibilidad',
+          orders: 'Pedidos/Reservas',
+          all: 'Todos'
+        },
+        inputPlaceholder: 'No asignar',
+        showCancelButton: true,
+        confirmButtonText: 'Asignar',
+        cancelButtonText: 'No asignar',
+        inputValidator: (value) => {
+          if (!value) return null;
+        }
       });
-      
+
+      if (dataType) {
+        try {
+          await ConnectionService.setConnectionDataType(connectionId, dataType, true);
+          Swal.fire({
+            icon: 'success',
+            title: 'Asignación realizada',
+            text: `La conexión se ha asignado como activa para el tipo "${dataType}".`,
+            timer: 3000,
+            showConfirmButton: false
+          });
+        } catch (assignError) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error al asignar tipo de datos',
+            text: assignError.message
+          });
+        }
+      } else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Conexión activada',
+          text: 'La conexión se ha activado correctamente. Los datos ahora se obtendrán de esta fuente.',
+          timer: 3000,
+          showConfirmButton: false
+        });
+      }
+
       await fetchConexiones();
     } catch (error) {
       console.error('Error activating connection:', error);
@@ -603,7 +670,10 @@ export default function GestionConexiones() {
                           <div
                             key={type.type}
                             onClick={() => {
-                              setFormData({...formData, type: type.type, credentials: {}});
+                              // Inicializar credenciales con todas las claves requeridas del tipo
+                              const initialCreds = {};
+                              type.fields.forEach(f => { initialCreds[f.name] = ""; });
+                              setFormData({...formData, type: type.type, credentials: initialCreds});
                               setShowTypeDropdown(false);
                             }}
                             className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
@@ -654,6 +724,17 @@ export default function GestionConexiones() {
                   />
                 </div>
 
+                {/* Selector de conexión global (solo admins) */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Conexión global (visible para todos los usuarios)</label>
+                  <input
+                    type="checkbox"
+                    checked={!!formData.is_global}
+                    onChange={(e) => setFormData({ ...formData, is_global: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-xs text-gray-500">Solo los administradores pueden crear conexiones globales</span>
+                </div>
                 {/* Campos específicos del tipo */}
                 {formData.type && (
                   <div className="bg-gray-50 p-4 rounded">

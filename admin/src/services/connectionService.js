@@ -29,14 +29,16 @@ class ConnectionService {
       // Crear registro de metadatos en la base de datos
       const { data, error } = await supabase
         .from("data_connections")
-        .insert([{
-          user_id: user.id,
-          name,
-          type,
-          description,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
+        .insert([
+          {
+            user_id: user.id,
+            name,
+            type,
+            description,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ])
         .select()
         .single();
 
@@ -51,8 +53,13 @@ class ConnectionService {
       if (vaultError) {
         // Si falla el guardado en la bóveda, revertir la creación de la conexión
         await supabase.from("data_connections").delete().eq("id", data.id);
-        console.error("Failed to save credentials to secure vault, rolling back.", vaultError);
-        throw new Error("No se pudieron guardar las credenciales de forma segura. La conexión no fue creada.");
+        console.error(
+          "Failed to save credentials to secure vault, rolling back.",
+          vaultError
+        );
+        throw new Error(
+          "No se pudieron guardar las credenciales de forma segura. La conexión no fue creada."
+        );
       }
 
       return { success: true, connection: data };
@@ -128,16 +135,76 @@ class ConnectionService {
    * @returns {Promise<Object>} Las credenciales desencriptadas.
    */
   static async getDecryptedCredentials(connectionId) {
-    const { data, error } = await supabase.functions.invoke(
-      "get-decrypted-credentials",
-      { body: { connection_id: connectionId } }
-    );
+    try {
+      console.log(
+        `🔐 [ConnectionService] Getting credentials for connection: ${connectionId}`
+      );
 
-    if (error) {
-      console.error("Error fetching decrypted credentials:", error);
-      throw new Error(error.message || "No se pudieron obtener las credenciales.");
+      // TEMPORAL: Pasar MASTER_ENCRYPTION_KEY como parámetro
+      const TEMP_MASTER_KEY = "my-application-master-key-2024-secure-32-chars"; // 32+ caracteres
+
+      const { data, error } = await supabase.functions.invoke(
+        "get-decrypted-credentials",
+        {
+          body: {
+            connection_id: connectionId,
+            master_encryption_key: TEMP_MASTER_KEY, // TEMPORAL
+          },
+        }
+      );
+
+      if (error) {
+        console.error("❌ [ConnectionService] Edge Function error:", error);
+        console.error("❌ [ConnectionService] Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+
+        // Distinguish between different types of errors
+        if (error.message?.includes("MASTER_ENCRYPTION_KEY")) {
+          throw new Error(
+            "🔧 Server configuration error: Encryption key not configured. Contact administrator."
+          );
+        } else if (error.message?.includes("No credentials found")) {
+          throw new Error(
+            "📝 No credentials saved for this connection. Please configure the connection first."
+          );
+        } else if (
+          error.message?.includes("Unauthorized") ||
+          error.message?.includes("Authentication")
+        ) {
+          throw new Error("🔐 Authentication error. Please log in again.");
+        } else if (error.message?.includes("Forbidden")) {
+          throw new Error(
+            "🚫 Access denied. You don't have permission to access this connection."
+          );
+        } else {
+          throw new Error(
+            `🚨 Edge Function error: ${
+              error.message || "Unknown error occurred"
+            }`
+          );
+        }
+      }
+
+      if (!data) {
+        console.error(
+          "❌ [ConnectionService] No data returned from Edge Function"
+        );
+        throw new Error("📭 No credential data returned from server");
+      }
+
+      console.log("✅ [ConnectionService] Credentials retrieved successfully");
+      return data;
+    } catch (error) {
+      console.error(
+        "💥 [ConnectionService] Fatal error in getDecryptedCredentials:",
+        error
+      );
+      throw error; // Re-throw to maintain error context
     }
-    return data;
   }
 
   /**
@@ -166,14 +233,27 @@ class ConnectionService {
       });
 
       // Si se proporcionan nuevas credenciales, guardarlas en la bóveda segura.
-      if (updateData.credentials && Object.keys(updateData.credentials).length > 0) {
+      if (
+        updateData.credentials &&
+        Object.keys(updateData.credentials).length > 0
+      ) {
         const { error: vaultError } = await supabase.functions.invoke(
           "save-service-credentials",
-          { body: { connection_id: connectionId, credentials: updateData.credentials } }
+          {
+            body: {
+              connection_id: connectionId,
+              credentials: updateData.credentials,
+            },
+          }
         );
         if (vaultError) {
-          console.error("Failed to update credentials in secure vault:", vaultError);
-          throw new Error("No se pudieron actualizar las credenciales de forma segura.");
+          console.error(
+            "Failed to update credentials in secure vault:",
+            vaultError
+          );
+          throw new Error(
+            "No se pudieron actualizar las credenciales de forma segura."
+          );
         }
       }
 
@@ -219,9 +299,12 @@ class ConnectionService {
       );
 
       if (vaultError) {
-          // No lanzar un error si la bóveda falla, pero sí loggearlo.
-          // La conexión principal ya habrá sido eliminada.
-          console.error("Failed to delete credentials from secure vault:", vaultError);
+        // No lanzar un error si la bóveda falla, pero sí loggearlo.
+        // La conexión principal ya habrá sido eliminada.
+        console.error(
+          "Failed to delete credentials from secure vault:",
+          vaultError
+        );
       }
 
       const { error } = await supabase
@@ -440,25 +523,63 @@ class ConnectionService {
     try {
       const activeConnection = await this.getActiveConnection(dataType);
       if (!activeConnection) {
-        console.warn(`No active connection found for data type: ${dataType}. Falling back to environment variables for Power Automate.`);
-        return await this.getDataFromPowerAutomate(null); // Pass null to signify fallback
+        console.warn(
+          `⚠️ [ConnectionService] No active connection found for data type: ${dataType}. Falling back to environment variables for Power Automate.`
+        );
+        return await this.getDataFromPowerAutomate(null, dataType); // Pass null to signify fallback
       }
 
-      console.log(`✅ Using connection ${activeConnection.name} (${activeConnection.type}) for ${dataType}`);
+      console.log(
+        `✅ [ConnectionService] Using connection ${activeConnection.name} (${activeConnection.type}) for ${dataType}`
+      );
 
-      const credentials = await this.getDecryptedCredentials(activeConnection.id);
+      let credentials;
+      try {
+        credentials = await this.getDecryptedCredentials(activeConnection.id);
+      } catch (credentialError) {
+        console.error(
+          `❌ [ConnectionService] Failed to get credentials for connection '${activeConnection.name}':`,
+          credentialError
+        );
+
+        // Don't fallback for configuration errors - these need to be fixed
+        if (
+          credentialError.message?.includes("Server configuration error") ||
+          credentialError.message?.includes("MASTER_ENCRYPTION_KEY") ||
+          credentialError.message?.includes("No credentials found") ||
+          credentialError.message?.includes("Authentication error") ||
+          credentialError.message?.includes("Access denied")
+        ) {
+          console.error(
+            `🚨 [ConnectionService] Configuration issue with connection '${activeConnection.name}' - NOT falling back to Power Automate`
+          );
+          throw new Error(
+            `Connection '${activeConnection.name}' configuration error: ${credentialError.message}`
+          );
+        }
+
+        // For other errors, we can fallback
+        console.warn(
+          `⚠️ [ConnectionService] Unexpected error with connection '${activeConnection.name}', falling back to Power Automate:`,
+          credentialError
+        );
+        return await this.getDataFromPowerAutomate(null, dataType);
+      }
+
       let rawData;
 
       switch (activeConnection.type) {
         case "powerautomate":
-          rawData = await this.getDataFromPowerAutomate(credentials);
+          rawData = await this.getDataFromPowerAutomate(credentials, dataType);
           break;
         case "supabase":
-          rawData = await this.getDataFromSupabase(credentials);
+          rawData = await this.getDataFromSupabase(credentials, dataType);
           break;
         default:
-          console.warn(`Connection type ${activeConnection.type} not fully implemented for data fetching. Falling back.`);
-          rawData = await this.getDataFromPowerAutomate(null); // Fallback
+          console.warn(
+            `⚠️ [ConnectionService] Connection type ${activeConnection.type} not fully implemented for data fetching. Falling back.`
+          );
+          rawData = await this.getDataFromPowerAutomate(null, dataType); // Fallback
           break;
       }
 
@@ -471,7 +592,7 @@ class ConnectionService {
 
         if (!validation.valid) {
           console.warn(
-            "Datos no cumplen estructura estándar:",
+            "⚠️ [ConnectionService] Datos no cumplen estructura estándar:",
             validation.errors
           );
 
@@ -485,7 +606,7 @@ class ConnectionService {
               if (isAdmin) {
                 // Los administradores ven todos los registros, incluso los inválidos
                 console.log(
-                  `[ConnectionService] Admin detectado - mostrando todos los ${rawData.data.length} registros (incluyendo inválidos)`
+                  `👑 [ConnectionService] Admin detectado - mostrando todos los ${rawData.data.length} registros (incluyendo inválidos)`
                 );
                 return {
                   ...rawData,
@@ -498,7 +619,7 @@ class ConnectionService {
                   (record) => DataValidator.validateSingleRecord(record).valid
                 );
                 console.log(
-                  `[ConnectionService] Usuario no-admin - mostrando solo ${validData.length} registros válidos`
+                  `👤 [ConnectionService] Usuario no-admin - mostrando solo ${validData.length} registros válidos`
                 );
                 return {
                   ...rawData,
@@ -508,7 +629,7 @@ class ConnectionService {
               }
             } catch (roleError) {
               console.error(
-                "[ConnectionService] Error obteniendo rol del usuario:",
+                "❌ [ConnectionService] Error obteniendo rol del usuario:",
                 roleError
               );
               // En caso de error, usar comportamiento por defecto (solo registros válidos)
@@ -525,11 +646,32 @@ class ConnectionService {
         }
       }
 
+      console.log(
+        `✅ [ConnectionService] Data retrieved successfully from ${activeConnection.name}`
+      );
       return rawData;
     } catch (error) {
-      console.error("Error getting data from active connection:", error);
-      // Fallback a Power Automate en caso de error
-      return await this.getDataFromPowerAutomate(dataType);
+      console.error(
+        "💥 [ConnectionService] Error getting data from active connection:",
+        error
+      );
+
+      // Only fallback for non-configuration errors
+      if (
+        error.message?.includes("Connection") &&
+        error.message?.includes("configuration error")
+      ) {
+        console.error(
+          "🚨 [ConnectionService] This is a configuration error - not falling back to Power Automate"
+        );
+        throw error; // Re-throw configuration errors
+      }
+
+      // For other errors, fallback to Power Automate
+      console.warn(
+        "⚠️ [ConnectionService] Falling back to Power Automate due to unexpected error"
+      );
+      return await this.getDataFromPowerAutomate(null, dataType);
     }
   }
 
@@ -545,7 +687,9 @@ class ConnectionService {
         targetUrl = credentials.flowUrl;
       } else {
         // Fallback a variables de entorno si no hay credenciales activas
-        console.log("[PA] No active connection. Falling back to environment variables.");
+        console.log(
+          "[PA] No active connection. Falling back to environment variables."
+        );
 
         // Para productos (disponibilidad) usar URL específica para productos
         if (dataType === "productos") {
@@ -1117,7 +1261,6 @@ class ConnectionService {
   /**
    * Probar una conexión existente
    * @param {string} connectionId - ID de la conexión a probar
-   * @param {string} userPassword - Contraseña del usuario para desencriptar credenciales
    * @returns {Promise<Object>} Resultado de la prueba de conexión
    */
   static async testConnection(connection) {
@@ -1130,7 +1273,9 @@ class ConnectionService {
         throw new Error("Datos de conexión incompletos para la prueba.");
       }
 
-      console.log(`[Edge Test] 🚀 Probando conexión '${name}' de tipo: ${type}`);
+      console.log(
+        `[Edge Test] 🚀 Probando conexión '${name}' de tipo: ${type}`
+      );
 
       // Invocar la Edge Function con las credenciales
       const { data, error } = await supabase.functions.invoke(
@@ -1148,12 +1293,14 @@ class ConnectionService {
         return {
           success: false,
           message: `Error al invocar la función de prueba: ${error.message}`,
-          details: { error: error.message, timestamp: new Date().toISOString() },
+          details: {
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          },
         };
       }
 
       return data;
-
     } catch (error) {
       console.error("Error general en testConnection:", error);
       return {
@@ -1163,8 +1310,6 @@ class ConnectionService {
       };
     }
   }
-
-
   /**
    * Obtener tipos de conexión soportados
    * @returns {Array} Lista de tipos soportados
@@ -1643,5 +1788,4 @@ class ConnectionService {
     }
   }
 }
-
 export default ConnectionService;

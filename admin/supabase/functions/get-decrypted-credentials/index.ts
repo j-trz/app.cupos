@@ -4,7 +4,8 @@ import { Buffer } from "https://deno.land/std@0.168.0/io/buffer.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // Helper to get the encryption key. It must be a 32-byte string.
@@ -37,12 +38,13 @@ async function decryptCredentials(encryptedBlob: string, secretKey: string) {
     return JSON.parse(decryptedString);
   } catch (e) {
     console.error("Decryption failed on server:", e);
-    throw new Error("Could not decrypt credentials on the server. Check MASTER_ENCRYPTION_KEY and data format.");
+    throw new Error(
+      "Could not decrypt credentials on the server. Check MASTER_ENCRYPTION_KEY and data format."
+    );
   }
 }
 
 serve(async (req) => {
-  // This is needed to handle CORS preflight requests.
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
@@ -51,61 +53,114 @@ serve(async (req) => {
   }
 
   try {
-    const { connection_id } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error("❌ Failed to parse request body:", parseError);
+      throw new Error("Invalid JSON in request body");
+    }
 
+    const { connection_id } = requestBody;
     if (!connection_id) {
       throw new Error("connection_id is required");
     }
 
     const masterKey = Deno.env.get("MASTER_ENCRYPTION_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
     if (!masterKey || masterKey.length < 32) {
-      throw new Error("Server configuration error: MASTER_ENCRYPTION_KEY is missing or is not 32 characters long.");
+      throw new Error(
+        "Server configuration error: MASTER_ENCRYPTION_KEY is missing or is not 32 characters long."
+      );
+    }
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      throw new Error(
+        "Server configuration error: Missing Supabase environment variables."
+      );
     }
 
-    // Create a Supabase client with the user's auth token
-    const userSupabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
-    );
-
-    const { data: { user } } = await userSupabaseClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Authorization header is required");
     }
 
-    // Use admin client to get the encrypted credentials, but check ownership first
-    const adminSupabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Get user info
+    const userSupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const {
+      data: { user },
+      error: userError,
+    } = await userSupabaseClient.auth.getUser();
 
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Authentication failed" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Get user profile to check admin role
+    const { data: profile, error: profileError } = await userSupabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.role === "admin";
+
+    // Get credentials and global flag
+    const adminSupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
     const { data: credential, error: selectError } = await adminSupabaseClient
       .from("encrypted_service_credentials")
-      .select("user_id, encrypted_credentials")
+      .select("user_id, encrypted_credentials, is_global")
       .eq("connection_id", connection_id)
       .single();
 
     if (selectError) {
-      console.error("Error fetching credentials to decrypt:", selectError);
-      throw new Error("Could not find credentials for this connection.");
+      if (selectError.code === "PGRST116") {
+        throw new Error(
+          "No credentials found for this connection. Please save credentials first."
+        );
+      }
+      throw new Error(`Database error: ${selectError.message}`);
+    }
+    if (!credential) {
+      throw new Error("No credentials found for this connection.");
     }
 
-    if (credential.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Permitir acceso si el usuario es dueño, si es admin, o si la conexión es global
+    if (credential.user_id !== user.id && !isAdmin && !credential.is_global) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden - you do not own this connection" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Decrypt and return the raw credentials
-    const decryptedCredentials = await decryptCredentials(credential.encrypted_credentials, masterKey);
+    const decryptedCredentials = await decryptCredentials(
+      credential.encrypted_credentials,
+      masterKey
+    );
 
     return new Response(JSON.stringify(decryptedCredentials), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-
   } catch (error) {
-    console.error("Error in get-decrypted-credentials function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorResponse = {
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      function: "get-decrypted-credentials",
+    };
+
+    return new Response(JSON.stringify(errorResponse), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });

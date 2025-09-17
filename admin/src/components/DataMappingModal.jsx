@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import {FaColumns, FaTimes, FaArrowRight, FaPlay, FaExclamationTriangle, FaSave, FaChevronDown, FaCheck} from "react-icons/fa"; // eslint-disable-line no-unused-vars
-import { Listbox } from '@headlessui/react'; // eslint-disable-line no-unused-vars
+import { Listbox, ListboxButton, ListboxOptions } from '@headlessui/react'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
 import { createClient } from '@supabase/supabase-js';
 
@@ -10,8 +10,6 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
   const [sampleData, setSampleData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState([]);
-  const [userPassword, setUserPassword] = useState('');
-  const [passwordRequired, setPasswordRequired] = useState(false);
 
   // Campos estándar de la aplicación
   const standardFields = {
@@ -94,18 +92,8 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
     setLoading(true);
     try {
       if (connection.type === 'supabase') {
-        if (!userPassword) {
-          setPasswordRequired(true);
-          setLoading(false);
-          return;
-        }
         await loadSupabaseData();
       } else if (['mongodb', 'smartsheet', 'tableau'].includes(connection.type)) {
-        if (!userPassword) {
-          setPasswordRequired(true);
-          setLoading(false);
-          return;
-        }
         await loadRealConnectionData();
       } else {
         // Para otros tipos, mantener datos de ejemplo
@@ -125,7 +113,9 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
   const loadSupabaseData = async () => {
     try {
       // Obtener credenciales desencriptadas
-      const { connection: connWithCreds } = await ConnectionService.getConnection(connection.id, userPassword);
+      const result = await ConnectionService.getConnectionForDataType(connection.dataType || dataType);
+const connWithCreds = result?.connection;
+if (!connWithCreds) throw new Error('No se encontró una conexión activa para este tipo de datos');
       
       console.log('🔍 Credenciales desencriptadas:', {
         hasCredentials: !!connWithCreds.credentials,
@@ -330,7 +320,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
         });
       }
       
-      setPasswordRequired(false);
+      
     } catch (error) {
       console.error('❌ Error loading Supabase data:', error);
       Swal.fire({
@@ -346,7 +336,9 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
   const loadRealConnectionData = async () => {
     try {
       // Obtener credenciales desencriptadas
-      const { connection: connWithCreds } = await ConnectionService.getConnection(connection.id, userPassword);
+      const result = await ConnectionService.getConnectionForDataType(connection.dataType || dataType);
+const connWithCreds = result?.connection;
+if (!connWithCreds) throw new Error('No se encontró una conexión activa para este tipo de datos');
       
       console.log(`🔍 Cargando datos reales para ${connection.type}:`, {
         hasCredentials: !!connWithCreds.credentials,
@@ -404,7 +396,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       }
 
       setSampleData(sampleData);
-      setPasswordRequired(false);
+      
       console.log(`✅ Datos reales cargados para ${connection.type}:`, sampleData);
       
     } catch (error) {
@@ -623,11 +615,6 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
     setSampleData(sample);
   };
 
-  const handlePasswordSubmit = () => {
-    if (userPassword) {
-      loadSampleData();
-    }
-  };
 
   const handleMappingChange = (standardField, sourceField) => {
     setMapping(prev => ({
@@ -811,32 +798,6 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
               <div className="animate-spin text-4xl text-[#2c4b8b] mb-4">⏳</div>
               <p className="text-gray-500">Cargando datos de muestra...</p>
             </div>
-          ) : passwordRequired ? (
-            <div className="text-center py-10">
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold mb-2">Contraseña Requerida</h3>
-                <p className="text-gray-600 mb-4">
-                  Para obtener los campos reales de {connection.name}, necesitas ingresar tu contraseña:
-                </p>
-                <div className="max-w-md mx-auto">
-                  <input
-                    type="password"
-                    value={userPassword}
-                    onChange={(e) => setUserPassword(e.target.value)}
-                    placeholder="Ingresa tu contraseña"
-                    className="w-full px-3 py-2 border rounded focus:outline-none focus:border-[#2c4b8b] mb-3"
-                    onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-                  />
-                  <button
-                    onClick={handlePasswordSubmit}
-                    disabled={!userPassword}
-                    className="w-full px-4 py-2 bg-[#2c4b8b] text-white rounded hover:bg-[#1e355e] transition-colors disabled:bg-gray-300"
-                  >
-                    Conectar y Cargar Campos
-                  </button>
-                </div>
-              </div>
-            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Panel de mapeo */}
@@ -863,17 +824,17 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                         onChange={(value) => handleMappingChange(field.key, value)}
                       >
                         <div className="relative">
-                          <Listbox.Button className="relative w-full px-3 py-2 text-left bg-white border rounded cursor-default focus:outline-none focus:border-[#2c4b8b] text-sm">
+                          <ListboxButton className="relative w-full px-3 py-2 text-left bg-white border rounded cursor-default focus:outline-none focus:border-[#2c4b8b] text-sm">
                             <span className="block truncate">
                               {mapping[field.key] || '-- Seleccionar campo fuente --'}
                             </span>
                             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                               <FaChevronDown className="w-4 h-4 text-gray-400" />
                             </span>
-                          </Listbox.Button>
-                          
-                          <Listbox.Options className="absolute z-10 w-full py-1 mt-1 overflow-auto text-base bg-white border border-gray-300 rounded-md shadow-lg max-h-60 focus:outline-none text-sm">
-                            <Listbox.Option
+                          </ListboxButton>
+
+                          <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-base bg-white border border-gray-300 rounded-md shadow-lg max-h-60 focus:outline-none text-sm">
+                            <ListboxOptions
                               key=""
                               value=""
                               className={({ active }) =>
@@ -894,10 +855,10 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                                   )}
                                 </>
                               )}
-                            </Listbox.Option>
+                            </ListboxOptions>
                             
                             {getSourceFields().map((sourceField) => (
-                              <Listbox.Option
+                              <ListboxOptions
                                 key={sourceField}
                                 value={sourceField}
                                 className={({ active }) =>
@@ -918,9 +879,9 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                                     )}
                                   </>
                                 )}
-                              </Listbox.Option>
+                              </ListboxOptions>
                             ))}
-                          </Listbox.Options>
+                          </ListboxOptions>
                         </div>
                       </Listbox>
                     </div>

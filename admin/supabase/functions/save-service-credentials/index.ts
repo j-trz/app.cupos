@@ -4,7 +4,8 @@ import { Buffer } from "https://deno.land/std@0.168.0/io/buffer.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // Helper to get the encryption key. It must be a 32-byte string.
@@ -32,8 +33,10 @@ async function encryptCredentials(credentials: object, secretKey: string) {
     encodedData
   );
 
-  const ivB64 = Buffer.from(iv).toString("base64");
-  const encryptedDataB64 = Buffer.from(encryptedData).toString("base64");
+  const ivB64 = btoa(String.fromCharCode(...iv));
+  const encryptedDataB64 = btoa(
+    String.fromCharCode(...new Uint8Array(encryptedData))
+  );
 
   return JSON.stringify({ iv: ivB64, data: encryptedDataB64 });
 }
@@ -56,30 +59,75 @@ serve(async (req) => {
 
     const masterKey = Deno.env.get("MASTER_ENCRYPTION_KEY");
     if (!masterKey || masterKey.length < 32) {
-      throw new Error("Server configuration error: MASTER_ENCRYPTION_KEY is missing or is not 32 characters long.");
+      throw new Error(
+        "Server configuration error: MASTER_ENCRYPTION_KEY is missing or is not 32 characters long."
+      );
     }
 
     // Create a Supabase client with the user's auth token to verify ownership
     const userSupabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+      {
+        global: {
+          headers: { Authorization: req.headers.get("Authorization")! },
+        },
+      }
     );
 
-    const { data: { user } } = await userSupabaseClient.auth.getUser();
+    const {
+      data: { user },
+    } = await userSupabaseClient.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Security Check: Verify the user owns the connection
     const { data: connection, error: connError } = await userSupabaseClient
       .from("data_connections")
-      .select("id, user_id")
+      .select("id, user_id, is_global")
       .eq("id", connection_id)
       .single();
 
-    if (connError || !connection || connection.user_id !== user.id) {
-       return new Response(JSON.stringify({ error: "Forbidden: Connection not found or you do not own it." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Logging para depuración
+    console.log("🔎 save-service-credentials debug:");
+    console.log("connection_id:", connection_id);
+    console.log("connection.user_id:", connection?.user_id);
+    console.log("user.id:", user?.id);
+    console.log("connection.is_global:", connection?.is_global);
+
+    let allowSave = connection && connection.user_id === user.id;
+    if (!allowSave && connection?.is_global) {
+      const { data: profile, error: profileError } = await userSupabaseClient
+        .from("profiles")
+        .select("admin")
+        .eq("id", user.id)
+        .single();
+      console.log(
+        "profile.admin:",
+        profile?.admin,
+        "profileError:",
+        profileError
+      );
+      if (!profileError && profile?.admin) {
+        allowSave = true;
+      }
+    }
+    if (connError || !connection || !allowSave) {
+      console.log("❌ Permiso denegado para guardar credenciales");
+      return new Response(
+        JSON.stringify({
+          error:
+            "Forbidden: Connection not found or you do not have permission.",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Encrypt the credentials
@@ -93,23 +141,28 @@ serve(async (req) => {
 
     const { error: upsertError } = await adminSupabaseClient
       .from("encrypted_service_credentials")
-      .upsert({
-        connection_id: connection_id,
-        user_id: user.id,
-        encrypted_credentials: encryptedBlob,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'connection_id' });
+      .upsert(
+        {
+          connection_id: connection_id,
+          user_id: user.id,
+          encrypted_credentials: encryptedBlob,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "connection_id" }
+      );
 
     if (upsertError) {
       console.error("Error upserting credentials:", upsertError);
       throw new Error("Failed to save encrypted credentials.");
     }
 
-    return new Response(JSON.stringify({ success: true, message: "Credentials saved securely." }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-
+    return new Response(
+      JSON.stringify({ success: true, message: "Credentials saved securely." }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error("Error in save-service-credentials function:", error);
     return new Response(JSON.stringify({ error: error.message }), {

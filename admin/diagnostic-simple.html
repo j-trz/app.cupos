@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Edge Functions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+
+        .success {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .error {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+        }
+
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .config-box {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Diagnóstico Edge Functions Supabase</h1>
+
+        <div class="config-box">
+            <h3>📝 Configuración</h3>
+            <p><strong>Paso 1:</strong> Edita este archivo y actualiza las variables:</p>
+            <pre>SUPABASE_URL = 'https://tu-proyecto.supabase.co'
+SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'</pre>
+        </div>
+
+        <div>
+            <button onclick="runDiagnostic()">🔍 Ejecutar Diagnóstico Completo</button>
+            <button onclick="clearResults()">🧹 Limpiar</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // 🚨 ACTUALIZA ESTAS VARIABLES CON TUS DATOS REALES
+        const SUPABASE_URL = 'https://nstntatroiykjfkmkevq.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zdG50YXRyb2l5a2pma21rZXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNzI1NjYsImV4cCI6MjA3Mjk0ODU2Nn0.4Rjbrs1Mrb7oKUuIToKlmLsmYqRMuqwhCpG6y7iMSl4';
+
+        function addResult(type, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function runDiagnostic() {
+            clearResults();
+
+            // Verificar configuración
+            if (SUPABASE_URL === 'TU_SUPABASE_URL_AQUI' || SUPABASE_ANON_KEY === 'TU_SUPABASE_ANON_KEY_AQUI') {
+                addResult('error', `
+                    <h3>❌ Configuración Requerida</h3>
+                    <p>Debes actualizar las variables SUPABASE_URL y SUPABASE_ANON_KEY en la línea 32-33 de este archivo.</p>
+                    <p><strong>Busca:</strong> TU_SUPABASE_URL_AQUI y TU_SUPABASE_ANON_KEY_AQUI</p>
+                `);
+                return;
+            }
+
+            addResult('info', '🚀 Iniciando diagnóstico...');
+
+            try {
+                // Cargar Supabase
+                addResult('info', '📦 Cargando Supabase...');
+                const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js@2');
+                const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+                addResult('success', '✅ Supabase cargado correctamente');
+                addResult('info', `🔗 URL: ${SUPABASE_URL}`);
+
+                // Test 1: Función de diagnóstico
+                addResult('info', '🔧 Probando función test-edge-function-config...');
+                try {
+                    const { data: configData, error: configError } = await supabase.functions.invoke('test-edge-function-config');
+
+                    if (configError) {
+                        addResult('error', `❌ Error en función de configuración: ${configError.message}`);
+                    } else {
+                        addResult('success', '✅ Función test-edge-function-config funciona');
+
+                        if (configData && configData.environmentVariables) {
+                            addResult('info', '<h4>🔧 Variables de Entorno:</h4>');
+                            const env = configData.environmentVariables;
+
+                            const checkVar = (name, required = true) => {
+                                const exists = env[name];
+                                const emoji = exists ? '✅' : '❌';
+                                const status = exists ? 'success' : 'error';
+                                let message = `${emoji} ${name}: ${exists ? 'Configurada' : 'NO CONFIGURADA'}`;
+
+                                if (name === 'MASTER_ENCRYPTION_KEY' && exists && env[name].length < 32) {
+                                    message += ' ⚠️ (muy corta, necesita 32+ caracteres)';
+                                }
+
+                                addResult(status, message);
+                                return exists;
+                            };
+
+                            const hasMasterKey = checkVar('MASTER_ENCRYPTION_KEY');
+                            checkVar('SUPABASE_URL');
+                            checkVar('SUPABASE_ANON_KEY');
+                            checkVar('SUPABASE_SERVICE_ROLE_KEY');
+
+                            if (!hasMasterKey) {
+                                addResult('error', `
+                                    <h4>🚨 PROBLEMA IDENTIFICADO</h4>
+                                    <p>MASTER_ENCRYPTION_KEY no está configurada. Esto es lo que causa el error HTTP 400.</p>
+                                    <p><strong>Solución:</strong></p>
+                                    <ol>
+                                        <li>Ve a tu Dashboard de Supabase</li>
+                                        <li>Settings → Edge Functions → Environment Variables</li>
+                                        <li>Agrega: <code>MASTER_ENCRYPTION_KEY</code> = una clave de 32+ caracteres</li>
+                                        <li>Guarda y redespliega las Edge Functions</li>
+                                    </ol>
+                                `);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    addResult('error', `❌ Error cargando función de configuración: ${e.message}`);
+                }
+
+                // Test 2: Función get-decrypted-credentials
+                addResult('info', '🔐 Probando función get-decrypted-credentials...');
+                try {
+                    const { data: credData, error: credError } = await supabase.functions.invoke('get-decrypted-credentials', {
+                        body: { connection_id: 'test-id' }
+                    });
+
+                    if (credError) {
+                        addResult('error', `❌ Error en get-decrypted-credentials: ${credError.message}`);
+
+                        // Análisis específico
+                        if (credError.message.includes('MASTER_ENCRYPTION_KEY')) {
+                            addResult('error', '🔧 Confirmado: Falta MASTER_ENCRYPTION_KEY');
+                        } else if (credError.message.includes('No credentials found')) {
+                            addResult('success', '✅ Función funciona (error esperado con ID ficticio)');
+                        } else if (credError.message.includes('Authorization')) {
+                            addResult('warning', '🔐 Problema de autenticación (normal si no estás logueado)');
+                        }
+                    } else {
+                        addResult('success', '✅ Función get-decrypted-credentials funciona');
+                    }
+                } catch (e) {
+                    addResult('error', `❌ Error en get-decrypted-credentials: ${e.message}`);
+                }
+
+                addResult('info', '🏁 Diagnóstico completado');
+
+            } catch (error) {
+                addResult('error', `💥 Error general: ${error.message}`);
+            }
+        }
+
+        // Auto-ejecutar al cargar si está configurado
+        window.onload = function () {
+            if (SUPABASE_URL !== 'TU_SUPABASE_URL_AQUI' && SUPABASE_ANON_KEY !== 'TU_SUPABASE_ANON_KEY_AQUI') {
+                addResult('info', '✅ Configuración detectada. Haz clic en "Ejecutar Diagnóstico" para continuar.');
+            }
+        };
+    </script>
+</body>
+
+</html>
