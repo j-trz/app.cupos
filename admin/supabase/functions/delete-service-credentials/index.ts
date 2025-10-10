@@ -22,55 +22,33 @@ serve(async (req) => {
       throw new Error("connection_id is required");
     }
 
-    // Create a Supabase client with the user's auth token
-    const userSupabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
-    );
-
-    const { data: { user } } = await userSupabaseClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // Create an admin client to perform the delete, but first check ownership
+    // Create an admin client to perform the delete.
+    // No user ownership checks are performed as per new requirements.
     const adminSupabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Security Check: Verify the user owns the credentials before deleting.
-    const { data: credential_to_delete, error: selectError } = await adminSupabaseClient
-      .from("encrypted_service_credentials")
-      .select("user_id")
-      .eq("connection_id", connection_id)
-      .single();
-
-    if (selectError) {
-      // If it doesn't exist, that's fine, the job is done.
-      return new Response(JSON.stringify({ success: true, message: "No credentials to delete or already deleted." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    if (credential_to_delete.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // Perform the delete
+    // Perform the delete on the new `service_credentials` table.
     const { error: deleteError } = await adminSupabaseClient
-      .from("encrypted_service_credentials")
+      .from("service_credentials")
       .delete()
       .eq("connection_id", connection_id);
 
     if (deleteError) {
       console.error("Error deleting credentials:", deleteError);
-      throw new Error("Failed to delete encrypted credentials.");
+      // It's better not to throw an error if the record is just not found.
+      // The client might retry deleting something that's already gone.
+      if (deleteError.code === 'PGRST116') { // PostgREST code for "Not Found"
+         return new Response(JSON.stringify({ success: true, message: "Credentials not found or already deleted." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+      throw new Error(`Failed to delete credentials: ${deleteError.message}`);
     }
 
-    return new Response(JSON.stringify({ success: true, message: "Credentials deleted securely." }), {
+    return new Response(JSON.stringify({ success: true, message: "Credentials deleted." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
