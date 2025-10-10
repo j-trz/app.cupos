@@ -1,0 +1,22 @@
+{
+    "connectionId": "45984b74-dd53-49e8-8abc-5d04654a7480",
+    "result_ok": {
+        "success": true,
+        "credentials": {
+            "projectUrl": "https://xyzcompany.supabase.co",
+            "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "tableName": "reservas"
+        },
+        "keys": [
+            "projectUrl",
+            "anonKey",
+            "tableName"
+        ],
+        "structure": "{\n  \"projectUrl\": \"https://xyzcompany.supabase.co\",\n  \"anonKey\": \"...\",\n  \"tableName\": \"reservas\"\n}"
+    },
+    "result_fail": {
+        "success": false,
+        "error": "No credentials found for this connection",
+        "details": {}
+    }
+}

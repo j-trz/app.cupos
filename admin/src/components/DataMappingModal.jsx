@@ -3,7 +3,7 @@ import Swal from 'sweetalert2';
 import {FaColumns, FaTimes, FaArrowRight, FaPlay, FaExclamationTriangle, FaSave, FaChevronDown, FaCheck} from "react-icons/fa"; // eslint-disable-line no-unused-vars
 import { Listbox, ListboxButton, ListboxOptions } from '@headlessui/react'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
-import { createClient } from '@supabase/supabase-js';
+import { createCustomSupabaseClient } from '../supabaseClient';
 
 const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
   const [mapping, setMapping] = useState({});
@@ -149,8 +149,8 @@ if (!connWithCreds) throw new Error('No se encontró una conexión activa para e
         throw new Error(`Credenciales incompletas. URL: ${!!supabaseUrl}, Key: ${!!anonKey}`);
       }
 
-      // Crear cliente Supabase
-      const supabaseClient = createClient(supabaseUrl, anonKey);
+      // Crear cliente Supabase con headers correctos
+      const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey);
 
       // Obtener nombre de tabla configurado o usar por defecto
       const tableName = connWithCreds.column_mapping?.tableName || 'reservas';

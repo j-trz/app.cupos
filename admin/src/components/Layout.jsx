@@ -1,3 +1,6 @@
+import DiagnoseConnectionCredentials from "./DiagnoseConnectionCredentials";
+{/* Diagnóstico rápido de credenciales */}
+<DiagnoseConnectionCredentials connectionId="45984b74-dd53-49e8-8abc-5d04654a7480" />
 import React, { useState, useEffect } from "react";// eslint-disable-line no-unused-vars
 import Topbar from "./Topbar";// eslint-disable-line no-unused-vars
 import Sidebar from "./Sidebar";// eslint-disable-line no-unused-vars
@@ -30,6 +33,8 @@ export default function Layout({ children, seccion, setSeccion }) {
         <main className="flex-1 p-8 overflow-x-auto">
           {children}
         </main>
+          {/* Diagnóstico rápido de credenciales */}
+          <DiagnoseConnectionCredentials connectionId="45984b74-dd53-49e8-8abc-5d04654a7480" />
       </div>
     </div>
   );

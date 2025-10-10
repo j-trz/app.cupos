@@ -27,10 +27,50 @@ class ReservationService {
 
   static async _fetchAvailability() {
     try {
-      // CORRECCIÓN: Ahora obtenemos productos directamente desde Power Automate
-      const result = await ConnectionService.getDataFromActiveConnection(
-        "productos"
-      );
+      // TEMPORAL: Obtener datos directamente sin Edge Function
+      console.log("🔄 [TEMPORAL] Obteniendo disponibilidad directamente...");
+
+      // Primero intentar con el sistema de conexiones
+      let result;
+      try {
+        result = await ConnectionService.getDataFromActiveConnection(
+          "productos"
+        );
+      } catch (connectionError) {
+        console.error("❌ Error con sistema de conexiones:", connectionError);
+
+        // FALLBACK TEMPORAL: Usar URL directa de Power Automate
+        console.warn("⚠️ [TEMPORAL] Usando fallback directo a Power Automate");
+        const powerAutomateUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL;
+
+        if (!powerAutomateUrl) {
+          throw new Error(
+            "URL de Power Automate no configurada en variables de entorno"
+          );
+        }
+
+        try {
+          const response = await fetch(powerAutomateUrl, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          result = {
+            success: true,
+            data: data || [],
+          };
+        } catch (fetchError) {
+          console.error("❌ Error en fallback directo:", fetchError);
+          throw new Error(
+            "No se pudo obtener disponibilidad de ninguna fuente"
+          );
+        }
+      }
 
       if (!result.success) {
         throw new Error(
@@ -693,7 +733,6 @@ class ReservationService {
       throw error;
     }
   }
-
 }
 
 export default ReservationService;

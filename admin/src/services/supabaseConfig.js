@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Configuración con headers necesarios
-const supabaseOptions = {
+// Configuración específica para evitar errores 406
+export const supabaseWithHeaders = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -17,18 +17,27 @@ const supabaseOptions = {
       Prefer: "return=minimal",
     },
   },
-};
-
-export const supabase = createClient(supabaseUrl, supabaseKey, supabaseOptions);
+  db: {
+    schema: "public",
+  },
+});
 
 // Función helper para crear clientes con credenciales personalizadas
 export const createCustomSupabaseClient = (url, key) => {
   return createClient(url, key, {
-    ...supabaseOptions,
     auth: {
-      ...supabaseOptions.auth,
       autoRefreshToken: false,
       persistSession: false,
+    },
+    global: {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+    },
+    db: {
+      schema: "public",
     },
   });
 };
