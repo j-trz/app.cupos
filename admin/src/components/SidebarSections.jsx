@@ -61,6 +61,14 @@ export const SECCIONES = [
     soloAdmin: true
   },
   {
+    id: 'data-mapper',
+    nombre: 'Data Mapper',
+    icono: FaTable,
+    ruta: '/admin/data-mapper',
+    descripcion: 'Mapeo de datos de conexiones externas.',
+    soloAdmin: true
+  },
+  {
     id: 'seguridad',
     nombre: 'Seguridad',
     icono: FaShieldAlt,

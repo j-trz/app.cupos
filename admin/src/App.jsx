@@ -8,6 +8,7 @@ import Login from "./pages/Login"; // eslint-disable-line no-unused-vars
 import CrearUsuario from "./pages/CrearUsuario"; // eslint-disable-line no-unused-vars
 import GestionUsuarios from "./pages/GestionUsuarios"; // eslint-disable-line no-unused-vars
 import GestionConexiones from "./pages/GestionConexiones"; // eslint-disable-line no-unused-vars
+import DataMapper from "./pages/DataMapper"; // eslint-disable-line no-unused-vars
 import GestionProductos from "./pages/GestionProductos"; // eslint-disable-line no-unused-vars
 import Disponibilidad from "./pages/Disponibilidad"; // eslint-disable-line no-unused-vars
 import Solicitudes from "./pages/Solicitudes"; // eslint-disable-line no-unused-vars
@@ -168,6 +169,14 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
           element={
             <AdminRoute>
               <GestionConexiones />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/data-mapper"
+          element={
+            <AdminRoute>
+              <DataMapper />
             </AdminRoute>
           }
         />
