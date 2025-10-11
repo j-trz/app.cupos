@@ -4,6 +4,7 @@ import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import UserService from '../services/userService';
 
 export default function CrearUsuario() {
+  const [seccion, setSeccion] = useState("crear-usuario");
   const [email, setEmail] = useState("");
   const [nombre, setNombre] = useState("");
   const [agencia, setAgencia] = useState("");
@@ -69,7 +70,7 @@ export default function CrearUsuario() {
   ];
 
   return (
-    <Layout>
+    <Layout seccion={seccion} setSeccion={setSeccion}>
       <div className="w-full max-w-lg mx-auto">
         <form className="bg-white p-6 rounded shadow" onSubmit={handleSubmit}>
       <h2 className="text-xl font-bold mb-4 text-brand-primary">Crear Usuario</h2>

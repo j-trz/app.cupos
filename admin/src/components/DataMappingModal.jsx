@@ -58,8 +58,10 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       // Cargar mapeo existente si existe
       if (connection.column_mapping) {
         try {
-          const existingMapping = JSON.parse(connection.column_mapping);
-          setMapping(existingMapping[dataType] || {});
+          const cm = typeof connection.column_mapping === 'string'
+            ? JSON.parse(connection.column_mapping)
+            : connection.column_mapping;
+          setMapping((cm && typeof cm === 'object' ? cm[dataType] : {}) || {});
         } catch (error) {
           console.error('Error parsing existing mapping:', error);
         }
@@ -113,31 +115,48 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
   const loadSupabaseData = async () => {
     try {
       // Obtener credenciales desencriptadas
-      const result = await ConnectionService.getConnectionForDataType(connection.dataType || dataType);
-const connWithCreds = result?.connection;
-if (!connWithCreds) throw new Error('No se encontró una conexión activa para este tipo de datos');
-      
+      const lookupType = connection.dataType || dataType;
+      const esType = lookupType === 'products' ? 'productos' : (lookupType === 'orders' ? 'pedidos' : lookupType);
+      const result = await ConnectionService.getConnectionForDataType(esType);
+      const connWithCreds = result?.connection;
+
+      let credentials;
+      try {
+        credentials = await ConnectionService.getDecryptedCredentials(connection.id);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.debug('No se pudieron obtener credenciales directas, se intentará con la conexión activa por tipo.', e?.message);
+      }
+
+      if (!connWithCreds && !credentials) {
+        throw new Error('No se encontró una conexión activa para este tipo de datos');
+      }
+
+      const creds = credentials || connWithCreds?.credentials;
+
       console.log('🔍 Credenciales desencriptadas:', {
-        hasCredentials: !!connWithCreds.credentials,
-        credentialsKeys: connWithCreds.credentials ? Object.keys(connWithCreds.credentials) : 'none',
-        credentials: connWithCreds.credentials
+        hasCredentials: !!creds,
+        credentialsKeys: creds ? Object.keys(creds) : 'none',
+        credentials: creds
       });
 
       // Verificar que las credenciales existan
-      if (!connWithCreds.credentials) {
+      if (!creds) {
         throw new Error('No se encontraron credenciales para esta conexión');
       }
 
       // Obtener URL y clave - pueden estar con diferentes nombres
-      const supabaseUrl = connWithCreds.credentials.url ||
-                         connWithCreds.credentials.supabaseUrl ||
-                         connWithCreds.credentials.project_url ||
-                         connWithCreds.credentials.projectUrl;
+      const supabaseUrl =
+        creds.url ||
+        creds.supabaseUrl ||
+        creds.project_url ||
+        creds.projectUrl;
       
-      const anonKey = connWithCreds.credentials.anonKey ||
-                     connWithCreds.credentials.anon_key ||
-                     connWithCreds.credentials.key ||
-                     connWithCreds.credentials.apiKey;
+      const anonKey =
+        creds.anonKey ||
+        creds.anon_key ||
+        creds.key ||
+        creds.apiKey;
 
       console.log('🔍 URLs y claves encontradas:', {
         supabaseUrl,
@@ -153,7 +172,10 @@ if (!connWithCreds) throw new Error('No se encontró una conexión activa para e
       const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey);
 
       // Obtener nombre de tabla configurado o usar por defecto
-      const tableName = connWithCreds.column_mapping?.tableName || 'reservas';
+      const cm = typeof connection.column_mapping === 'string'
+        ? JSON.parse(connection.column_mapping)
+        : connection.column_mapping;
+      const tableName = cm?.tableName || 'reservas';
       
       console.log('🔍 Obteniendo estructura de columnas para tabla:', tableName);
       
@@ -335,17 +357,22 @@ if (!connWithCreds) throw new Error('No se encontró una conexión activa para e
 
   const loadRealConnectionData = async () => {
     try {
-      // Obtener credenciales desencriptadas
-      const result = await ConnectionService.getConnectionForDataType(connection.dataType || dataType);
-const connWithCreds = result?.connection;
-if (!connWithCreds) throw new Error('No se encontró una conexión activa para este tipo de datos');
+      // Obtener credenciales desencriptadas de la conexión seleccionada
+      let credentials;
+      try {
+        credentials = await ConnectionService.getDecryptedCredentials(connection.id);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.debug('getDecryptedCredentials falló en loadRealConnectionData', e?.message);
+      }
+      if (!credentials) throw new Error('No se encontró una conexión activa para este tipo de datos');
       
       console.log(`🔍 Cargando datos reales para ${connection.type}:`, {
-        hasCredentials: !!connWithCreds.credentials,
-        credentialsKeys: connWithCreds.credentials ? Object.keys(connWithCreds.credentials) : 'none'
+        hasCredentials: !!credentials,
+        credentialsKeys: credentials ? Object.keys(credentials) : 'none'
       });
 
-      if (!connWithCreds.credentials) {
+      if (!credentials) {
         throw new Error('No se encontraron credenciales para esta conexión');
       }
 
@@ -353,13 +380,13 @@ if (!connWithCreds) throw new Error('No se encontró una conexión activa para e
       
       switch (connection.type) {
         case 'mongodb':
-          sampleData = await loadMongoDBData(connWithCreds.credentials);
+          sampleData = await loadMongoDBData(credentials);
           break;
         case 'smartsheet':
-          sampleData = await loadSmartsheetData(connWithCreds.credentials);
+          sampleData = await loadSmartsheetData(credentials);
           break;
         case 'tableau':
-          sampleData = await loadTableauData(connWithCreds.credentials);
+          sampleData = await loadTableauData(credentials);
           break;
         default:
           throw new Error(`Tipo de conexión ${connection.type} no soportado`);
@@ -659,12 +686,15 @@ if (!connWithCreds) throw new Error('No se encontró una conexión activa para e
       }
 
       // Crear mapeo completo (productos y pedidos)
-      const existingMapping = connection.column_mapping ? JSON.parse(connection.column_mapping) : {};
+      const existingMapping = connection.column_mapping
+        ? (typeof connection.column_mapping === 'string' ? JSON.parse(connection.column_mapping) : connection.column_mapping)
+        : {};
       const fullMapping = {
         ...existingMapping,
         [dataType]: mapping
       };
 
+      // Guardar siempre como JSON string para compatibilidad con la columna (text/json)
       await onSave(connection.id, { column_mapping: JSON.stringify(fullMapping) });
       
       Swal.fire({
@@ -747,7 +777,7 @@ if (!connWithCreds) throw new Error('No se encontró una conexión activa para e
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-screen overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-[1300px] max-h-screen overflow-y-auto">
         <div className="flex justify-between items-center p-6 border-b">
           <div className="flex items-center gap-3">
             <FaColumns className="text-[#2c4b8b]" />

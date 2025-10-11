@@ -1,17 +1,24 @@
+/* eslint-disable no-unused-vars */
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import ConnectionService from "../services/connectionService";
-import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaTable, FaDatabase, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaTable, FaDatabase, FaCheckCircle, FaColumns } from 'react-icons/fa';
 import { SiMongodb, SiTableau, SiSupabase } from 'react-icons/si';
 import { TiVendorMicrosoft } from 'react-icons/ti';
 import Swal from 'sweetalert2';
+import DataMappingModal from "../components/DataMappingModal";
+import DataTypeConnectionManager from "../components/DataTypeConnectionManager";
 
 export default function GestionConexiones() {
+  const [seccion, setSeccion] = useState("gestion-conexiones");
   const [conexiones, setConexiones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [mappingConnection, setMappingConnection] = useState(null);
+  const [assignManagerOpen, setAssignManagerOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     id: null,
@@ -38,35 +45,29 @@ export default function GestionConexiones() {
   async function fetchConexiones() {
     setLoading(true);
     try {
-      const result = await ConnectionService.getConnections();
+      const result = await ConnectionService.getUserConnections();
       if (result.success) {
         setConexiones(result.connections);
       }
     } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not load connections.' });
+      console.error('Error loading connections:', error);
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudieron cargar las conexiones.' });
     }
     setLoading(false);
   }
 
   async function abrirModal(connection = null) {
     if (connection) {
-      try {
-        setLoading(true);
-        const details = await ConnectionService.getConnectionDetails(connection.id);
-        setFormData({
-          id: details.id,
-          name: details.name,
-          type: details.type,
-          description: details.description || '',
-          credentials: details.credentials || {}
-        });
-        setSelectedConnection(details);
-        setModalOpen(true);
-      } catch (error) {
-        Swal.fire({ icon: 'error', title: 'Error', text: `Could not fetch connection details: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
+      // Para editar, usar los datos de la conexión existente
+      setFormData({
+        id: connection.id,
+        name: connection.name,
+        type: connection.type,
+        description: connection.description || '',
+        credentials: {} // Las credenciales no se muestran por seguridad
+      });
+      setSelectedConnection(connection);
+      setModalOpen(true);
     } else {
       setFormData({ id: null, name: '', type: '', description: '', credentials: {} });
       setSelectedConnection(null);
@@ -87,15 +88,35 @@ export default function GestionConexiones() {
         .map(f => f.label);
 
       if (missingFields.length > 0) {
-        Swal.fire({ icon: 'error', title: 'Missing Required Fields', text: `Please complete: ${missingFields.join(", ")}` });
+        Swal.fire({ icon: 'error', title: 'Campos Requeridos', text: `Por favor complete: ${missingFields.join(", ")}` });
         return;
       }
     }
 
     setLoading(true);
     try {
-      await ConnectionService.saveConnection(formData);
-      Swal.fire({ icon: 'success', title: 'Connection Saved', text: 'The connection has been saved successfully.' });
+      if (formData.id) {
+        // Actualizar conexión existente
+        const updateData = {
+          name: formData.name,
+          description: formData.description
+        };
+        
+        // Solo enviar credenciales si hay valores no vacíos
+        const hasCredentials = Object.keys(formData.credentials).some(
+          key => formData.credentials[key] && formData.credentials[key].trim() !== ''
+        );
+        
+        if (hasCredentials) {
+          updateData.credentials = formData.credentials;
+        }
+        
+        await ConnectionService.updateConnection(formData.id, updateData);
+      } else {
+        // Crear nueva conexión
+        await ConnectionService.createConnection(formData);
+      }
+      Swal.fire({ icon: 'success', title: 'Conexión Guardada', text: 'La conexión se ha guardado exitosamente.' });
       cerrarModal();
       await fetchConexiones();
     } catch (error) {
@@ -105,14 +126,29 @@ export default function GestionConexiones() {
     }
   }
 
-  async function testConnection(connectionId) {
+  async function handleSaveMapping(connectionId, update) {
     setLoading(true);
     try {
-      const result = await ConnectionService.testConnection(connectionId);
+      await ConnectionService.updateConnection(connectionId, update);
+      await fetchConexiones();
+      Swal.fire({ icon: 'success', title: 'Mapeo guardado', text: 'El mapeo se guardó correctamente.' });
+      setMappingOpen(false);
+      setMappingConnection(null);
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo guardar el mapeo.' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function testConnection(connection) {
+    setLoading(true);
+    try {
+      const result = await ConnectionService.testConnection(connection);
       if (result.success) {
-        Swal.fire({ icon: 'success', title: 'Connection Successful', text: result.message });
+        Swal.fire({ icon: 'success', title: 'Conexión Exitosa', text: result.message });
       } else {
-        Swal.fire({ icon: 'error', title: 'Connection Failed', text: result.message });
+        Swal.fire({ icon: 'error', title: 'Conexión Fallida', text: result.message });
       }
       await fetchConexiones();
     } catch (error) {
@@ -125,11 +161,11 @@ export default function GestionConexiones() {
   async function activateConnection(connectionId) {
     setLoading(true);
     try {
-      await ConnectionService.activateConnection(connectionId);
-      Swal.fire({ icon: 'success', title: 'Connection Activated', text: 'The connection is now active.' });
+      await ConnectionService.setActiveConnection(connectionId);
+      Swal.fire({ icon: 'success', title: 'Conexión Activada', text: 'La conexión ahora está activa.' });
       await fetchConexiones();
     } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: `Could not activate connection: ${error.message}` });
+      Swal.fire({ icon: 'error', title: 'Error', text: `No se pudo activar la conexión: ${error.message}` });
     } finally {
       setLoading(false);
     }
@@ -137,12 +173,12 @@ export default function GestionConexiones() {
 
   async function deleteConnection(connection) {
     const result = await Swal.fire({
-      title: 'Delete Connection?',
-      text: `This will permanently delete the connection "${connection.name}".`,
+      title: '¿Eliminar Conexión?',
+      text: `Esto eliminará permanentemente la conexión "${connection.name}".`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Yes, delete',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
       confirmButtonColor: '#d33'
     });
 
@@ -151,7 +187,7 @@ export default function GestionConexiones() {
     setLoading(true);
     try {
       await ConnectionService.deleteConnection(connection.id);
-      Swal.fire({ icon: 'success', title: 'Connection Deleted', text: 'The connection has been deleted.' });
+      Swal.fire({ icon: 'success', title: 'Conexión Eliminada', text: 'La conexión ha sido eliminada.' });
       await fetchConexiones();
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message });
@@ -173,116 +209,154 @@ export default function GestionConexiones() {
     }
   };
 
-  const getStatusPill = (status) => {
-    if (status === 'connected') {
-      return <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-100 rounded-full">Connected</span>;
-    }
-    if (status === 'failed') {
-      return <span className="px-2 py-1 text-xs font-medium text-red-800 bg-red-100 rounded-full">Failed</span>;
-    }
-    return <span className="px-2 py-1 text-xs font-medium text-gray-800 bg-gray-100 rounded-full">Unknown</span>;
-  };
 
   return (
-    <Layout>
+    <Layout seccion={seccion} setSeccion={setSeccion}>
       <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-[#2c4b8b]">API Connection Management</h1>
+          <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Conexiones API</h1>
           <div className="flex gap-2">
+            <button
+              onClick={() => setAssignManagerOpen(true)}
+              className="flex items-center gap-2 bg-gray-100 text-[#2c4b8b] px-4 py-2 rounded hover:bg-gray-200 transition-colors"
+            >
+              <FaColumns />
+              Asignar a sección
+            </button>
             <button
               onClick={() => abrirModal()}
               className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] transition-colors"
             >
               <FaPlus />
-              New Connection
+              Nueva Conexión
             </button>
           </div>
         </div>
 
-        {loading && !modalOpen ? (
-          <div className="text-center py-10">
-            <FaSync className="animate-spin text-4xl text-[#2c4b8b] mx-auto mb-4" />
-            <p className="text-gray-500">Loading connections...</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] bg-white">
-              <thead>
-                <tr className="bg-[#2c4b8b] text-white">
-                  <th className="px-6 py-3 text-left">Type</th>
-                  <th className="px-6 py-3 text-left">Name</th>
-                  <th className="px-6 py-3 text-left">Status</th>
-                  <th className="px-6 py-3 text-left">Active</th>
-                  <th className="px-6 py-3 text-left">Last Tested</th>
-                  <th className="px-6 py-3 text-center">Actions</th>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] bg-white border-0 rounded-2xl shadow-xl">
+            <thead>
+              <tr className="bg-[#2c4b8b] text-white">
+                <th className="px-6 py-4 text-lg font-semibold rounded-tl-2xl">Tipo</th>
+                <th className="px-6 py-4 text-lg font-semibold">Nombre</th>
+                <th className="px-6 py-4 text-lg font-semibold">Descripción</th>
+                <th className="px-6 py-4 text-lg font-semibold">Estado</th>
+                <th className="px-6 py-4 text-lg font-semibold">Activa</th>
+                <th className="px-6 py-4 text-lg font-semibold">Última Prueba</th>
+                <th className="px-6 py-4 text-lg font-semibold rounded-tr-2xl">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && !modalOpen ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10">
+                    <div className="flex items-center justify-center gap-2 text-gray-500">
+                      <FaSync className="animate-spin" />
+                      <span>Cargando conexiones...</span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {conexiones.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="text-center py-8 text-gray-500">
-                      No connections configured.
-                    </td>
-                  </tr>
-                ) : conexiones.map((connection) => (
-                  <tr key={connection.id} className="border-b transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 text-center">{getTypeIcon(connection.type)}</td>
-                    <td className="px-6 py-4 font-medium">{connection.name}</td>
-                    <td className="px-6 py-4">{getStatusPill(connection.connection_status)}</td>
-                    <td className="px-6 py-4">
-                        {connection.is_active ?
-                           <FaCheckCircle className="text-green-500" /> :
-                           <button onClick={() => activateConnection(connection.id)} className="text-gray-400 hover:text-green-500"><FaCheckCircle /></button>
-                        }
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {connection.last_tested_at ? new Date(connection.last_tested_at).toLocaleString() : 'Never'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => testConnection(connection.id)}
-                          className="p-2 text-green-600 hover:bg-green-100 rounded transition-colors"
-                          title="Test Connection"
-                        >
-                          <FaPlay />
-                        </button>
-                        <button
-                          onClick={() => abrirModal(connection)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                          title="Edit"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => deleteConnection(connection)}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ) : conexiones.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                    No hay conexiones configuradas
+                  </td>
+                </tr>
+              ) : conexiones.map((connection) => (
+                <tr key={connection.id} className="last:border-b-0 cursor-pointer transition-all duration-150 hover:bg-[#e6f0fa] group" style={{ height: '64px' }}>
+                  <td className="px-6 py-4 text-center">{getTypeIcon(connection.type)}</td>
+                  <td className="px-6 py-4 text-base whitespace-nowrap">
+                    <span className="font-medium">{connection.name}</span>
+                  </td>
+                  <td className="px-6 py-4 text-base">
+                    <span className="block truncate max-w-xs" title={connection.description}>
+                      {connection.description || '-'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {connection.connection_status === 'connected' ? (
+                      <span className="px-2 py-2 inline-flex text-md leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        Conectado
+                      </span>
+                    ) : connection.connection_status === 'failed' ? (
+                      <span className="px-2 py-2 inline-flex text-md leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                        Fallido
+                      </span>
+                    ) : (
+                      <span className="px-2 py-2 inline-flex text-md leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                        Desconocido
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {connection.is_active ? (
+                      <span className="inline-flex">
+                        <FaCheckCircle className="text-green-500 text-xl" />
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => activateConnection(connection.id)}
+                        className="text-gray-400 hover:text-green-500 transition-colors"
+                        title="Activar conexión"
+                      >
+                        <FaCheckCircle className="text-xl" />
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">
+                    {connection.last_tested_at ? new Date(connection.last_tested_at).toLocaleDateString() : 'Nunca'}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => testConnection(connection)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                        title="Probar Conexión"
+                      >
+                        <FaPlay className="inline" />
+                      </button>
+                      <button
+                        onClick={() => { setMappingConnection(connection); setMappingOpen(true); }}
+                        className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 transition-colors"
+                        title="Configurar Mapeo"
+                      >
+                        <FaColumns className="inline" />
+                      </button>
+                      <button
+                        onClick={() => abrirModal(connection)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
+                        title="Editar"
+                      >
+                        <FaEdit className="inline" />
+                      </button>
+                      <button
+                        onClick={() => deleteConnection(connection)}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+                        title="Eliminar"
+                      >
+                        <FaTrash className="inline" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {modalOpen && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto">
               <div className="flex justify-between items-center p-6 border-b">
                 <h2 className="text-xl font-semibold text-[#2c4b8b]">
-                  {selectedConnection ? 'Edit Connection' : 'New Connection'}
+                  {selectedConnection ? 'Editar Conexión' : 'Nueva Conexión'}
                 </h2>
                 <button onClick={cerrarModal} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
               </div>
               
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Connection Type</label>
+                  <label className="block text-sm font-medium mb-2">Tipo de Conexión</label>
                   <div className="relative type-dropdown">
                     <div
                       onClick={() => !selectedConnection && setShowTypeDropdown(!showTypeDropdown)}
@@ -294,7 +368,7 @@ export default function GestionConexiones() {
                           <span>{supportedTypes.find(t => t.type === formData.type)?.name}</span>
                         </div>
                       ) : (
-                        <span className="text-gray-500">Select a type...</span>
+                        <span className="text-gray-500">Seleccione un tipo...</span>
                       )}
                     </div>
                     {showTypeDropdown && !selectedConnection && (
@@ -320,7 +394,7 @@ export default function GestionConexiones() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Name</label>
+                  <label className="block text-sm font-medium mb-2">Nombre</label>
                   <input
                     type="text"
                     value={formData.name}
@@ -331,7 +405,7 @@ export default function GestionConexiones() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Description</label>
+                  <label className="block text-sm font-medium mb-2">Descripción</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -342,7 +416,7 @@ export default function GestionConexiones() {
 
                 {formData.type && (
                   <div className="bg-gray-50 p-4 rounded">
-                    <h3 className="font-medium mb-3">Credentials for {supportedTypes.find(t => t.type === formData.type)?.name}</h3>
+                    <h3 className="font-medium mb-3">Credenciales para {supportedTypes.find(t => t.type === formData.type)?.name}</h3>
                     {supportedTypes.find(t => t.type === formData.type)?.fields.map(field => (
                       <div key={field.name} className="mb-3">
                         <label className="block text-sm font-medium mb-1">
@@ -365,14 +439,30 @@ export default function GestionConexiones() {
                 )}
 
                 <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={cerrarModal} className="flex-1 px-4 py-2 border rounded">Cancel</button>
+                  <button type="button" onClick={cerrarModal} className="flex-1 px-4 py-2 border rounded">Cancelar</button>
                   <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-[#2c4b8b] text-white rounded disabled:opacity-50">
-                    {loading ? 'Saving...' : 'Save Connection'}
+                    {loading ? 'Guardando...' : 'Guardar Conexión'}
                   </button>
                 </div>
               </form>
             </div>
           </div>
+        )}
+
+        {mappingOpen && (
+          <DataMappingModal
+            isOpen={mappingOpen}
+            onClose={() => { setMappingOpen(false); setMappingConnection(null); }}
+            connection={mappingConnection}
+            onSave={handleSaveMapping}
+          />
+        )}
+
+        {assignManagerOpen && (
+          <DataTypeConnectionManager
+            isOpen={assignManagerOpen}
+            onClose={() => setAssignManagerOpen(false)}
+          />
         )}
       </div>
     </Layout>

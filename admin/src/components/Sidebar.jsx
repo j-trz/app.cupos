@@ -63,7 +63,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
                 seccion === sec.id ? "bg-[#1e355e] font-semibold" : ""
               )}
               onClick={() => {
-                setSeccion(sec.id);
+                if (typeof setSeccion === 'function') {
+                  setSeccion(sec.id);
+                }
                 navigate(sec.ruta);
               }}
             >

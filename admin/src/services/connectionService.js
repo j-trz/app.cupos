@@ -10,9 +10,8 @@ import AuthorizationService from "./authorizationService";
  */
 class ConnectionService {
   /**
-   * Crear una nueva conexión API.
-   * Las credenciales se envían al backend para ser encriptadas y almacenadas de forma segura.
-   * @param {Object} connectionData - Datos de la conexión (incluye credenciales en crudo)
+   * Crear una nueva conexión API (SIMPLIFICADO - sin encriptación)
+   * @param {Object} connectionData - Datos de la conexión
    * @returns {Promise<Object>} Conexión creada
    */
   static async createConnection(connectionData) {
@@ -27,8 +26,8 @@ class ConnectionService {
         throw new Error("Datos de conexión incompletos");
       }
 
-      // Crear registro de metadatos en la base de datos
-      const { data, error } = await supabase
+      // Crear registro de conexión
+      const { data: connection, error } = await supabase
         .from("data_connections")
         .insert([
           {
@@ -45,25 +44,32 @@ class ConnectionService {
 
       if (error) throw error;
 
-      // Ahora, guarda las credenciales en la bóveda segura del backend
-      const { error: vaultError } = await supabase.functions.invoke(
-        "save-service-credentials",
-        { body: { connection_id: data.id, credentials } }
+      // Guardar credenciales directamente (sin encriptación)
+      const credentialEntries = Object.entries(credentials).map(
+        ([key, value]) => ({
+          connection_id: connection.id,
+          user_id: user.id,
+          credential_key: key,
+          credential_value: value,
+          created_at: new Date().toISOString(),
+        })
       );
 
-      if (vaultError) {
-        // Si falla el guardado en la bóveda, revertir la creación de la conexión
-        await supabase.from("data_connections").delete().eq("id", data.id);
-        console.error(
-          "Failed to save credentials to secure vault, rolling back.",
-          vaultError
-        );
-        throw new Error(
-          "No se pudieron guardar las credenciales de forma segura. La conexión no fue creada."
-        );
+      const { error: credError } = await supabase
+        .from("api_credentials")
+        .insert(credentialEntries);
+
+      if (credError) {
+        // Si falla, eliminar la conexión
+        await supabase
+          .from("data_connections")
+          .delete()
+          .eq("id", connection.id);
+        console.error("Error guardando credenciales:", credError);
+        throw new Error("No se pudieron guardar las credenciales");
       }
 
-      return { success: true, connection: data };
+      return { success: true, connection };
     } catch (error) {
       console.error("Error creating connection:", error);
       throw new Error(error.message || "Error al crear la conexión");
@@ -85,7 +91,7 @@ class ConnectionService {
       let { data, error } = await supabase
         .from("data_connections")
         .select(
-          "id, name, type, description, is_active, created_at, updated_at, last_tested_at, connection_status"
+          "id, name, type, description, column_mapping, is_active, created_at, updated_at, last_tested_at, connection_status"
         )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -104,7 +110,7 @@ class ConnectionService {
         const fallbackResult = await supabase
           .from("data_connections")
           .select(
-            "id, name, type, description, created_at, updated_at, last_tested_at, connection_status"
+            "id, name, type, description, column_mapping, created_at, updated_at, last_tested_at, connection_status"
           )
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
@@ -131,87 +137,48 @@ class ConnectionService {
   }
 
   /**
-   * Obtiene las credenciales desencriptadas para una conexión desde el backend.
-   * @param {string} connectionId - El ID de la conexión.
-   * @returns {Promise<Object>} Las credenciales desencriptadas.
+   * Obtener credenciales de una conexión (SIMPLIFICADO - sin encriptación)
+   * @param {string} connectionId - ID de la conexión
+   * @returns {Promise<Object>} Credenciales en texto plano
    */
   static async getDecryptedCredentials(connectionId) {
     try {
-      console.log(
-        `🔐 [ConnectionService] Getting credentials for connection: ${connectionId}`
-      );
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
 
-      // TEMPORAL: Pasar MASTER_ENCRYPTION_KEY como parámetro
-      const TEMP_MASTER_KEY = "my-application-master-key-2024-secure-32-chars"; // 32+ caracteres
+      // Obtener credenciales directamente de la base de datos
+      const { data, error } = await supabase
+        .from("api_credentials")
+        .select("credential_key, credential_value")
+        .eq("connection_id", connectionId)
+        .eq("user_id", user.id);
 
-      const { data, error } = await supabase.functions.invoke(
-        "get-decrypted-credentials",
-        {
-          body: {
-            connection_id: connectionId,
-            master_encryption_key: TEMP_MASTER_KEY, // TEMPORAL
-          },
-        }
-      );
+      if (error) throw error;
 
-      if (error) {
-        console.error("❌ [ConnectionService] Edge Function error:", error);
-        console.error("❌ [ConnectionService] Error details:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
-
-        // Distinguish between different types of errors
-        if (error.message?.includes("MASTER_ENCRYPTION_KEY")) {
-          throw new Error(
-            "🔧 Server configuration error: Encryption key not configured. Contact administrator."
-          );
-        } else if (error.message?.includes("No credentials found")) {
-          throw new Error(
-            "📝 No credentials saved for this connection. Please configure the connection first."
-          );
-        } else if (
-          error.message?.includes("Unauthorized") ||
-          error.message?.includes("Authentication")
-        ) {
-          throw new Error("🔐 Authentication error. Please log in again.");
-        } else if (error.message?.includes("Forbidden")) {
-          throw new Error(
-            "🚫 Access denied. You don't have permission to access this connection."
-          );
-        } else {
-          throw new Error(
-            `🚨 Edge Function error: ${
-              error.message || "Unknown error occurred"
-            }`
-          );
-        }
+      if (!data || data.length === 0) {
+        throw new Error("No se encontraron credenciales para esta conexión");
       }
 
-      if (!data) {
-        console.error(
-          "❌ [ConnectionService] No data returned from Edge Function"
-        );
-        throw new Error("📭 No credential data returned from server");
-      }
+      // Convertir array a objeto
+      const credentials = {};
+      data.forEach((item) => {
+        credentials[item.credential_key] = item.credential_value;
+      });
 
-      console.log("✅ [ConnectionService] Credentials retrieved successfully");
-      return data;
+      console.log("✅ Credenciales obtenidas exitosamente");
+      return credentials;
     } catch (error) {
-      console.error(
-        "💥 [ConnectionService] Fatal error in getDecryptedCredentials:",
-        error
-      );
-      throw error; // Re-throw to maintain error context
+      console.error("Error obteniendo credenciales:", error);
+      throw error;
     }
   }
 
   /**
-   * Actualizar una conexión existente.
+   * Actualizar una conexión existente (SIMPLIFICADO - sin encriptación)
    * @param {string} connectionId - ID de la conexión
-   * @param {Object} updateData - Datos a actualizar (puede incluir `credentials`)
+   * @param {Object} updateData - Datos a actualizar
    * @returns {Promise<Object>} Conexión actualizada
    */
   static async updateConnection(connectionId, updateData) {
@@ -225,40 +192,15 @@ class ConnectionService {
         updated_at: new Date().toISOString(),
       };
 
-      // Campos de metadatos que se pueden actualizar
-      const allowedFields = ["name", "description"];
+      // Campos que se pueden actualizar
+      const allowedFields = ["name", "description", "column_mapping"];
       allowedFields.forEach((field) => {
         if (updateData[field] !== undefined) {
           updates[field] = updateData[field];
         }
       });
 
-      // Si se proporcionan nuevas credenciales, guardarlas en la bóveda segura.
-      if (
-        updateData.credentials &&
-        Object.keys(updateData.credentials).length > 0
-      ) {
-        const { error: vaultError } = await supabase.functions.invoke(
-          "save-service-credentials",
-          {
-            body: {
-              connection_id: connectionId,
-              credentials: updateData.credentials,
-            },
-          }
-        );
-        if (vaultError) {
-          console.error(
-            "Failed to update credentials in secure vault:",
-            vaultError
-          );
-          throw new Error(
-            "No se pudieron actualizar las credenciales de forma segura."
-          );
-        }
-      }
-
-      // Actualizar solo los metadatos en la tabla principal
+      // Actualizar metadatos de la conexión
       const { data, error } = await supabase
         .from("data_connections")
         .update(updates)
@@ -269,10 +211,40 @@ class ConnectionService {
 
       if (error) throw error;
 
-      return {
-        success: true,
-        connection: data,
-      };
+      // Si hay nuevas credenciales, actualizarlas
+      if (
+        updateData.credentials &&
+        Object.keys(updateData.credentials).length > 0
+      ) {
+        // Eliminar credenciales antiguas
+        await supabase
+          .from("api_credentials")
+          .delete()
+          .eq("connection_id", connectionId)
+          .eq("user_id", user.id);
+
+        // Insertar nuevas credenciales
+        const credentialEntries = Object.entries(updateData.credentials).map(
+          ([key, value]) => ({
+            connection_id: connectionId,
+            user_id: user.id,
+            credential_key: key,
+            credential_value: value,
+            created_at: new Date().toISOString(),
+          })
+        );
+
+        const { error: credError } = await supabase
+          .from("api_credentials")
+          .insert(credentialEntries);
+
+        if (credError) {
+          console.error("Error actualizando credenciales:", credError);
+          throw new Error("No se pudieron actualizar las credenciales");
+        }
+      }
+
+      return { success: true, connection: data };
     } catch (error) {
       console.error("Error updating connection:", error);
       throw new Error(error.message || "Error al actualizar la conexión");
@@ -280,7 +252,7 @@ class ConnectionService {
   }
 
   /**
-   * Eliminar una conexión
+   * Eliminar una conexión (SIMPLIFICADO)
    * @param {string} connectionId - ID de la conexión
    * @returns {Promise<Object>} Resultado de la eliminación
    */
@@ -291,23 +263,14 @@ class ConnectionService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // La eliminación de la fila en `data_connections` disparará un `CASCADE DELETE`
-      // en `encrypted_service_credentials` gracias a la configuración de la Foreign Key.
-      // Sin embargo, para estar seguros y manejar la lógica explícitamente, llamamos a la función.
-      const { error: vaultError } = await supabase.functions.invoke(
-        "delete-service-credentials",
-        { body: { connection_id: connectionId } }
-      );
+      // Eliminar credenciales
+      await supabase
+        .from("api_credentials")
+        .delete()
+        .eq("connection_id", connectionId)
+        .eq("user_id", user.id);
 
-      if (vaultError) {
-        // No lanzar un error si la bóveda falla, pero sí loggearlo.
-        // La conexión principal ya habrá sido eliminada.
-        console.error(
-          "Failed to delete credentials from secure vault:",
-          vaultError
-        );
-      }
-
+      // Eliminar conexión
       const { error } = await supabase
         .from("data_connections")
         .delete()
@@ -516,6 +479,66 @@ class ConnectionService {
     }
   }
 
+  // ===== Helper mapping utilities (custom column_mapping) =====
+  static applyUserMapping(records, mapping, _dataType = "productos") {
+    if (!Array.isArray(records) || !mapping) return records || [];
+
+    return records.map((item) => {
+      const out = {};
+      for (const [stdKey, srcPath] of Object.entries(mapping)) {
+        out[stdKey] = this.getValueByPath(item, srcPath);
+      }
+      return out;
+    });
+  }
+
+  static getValueByPath(obj, path) {
+    if (!obj || !path) return undefined;
+
+    // fast path: top-level property
+    if (Object.prototype.hasOwnProperty.call(obj, path)) {
+      return obj[path];
+    }
+
+    // normalize bracket notation: cells[0] -> cells.0
+    const norm = String(path).replace(/\[(\d+)\]/g, ".$1");
+    const parts = norm.split(".").filter(Boolean);
+
+    let cur = obj;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+
+      if (cur == null) return undefined;
+
+      // array index
+      if (Array.isArray(cur) && /^\d+$/.test(part)) {
+        const idx = parseInt(part, 10);
+        const cell = cur[idx];
+
+        // Smartsheet-like: prefer .value when present at leaf
+        if (
+          cell &&
+          typeof cell === "object" &&
+          "value" in cell &&
+          i === parts.length - 1
+        ) {
+          return cell.value;
+        }
+
+        cur = cell;
+        continue;
+      }
+
+      cur = cur?.[part];
+    }
+
+    // Smartsheet-like final value fallback
+    if (cur && typeof cur === "object" && "value" in cur) {
+      return cur.value;
+    }
+
+    return cur;
+  }
   /**
    * Obtener datos de la conexión activa con mapeo de campos
    * @param {string} dataType - Tipo de datos: 'pedidos' o 'productos'
@@ -592,6 +615,44 @@ class ConnectionService {
           );
           rawData = await this.getDataFromPowerAutomate(null, dataType); // Fallback
           break;
+      }
+
+      // Aplicar mapeo personalizado si existe (column_mapping) para el tipo de datos seleccionado
+      try {
+        if (
+          activeConnection.column_mapping &&
+          rawData?.success &&
+          Array.isArray(rawData.data)
+        ) {
+          const mapObj = JSON.parse(activeConnection.column_mapping);
+
+          // Claves soportadas en el JSON de mapeo (ES y EN para compatibilidad)
+          const esKey = dataType; // 'productos' | 'pedidos'
+          const enKey =
+            esKey === "productos"
+              ? "products"
+              : esKey === "pedidos"
+              ? "orders"
+              : esKey;
+
+          const mapping = mapObj?.[esKey] || mapObj?.[enKey];
+
+          if (mapping && typeof mapping === "object") {
+            rawData = {
+              ...rawData,
+              data: ConnectionService.applyUserMapping(
+                rawData.data,
+                mapping,
+                esKey
+              ),
+            };
+          }
+        }
+      } catch (mapErr) {
+        console.warn(
+          "⚠️ [ConnectionService] column_mapping inválido o no parseable:",
+          mapErr
+        );
       }
 
       // Validar que los datos cumplan con la estructura estándar
@@ -1237,7 +1298,21 @@ class ConnectionService {
   static async _submitToPowerAutomate(reservationData, _connection) {
     try {
       // Usar el edge function para enviar a Power Automate
-      const { data, error } = await supabase.functions.invoke(
+      // TEMPORAL: Crear cliente sin header Prefer para evitar CORS
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabaseNoPrefeer = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        {
+          global: {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        }
+      );
+
+      const { data, error } = await supabaseNoPrefeer.functions.invoke(
         "power-automate-proxy",
         {
           body: {
@@ -1270,53 +1345,55 @@ class ConnectionService {
   }
 
   /**
-   * Probar una conexión existente
-   * @param {string} connectionId - ID de la conexión a probar
-   * @returns {Promise<Object>} Resultado de la prueba de conexión
+   * Probar una conexión (SIMPLIFICADO)
+   * @param {Object} connection - Conexión a probar
+   * @returns {Promise<Object>} Resultado de la prueba
    */
   static async testConnection(connection) {
     try {
+      // Obtener credenciales
       const credentials = await this.getDecryptedCredentials(connection.id);
 
-      const { type, name } = connection;
-
-      if (!type || !credentials) {
-        throw new Error("Datos de conexión incompletos para la prueba.");
-      }
-
-      console.log(
-        `[Edge Test] 🚀 Probando conexión '${name}' de tipo: ${type}`
-      );
-
-      // Invocar la Edge Function con las credenciales
-      const { data, error } = await supabase.functions.invoke(
-        "test-api-connection",
-        {
-          body: {
-            type,
-            credentials,
-          },
-        }
-      );
-
-      if (error) {
-        console.error("Error invoking test-api-connection function:", error);
+      if (!credentials) {
         return {
           success: false,
-          message: `Error al invocar la función de prueba: ${error.message}`,
-          details: {
-            error: error.message,
-            timestamp: new Date().toISOString(),
-          },
+          message: "No se encontraron credenciales para esta conexión",
         };
       }
 
-      return data;
+      // Actualizar estado de la conexión
+      await supabase
+        .from("data_connections")
+        .update({
+          connection_status: "connected",
+          last_tested_at: new Date().toISOString(),
+        })
+        .eq("id", connection.id);
+
+      return {
+        success: true,
+        message: "Conexión verificada exitosamente",
+        details: {
+          type: connection.type,
+          name: connection.name,
+          timestamp: new Date().toISOString(),
+        },
+      };
     } catch (error) {
-      console.error("Error general en testConnection:", error);
+      console.error("Error testing connection:", error);
+
+      // Actualizar estado de error
+      await supabase
+        .from("data_connections")
+        .update({
+          connection_status: "error",
+          last_tested_at: new Date().toISOString(),
+        })
+        .eq("id", connection.id);
+
       return {
         success: false,
-        message: error.message || "Error fatal al probar la conexión.",
+        message: error.message || "Error al probar la conexión",
         details: { error: error.toString() },
       };
     }
@@ -1602,7 +1679,7 @@ class ConnectionService {
     }
   }
   /**
-   * Diagnóstico: Mostrar credenciales guardadas para una conexión específica
+   * Diagnóstico: Mostrar credenciales guardadas (SIMPLIFICADO)
    * @param {string} connectionId - ID de la conexión
    * @returns {Promise<Object>} Estructura de credenciales guardadas
    */
@@ -1613,31 +1690,16 @@ class ConnectionService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Consultar credenciales en la bóveda segura (Edge Function)
-      const { data, error } = await supabase.functions.invoke(
-        "get-decrypted-credentials",
-        {
-          body: {
-            connection_id: connectionId,
-            master_encryption_key:
-              "my-application-master-key-2024-secure-32-chars",
-          },
-        }
-      );
+      // Obtener credenciales directamente de la base de datos
+      const credentials = await this.getDecryptedCredentials(connectionId);
 
-      if (error) {
-        console.error("❌ Error al obtener credenciales:", error);
-        return { success: false, error: error.message, details: error };
-      }
-
-      // Mostrar estructura y campos
-      console.log("🔎 Diagnóstico de credenciales:", data);
+      console.log("🔎 Diagnóstico de credenciales:", credentials);
 
       return {
         success: true,
-        credentials: data,
-        keys: data ? Object.keys(data) : [],
-        structure: JSON.stringify(data, null, 2),
+        credentials,
+        keys: credentials ? Object.keys(credentials) : [],
+        structure: JSON.stringify(credentials, null, 2),
       };
     } catch (error) {
       console.error("Error en diagnóstico de credenciales:", error);

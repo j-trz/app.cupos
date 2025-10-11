@@ -10,13 +10,6 @@ export const supabaseWithHeaders = createClient(supabaseUrl, supabaseKey, {
     persistSession: true,
     detectSessionInUrl: true,
   },
-  global: {
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-  },
   db: {
     schema: "public",
   },
@@ -28,13 +21,6 @@ export const createCustomSupabaseClient = (url, key) => {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
-    },
-    global: {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
     },
     db: {
       schema: "public",

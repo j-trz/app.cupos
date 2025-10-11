@@ -3,7 +3,7 @@ import { TbBellBolt, TbTicket } from 'react-icons/tb';
 import { RiUserSettingsLine } from "react-icons/ri";
 import { PiAirplaneInFlightFill } from "react-icons/pi";
 import { MdApi } from "react-icons/md";
-import { FaShieldAlt, FaUser, FaBox } from "react-icons/fa";
+import { FaShieldAlt, FaUser, FaBox , FaTable} from "react-icons/fa";
 
 
 export const SECCIONES = [

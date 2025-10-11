@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import ConnectionService from "../services/connectionService";
-import { FaTable, FaArrowRight, FaSync } from 'react-icons/fa';
+import { FaArrowRight, FaSync } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 export default function DataMapper() {
+  const [seccion, setSeccion] = useState("data-mapper");
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [tableName, setTableName] = useState('');
@@ -27,7 +28,7 @@ export default function DataMapper() {
         if (result.success) {
           setConnections(result.connections);
         }
-      } catch (error) {
+      } catch {
         Swal.fire({ icon: 'error', title: 'Error', text: 'Could not load connections.' });
       }
     }
@@ -85,7 +86,7 @@ export default function DataMapper() {
   }
 
   return (
-    <Layout>
+    <Layout seccion={seccion} setSeccion={setSeccion}>
       <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <h1 className="text-2xl font-bold text-[#2c4b8b] mb-6">Data Mapping</h1>
 
