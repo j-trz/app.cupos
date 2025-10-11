@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";// eslint-disable-line no-unu
 import Topbar from "./Topbar";// eslint-disable-line no-unused-vars
 import Sidebar from "./Sidebar";// eslint-disable-line no-unused-vars
 
-export default function Layout({ children, seccion, setSeccion }) {
+export default function Layout({ children, seccion, setSeccion = () => {} }) {
   // Persistir estado del sidebar en localStorage
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== 'undefined') {

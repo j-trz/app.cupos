@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";// eslint-disable-line no-unused-vars
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import TwoFactorManager from "../components/TwoFactorManager";// eslint-disable-line no-unused-vars
-import { FaUser, FaShieldAlt, FaCog, FaEnvelope, FaBuilding } from "react-icons/fa";// eslint-disable-line no-unused-vars
+import {FaEnvelope, FaBuilding } from "react-icons/fa";// eslint-disable-line no-unused-vars
 import { supabase } from "../supabaseClient";// eslint-disable-line no-unused-vars
 import AuthorizationService from "../services/authorizationService";
+import { HiOutlineUser, HiOutlineShieldCheck, HiOutlineCog6Tooth   } from "react-icons/hi2";// eslint-disable-line no-unused-vars
 
 /**
  * Página de perfil del usuario con gestión de seguridad
@@ -48,7 +49,7 @@ export default function Perfil() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <FaUser className="text-[#2c4b8b]" />
+            <HiOutlineUser className="text-[#2c4b8b]" />
             Mi Perfil
           </h1>
           <p className="text-gray-600 mt-2">
@@ -63,7 +64,7 @@ export default function Perfil() {
               <div className="bg-gradient-to-r from-[#2c4b8b] to-[#1e355e] px-6 py-8 text-white">
                 <div className="flex items-center justify-center mb-4">
                   <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
-                    <FaUser className="text-3xl" />
+                    <HiOutlineUser className="text-3xl" />
                   </div>
                 </div>
                 <h2 className="text-xl font-semibold text-center">
@@ -97,7 +98,7 @@ export default function Perfil() {
 
                 {/* Rol */}
                 <div className="flex items-center gap-3">
-                  <FaCog className="text-gray-400" />
+                  <HiOutlineCog6Tooth  ooth  className="text-gray-400" />
                   <div>
                     <p className="text-sm text-gray-500">Rol</p>
                     <p className="font-medium">
@@ -114,7 +115,7 @@ export default function Perfil() {
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <FaShieldAlt className="text-[#2c4b8b]" />
+                  <HiOutlineShieldCheck className="text-[#2c4b8b] h-8 w-8" />
                   Configuraciones de Seguridad
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
@@ -132,7 +133,7 @@ export default function Perfil() {
             {/* Información de Seguridad */}
             <div className="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-200">
               <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                <FaShieldAlt className="text-blue-600" />
+                <HiOutlineShieldCheck className="text-green-600 h-8 w-8" />
                 Funciones de Seguridad Activas
               </h4>
               <ul className="space-y-2 text-sm text-blue-800">

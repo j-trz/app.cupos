@@ -2,12 +2,16 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import ConnectionService from "../services/connectionService";
-import { FaPlus, FaSync, FaEdit, FaTrash, FaPlay, FaTable, FaDatabase, FaCheckCircle, FaColumns } from 'react-icons/fa';
+import { FaSync, FaTable, FaDatabase, FaCheckCircle } from 'react-icons/fa';
 import { SiMongodb, SiTableau, SiSupabase } from 'react-icons/si';
 import { TiVendorMicrosoft } from 'react-icons/ti';
+import { HiOutlinePencilSquare, HiOutlinePlus, HiOutlineCircleStack, HiOutlineCheck,HiOutlineTrash } from "react-icons/hi2";
+
+
 import Swal from 'sweetalert2';
 import DataMappingModal from "../components/DataMappingModal";
 import DataTypeConnectionManager from "../components/DataTypeConnectionManager";
+import { supabase } from "../supabaseClient";
 
 export default function GestionConexiones() {
   const [seccion, setSeccion] = useState("gestion-conexiones");
@@ -19,17 +23,40 @@ export default function GestionConexiones() {
   const [mappingOpen, setMappingOpen] = useState(false);
   const [mappingConnection, setMappingConnection] = useState(null);
   const [assignManagerOpen, setAssignManagerOpen] = useState(false);
+  const [agencies, setAgencies] = useState([]);
 
   const [formData, setFormData] = useState({
     id: null,
     name: '',
     type: '',
     description: '',
+    scope: 'user',
+    target_agency: '',
     credentials: {}
   });
 
   useEffect(() => {
     fetchConexiones();
+  }, []);
+
+  // Cargar agencias distintas desde perfiles para selector
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('agencia')
+          .not('agencia', 'is', null);
+        if (!error && data && active) {
+          const unique = Array.from(new Set(data.map(d => d.agencia).filter(Boolean)));
+          setAgencies(unique);
+        }
+      } catch {
+        // no-op
+      }
+    })();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -64,12 +91,14 @@ export default function GestionConexiones() {
         name: connection.name,
         type: connection.type,
         description: connection.description || '',
+        scope: connection.scope || 'user',
+        target_agency: connection.target_agency || '',
         credentials: {} // Las credenciales no se muestran por seguridad
       });
       setSelectedConnection(connection);
       setModalOpen(true);
     } else {
-      setFormData({ id: null, name: '', type: '', description: '', credentials: {} });
+      setFormData({ id: null, name: '', type: '', description: '', scope: 'user', target_agency: '', credentials: {} });
       setSelectedConnection(null);
       setModalOpen(true);
     }
@@ -99,7 +128,9 @@ export default function GestionConexiones() {
         // Actualizar conexión existente
         const updateData = {
           name: formData.name,
-          description: formData.description
+          description: formData.description,
+          scope: formData.scope,
+          target_agency: formData.scope === 'agency' ? (formData.target_agency || '') : null
         };
         
         // Solo enviar credenciales si hay valores no vacíos
@@ -218,16 +249,16 @@ export default function GestionConexiones() {
           <div className="flex gap-2">
             <button
               onClick={() => setAssignManagerOpen(true)}
-              className="flex items-center gap-2 bg-gray-100 text-[#2c4b8b] px-4 py-2 rounded hover:bg-gray-200 transition-colors"
+              className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] transition-colors"
             >
-              <FaColumns />
+              <HiOutlineCircleStack  />
               Asignar a sección
             </button>
             <button
               onClick={() => abrirModal()}
               className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] transition-colors"
             >
-              <FaPlus />
+              <HiOutlinePlus  />
               Nueva Conexión
             </button>
           </div>
@@ -240,6 +271,7 @@ export default function GestionConexiones() {
                 <th className="px-6 py-4 text-lg font-semibold rounded-tl-2xl">Tipo</th>
                 <th className="px-6 py-4 text-lg font-semibold">Nombre</th>
                 <th className="px-6 py-4 text-lg font-semibold">Descripción</th>
+                <th className="px-6 py-4 text-lg font-semibold">Ámbito</th>
                 <th className="px-6 py-4 text-lg font-semibold">Estado</th>
                 <th className="px-6 py-4 text-lg font-semibold">Activa</th>
                 <th className="px-6 py-4 text-lg font-semibold">Última Prueba</th>
@@ -249,7 +281,7 @@ export default function GestionConexiones() {
             <tbody>
               {loading && !modalOpen ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10">
+                  <td colSpan={8} className="text-center py-10">
                     <div className="flex items-center justify-center gap-2 text-gray-500">
                       <FaSync className="animate-spin" />
                       <span>Cargando conexiones...</span>
@@ -258,7 +290,7 @@ export default function GestionConexiones() {
                 </tr>
               ) : conexiones.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     No hay conexiones configuradas
                   </td>
                 </tr>
@@ -272,6 +304,21 @@ export default function GestionConexiones() {
                     <span className="block truncate max-w-xs" title={connection.description}>
                       {connection.description || '-'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {connection.scope === 'all' ? (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                        Todas
+                      </span>
+                    ) : connection.scope === 'agency' ? (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800" title={connection.target_agency || ''}>
+                        Agencia: {connection.target_agency || '-'}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                        Solo usuario
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {connection.connection_status === 'connected' ? (
@@ -310,31 +357,31 @@ export default function GestionConexiones() {
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => testConnection(connection)}
-                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                        className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Probar Conexión"
                       >
-                        <FaPlay className="inline" />
+                        <HiOutlineCheck  className="inline" />
                       </button>
                       <button
                         onClick={() => { setMappingConnection(connection); setMappingOpen(true); }}
-                        className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 transition-colors"
+                        className=" text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Configurar Mapeo"
                       >
-                        <FaColumns className="inline" />
+                        <HiOutlineCircleStack   className="inline" />
                       </button>
                       <button
                         onClick={() => abrirModal(connection)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
+                        className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Editar"
                       >
-                        <FaEdit className="inline" />
+                        <HiOutlinePencilSquare className="inline" />
                       </button>
                       <button
                         onClick={() => deleteConnection(connection)}
-                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+                        className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Eliminar"
                       >
-                        <FaTrash className="inline" />
+                        <HiOutlineTrash  className="inline" />
                       </button>
                     </div>
                   </td>
@@ -438,6 +485,44 @@ export default function GestionConexiones() {
                   </div>
                 )}
 
+                {/* Ámbito */}
+                <div className="bg-gray-50 p-4 rounded">
+                  <h3 className="font-medium mb-3">Ámbito</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Disponibilidad</label>
+                      <select
+                        value={formData.scope}
+                        onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
+                        className="w-full px-3 py-2 border rounded text-sm"
+                      >
+                        <option value="user">Solo este usuario</option>
+                        <option value="agency">Una agencia específica</option>
+                        <option value="all">Todas las agencias</option>
+                      </select>
+                    </div>
+
+                    {formData.scope === 'agency' && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1">Agencia</label>
+                        <select
+                          value={formData.target_agency}
+                          onChange={(e) => setFormData({ ...formData, target_agency: e.target.value })}
+                          className="w-full px-3 py-2 border rounded text-sm"
+                        >
+                          <option value="">Seleccionar agencia...</option>
+                          {agencies.map((ag) => (
+                            <option key={ag} value={ag}>{ag}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Esta conexión será visible y utilizable por todos los usuarios de la agencia seleccionada.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+ 
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={cerrarModal} className="flex-1 px-4 py-2 border rounded">Cancelar</button>
                   <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-[#2c4b8b] text-white rounded disabled:opacity-50">

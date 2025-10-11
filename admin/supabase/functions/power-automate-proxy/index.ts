@@ -11,8 +11,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, Authorization, x-client-info, X-Client-Info, apikey, content-type, x-supabase-api-version",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 interface ReservationData {
@@ -43,9 +44,18 @@ interface ReservationData {
 serve(async (req) => {
   // Enhanced CORS handling - always return CORS headers
   if (req.method === "OPTIONS") {
+    const origin = req.headers.get("Origin") ?? "*";
+    const reqHeaders =
+      req.headers.get("Access-Control-Request-Headers") ??
+      "authorization, x-client-info, apikey, content-type";
     return new Response(null, {
       status: 204,
-      headers: corsHeaders,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers": reqHeaders,
+        Vary: "Origin",
+      },
     });
   }
 

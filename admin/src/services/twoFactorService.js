@@ -597,67 +597,74 @@ class TwoFactorService {
    */
   static async getAllUsers2FA() {
     try {
-      // Obtener usuarios con 2FA habilitado sin JOIN automático
-      const { data: securityData, error: securityError } = await supabase
-        .from("user_security_status")
-        .select(
+      // Intento con Edge Function (Service Role)
+      const { data, error } = await supabase.functions.invoke(
+        "user-management",
+        {
+          body: { action: "listUsers2FA" },
+        }
+      );
+
+      let users = [];
+      if (error) {
+        console.error("Error invoking listUsers2FA:", error);
+      } else if (data?.success && Array.isArray(data.users)) {
+        users = data.users;
+      }
+
+      // Fallback: si la lista viene vacía, intentar consulta directa (RLS debería permitir admin)
+      if (!users.length) {
+        const { data: securityData, error: securityError } = await supabase
+          .from("user_security_status")
+          .select(
+            `
+            user_id,
+            two_factor_enabled,
+            backup_codes,
+            created_at
           `
-          user_id,
-          two_factor_enabled,
-          backup_codes,
-          created_at
-        `
-        )
-        .eq("two_factor_enabled", true);
+          )
+          .eq("two_factor_enabled", true);
 
-      if (securityError) {
-        console.error("Error getting users with 2FA:", securityError);
-        return {
-          success: false,
-          error: "Error al obtener usuarios con 2FA",
-        };
+        if (
+          !securityError &&
+          Array.isArray(securityData) &&
+          securityData.length
+        ) {
+          const userIds = securityData.map((item) => item.user_id);
+          const { data: profilesData } = await supabase
+            .from("profiles")
+            .select("id, email, full_name, nombre, agency, agencia, role")
+            .in("id", userIds);
+
+          users = securityData.map((securityItem) => {
+            const rawProfile =
+              profilesData?.find((p) => p.id === securityItem.user_id) || null;
+            const profile = rawProfile
+              ? {
+                  ...rawProfile,
+                  full_name:
+                    rawProfile.full_name ||
+                    rawProfile.nombre ||
+                    (rawProfile.email ? rawProfile.email.split("@")[0] : "N/A"),
+                  agency: rawProfile.agency || rawProfile.agencia || null,
+                }
+              : {
+                  id: securityItem.user_id,
+                  email: null,
+                  full_name: "N/A",
+                  agency: null,
+                };
+            return {
+              ...securityItem,
+              profiles: profile,
+              backup_codes_count: securityItem.backup_codes?.length || 0,
+            };
+          });
+        }
       }
 
-      if (!securityData || securityData.length === 0) {
-        return {
-          success: true,
-          users: [],
-        };
-      }
-
-      // Obtener perfiles de usuarios por separado
-      const userIds = securityData.map((item) => item.user_id);
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, email, agency, role")
-        .in("id", userIds);
-
-      if (profilesError) {
-        console.error("Error getting profiles:", profilesError);
-        return {
-          success: false,
-          error: "Error al obtener perfiles de usuarios",
-        };
-      }
-
-      // Combinar datos manualmente y agregar conteo de códigos de backup
-      const usersWithBackupCount = securityData
-        .map((securityItem) => {
-          const profile = profilesData.find(
-            (p) => p.id === securityItem.user_id
-          );
-          return {
-            ...securityItem,
-            profiles: profile || null,
-            backup_codes_count: securityItem.backup_codes?.length || 0,
-          };
-        })
-        .filter((user) => user.profiles); // Solo incluir usuarios con perfil válido
-
-      return {
-        success: true,
-        users: usersWithBackupCount,
-      };
+      return { success: true, users };
     } catch (error) {
       console.error("Error in getAllUsers2FA:", error);
       return {

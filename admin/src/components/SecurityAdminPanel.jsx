@@ -372,15 +372,15 @@ export default function SecurityAdminPanel() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {user.profiles.full_name || "N/A"}
+                          {user.profiles?.full_name || user.profiles?.nombre || (user.profiles?.email ? user.profiles.email.split("@")[0] : "Sin nombre")}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {user.profiles.email}
+                          {user.profiles?.email || "Sin email"}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.profiles.agency || "N/A"}
+                      {user.profiles?.agency || user.profiles?.agencia || "Sin agencia"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -467,15 +467,15 @@ export default function SecurityAdminPanel() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
-                              {user.profiles?.full_name || "N/A"}
+                              {user.profiles?.full_name || user.profiles?.nombre || (user.profiles?.email ? user.profiles.email.split("@")[0] : "Sin nombre")}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {user.profiles?.email}
+                              {user.profiles?.email || "Sin email"}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {user.profiles?.agency || "N/A"}
+                          {user.profiles?.agency || user.profiles?.agencia || "Sin agencia"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(user.created_at)}

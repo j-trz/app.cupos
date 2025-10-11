@@ -394,54 +394,27 @@ class SecurityService {
         throw new Error("Acceso denegado");
       }
 
-      // Obtener usuarios bloqueados sin JOIN automático
-      const { data: securityData, error: securityError } = await supabase
-        .from("user_security_status")
-        .select(
-          `
-          user_id,
-          is_locked,
-          locked_at,
-          locked_reason,
-          failed_attempts_count
-        `
-        )
-        .eq("is_locked", true);
+      // Usar Edge Function con Service Role (bypassa RLS) y datos normalizados
+      const { data, error } = await supabase.functions.invoke(
+        "user-management",
+        {
+          body: { action: "listLockedUsers" },
+        }
+      );
 
-      if (securityError) throw securityError;
+      if (error) throw error;
 
-      if (!securityData || securityData.length === 0) {
+      if (!data?.success) {
         return {
-          success: true,
+          success: false,
+          error: data?.error || "Error al obtener usuarios bloqueados",
           lockedUsers: [],
         };
       }
 
-      // Obtener perfiles de usuarios por separado
-      const userIds = securityData.map((item) => item.user_id);
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, agency, role")
-        .in("id", userIds);
-
-      if (profilesError) throw profilesError;
-
-      // Combinar datos manualmente
-      const lockedUsers = securityData
-        .map((securityItem) => {
-          const profile = profilesData.find(
-            (p) => p.id === securityItem.user_id
-          );
-          return {
-            ...securityItem,
-            profiles: profile || null,
-          };
-        })
-        .filter((user) => user.profiles); // Solo incluir usuarios con perfil válido
-
       return {
         success: true,
-        lockedUsers,
+        lockedUsers: data.lockedUsers || [],
       };
     } catch (error) {
       console.error("Error fetching locked users:", error);
@@ -478,6 +451,7 @@ class SecurityService {
           activeSessions: stats.active_sessions || 0,
           failedAttemptsToday: stats.failed_attempts_today || 0,
           usersWith2FA: stats.users_with_2fa || 0,
+          users2FA: stats.users_with_2fa || 0, // compatibilidad con UI
         },
       };
     } catch (error) {

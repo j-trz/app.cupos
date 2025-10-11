@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { FaShieldAlt, FaCheck, FaTimes, FaCog, FaKey, FaExclamationTriangle, FaTrash } from "react-icons/fa";
+import { HiOutlineExclamationTriangle , HiOutlineXMark , HiOutlineCheck , HiShieldCheck, HiOutlineKey, HiOutlineTrash, HiOutlineCog6Tooth } from "react-icons/hi2";// eslint-disable-line no-unused-vars
+
 import TwoFactorService from "../services/twoFactorService";
-import TwoFactorSetup from "./TwoFactorSetup";
+import TwoFactorSetup from "./TwoFactorSetup"; // eslint-disable-line no-unused-vars
+import AuthorizationService from "../services/authorizationService";
 
 /**
  * Componente para gestionar configuración 2FA del usuario
@@ -15,9 +17,11 @@ export default function TwoFactorManager({ user }) {
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [disableCode, setDisableCode] = useState("");
   const [disableLoading, setDisableLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadTwoFactorStatus();
+    loadIsAdmin();
   }, [user]);
 
   /**
@@ -35,6 +39,15 @@ export default function TwoFactorManager({ user }) {
       setError("Error al cargar el estado de 2FA");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadIsAdmin = async () => {
+    try {
+      const profile = await AuthorizationService.getCurrentUserProfile();
+      setIsAdmin(Boolean(profile?.admin || profile?.role === 'admin'));
+    } catch {
+      // no-op
     }
   };
 
@@ -59,6 +72,7 @@ export default function TwoFactorManager({ user }) {
    * Iniciar proceso de desactivación
    */
   const handleStartDisable = () => {
+    if (!user?.isAdmin && !isAdmin) return;
     setShowDisableConfirm(true);
     setError("");
     setDisableCode("");
@@ -144,7 +158,7 @@ export default function TwoFactorManager({ user }) {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-              <FaExclamationTriangle className="h-6 w-6 text-red-600" />
+              <HiOutlineExclamationTriangle  className="h-6 w-6 text-red-600" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
@@ -232,7 +246,7 @@ export default function TwoFactorManager({ user }) {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-          <FaShieldAlt className="h-6 w-6 text-blue-600" />
+          <HiShieldCheck className="h-6 w-6 text-blue-600" />
         </div>
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
@@ -248,7 +262,7 @@ export default function TwoFactorManager({ user }) {
       {success && (
         <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
           <div className="flex items-center gap-2">
-            <FaCheck className="text-green-600 flex-shrink-0" />
+            <HiOutlineCheck  className="text-green-600 flex-shrink-0" />
             <p className="text-green-700 text-sm">{success}</p>
           </div>
         </div>
@@ -286,9 +300,9 @@ export default function TwoFactorManager({ user }) {
           
           <div className="flex items-center gap-2">
             {twoFactorStatus?.enabled ? (
-              <FaCheck className="h-5 w-5 text-green-500" />
+              <HiOutlineCheck className="h-5 w-5 text-green-500" />
             ) : (
-              <FaTimes className="h-5 w-5 text-gray-400" />
+              <HiOutlineXMark className="h-5 w-5 text-gray-400" />
             )}
           </div>
         </div>
@@ -296,7 +310,7 @@ export default function TwoFactorManager({ user }) {
         {twoFactorStatus?.enabled && (
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <FaKey className="text-blue-600 mt-1" />
+              <HiOutlineKey  className="text-blue-600 mt-1" />
               <div className="flex-1">
                 <h4 className="font-medium text-blue-900 mb-1">
                   Información de 2FA
@@ -314,26 +328,34 @@ export default function TwoFactorManager({ user }) {
         {/* Actions */}
         <div className="pt-4 border-t border-gray-200">
           {twoFactorStatus?.enabled ? (
-            <div className="space-y-3">
-              <button
-                onClick={handleStartDisable}
-                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <FaTrash />
-                Desactivar 2FA
-              </button>
-              
-              <p className="text-xs text-gray-500 text-center">
-                Necesitará un código de verificación para desactivar 2FA
-              </p>
-            </div>
+            isAdmin || user?.isAdmin ? (
+              <div className="space-y-3">
+                <button
+                  onClick={handleStartDisable}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <HiOutlineTrash  />
+                  Desactivar 2FA
+                </button>
+                
+                <p className="text-xs text-gray-500 text-center">
+                  Necesitará un código de verificación para desactivar 2FA
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+                  La desactivación de 2FA solo puede ser realizada por un administrador.
+                </div>
+              </div>
+            )
           ) : (
             <div className="space-y-3">
               <button
                 onClick={() => setShowSetup(true)}
                 className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
               >
-                <FaCog />
+                <HiOutlineCog6Tooth />
                 Configurar 2FA
               </button>
               

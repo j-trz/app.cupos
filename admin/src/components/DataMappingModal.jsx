@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import {FaColumns, FaTimes, FaArrowRight, FaPlay, FaExclamationTriangle, FaSave, FaChevronDown, FaCheck} from "react-icons/fa"; // eslint-disable-line no-unused-vars
-import { Listbox, ListboxButton, ListboxOptions } from '@headlessui/react'; // eslint-disable-line no-unused-vars
+import { Listbox } from '@headlessui/react'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
 import { createCustomSupabaseClient } from '../supabaseClient';
 
@@ -854,17 +854,17 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                         onChange={(value) => handleMappingChange(field.key, value)}
                       >
                         <div className="relative">
-                          <ListboxButton className="relative w-full px-3 py-2 text-left bg-white border rounded cursor-default focus:outline-none focus:border-[#2c4b8b] text-sm">
+                          <Listbox.Button className="relative w-full px-3 py-2 text-left bg-white border rounded cursor-default focus:outline-none focus:border-[#2c4b8b] text-sm">
                             <span className="block truncate">
                               {mapping[field.key] || '-- Seleccionar campo fuente --'}
                             </span>
                             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                               <FaChevronDown className="w-4 h-4 text-gray-400" />
                             </span>
-                          </ListboxButton>
+                          </Listbox.Button>
 
-                          <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-base bg-white border border-gray-300 rounded-md shadow-lg max-h-60 focus:outline-none text-sm">
-                            <ListboxOptions
+                          <Listbox.Options className="absolute z-10 w-full py-1 mt-1 overflow-auto text-base bg-white border border-gray-300 rounded-md shadow-lg max-h-60 focus:outline-none text-sm">
+                            <Listbox.Option
                               key=""
                               value=""
                               className={({ active }) =>
@@ -885,10 +885,10 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                                   )}
                                 </>
                               )}
-                            </ListboxOptions>
+                            </Listbox.Option>
                             
                             {getSourceFields().map((sourceField) => (
-                              <ListboxOptions
+                              <Listbox.Option
                                 key={sourceField}
                                 value={sourceField}
                                 className={({ active }) =>
@@ -909,9 +909,9 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                                     )}
                                   </>
                                 )}
-                              </ListboxOptions>
+                              </Listbox.Option>
                             ))}
-                          </ListboxOptions>
+                          </Listbox.Options>
                         </div>
                       </Listbox>
                     </div>

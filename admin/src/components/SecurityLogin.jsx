@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaLock, FaShieldAlt, FaClock, FaExclamationTriangle } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaLock, FaShieldAlt, FaClock, FaExclamationTriangle } from "react-icons/fa"; // eslint-disable-line no-unused-vars
 import SecurityService from "../services/securityService";
 import TwoFactorService from "../services/twoFactorService";
-import TwoFactorSetup from "./TwoFactorSetup";
-import TwoFactorVerify from "./TwoFactorVerify";
+import TwoFactorSetup from "./TwoFactorSetup"; // eslint-disable-line no-unused-vars
+import TwoFactorVerify from "./TwoFactorVerify"; // eslint-disable-line no-unused-vars
 
 /**
  * Componente de login con funcionalidades de seguridad avanzadas
  * Incluye integración completa con 2FA obligatorio
  */
-export default function SecurityLogin({ onLoginSuccess }) {
+export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
   // Estados del formulario
   const [formData, setFormData] = useState({
     email: "",
@@ -333,7 +333,7 @@ export default function SecurityLogin({ onLoginSuccess }) {
    */
   if (loginStep === "setup2fa") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen  flex items-center justify-center p-4">
         <div className="max-w-lg w-full">
           {force2FASetup && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
@@ -363,7 +363,7 @@ export default function SecurityLogin({ onLoginSuccess }) {
    */
   if (loginStep === "verify2fa" && pendingUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <TwoFactorVerify
           user={pendingUser}
           onSuccess={handle2FAVerifySuccess}
@@ -376,116 +376,112 @@ export default function SecurityLogin({ onLoginSuccess }) {
   /**
    * Renderizar formulario de login principal
    */
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-lg" onSubmit={handleSubmit}>
-        <div className="text-center">
-          <div className="mx-auto h-[90px] w-[90px] bg-[#2c4b8b] rounded-full flex items-center justify-center mb-4">
-            <img className="h-[65px] w-[65px]" src="https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/media/Je_logo-02%20(1).png" alt="" />
-          </div>
-          <h2 className="text-2xl font-bold text-[#2c4b8b]">Iniciar sesión</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Sistema de gestión de cupos
-          </p>
-        </div>
+  const formCard = (
+    <div className="w-full max-w-lg">
+      <form className="space-y-7 md:space-y-8 bg-white p-8 md:p-10 rounded-2xl" onSubmit={handleSubmit}>
+        {/* Información de seguridad */}
+        {renderSecurityInfo()}
 
-        {/* Formulario */}
-          {/* Información de seguridad */}
-          {renderSecurityInfo()}
-
-          {/* Error general */}
-          {error && !securityInfo && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <FaExclamationTriangle className="text-red-500" />
-                <p className="text-red-700 text-sm">{error}</p>
-              </div>
+        {/* Error general */}
+        {error && !securityInfo && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <FaExclamationTriangle className="text-red-500" />
+              <p className="text-red-700 text-sm">{error}</p>
             </div>
-          )}
+          </div>
+        )}
 
-          <div className="space-y-5">
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Correo Electrónico
-              </label>
+        <div className="space-y-5">
+          {/* Email */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              Correo Electrónico
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={formData.email}
+              onChange={handleInputChange}
+              disabled={loading || (securityInfo?.type === "locked")}
+              className="appearance-none relative block w-full px-4 py-3.5 border border-gray-300 rounded-xl placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent focus:z-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              placeholder="ejemplo@empresa.com"
+            />
+          </div>
+
+          {/* Contraseña */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              Contraseña
+            </label>
+            <div className="relative">
               <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 required
-                value={formData.email}
+                value={formData.password}
                 onChange={handleInputChange}
                 disabled={loading || (securityInfo?.type === "locked")}
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 rounded-lg placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent focus:z-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                placeholder="ejemplo@empresa.com"
+                className="appearance-none relative block w-full px-4 py-3.5 pr-12 border border-gray-300 rounded-xl placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent focus:z-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="Su contraseña"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading || (securityInfo?.type === "locked")}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+              >
+                {showPassword ? (
+                  <FaEyeSlash className="h-5 w-5" />
+                ) : (
+                  <FaEye className="h-5 w-5" />
+                )}
+              </button>
             </div>
+          </div>
+        </div>
 
-            {/* Contraseña */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  disabled={loading || (securityInfo?.type === "locked")}
-                  className="appearance-none relative block w-full px-3 py-3 pr-12 border border-gray-300 rounded-lg placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent focus:z-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  placeholder="Su contraseña"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading || (securityInfo?.type === "locked")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
-                >
-                  {showPassword ? (
-                    <FaEyeSlash className="h-5 w-5" />
-                  ) : (
-                    <FaEye className="h-5 w-5" />
-                  )}
-                </button>
+        {/* Botón de login */}
+        <div>
+          <button
+            type="submit"
+            disabled={loading || (securityInfo?.type === "locked")}
+            className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-[#2c4b8b] hover:bg-[#1a2952] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c4b8b] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Verificando...</span>
               </div>
-            </div>
-          </div>
+            ) : securityInfo?.type === "locked" ? (
+              <div className="flex items-center gap-2">
+                <FaLock className="h-5 w-5" />
+                <span>Cuenta Bloqueada</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <FaShieldAlt className="h-5 w-5" />
+                <span>Iniciar Sesión</span>
+              </div>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 
-          {/* Botón de login */}
-          <div>
-            <button
-              type="submit"
-              disabled={loading || (securityInfo?.type === "locked")}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-[#2c4b8b] hover:bg-[#1a2952] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2c4b8b] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Verificando...</span>
-                </div>
-              ) : securityInfo?.type === "locked" ? (
-                <div className="flex items-center gap-2">
-                  <FaLock className="h-4 w-4" />
-                  <span>Cuenta Bloqueada</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <FaShieldAlt className="h-4 w-4" />
-                  <span>Iniciar Sesión</span>
-                </div>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
+  if (!fullPage) {
+    return formCard;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
+      {formCard}
     </div>
   );
 }

@@ -1,9 +1,7 @@
 
-import { TbBellBolt, TbTicket } from 'react-icons/tb';
-import { RiUserSettingsLine } from "react-icons/ri";
 import { PiAirplaneInFlightFill } from "react-icons/pi";
-import { MdApi } from "react-icons/md";
-import { FaShieldAlt, FaUser, FaBox , FaTable} from "react-icons/fa";
+import { HiOutlineShare , HiOutlineShieldCheck , HiOutlineCube , HiOutlineUser, HiOutlineUserGroup, HiOutlineBellAlert, HiOutlineTicket } from "react-icons/hi2";
+
 
 
 export const SECCIONES = [
@@ -18,28 +16,28 @@ export const SECCIONES = [
   {
     id: 'solicitudes',
     nombre: 'Solicitudes',
-    icono: TbBellBolt,
+    icono: HiOutlineBellAlert ,
     ruta: '/admin/solicitudes',
     descripcion: 'Gestión de solicitudes de reserva.'
   },
   {
     id: 'confirmaciones',
     nombre: 'Confirmaciones',
-    icono: TbTicket,
+    icono: HiOutlineTicket ,
     ruta: '/admin/confirmaciones',
     descripcion: 'Confirmación de reservas y cupos.'
   },
   {
     id: 'perfil',
     nombre: 'Mi Perfil',
-    icono: FaUser,
+    icono: HiOutlineUser,
     ruta: '/admin/perfil',
     descripcion: 'Gestión de perfil personal y configuraciones de seguridad.'
   },
   {
     id: 'gestion-usuarios',
     nombre: 'Usuarios',
-    icono: RiUserSettingsLine,
+    icono: HiOutlineUserGroup ,
     ruta: '/admin/gestion-usuarios',
     descripcion: 'Administración y edición de usuarios.',
     soloAdmin: true
@@ -47,7 +45,7 @@ export const SECCIONES = [
   {
     id: 'gestion-productos',
     nombre: 'Productos',
-    icono: FaBox,
+    icono: HiOutlineCube ,
     ruta: '/admin/gestion-productos',
     descripcion: 'CRUD de productos/cupos usando conexión API activa.',
     soloAdmin: true
@@ -55,23 +53,16 @@ export const SECCIONES = [
   {
     id: 'gestion-conexiones',
     nombre: 'Conexiones API',
-    icono: MdApi,
+    icono: HiOutlineShare ,
     ruta: '/admin/gestion-conexiones',
     descripcion: 'Gestión de conexiones a APIs externas.',
     soloAdmin: true
   },
-  {
-    id: 'data-mapper',
-    nombre: 'Data Mapper',
-    icono: FaTable,
-    ruta: '/admin/data-mapper',
-    descripcion: 'Mapeo de datos de conexiones externas.',
-    soloAdmin: true
-  },
+
   {
     id: 'seguridad',
     nombre: 'Seguridad',
-    icono: FaShieldAlt,
+    icono: HiOutlineShieldCheck ,
     ruta: '/admin/seguridad',
     descripcion: 'Panel de administración de seguridad y 2FA.',
     soloAdmin: true

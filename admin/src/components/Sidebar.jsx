@@ -6,7 +6,7 @@ import AuthorizationService from '../services/authorizationService';
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../contexts/AuthContext';
 
-export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSeccion }) {
+export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSeccion = () => {} }) {
   const { userRole } = useAuth();
   const [availableSections, setAvailableSections] = React.useState([]);
   const navigate = useNavigate();

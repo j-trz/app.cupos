@@ -21,10 +21,18 @@ class ConnectionService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      const { name, type, description, credentials } = connectionData;
+      const {
+        name,
+        type,
+        description,
+        credentials,
+        scope = "user",
+        target_agency,
+      } = connectionData;
       if (!name || !type || !credentials) {
         throw new Error("Datos de conexión incompletos");
       }
+      const profile = await AuthorizationService.getCurrentUserProfile();
 
       // Crear registro de conexión
       const { data: connection, error } = await supabase
@@ -35,6 +43,11 @@ class ConnectionService {
             name,
             type,
             description,
+            scope,
+            target_agency:
+              scope === "agency"
+                ? target_agency || profile?.agencia || null
+                : null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
@@ -87,13 +100,12 @@ class ConnectionService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Primero intentar con is_active
+      // Primero intentar con is_active (usando RLS para listar accesibles: propias, de agencia y globales)
       let { data, error } = await supabase
         .from("data_connections")
         .select(
-          "id, name, type, description, column_mapping, is_active, created_at, updated_at, last_tested_at, connection_status"
+          "id, user_id, name, type, description, column_mapping, scope, target_agency, is_active, created_at, updated_at, last_tested_at, connection_status"
         )
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       // Si hay error por columna is_active, usar consulta sin esa columna
@@ -110,9 +122,8 @@ class ConnectionService {
         const fallbackResult = await supabase
           .from("data_connections")
           .select(
-            "id, name, type, description, column_mapping, created_at, updated_at, last_tested_at, connection_status"
+            "id, user_id, name, type, description, column_mapping, scope, target_agency, created_at, updated_at, last_tested_at, connection_status"
           )
-          .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
         data = fallbackResult.data;
@@ -152,9 +163,7 @@ class ConnectionService {
       const { data, error } = await supabase
         .from("api_credentials")
         .select("credential_key, credential_value")
-        .eq("connection_id", connectionId)
-        .eq("user_id", user.id);
-
+        .eq("connection_id", connectionId);
       if (error) throw error;
 
       if (!data || data.length === 0) {
@@ -193,19 +202,37 @@ class ConnectionService {
       };
 
       // Campos que se pueden actualizar
-      const allowedFields = ["name", "description", "column_mapping"];
+      const allowedFields = [
+        "name",
+        "description",
+        "column_mapping",
+        "scope",
+        "target_agency",
+        "is_active",
+      ];
       allowedFields.forEach((field) => {
         if (updateData[field] !== undefined) {
           updates[field] = updateData[field];
         }
       });
 
+      // Completar agency por defecto cuando el scope sea 'agency' y no se haya provisto
+      if (
+        updates.scope === "agency" &&
+        (updates.target_agency === undefined ||
+          updates.target_agency === null ||
+          updates.target_agency === "")
+      ) {
+        const profile = await AuthorizationService.getCurrentUserProfile();
+        updates.target_agency = profile?.agencia || null;
+      }
+
       // Actualizar metadatos de la conexión
       const { data, error } = await supabase
         .from("data_connections")
         .update(updates)
         .eq("id", connectionId)
-        .eq("user_id", user.id)
+
         .select()
         .single();
 
@@ -220,8 +247,7 @@ class ConnectionService {
         await supabase
           .from("api_credentials")
           .delete()
-          .eq("connection_id", connectionId)
-          .eq("user_id", user.id);
+          .eq("connection_id", connectionId);
 
         // Insertar nuevas credenciales
         const credentialEntries = Object.entries(updateData.credentials).map(
@@ -267,16 +293,13 @@ class ConnectionService {
       await supabase
         .from("api_credentials")
         .delete()
-        .eq("connection_id", connectionId)
-        .eq("user_id", user.id);
+        .eq("connection_id", connectionId);
 
       // Eliminar conexión
       const { error } = await supabase
         .from("data_connections")
         .delete()
-        .eq("id", connectionId)
-        .eq("user_id", user.id);
-
+        .eq("id", connectionId);
       if (error) throw error;
 
       return {
@@ -306,9 +329,7 @@ class ConnectionService {
         // Primero desactivar todas las conexiones del usuario
         const { error: deactivateError } = await supabase
           .from("data_connections")
-          .update({ is_active: false })
-          .eq("user_id", user.id);
-
+          .update({ is_active: false });
         if (
           deactivateError &&
           !deactivateError.message?.includes("is_active") &&
@@ -321,9 +342,7 @@ class ConnectionService {
         const { error: activateError } = await supabase
           .from("data_connections")
           .update({ is_active: true })
-          .eq("id", connectionId)
-          .eq("user_id", user.id);
-
+          .eq("id", connectionId);
         if (
           activateError &&
           !activateError.message?.includes("is_active") &&
@@ -370,8 +389,6 @@ class ConnectionService {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      let data, error;
-
       // Si se especifica un tipo de datos, buscar conexión específica
       if (dataType) {
         try {
@@ -386,7 +403,7 @@ class ConnectionService {
               connection:data_connections(*)
             `
               )
-              .eq("user_id", user.id)
+
               .eq("data_type", dataType)
               .eq("is_active", true)
               .single();
@@ -410,7 +427,7 @@ class ConnectionService {
               connection:data_connections(*)
             `
               )
-              .eq("user_id", user.id)
+
               .eq("data_type", "all")
               .eq("is_active", true)
               .single();
@@ -434,45 +451,64 @@ class ConnectionService {
         }
       }
 
-      // Fallback al método legacy (is_active en data_connections)
-      ({ data, error } = await supabase
-        .from("data_connections")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .single());
-
-      // Si hay error con is_active, usar fallback a primera conexión
-      if (
-        error &&
-        (error.code === "42703" ||
-          error.message?.includes("is_active") ||
-          error.message?.includes("column") ||
-          error.message?.includes("406"))
-      ) {
-        console.warn(
-          "Columna is_active no existe, usando primera conexión como fallback"
-        );
-
-        const fallbackResult = await supabase
+      // Fallback con soporte de alcance (user → agency → all) respetando RLS
+      let candidates = [];
+      try {
+        const { data: rows, error: rowsError } = await supabase
           .from("data_connections")
           .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        data = fallbackResult.data;
-        error = fallbackResult.error;
+          .eq("is_active", true)
+          .order("updated_at", { ascending: false });
+        if (rowsError) throw rowsError;
+        candidates = rows || [];
+      } catch (e) {
+        if (
+          e.code === "42703" ||
+          e.message?.includes("is_active") ||
+          e.message?.includes("column") ||
+          e.message?.includes("406")
+        ) {
+          const { data: rows2 } = await supabase
+            .from("data_connections")
+            .select("*")
+            .order("created_at", { ascending: false });
+          candidates = rows2 || [];
+        } else {
+          throw e;
+        }
       }
 
-      if (error && error.code !== "PGRST116") throw error;
+      if (candidates.length > 0) {
+        const profile = await AuthorizationService.getCurrentUserProfile();
+        const agency = profile?.agencia || null;
+        const normScope = (s) => (s == null ? "user" : s);
 
-      if (data) {
-        console.log(`✅ Conexión legacy encontrada:`, data.name);
+        const own = candidates.find(
+          (c) => normScope(c.scope) === "user" && c.user_id === user.id
+        );
+        const agencyScoped =
+          candidates.find(
+            (c) =>
+              normScope(c.scope) === "agency" &&
+              agency &&
+              c.target_agency === agency
+          ) || null;
+        const global =
+          candidates.find((c) => normScope(c.scope) === "all") || null;
+
+        const chosen = own || agencyScoped || global || candidates[0] || null;
+        if (chosen) {
+          console.log("✅ Conexión activa seleccionada por alcance:", {
+            id: chosen.id,
+            name: chosen.name,
+            scope: normScope(chosen.scope),
+            target_agency: chosen.target_agency || null,
+          });
+          return chosen;
+        }
       }
 
-      return data || null;
+      return null;
     } catch (error) {
       console.error("Error getting active connection:", error);
       return null;
@@ -486,7 +522,52 @@ class ConnectionService {
     return records.map((item) => {
       const out = {};
       for (const [stdKey, srcPath] of Object.entries(mapping)) {
-        out[stdKey] = this.getValueByPath(item, srcPath);
+        let val = this.getValueByPath(item, srcPath);
+
+        // Fallback: si el valor mapeado viene vacío, usar el campo estándar si ya existe en el item
+        if (val === undefined || val === null || val === "") {
+          if (Object.prototype.hasOwnProperty.call(item, stdKey)) {
+            val = item[stdKey];
+          }
+        }
+
+        // Fallbacks específicos por tipo para fechas de disponibilidad
+        if (_dataType === "productos") {
+          if (
+            (val === undefined || val === null || val === "") &&
+            stdKey === "salida"
+          ) {
+            val =
+              item.salida ||
+              item.Salida ||
+              item.departure_date ||
+              item.Departure ||
+              item["Fecha_Salida"] ||
+              item.fecha_salida ||
+              item.departure ||
+              item.DepartureDate ||
+              item.departureDate ||
+              "";
+          }
+          if (
+            (val === undefined || val === null || val === "") &&
+            stdKey === "regreso"
+          ) {
+            val =
+              item.regreso ||
+              item.Regreso ||
+              item.return_date ||
+              item.Return ||
+              item["Fecha_Regreso"] ||
+              item.fecha_regreso ||
+              item.return ||
+              item.ReturnDate ||
+              item.returnDate ||
+              "";
+          }
+        }
+
+        out[stdKey] = val;
       }
       return out;
     });
@@ -854,7 +935,14 @@ class ConnectionService {
 
       // Importar dinámicamente para evitar problemas de dependencias
       const { createClient } = await import("@supabase/supabase-js");
-      const supabaseClient = createClient(projectUrl, anonKey);
+      const supabaseClient = createClient(projectUrl, anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: `sb-temp-${dataType}-${tableName || "default"}`,
+        },
+      });
 
       // Determinar tabla según el tipo de datos
       const targetTable =
@@ -872,7 +960,7 @@ class ConnectionService {
         console.error("Error consultando Supabase:", error);
         // Si hay error, usar fallback a Power Automate
         console.warn("Usando Power Automate como fallback");
-        return await this.getDataFromPowerAutomate(dataType);
+        return await this.getDataFromPowerAutomate(null, dataType);
       }
 
       console.log(`✅ Datos obtenidos de Supabase:`, {
@@ -903,7 +991,72 @@ class ConnectionService {
    */
   static mapToStandardFormat(data, sourceType, dataType = "pedidos") {
     if (sourceType === "powerautomate") {
-      // Power Automate ya usa el formato correcto
+      // Normalizar productos de Power Automate a claves estándar
+      if (dataType === "productos") {
+        return Array.isArray(data)
+          ? data.map((item) => ({
+              "@odata.etag": item["@odata.etag"] || "",
+              ItemInternalId: item.ItemInternalId || item.id || "",
+              codigo_cupo:
+                item.codigo_cupo ||
+                item.Codigo_Cupo ||
+                item.Cupo ||
+                item.cupo_code ||
+                item.cupoCode ||
+                "",
+              destino:
+                item.destino ||
+                item.Destino ||
+                item.destination ||
+                item.Destination ||
+                "",
+              compania:
+                item.compania ||
+                item.Compania ||
+                item["Compañía"] ||
+                item.airline ||
+                item.Airline ||
+                "",
+              disponibilidad: String(
+                item.disponibilidad ??
+                  item.Disponibilidad ??
+                  item.availability ??
+                  item.Availability ??
+                  "0"
+              ),
+              salida:
+                item.salida ||
+                item.Salida ||
+                item.departure_date ||
+                item.Departure ||
+                item["Fecha_Salida"] ||
+                item.fecha_salida ||
+                "",
+              regreso:
+                item.regreso ||
+                item.Regreso ||
+                item.return_date ||
+                item.Return ||
+                item["Fecha_Regreso"] ||
+                item.fecha_regreso ||
+                "",
+              precio: String(
+                item.precio ?? item.Precio ?? item.price ?? item.Price ?? "0"
+              ),
+              ruta: item.ruta || item.Ruta || item.route || item.Route || "",
+              pnr: item.pnr || item.Pnr || item.PNR || "",
+              ficha:
+                item.ficha || item.Ficha || item.ticket || item.Ticket || "",
+              temporada:
+                item.temporada ||
+                item.Temporada ||
+                item.season ||
+                item.Season ||
+                "",
+            }))
+          : [];
+      }
+      // Para otros tipos, ya vienen en formato esperado
       return data;
     }
 
@@ -929,15 +1082,41 @@ class ConnectionService {
    */
   static mapSupabaseToStandard(item, dataType) {
     if (dataType === "productos") {
+      const salida =
+        item.salida ||
+        item.Salida ||
+        item.departure_date ||
+        item.departureDate ||
+        item.DepartureDate ||
+        item.Departure ||
+        item["Fecha_Salida"] ||
+        item.fecha_salida ||
+        item.fechaSalida ||
+        "";
+      const regreso =
+        item.regreso ||
+        item.Regreso ||
+        item.return_date ||
+        item.returnDate ||
+        item.ReturnDate ||
+        item.Return ||
+        item["Fecha_Regreso"] ||
+        item.fecha_regreso ||
+        item.fechaRegreso ||
+        "";
       return {
         "@odata.etag": "",
         ItemInternalId: item.id || "",
-        codigo_cupo: item.cupo_code || item.codigo_cupo || "",
+        codigo_cupo:
+          (item.cupo_code || item.codigo_cupo || "").trim?.() ||
+          item.cupo_code ||
+          item.codigo_cupo ||
+          "",
         destino: item.destination || item.destino || "",
         compania: item.airline || item.compania || "",
         disponibilidad: String(item.availability || item.disponibilidad || "0"),
-        salida: item.departure_date || item.salida || "",
-        regreso: item.return_date || item.regreso || "",
+        salida,
+        regreso,
         precio: String(item.price || item.precio || "0"),
         ruta: item.route || item.ruta || "",
         pnr: item.pnr_code || item.pnr || "",
@@ -945,6 +1124,17 @@ class ConnectionService {
         temporada: item.season || item.temporada || "",
       };
     } else {
+      const vueloSalida =
+        item.vuelo_salida ||
+        item.Vuelo_Salida ||
+        item.departure_date ||
+        item.departureDate ||
+        item.DepartureDate ||
+        item.Departure ||
+        item["Fecha_Salida"] ||
+        item.fecha_salida ||
+        item.fechaSalida ||
+        "";
       return {
         "@odata.etag": "",
         ItemInternalId: item.id || "",
@@ -957,7 +1147,7 @@ class ConnectionService {
         Vuelo_Codigo: item.flight_code || item.vuelo_codigo || "",
         Vuelo_Destino: item.destination || item.vuelo_destino || "",
         Vuelo_Compania: item.airline || item.vuelo_compania || "",
-        Vuelo_Salida: item.departure_date || item.vuelo_salida || "",
+        Vuelo_Salida: vueloSalida,
         Vuelo_Precio: String(item.price || item.vuelo_precio || "0"),
         Nombre_Pasajero: item.passenger_name || item.nombre_pasajero || "",
         Apellido_Pasajero:
@@ -1312,6 +1502,10 @@ class ConnectionService {
         }
       );
 
+      // Obtener access token del usuario actual para autorizar contra la Edge Function
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
       const { data, error } = await supabaseNoPrefeer.functions.invoke(
         "power-automate-proxy",
         {
@@ -1319,6 +1513,9 @@ class ConnectionService {
             action: "submit-reservation",
             payload: reservationData,
           },
+          headers: accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : undefined,
         }
       );
 
@@ -1351,6 +1548,14 @@ class ConnectionService {
    */
   static async testConnection(connection) {
     try {
+      // Verificar sesión
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        return { success: false, message: "Usuario no autenticado" };
+      }
+
       // Obtener credenciales
       const credentials = await this.getDecryptedCredentials(connection.id);
 
@@ -1361,14 +1566,15 @@ class ConnectionService {
         };
       }
 
-      // Actualizar estado de la conexión
+      // Actualizar estado de la conexión (scoped al usuario)
       await supabase
         .from("data_connections")
         .update({
           connection_status: "connected",
           last_tested_at: new Date().toISOString(),
         })
-        .eq("id", connection.id);
+        .eq("id", connection.id)
+        .eq("user_id", user.id);
 
       return {
         success: true,
@@ -1382,14 +1588,24 @@ class ConnectionService {
     } catch (error) {
       console.error("Error testing connection:", error);
 
-      // Actualizar estado de error
-      await supabase
-        .from("data_connections")
-        .update({
-          connection_status: "error",
-          last_tested_at: new Date().toISOString(),
-        })
-        .eq("id", connection.id);
+      // Intentar marcar estado de error si hay sesión y conexión
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (connection?.id && user?.id) {
+          await supabase
+            .from("data_connections")
+            .update({
+              connection_status: "error",
+              last_tested_at: new Date().toISOString(),
+            })
+            .eq("id", connection.id)
+            .eq("user_id", user.id);
+        }
+      } catch {
+        // noop
+      }
 
       return {
         success: false,
@@ -1630,7 +1846,7 @@ class ConnectionService {
         .from("data_connections")
         .select("id")
         .eq("id", connectionId)
-        .eq("user_id", user.id)
+
         .single();
 
       if (connectionError || !connection) {
@@ -1642,7 +1858,7 @@ class ConnectionService {
         await supabaseWithHeaders
           .from("connection_data_types")
           .update({ is_active: false })
-          .eq("user_id", user.id)
+
           .eq("data_type", dataType);
       }
 
@@ -1735,7 +1951,7 @@ class ConnectionService {
           )
         `
         )
-        .eq("user_id", user.id)
+
         .order("data_type");
 
       if (error) throw error;
@@ -1765,9 +1981,7 @@ class ConnectionService {
       const { error } = await supabaseWithHeaders
         .from("connection_data_types")
         .delete()
-        .eq("id", assignmentId)
-        .eq("user_id", user.id);
-
+        .eq("id", assignmentId);
       if (error) throw error;
 
       return {
@@ -1801,7 +2015,7 @@ class ConnectionService {
           connection:data_connections(*)
         `
           )
-          .eq("user_id", user.id)
+
           .eq("data_type", dataType)
           .eq("is_active", true)
           .single();
@@ -1822,7 +2036,7 @@ class ConnectionService {
           connection:data_connections(*)
         `
         )
-        .eq("user_id", user.id)
+
         .eq("data_type", "all")
         .eq("is_active", true)
         .single();
@@ -1866,7 +2080,7 @@ class ConnectionService {
         await supabase
           .from("data_connections")
           .select("id, name")
-          .eq("user_id", user.id)
+
           .eq("is_active", true);
 
       if (connectionsError) throw connectionsError;
