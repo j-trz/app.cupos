@@ -639,7 +639,7 @@ class ConnectionService {
         `✅ [ConnectionService] Using connection ${activeConnection.name} (${activeConnection.type}) for ${dataType}`
       );
 
-      // TEMPORAL: Si hay problemas con las credenciales, usar fallback directo
+      // TEMPORAL: Si hay problemas con las credenciales, intentar Supabase (Jetmar) y luego fallback
       let credentials;
       try {
         credentials = await this.getDecryptedCredentials(activeConnection.id);
@@ -649,6 +649,137 @@ class ConnectionService {
           credentialError
         );
 
+        // Intentar usar una conexión Supabase alternativa para productos (Jetmar)
+        if (dataType === "productos") {
+          try {
+            const { data: supRows } = await supabase
+              .from("data_connections")
+              .select("*")
+              .eq("type", "supabase")
+              .order("updated_at", { ascending: false });
+
+            const supCandidates = supRows || [];
+            if (supCandidates.length > 0) {
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+              const profile =
+                await AuthorizationService.getCurrentUserProfile();
+              const agency = profile?.agencia || null;
+              const normScope = (s) => (s == null ? "user" : s);
+
+              const supOwn = supCandidates.find(
+                (c) => normScope(c.scope) === "user" && c.user_id === user?.id
+              );
+              const supAgency =
+                supCandidates.find(
+                  (c) =>
+                    normScope(c.scope) === "agency" &&
+                    agency &&
+                    c.target_agency === agency
+                ) || null;
+              const supGlobal =
+                supCandidates.find((c) => normScope(c.scope) === "all") || null;
+
+              const supConn =
+                supOwn || supAgency || supGlobal || supCandidates[0] || null;
+
+              if (supConn) {
+                try {
+                  const supCreds = await this.getDecryptedCredentials(
+                    supConn.id
+                  );
+
+                  // Usar Supabase directamente
+                  console.log(
+                    `🔁 [ConnectionService] Usando conexión Supabase alternativa: ${supConn.name}`
+                  );
+                  let rawData = await this.getDataFromSupabase(
+                    supCreds,
+                    dataType
+                  );
+
+                  // Aplicar mapeo si corresponde
+                  try {
+                    if (
+                      supConn.column_mapping &&
+                      rawData?.success &&
+                      Array.isArray(rawData.data)
+                    ) {
+                      const mapObj = JSON.parse(supConn.column_mapping);
+                      const esKey = dataType;
+                      const enKey = esKey === "productos" ? "products" : esKey;
+                      const mapping = mapObj?.[esKey] || mapObj?.[enKey];
+                      if (mapping && typeof mapping === "object") {
+                        rawData = {
+                          ...rawData,
+                          data: ConnectionService.applyUserMapping(
+                            rawData.data,
+                            mapping,
+                            esKey
+                          ),
+                        };
+                      }
+                    }
+                  } catch (mapErr) {
+                    console.warn(
+                      "⚠️ [ConnectionService] column_mapping inválido o no parseable:",
+                      mapErr
+                    );
+                  }
+
+                  // Validación estándar
+                  if (rawData.success && rawData.data) {
+                    const validation = DataValidator.validateRecords(
+                      rawData.data,
+                      dataType
+                    );
+                    if (!validation.valid && validation.validRecords > 0) {
+                      try {
+                        const userRole =
+                          await AuthorizationService.getCurrentUserRole();
+                        const isAdmin =
+                          userRole === AuthorizationService.ROLES.ADMIN;
+                        if (!isAdmin) {
+                          const validData = rawData.data.filter(
+                            (r) => DataValidator.validateSingleRecord(r).valid
+                          );
+                          return {
+                            ...rawData,
+                            data: validData,
+                            validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
+                          };
+                        }
+                      } catch {
+                        const validData = rawData.data.filter(
+                          (r) => DataValidator.validateSingleRecord(r).valid
+                        );
+                        return {
+                          ...rawData,
+                          data: validData,
+                          validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
+                        };
+                      }
+                    }
+                  }
+
+                  return rawData;
+                } catch (e) {
+                  console.warn(
+                    "⚠️ [ConnectionService] No se pudo usar la conexión Supabase alternativa:",
+                    e
+                  );
+                }
+              }
+            }
+          } catch (altErr) {
+            console.warn(
+              "⚠️ [ConnectionService] Búsqueda de conexión Supabase alternativa falló:",
+              altErr
+            );
+          }
+        }
+
         // TEMPORAL: Para Power Automate, usar fallback directo sin credenciales
         if (activeConnection.type === "powerautomate") {
           console.warn(
@@ -657,7 +788,7 @@ class ConnectionService {
           return await this.getDataFromPowerAutomate(null, dataType);
         }
 
-        // Don't fallback for configuration errors - these need to be fixed
+        // No hacer fallback para errores de configuración - requieren corrección
         if (
           credentialError.message?.includes("Server configuration error") ||
           credentialError.message?.includes("MASTER_ENCRYPTION_KEY") ||
@@ -673,7 +804,7 @@ class ConnectionService {
           );
         }
 
-        // For other errors, we can fallback
+        // Para otros errores, fallback a Power Automate
         console.warn(
           `⚠️ [ConnectionService] Unexpected error with connection '${activeConnection.name}', falling back to Power Automate:`,
           credentialError
@@ -927,7 +1058,28 @@ class ConnectionService {
     try {
       console.log(`🔗 Obteniendo datos de Supabase para ${dataType}`);
 
-      const { projectUrl, anonKey, tableName } = credentials;
+      // Normalizar credenciales desde distintos alias
+      const projectUrl =
+        credentials.projectUrl ||
+        credentials.project_url ||
+        credentials.url ||
+        credentials.supabaseUrl ||
+        credentials.supabase_url;
+
+      const anonKey =
+        credentials.anonKey ||
+        credentials.anon_key ||
+        credentials.apiKey ||
+        credentials.apikey ||
+        credentials.publicKey ||
+        credentials.public_key ||
+        credentials.key;
+
+      const tableName =
+        credentials.tableName ||
+        credentials.table_name ||
+        credentials.table ||
+        (dataType === "productos" ? "productos" : "reservas");
 
       if (!projectUrl || !anonKey) {
         throw new Error("Credenciales de Supabase incompletas");
@@ -941,6 +1093,13 @@ class ConnectionService {
           autoRefreshToken: false,
           detectSessionInUrl: false,
           storageKey: `sb-temp-${dataType}-${tableName || "default"}`,
+        },
+        global: {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
         },
       });
 
