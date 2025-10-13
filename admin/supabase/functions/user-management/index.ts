@@ -15,6 +15,7 @@ interface UserData {
   nombre: string;
   agencia: string;
   admin: boolean;
+  role?: string;
   password?: string;
 }
 
@@ -113,6 +114,7 @@ async function createUser(supabaseAdmin: any, userData: UserData) {
     nombre: userData.nombre,
     agencia: userData.agencia,
     admin: userData.admin || false,
+    role: userData.role || (userData.admin ? "admin" : "agency_user"),
   });
 
   if (profileError) {
@@ -137,13 +139,33 @@ async function updateUser(supabaseAdmin: any, userData: UserData) {
       status: 400,
     });
   }
+  // Si se envía un nuevo email, actualizar también en Auth y en profiles
+  if (userData.email) {
+    const { error: authUpdateError } =
+      await supabaseAdmin.auth.admin.updateUserById(userData.id, {
+        email: userData.email,
+      });
+    if (authUpdateError) {
+      return new Response(
+        JSON.stringify({
+          error: `Failed to update auth email: ${authUpdateError.message}`,
+        }),
+        { status: 500 }
+      );
+    }
+  }
+
+  const updates: any = {
+    nombre: userData.nombre,
+    agencia: userData.agencia,
+    admin: userData.admin,
+  };
+  if (typeof userData.role !== "undefined") updates.role = userData.role;
+  if (typeof userData.email !== "undefined") updates.email = userData.email;
+
   const { error } = await supabaseAdmin
     .from("profiles")
-    .update({
-      nombre: userData.nombre,
-      agencia: userData.agencia,
-      admin: userData.admin,
-    })
+    .update(updates)
     .eq("id", userData.id);
 
   if (error) {
@@ -179,7 +201,29 @@ async function deleteUser(supabaseAdmin: any, userId: string) {
 }
 
 async function listUsers(supabaseAdmin: any, options: any = {}) {
-  const { data, error } = await supabaseAdmin.from("profiles").select("*");
+  const page = Math.max(1, Number(options?.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(options?.limit) || 10));
+  const search = (options?.search || "").trim();
+  const sortBy = options?.sortBy || "created_at";
+  const sortOrder =
+    (options?.sortOrder || "desc").toLowerCase() === "asc" ? "asc" : "desc";
+
+  let query = supabaseAdmin.from("profiles").select("*", { count: "exact" });
+
+  if (search) {
+    query = query.or(
+      `email.ilike.%${search}%,nombre.ilike.%${search}%,agencia.ilike.%${search}%`
+    );
+  }
+
+  // Orden
+  query = query.order(sortBy, { ascending: sortOrder === "asc" });
+
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  const { data, error, count } = await query.range(from, to);
+
   if (error) {
     return new Response(
       JSON.stringify({ error: `Failed to list users: ${error.message}` }),
@@ -189,10 +233,26 @@ async function listUsers(supabaseAdmin: any, options: any = {}) {
       }
     );
   }
-  return new Response(JSON.stringify({ success: true, users: data }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+
+  const total = count ?? 0;
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+  const pagination = {
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+
+  return new Response(
+    JSON.stringify({ success: true, users: data || [], pagination }),
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
 }
 
 /**

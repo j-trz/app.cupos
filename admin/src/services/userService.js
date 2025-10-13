@@ -55,6 +55,7 @@ class UserService {
             action: "update",
             userData: {
               id: userData.id,
+              email: userData.email,
               nombre: userData.nombre,
               agencia: userData.agencia,
               role: userData.role || AuthorizationService.ROLES.AGENCY_USER,

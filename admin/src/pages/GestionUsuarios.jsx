@@ -127,6 +127,7 @@ export default function GestionUsuarios() {
         // Editar usuario
         const result = await UserService.updateUser({
           id: editUser.id,
+          email: data.email,
           nombre: data.nombre,
           agencia: data.agencia,
           admin: data.admin,
