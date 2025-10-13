@@ -14,7 +14,6 @@ export const supabaseWithHeaders = createClient(supabaseUrl, supabaseKey, {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Prefer: "return=minimal",
     },
   },
   db: {

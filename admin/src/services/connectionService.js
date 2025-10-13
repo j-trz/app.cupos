@@ -393,7 +393,7 @@ class ConnectionService {
       if (dataType) {
         try {
           // Intentar obtener conexión específica para el tipo de datos
-          const { data: specificConnection, error: specificError } =
+          const { data: specificRows, error: specificError } =
             await supabaseWithHeaders
               .from("connection_data_types")
               .select(
@@ -403,41 +403,98 @@ class ConnectionService {
               connection:data_connections(*)
             `
               )
-
               .eq("data_type", dataType)
-              .eq("is_active", true)
-              .single();
+              .eq("is_active", true);
 
-          if (!specificError && specificConnection?.connection) {
-            console.log(
-              `✅ Conexión específica encontrada para ${dataType}:`,
-              specificConnection.connection.name
+          if (
+            !specificError &&
+            Array.isArray(specificRows) &&
+            specificRows.length > 0
+          ) {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            const profile = await AuthorizationService.getCurrentUserProfile();
+            const agency = profile?.agencia || null;
+            const normScope = (s) => (s == null ? "user" : s);
+            const conns = specificRows
+              .map((r) => r?.connection)
+              .filter(Boolean);
+
+            const own = conns.find(
+              (c) => normScope(c.scope) === "user" && c.user_id === user?.id
             );
-            return specificConnection.connection;
+            const agencyScoped =
+              conns.find(
+                (c) =>
+                  normScope(c.scope) === "agency" &&
+                  agency &&
+                  c.target_agency === agency
+              ) || null;
+            const global =
+              conns.find((c) => normScope(c.scope) === "all") || null;
+
+            const chosen = own || agencyScoped || global || conns[0] || null;
+            if (chosen) {
+              console.log(
+                `✅ Conexión específica encontrada para ${dataType} (por alcance):`,
+                {
+                  name: chosen.name,
+                  scope: normScope(chosen.scope),
+                  target_agency: chosen.target_agency || null,
+                }
+              );
+              return chosen;
+            }
           }
 
-          // Si no hay conexión específica, buscar conexión 'all'
-          const { data: allConnection, error: allError } =
-            await supabaseWithHeaders
-              .from("connection_data_types")
-              .select(
-                `
+          // Si no hay conexión específica, buscar conexiones 'all' y aplicar alcance del usuario
+          const { data: allRows, error: allError } = await supabaseWithHeaders
+            .from("connection_data_types")
+            .select(
+              `
               data_type,
               is_active,
               connection:data_connections(*)
             `
-              )
+            )
+            .eq("data_type", "all")
+            .eq("is_active", true);
 
-              .eq("data_type", "all")
-              .eq("is_active", true)
-              .single();
+          if (!allError && Array.isArray(allRows) && allRows.length > 0) {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            const profile = await AuthorizationService.getCurrentUserProfile();
+            const agency = profile?.agencia || null;
+            const normScope = (s) => (s == null ? "user" : s);
+            const conns = allRows.map((r) => r?.connection).filter(Boolean);
 
-          if (!allError && allConnection?.connection) {
-            console.log(
-              `✅ Conexión 'all' encontrada para ${dataType}:`,
-              allConnection.connection.name
+            const own = conns.find(
+              (c) => normScope(c.scope) === "user" && c.user_id === user?.id
             );
-            return allConnection.connection;
+            const agencyScoped =
+              conns.find(
+                (c) =>
+                  normScope(c.scope) === "agency" &&
+                  agency &&
+                  c.target_agency === agency
+              ) || null;
+            const global =
+              conns.find((c) => normScope(c.scope) === "all") || null;
+
+            const chosen = own || agencyScoped || global || conns[0] || null;
+            if (chosen) {
+              console.log(
+                `✅ Conexión 'all' encontrada para ${dataType} (por alcance):`,
+                {
+                  name: chosen.name,
+                  scope: normScope(chosen.scope),
+                  target_agency: chosen.target_agency || null,
+                }
+              );
+              return chosen;
+            }
           }
 
           console.warn(
@@ -639,6 +696,8 @@ class ConnectionService {
         `✅ [ConnectionService] Using connection ${activeConnection.name} (${activeConnection.type}) for ${dataType}`
       );
 
+      // Respetar configuración del administrador: no forzar Supabase por encima de la conexión activa seleccionada por alcance/agency
+
       // TEMPORAL: Si hay problemas con las credenciales, intentar Supabase (Jetmar) y luego fallback
       let credentials;
       try {
@@ -649,144 +708,214 @@ class ConnectionService {
           credentialError
         );
 
-        // Intentar usar una conexión Supabase alternativa para productos (Jetmar)
-        if (dataType === "productos") {
+        // Iterar conexiones definidas por admin según alcance (user -> agency -> all)
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          const profile = await AuthorizationService.getCurrentUserProfile();
+          const agency = profile?.agencia || null;
+          const normScope = (s) => (s == null ? "user" : s);
+
+          // 1) Candidatas mapeadas para el tipo de datos (o 'all') en connection_data_types
+          let mappedCandidates = [];
           try {
-            const { data: supRows } = await supabase
+            const { data: mapRows } = await supabaseWithHeaders
+              .from("connection_data_types")
+              .select(
+                `
+                data_type,
+                is_active,
+                connection:data_connections(*)
+              `
+              )
+              .in("data_type", [dataType, "all"])
+              .eq("is_active", true);
+            if (Array.isArray(mapRows)) {
+              mappedCandidates = mapRows
+                .map((r) => r?.connection)
+                .filter(Boolean);
+            }
+          } catch (e) {
+            console.warn(
+              "⚠️ [ConnectionService] No se pudo leer connection_data_types, usando fallback a data_connections:",
+              e?.message || e
+            );
+          }
+
+          // 2) Fallback: añadir conexiones visibles por RLS
+          let allConns = [];
+          try {
+            const { data: rows } = await supabase
               .from("data_connections")
               .select("*")
-              .eq("type", "supabase")
               .order("updated_at", { ascending: false });
+            allConns = rows || [];
+          } catch {
+            allConns = [];
+          }
 
-            const supCandidates = supRows || [];
-            if (supCandidates.length > 0) {
-              const {
-                data: { user },
-              } = await supabase.auth.getUser();
-              const profile =
-                await AuthorizationService.getCurrentUserProfile();
-              const agency = profile?.agencia || null;
-              const normScope = (s) => (s == null ? "user" : s);
+          // Mezclar y de-duplicar por id
+          const byId = new Map();
+          [...mappedCandidates, ...allConns].forEach((c) => {
+            if (c && !byId.has(c.id)) byId.set(c.id, c);
+          });
+          let candidates = Array.from(byId.values());
 
-              const supOwn = supCandidates.find(
-                (c) => normScope(c.scope) === "user" && c.user_id === user?.id
-              );
-              const supAgency =
-                supCandidates.find(
-                  (c) =>
-                    normScope(c.scope) === "agency" &&
-                    agency &&
-                    c.target_agency === agency
-                ) || null;
-              const supGlobal =
-                supCandidates.find((c) => normScope(c.scope) === "all") || null;
+          // Filtrar por tipo de dato si existe column_mapping específico (no obligatorio)
+          candidates = candidates.filter(Boolean);
 
-              const supConn =
-                supOwn || supAgency || supGlobal || supCandidates[0] || null;
+          // Orden por alcance
+          const orderByScope = (list) => {
+            const own = list.filter(
+              (c) => normScope(c.scope) === "user" && c.user_id === user?.id
+            );
+            const agencyScoped = list.filter(
+              (c) =>
+                normScope(c.scope) === "agency" &&
+                agency &&
+                c.target_agency === agency
+            );
+            const global = list.filter((c) => normScope(c.scope) === "all");
+            const rest = list.filter(
+              (c) =>
+                !own.includes(c) &&
+                !agencyScoped.includes(c) &&
+                !global.includes(c)
+            );
+            return [...own, ...agencyScoped, ...global, ...rest];
+          };
 
-              if (supConn) {
+          const ordered = orderByScope(candidates);
+
+          // Probar cada conexión hasta encontrar una con credenciales válidas
+          for (const conn of ordered) {
+            try {
+              let creds = null;
+              try {
+                creds = await this.getDecryptedCredentials(conn.id);
+              } catch (e) {
+                console.warn(
+                  "⚠️ [ConnectionService] getDecryptedCredentials falló:",
+                  e?.message || e
+                );
                 try {
-                  const supCreds = await this.getDecryptedCredentials(
-                    supConn.id
-                  );
-
-                  // Usar Supabase directamente
-                  console.log(
-                    `🔁 [ConnectionService] Usando conexión Supabase alternativa: ${supConn.name}`
-                  );
-                  let rawData = await this.getDataFromSupabase(
-                    supCreds,
-                    dataType
-                  );
-
-                  // Aplicar mapeo si corresponde
-                  try {
-                    if (
-                      supConn.column_mapping &&
-                      rawData?.success &&
-                      Array.isArray(rawData.data)
-                    ) {
-                      const mapObj = JSON.parse(supConn.column_mapping);
-                      const esKey = dataType;
-                      const enKey = esKey === "productos" ? "products" : esKey;
-                      const mapping = mapObj?.[esKey] || mapObj?.[enKey];
-                      if (mapping && typeof mapping === "object") {
-                        rawData = {
-                          ...rawData,
-                          data: ConnectionService.applyUserMapping(
-                            rawData.data,
-                            mapping,
-                            esKey
-                          ),
-                        };
-                      }
-                    }
-                  } catch (mapErr) {
-                    console.warn(
-                      "⚠️ [ConnectionService] column_mapping inválido o no parseable:",
-                      mapErr
-                    );
+                  const { data: credRows } = await supabaseWithHeaders
+                    .from("api_credentials")
+                    .select("credential_key, credential_value")
+                    .eq("connection_id", conn.id);
+                  if (Array.isArray(credRows) && credRows.length > 0) {
+                    creds = {};
+                    credRows.forEach((row) => {
+                      creds[row.credential_key] = row.credential_value;
+                    });
                   }
-
-                  // Validación estándar
-                  if (rawData.success && rawData.data) {
-                    const validation = DataValidator.validateRecords(
-                      rawData.data,
-                      dataType
-                    );
-                    if (!validation.valid && validation.validRecords > 0) {
-                      try {
-                        const userRole =
-                          await AuthorizationService.getCurrentUserRole();
-                        const isAdmin =
-                          userRole === AuthorizationService.ROLES.ADMIN;
-                        if (!isAdmin) {
-                          const validData = rawData.data.filter(
-                            (r) => DataValidator.validateSingleRecord(r).valid
-                          );
-                          return {
-                            ...rawData,
-                            data: validData,
-                            validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
-                          };
-                        }
-                      } catch {
-                        const validData = rawData.data.filter(
-                          (r) => DataValidator.validateSingleRecord(r).valid
-                        );
-                        return {
-                          ...rawData,
-                          data: validData,
-                          validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
-                        };
-                      }
-                    }
-                  }
-
-                  return rawData;
-                } catch (e) {
+                } catch (fallbackError) {
                   console.warn(
-                    "⚠️ [ConnectionService] No se pudo usar la conexión Supabase alternativa:",
-                    e
+                    "⚠️ [ConnectionService] Lectura alternativa de api_credentials falló:",
+                    fallbackError?.message || fallbackError
                   );
                 }
               }
+              if (!creds) {
+                continue;
+              }
+              console.log(
+                `🔁 [ConnectionService] Probando conexión '${conn.name}' (${conn.type}) por alcance`,
+                {
+                  scope: normScope(conn.scope),
+                  target_agency: conn.target_agency || null,
+                }
+              );
+
+              let rawData = null;
+              if (conn.type === "supabase") {
+                rawData = await this.getDataFromSupabase(creds, dataType);
+              } else if (conn.type === "powerautomate") {
+                rawData = await this.getDataFromPowerAutomate(creds, dataType);
+              } else {
+                continue; // tipos no soportados aquí
+              }
+
+              if (rawData?.success && Array.isArray(rawData.data)) {
+                // Aplicar mapeo de columnas si existe para esta conexión
+                try {
+                  if (conn.column_mapping) {
+                    const mapObj = JSON.parse(conn.column_mapping);
+                    const esKey = dataType;
+                    const enKey =
+                      esKey === "productos"
+                        ? "products"
+                        : esKey === "pedidos"
+                        ? "orders"
+                        : esKey;
+                    const mapping = mapObj?.[esKey] || mapObj?.[enKey];
+                    if (mapping && typeof mapping === "object") {
+                      rawData = {
+                        ...rawData,
+                        data: ConnectionService.applyUserMapping(
+                          rawData.data,
+                          mapping,
+                          esKey
+                        ),
+                      };
+                    }
+                  }
+                } catch (mapErr) {
+                  console.warn(
+                    "⚠️ [ConnectionService] column_mapping inválido o no parseable:",
+                    mapErr
+                  );
+                }
+
+                // Validación estándar
+                const validation = DataValidator.validateRecords(
+                  rawData.data,
+                  dataType
+                );
+                if (!validation.valid && validation.validRecords > 0) {
+                  try {
+                    const userRole =
+                      await AuthorizationService.getCurrentUserRole();
+                    const isAdmin =
+                      userRole === AuthorizationService.ROLES.ADMIN;
+                    if (!isAdmin) {
+                      const validData = rawData.data.filter(
+                        (r) => DataValidator.validateSingleRecord(r).valid
+                      );
+                      return {
+                        ...rawData,
+                        data: validData,
+                        validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
+                      };
+                    }
+                  } catch {
+                    const validData = rawData.data.filter(
+                      (r) => DataValidator.validateSingleRecord(r).valid
+                    );
+                    return {
+                      ...rawData,
+                      data: validData,
+                      validationWarning: `${validation.validRecords}/${validation.totalRecords} registros válidos`,
+                    };
+                  }
+                }
+
+                return rawData;
+              }
+            } catch {
+              // sin credenciales o fallo de esa conexión; continuar con la próxima
+              continue;
             }
-          } catch (altErr) {
-            console.warn(
-              "⚠️ [ConnectionService] Búsqueda de conexión Supabase alternativa falló:",
-              altErr
-            );
           }
+        } catch (iterErr) {
+          console.warn(
+            "⚠️ [ConnectionService] Iteración de conexiones por alcance falló:",
+            iterErr?.message || iterErr
+          );
         }
 
-        // TEMPORAL: Para Power Automate, usar fallback directo sin credenciales
-        if (activeConnection.type === "powerautomate") {
-          console.warn(
-            `⚠️ [ConnectionService] Using direct Power Automate fallback due to credential error`
-          );
-          return await this.getDataFromPowerAutomate(null, dataType);
-        }
+        // Supabase env fallback deshabilitado: no consultar tablas sin tableName de credenciales
 
         // No hacer fallback para errores de configuración - requieren corrección
         if (
@@ -1058,28 +1187,33 @@ class ConnectionService {
     try {
       console.log(`🔗 Obteniendo datos de Supabase para ${dataType}`);
 
-      // Normalizar credenciales desde distintos alias
+      // Normalizar credenciales desde distintos alias + fallback a variables de entorno
+      const cred = credentials || {};
       const projectUrl =
-        credentials.projectUrl ||
-        credentials.project_url ||
-        credentials.url ||
-        credentials.supabaseUrl ||
-        credentials.supabase_url;
+        cred.projectUrl ||
+        cred.project_url ||
+        cred.url ||
+        cred.supabaseUrl ||
+        cred.supabase_url;
 
       const anonKey =
-        credentials.anonKey ||
-        credentials.anon_key ||
-        credentials.apiKey ||
-        credentials.apikey ||
-        credentials.publicKey ||
-        credentials.public_key ||
-        credentials.key;
+        cred.anonKey ||
+        cred.anon_key ||
+        cred.apiKey ||
+        cred.apikey ||
+        cred.publicKey ||
+        cred.public_key ||
+        cred.key;
 
-      const tableName =
-        credentials.tableName ||
-        credentials.table_name ||
-        credentials.table ||
-        (dataType === "productos" ? "productos" : "reservas");
+      const tableName = cred.tableName || cred.table_name || cred.table;
+
+      const wasProvidedTable = Boolean(tableName);
+
+      if (!projectUrl || !anonKey || !wasProvidedTable) {
+        throw new Error(
+          "Credenciales de Supabase incompletas: se requiere projectUrl, anonKey y tableName"
+        );
+      }
 
       if (!projectUrl || !anonKey) {
         throw new Error("Credenciales de Supabase incompletas");
@@ -1103,23 +1237,30 @@ class ConnectionService {
         },
       });
 
-      // Determinar tabla según el tipo de datos
-      const targetTable =
-        tableName || (dataType === "productos" ? "productos" : "reservas");
+      // Determinar tabla según credenciales
+      const targetTable = tableName;
 
       console.log(`📊 Consultando tabla ${targetTable} en Supabase`);
 
-      const { data, error } = await supabaseClient
-        .from(targetTable)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000);
+      let data, error;
+      const queryTable = async (tbl) => {
+        try {
+          const { data: d, error: e } = await supabaseClient
+            .from(tbl)
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(1000);
+          return { d, e };
+        } catch (e) {
+          return { d: null, e };
+        }
+      };
+
+      ({ d: data, e: error } = await queryTable(targetTable));
 
       if (error) {
         console.error("Error consultando Supabase:", error);
-        // Si hay error, usar fallback a Power Automate
-        console.warn("Usando Power Automate como fallback");
-        return await this.getDataFromPowerAutomate(null, dataType);
+        throw error;
       }
 
       console.log(`✅ Datos obtenidos de Supabase:`, {
@@ -1136,8 +1277,7 @@ class ConnectionService {
       };
     } catch (error) {
       console.error(`Error fetching from Supabase (${dataType}):`, error);
-      console.warn("Error en Supabase, usando Power Automate como fallback");
-      return await this.getDataFromPowerAutomate(null, dataType);
+      return { success: false, data: [], error: error.message };
     }
   }
 

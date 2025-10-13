@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
 import { FaEye, FaEyeSlash, FaLock, FaShieldAlt, FaClock, FaExclamationTriangle } from "react-icons/fa"; // eslint-disable-line no-unused-vars
 import SecurityService from "../services/securityService";
 import TwoFactorService from "../services/twoFactorService";
@@ -113,9 +114,20 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
         
         const user = result.user;
         setPendingUser(user);
-        
-        // Verificar si el usuario tiene 2FA configurado
-        const twoFactorStatus = await TwoFactorService.get2FAStatus(user.id);
+
+        // Asegurar que la sesión esté establecida antes de listar factores
+        try {
+          await supabase.auth.getSession();
+        } catch (e) { console.warn("Supabase session fetch failed (non-fatal):", e?.message || e); }
+
+        // Verificar si el usuario tiene 2FA configurado (con reintento corto)
+        let twoFactorStatus = await TwoFactorService.get2FAStatus(user.id);
+
+        // Algunos navegadores requieren un ciclo extra para que Supabase propague el estado
+        if (!twoFactorStatus.enabled && !twoFactorStatus.hasUnverifiedFactor) {
+          await new Promise((r) => setTimeout(r, 300));
+          twoFactorStatus = await TwoFactorService.get2FAStatus(user.id);
+        }
         
         console.log("🔍 Estado 2FA completo:", twoFactorStatus);
         
