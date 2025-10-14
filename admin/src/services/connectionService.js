@@ -52,15 +52,38 @@ class ConnectionService {
             updated_at: new Date().toISOString(),
           },
         ])
-        .select()
+        .select("id")
         .single();
 
       if (error) throw error;
 
+      // Manejo cuando RLS impide devolver la fila insertada
+      let connId = connection?.id;
+      if (!connId) {
+        const { data: fallbackRow, error: fallbackError } = await supabase
+          .from("data_connections")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("name", name)
+          .eq("type", type)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (fallbackError || !fallbackRow?.id) {
+          console.error(
+            "No se pudo recuperar ID de la nueva conexión. Verifique policies RLS para permitir SELECT al propietario.",
+            fallbackError
+          );
+          throw new Error("No se pudo obtener el ID de la conexión creada");
+        }
+        connId = fallbackRow.id;
+      }
+
       // Guardar credenciales directamente (sin encriptación)
       const credentialEntries = Object.entries(credentials).map(
         ([key, value]) => ({
-          connection_id: connection.id,
+          connection_id: connId,
           user_id: user.id,
           credential_key: key,
           credential_value: value,
@@ -74,15 +97,41 @@ class ConnectionService {
 
       if (credError) {
         // Si falla, eliminar la conexión
-        await supabase
-          .from("data_connections")
-          .delete()
-          .eq("id", connection.id);
+        await supabase.from("data_connections").delete().eq("id", connId);
         console.error("Error guardando credenciales:", credError);
         throw new Error("No se pudieron guardar las credenciales");
       }
 
-      return { success: true, connection };
+      // Intentar devolver la conexión completa; si falla, devolver mínima
+      let connectionToReturn = null;
+      try {
+        const { data: fullConn } = await supabase
+          .from("data_connections")
+          .select(
+            "id, user_id, name, type, description, column_mapping, scope, target_agency, is_active, created_at, updated_at, last_tested_at, connection_status"
+          )
+          .eq("id", connId)
+          .single();
+        connectionToReturn = fullConn || null;
+      } catch {
+        // noop
+      }
+      if (!connectionToReturn) {
+        connectionToReturn = {
+          id: connId,
+          user_id: user.id,
+          name,
+          type,
+          description,
+          scope,
+          target_agency:
+            scope === "agency"
+              ? target_agency || profile?.agencia || null
+              : null,
+        };
+      }
+
+      return { success: true, connection: connectionToReturn };
     } catch (error) {
       console.error("Error creating connection:", error);
       throw new Error(error.message || "Error al crear la conexión");
@@ -404,6 +453,7 @@ class ConnectionService {
             `
               )
               .eq("data_type", dataType)
+              .eq("user_id", user.id)
               .eq("is_active", true);
 
           if (
@@ -421,25 +471,49 @@ class ConnectionService {
               .map((r) => r?.connection)
               .filter(Boolean);
 
-            const own = conns.find(
+            const typePref = (c) => {
+              if (dataType === "pedidos")
+                return c?.type === "powerautomate" ? 0 : 1;
+              if (dataType === "productos")
+                return c?.type === "supabase" ? 0 : 1;
+              return 0;
+            };
+            const sortByType = (list) =>
+              [...list].sort((a, b) => typePref(a) - typePref(b));
+
+            const ownList = conns.filter(
               (c) => normScope(c.scope) === "user" && c.user_id === user?.id
             );
-            const agencyScoped =
-              conns.find(
-                (c) =>
-                  normScope(c.scope) === "agency" &&
-                  agency &&
-                  c.target_agency === agency
-              ) || null;
-            const global =
-              conns.find((c) => normScope(c.scope) === "all") || null;
+            const agencyList = conns.filter(
+              (c) =>
+                normScope(c.scope) === "agency" &&
+                agency &&
+                c.target_agency === agency
+            );
+            const globalList = conns.filter(
+              (c) => normScope(c.scope) === "all"
+            );
+            const restList = conns.filter(
+              (c) =>
+                !ownList.includes(c) &&
+                !agencyList.includes(c) &&
+                !globalList.includes(c)
+            );
 
-            const chosen = own || agencyScoped || global || conns[0] || null;
+            const ordered = [
+              ...sortByType(ownList),
+              ...sortByType(agencyList),
+              ...sortByType(globalList),
+              ...sortByType(restList),
+            ];
+
+            const chosen = ordered[0] || null;
             if (chosen) {
               console.log(
-                `✅ Conexión específica encontrada para ${dataType} (por alcance):`,
+                `✅ Conexión específica encontrada para ${dataType} (alcance+tipo preferido):`,
                 {
                   name: chosen.name,
+                  type: chosen.type,
                   scope: normScope(chosen.scope),
                   target_agency: chosen.target_agency || null,
                 }
@@ -459,6 +533,7 @@ class ConnectionService {
             `
             )
             .eq("data_type", "all")
+            .eq("user_id", user.id)
             .eq("is_active", true);
 
           if (!allError && Array.isArray(allRows) && allRows.length > 0) {
@@ -470,25 +545,49 @@ class ConnectionService {
             const normScope = (s) => (s == null ? "user" : s);
             const conns = allRows.map((r) => r?.connection).filter(Boolean);
 
-            const own = conns.find(
+            const typePref = (c) => {
+              if (dataType === "pedidos")
+                return c?.type === "powerautomate" ? 0 : 1;
+              if (dataType === "productos")
+                return c?.type === "supabase" ? 0 : 1;
+              return 0;
+            };
+            const sortByType = (list) =>
+              [...list].sort((a, b) => typePref(a) - typePref(b));
+
+            const ownList = conns.filter(
               (c) => normScope(c.scope) === "user" && c.user_id === user?.id
             );
-            const agencyScoped =
-              conns.find(
-                (c) =>
-                  normScope(c.scope) === "agency" &&
-                  agency &&
-                  c.target_agency === agency
-              ) || null;
-            const global =
-              conns.find((c) => normScope(c.scope) === "all") || null;
+            const agencyList = conns.filter(
+              (c) =>
+                normScope(c.scope) === "agency" &&
+                agency &&
+                c.target_agency === agency
+            );
+            const globalList = conns.filter(
+              (c) => normScope(c.scope) === "all"
+            );
+            const restList = conns.filter(
+              (c) =>
+                !ownList.includes(c) &&
+                !agencyList.includes(c) &&
+                !globalList.includes(c)
+            );
 
-            const chosen = own || agencyScoped || global || conns[0] || null;
+            const ordered = [
+              ...sortByType(ownList),
+              ...sortByType(agencyList),
+              ...sortByType(globalList),
+              ...sortByType(restList),
+            ];
+
+            const chosen = ordered[0] || null;
             if (chosen) {
               console.log(
-                `✅ Conexión 'all' encontrada para ${dataType} (por alcance):`,
+                `✅ Conexión 'all' encontrada para ${dataType} (alcance+tipo preferido):`,
                 {
                   name: chosen.name,
+                  type: chosen.type,
                   scope: normScope(chosen.scope),
                   target_agency: chosen.target_agency || null,
                 }
@@ -540,27 +639,54 @@ class ConnectionService {
         const agency = profile?.agencia || null;
         const normScope = (s) => (s == null ? "user" : s);
 
-        const own = candidates.find(
+        // Preferencia por proveedor según tipo de datos
+        const typePref = (c) => {
+          if (dataType === "pedidos")
+            return c?.type === "powerautomate" ? 0 : 1;
+          if (dataType === "productos") return c?.type === "supabase" ? 0 : 1;
+          return 0;
+        };
+        const sortByType = (list) =>
+          [...list].filter(Boolean).sort((a, b) => typePref(a) - typePref(b));
+
+        const ownList = candidates.filter(
           (c) => normScope(c.scope) === "user" && c.user_id === user.id
         );
-        const agencyScoped =
-          candidates.find(
-            (c) =>
-              normScope(c.scope) === "agency" &&
-              agency &&
-              c.target_agency === agency
-          ) || null;
-        const global =
-          candidates.find((c) => normScope(c.scope) === "all") || null;
+        const agencyList = candidates.filter(
+          (c) =>
+            normScope(c.scope) === "agency" &&
+            agency &&
+            c.target_agency === agency
+        );
+        const globalList = candidates.filter(
+          (c) => normScope(c.scope) === "all"
+        );
+        const restList = candidates.filter(
+          (c) =>
+            !ownList.includes(c) &&
+            !agencyList.includes(c) &&
+            !globalList.includes(c)
+        );
 
-        const chosen = own || agencyScoped || global || candidates[0] || null;
+        const ordered = [
+          ...sortByType(ownList),
+          ...sortByType(agencyList),
+          ...sortByType(globalList),
+          ...sortByType(restList),
+        ];
+
+        const chosen = ordered[0] || null;
         if (chosen) {
-          console.log("✅ Conexión activa seleccionada por alcance:", {
-            id: chosen.id,
-            name: chosen.name,
-            scope: normScope(chosen.scope),
-            target_agency: chosen.target_agency || null,
-          });
+          console.log(
+            "✅ Conexión activa seleccionada (alcance + tipo preferido):",
+            {
+              id: chosen.id,
+              name: chosen.name,
+              type: chosen.type,
+              scope: normScope(chosen.scope),
+              target_agency: chosen.target_agency || null,
+            }
+          );
           return chosen;
         }
       }
@@ -708,6 +834,17 @@ class ConnectionService {
           credentialError
         );
 
+        // Si la conexión elegida es Power Automate para pedidos, mantener proveedor y usar fallback por entorno
+        if (
+          dataType === "pedidos" &&
+          activeConnection.type === "powerautomate"
+        ) {
+          console.warn(
+            "⚠️ [ConnectionService] Sin credenciales PA; usando fallback de entorno para pedidos"
+          );
+          return await this.getDataFromPowerAutomate(null, dataType);
+        }
+
         // Iterar conexiones definidas por admin según alcance (user -> agency -> all)
         try {
           const {
@@ -730,6 +867,7 @@ class ConnectionService {
               `
               )
               .in("data_type", [dataType, "all"])
+              .eq("user_id", user.id)
               .eq("is_active", true);
             if (Array.isArray(mapRows)) {
               mappedCandidates = mapRows
@@ -764,6 +902,13 @@ class ConnectionService {
 
           // Filtrar por tipo de dato si existe column_mapping específico (no obligatorio)
           candidates = candidates.filter(Boolean);
+
+          // Restringir a mismo tipo de proveedor que la conexión elegida para este dataType
+          if (activeConnection?.type) {
+            candidates = candidates.filter(
+              (c) => c?.type === activeConnection.type
+            );
+          }
 
           // Orden por alcance
           const orderByScope = (list) => {
@@ -841,24 +986,36 @@ class ConnectionService {
                 // Aplicar mapeo de columnas si existe para esta conexión
                 try {
                   if (conn.column_mapping) {
-                    const mapObj = JSON.parse(conn.column_mapping);
-                    const esKey = dataType;
-                    const enKey =
-                      esKey === "productos"
-                        ? "products"
-                        : esKey === "pedidos"
-                        ? "orders"
-                        : esKey;
-                    const mapping = mapObj?.[esKey] || mapObj?.[enKey];
-                    if (mapping && typeof mapping === "object") {
-                      rawData = {
-                        ...rawData,
-                        data: ConnectionService.applyUserMapping(
-                          rawData.data,
-                          mapping,
-                          esKey
-                        ),
-                      };
+                    let mapObj = null;
+                    if (
+                      typeof conn.column_mapping === "string" &&
+                      /[[{]/.test(conn.column_mapping.trim())
+                    ) {
+                      try {
+                        mapObj = JSON.parse(conn.column_mapping);
+                      } catch {
+                        mapObj = null;
+                      }
+                    }
+                    if (mapObj) {
+                      const esKey = dataType;
+                      const enKey =
+                        esKey === "productos"
+                          ? "products"
+                          : esKey === "pedidos"
+                          ? "orders"
+                          : esKey;
+                      const mapping = mapObj?.[esKey] || mapObj?.[enKey];
+                      if (mapping && typeof mapping === "object") {
+                        rawData = {
+                          ...rawData,
+                          data: ConnectionService.applyUserMapping(
+                            rawData.data,
+                            mapping,
+                            esKey
+                          ),
+                        };
+                      }
                     }
                   }
                 } catch (mapErr) {
@@ -965,7 +1122,18 @@ class ConnectionService {
           rawData?.success &&
           Array.isArray(rawData.data)
         ) {
-          const mapObj = JSON.parse(activeConnection.column_mapping);
+          let mapObj = null;
+          const _cm = activeConnection.column_mapping;
+          if (typeof _cm === "string" && /[[{]/.test(_cm.trim())) {
+            try {
+              mapObj = JSON.parse(_cm);
+            } catch {
+              mapObj = null;
+            }
+          }
+          if (!mapObj) {
+            throw new Error("SKIP_PARSE"); // forzar captura y omitir warning personalizado abajo
+          }
 
           // Claves soportadas en el JSON de mapeo (ES y EN para compatibilidad)
           const esKey = dataType; // 'productos' | 'pedidos'
@@ -990,10 +1158,12 @@ class ConnectionService {
           }
         }
       } catch (mapErr) {
-        console.warn(
-          "⚠️ [ConnectionService] column_mapping inválido o no parseable:",
-          mapErr
-        );
+        if (mapErr?.message !== "SKIP_PARSE") {
+          console.warn(
+            "⚠️ [ConnectionService] column_mapping inválido o no parseable (omitido):",
+            mapErr
+          );
+        }
       }
 
       // Validar que los datos cumplan con la estructura estándar
@@ -1242,7 +1412,6 @@ class ConnectionService {
 
       console.log(`📊 Consultando tabla ${targetTable} en Supabase`);
 
-      let data, error;
       const queryTable = async (tbl) => {
         try {
           const { data: d, error: e } = await supabaseClient
@@ -1256,7 +1425,7 @@ class ConnectionService {
         }
       };
 
-      ({ d: data, e: error } = await queryTable(targetTable));
+      const { d: data, e: error } = await queryTable(targetTable);
 
       if (error) {
         console.error("Error consultando Supabase:", error);
@@ -2157,7 +2326,7 @@ class ConnectionService {
         await supabaseWithHeaders
           .from("connection_data_types")
           .update({ is_active: false })
-
+          .eq("user_id", user.id)
           .eq("data_type", dataType);
       }
 
@@ -2314,7 +2483,7 @@ class ConnectionService {
           connection:data_connections(*)
         `
           )
-
+          .eq("user_id", user.id)
           .eq("data_type", dataType)
           .eq("is_active", true)
           .single();
@@ -2335,7 +2504,7 @@ class ConnectionService {
           connection:data_connections(*)
         `
         )
-
+        .eq("user_id", user.id)
         .eq("data_type", "all")
         .eq("is_active", true)
         .single();

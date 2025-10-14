@@ -4,6 +4,7 @@ import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line
 import ReservationService from '../services/reservationService';
 import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
+import ItineraryDetails from '../components/ItineraryDetails';
   
 
 export default function Confirmaciones() {
@@ -13,6 +14,8 @@ export default function Confirmaciones() {
   const [refrescando, setRefrescando] = useState(false);
   const [popupItinerarioOpen, setPopupItinerarioOpen] = useState(false);
   const [itinerarioSeleccionado, setItinerarioSeleccionado] = useState(null);
+  const [popupTicketOpen, setPopupTicketOpen] = useState(false);
+  const [ticketSeleccionado, setTicketSeleccionado] = useState(null);
 
   // Filtros
   const [filtroAgencia, setFiltroAgencia] = useState("");
@@ -91,6 +94,11 @@ export default function Confirmaciones() {
   function mostrarItinerario(itinerario) {
     setItinerarioSeleccionado(itinerario);
     setPopupItinerarioOpen(true);
+  }
+
+  function mostrarTicket(item) {
+    setTicketSeleccionado(item);
+    setPopupTicketOpen(true);
   }
 
   return (
@@ -185,12 +193,20 @@ export default function Confirmaciones() {
                     <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Estado}</td>
                     <td className="px-6 py-4 text-center">
                       {item.Ruta ? (
-                        <button
-                          className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
-                          onClick={() => mostrarItinerario(item.Ruta)}
-                        >
-                          Ver Itinerario
-                        </button>
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
+                            onClick={() => mostrarItinerario(item.Ruta)}
+                          >
+                            Ver Itinerario
+                          </button>
+                          <button
+                            className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
+                            onClick={() => mostrarTicket(item)}
+                          >
+                            Ver Ticket
+                          </button>
+                        </div>
                       ) : "-"}
                     </td>
                     <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.Fecha_Registro ? new Date(item.Fecha_Registro).toLocaleDateString("es-ES") : ""}</td>
@@ -265,6 +281,55 @@ export default function Confirmaciones() {
                 })()
               ) : (
                 <div className="text-gray-500">No hay datos de itinerario disponibles.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Popup Ticket */}
+        {popupTicketOpen && (
+          <div className="fixed inset-0 bg-black/60 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-[900px] h-auto max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-[#2c4b8b]">Ticket de Reserva</h2>
+                <button onClick={() => setPopupTicketOpen(false)} className="text-[#2c4b8b] hover:text-gray-600 text-2xl">&times;</button>
+              </div>
+              {ticketSeleccionado ? (
+                <ItineraryDetails itineraryData={{
+                  localizadorReserva: ticketSeleccionado.Pedido_ID,
+                  detallesViajero: [{
+                    nombre: ticketSeleccionado.Nombre_Pasajero,
+                    apellido: ticketSeleccionado.Apellido_Pasajero
+                  }],
+                  vuelos: ticketSeleccionado.Ruta ? 
+                    (() => {
+                      const tokens = String(ticketSeleccionado.Ruta)
+                        .replace(/\n/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .split(' ');
+                      const vuelos = [];
+                      for (let i = 0; i < tokens.length; i += 7) {
+                        if (tokens.length - i >= 7) {
+                          vuelos.push({
+                            aerolinea: tokens[i],
+                            numeroVuelo: tokens[i+1],
+                            fecha: tokens[i+2],
+                            origen: tokens[i+3],
+                            destino: tokens[i+4],
+                            horaSalida: tokens[i+5],
+                            horaLlegada: tokens[i+6],
+                            clase: "Economy",
+                            duracionVuelo: "N/A",
+                            aeronave: "N/A"
+                          });
+                        }
+                      }
+                      return vuelos;
+                    })() : []
+                }} />
+              ) : (
+                <div className="text-gray-500">No hay datos de ticket disponibles.</div>
               )}
             </div>
           </div>
