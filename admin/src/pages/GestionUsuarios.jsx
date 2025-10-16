@@ -203,7 +203,7 @@ export default function GestionUsuarios() {
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
-      <div className="p-8">
+      <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-[#2c4b8b]">Gestión de Usuarios</h1>
           <div className="flex gap-2">
@@ -251,7 +251,7 @@ export default function GestionUsuarios() {
           </div>
         ) : (
           <div className="overflow-x-[800px]">
-            <table className="w-full min-w-[900px] bg-white border-0 rounded-2xl shadow-xl">
+            <table className="w-full min-w-[900px] bg-white border-0 rounded-2xl ">
               <thead>
                 <tr className="bg-[#2c4b8b] text-white">
                   <th className="px-6 py-4 text-lg font-semibold text-center rounded-tl-2xl">

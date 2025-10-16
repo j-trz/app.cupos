@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaSearch, FaSync, FaSave, FaTimes, FaExclamationTriangle, FaCheckCircle } from 'react-icons/fa'; // eslint-disable-line no-unused-vars
+/* eslint-disable no-unused-vars */
+import {
+  HiOutlinePlus,  
+  HiOutlinePencilSquare,  
+  HiOutlineTrash,  
+  HiArrowPathRoundedSquare,  
+  HiOutlineMagnifyingGlass,  
+  HiMiniXMark,  
+  HiOutlineExclamationTriangle,  
+  HiOutlineCheck,  
+} from "react-icons/hi2";
+/* eslint-enable no-unused-vars */
 import Swal from 'sweetalert2';
 import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
@@ -15,19 +26,39 @@ const GestionProductos = () => {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [seccion, setSeccion] = useState('gestion-productos');
 
+  // Resolver ID robusto desde diferentes fuentes
+  const resolveId = (obj) => {
+    if (!obj) return null;
+    return (
+      obj.id ??
+      obj.ItemInternalId ??
+      obj._id ??
+      obj.Item_ID ??
+      obj.ItemId ??
+      obj.ItemInternalID ??
+      null
+    );
+  };
+
   // Estado del formulario
   const [formData, setFormData] = useState({
     codigo_cupo: '',
     destino: '',
     compania: '',
     disponibilidad: '',
-    salida: '',
-    regreso: '',
+    fecha_salida: '',
+    fecha_regreso: '',
     precio: '',
     ruta: '',
     pnr: '',
     ficha: '',
-    temporada: ''
+    temporada: '',
+    neto_1: '',
+    op: '',
+    carryon: true,
+    handbag: true,
+    checkedbag: true,
+    inf_fare: ''
   });
 
   useEffect(() => {
@@ -43,7 +74,7 @@ const GestionProductos = () => {
   const checkActiveConnection = async () => {
     try {
       setConnectionStatus('checking');
-      const connection = await ConnectionService.getActiveConnection();
+      const connection = await ConnectionService.getActiveConnection('productos');
       
       if (connection) {
         setActiveConnection(connection);
@@ -105,13 +136,19 @@ const GestionProductos = () => {
       destino: '',
       compania: '',
       disponibilidad: '',
-      salida: '',
-      regreso: '',
+      fecha_salida: '',
+      fecha_regreso: '',
       precio: '',
       ruta: '',
       pnr: '',
       ficha: '',
-      temporada: ''
+      temporada: '',
+      neto_1: '',
+      op: '',
+      carryon: true,
+      handbag: true,
+      checkedbag: true,
+      inf_fare: ''
     });
     setShowModal(true);
   };
@@ -123,13 +160,19 @@ const GestionProductos = () => {
       destino: producto.destino || '',
       compania: producto.compania || '',
       disponibilidad: String(producto.disponibilidad || ''),
-      salida: producto.salida || '',
-      regreso: producto.regreso || '',
+      fecha_salida: producto.fecha_salida || producto.salida || '',
+      fecha_regreso: producto.fecha_regreso || producto.regreso || '',
       precio: String(producto.precio || ''),
       ruta: producto.ruta || '',
       pnr: producto.pnr || '',
       ficha: producto.ficha || '',
-      temporada: producto.temporada || ''
+      temporada: producto.temporada || '',
+      neto_1: producto.neto_1 || '',
+      op: producto.op || '',
+      carryon: producto.carryon ?? true,
+      handbag: producto.handbag ?? true,
+      checkedbag: producto.checkedbag ?? true,
+      inf_fare: producto.inf_fare || ''
     });
     setShowModal(true);
   };
@@ -140,6 +183,15 @@ const GestionProductos = () => {
         icon: 'error',
         title: 'Sin conexión activa',
         text: 'No hay una conexión API activa configurada'
+      });
+      return;
+    }
+
+    if (activeConnection.type === 'powerautomate') {
+      Swal.fire({
+        icon: 'info',
+        title: 'Operación no soportada',
+        text: 'La eliminación no está disponible con la conexión Power Automate activa'
       });
       return;
     }
@@ -163,12 +215,25 @@ const GestionProductos = () => {
     if (result.isConfirmed) {
       try {
         console.log('🗑️ Eliminando producto:', producto);
+        console.log('🆔 ID detectado para delete:', resolveId(producto));
         
-        // Usar DataOperationsService para eliminar
+        // Usar DataOperationsService para eliminar (solo Supabase)
+        // Preparar credenciales si la conexión es Supabase
+        let connWithCreds = activeConnection;
+        if (activeConnection.type === 'supabase') {
+          const creds = await ConnectionService.getDecryptedCredentials(activeConnection.id);
+          const supaCreds = {
+            projectUrl: creds.projectUrl || creds.project_url || creds.url || creds.supabaseUrl || creds.supabase_url,
+            anonKey: creds.anonKey || creds.anon_key || creds.key,
+            tableName: creds.tableName || creds.table_name || creds.table || 'reservas'
+          };
+          connWithCreds = { ...activeConnection, credentials: supaCreds };
+        }
+
         const deleteResult = await DataOperationsService.deleteData(
           activeConnection.type,
-          activeConnection,
-          producto.ItemInternalId || producto.id,
+          connWithCreds,
+          resolveId(producto),
           'productos'
         );
 
@@ -224,32 +289,72 @@ const GestionProductos = () => {
         codigo_cupo: formData.codigo_cupo,
         destino: formData.destino,
         compania: formData.compania,
-        disponibilidad: parseInt(formData.disponibilidad) || 0,
-        salida: formData.salida,
-        regreso: formData.regreso,
-        precio: parseFloat(formData.precio) || 0,
+        disponibilidad: String(formData.disponibilidad ?? ''),
+        fecha_salida: formData.fecha_salida || null,
+        fecha_regreso: formData.fecha_regreso || null,
+        precio: String(formData.precio ?? ''),
         ruta: formData.ruta,
         pnr: formData.pnr,
         ficha: formData.ficha,
-        temporada: formData.temporada
+        temporada: formData.temporada,
+        neto_1: formData.neto_1,
+        op: formData.op,
+        carryon: Boolean(formData.carryon),
+        handbag: Boolean(formData.handbag),
+        checkedbag: Boolean(formData.checkedbag),
+        inf_fare: formData.inf_fare
       };
 
       console.log(editingProduct ? '✏️ Actualizando producto:' : '➕ Creando producto:', productData);
 
+      // Validar conexión para creación: solo Supabase soportado
+      if (!editingProduct && activeConnection.type !== 'supabase') {
+        setLoading(false);
+        Swal.fire({
+          icon: 'info',
+          title: 'Conexión no soportada',
+          text: 'La creación de productos requiere una conexión Supabase activa para "productos".'
+        });
+        return;
+      }
+
+      // Preparar conexión con credenciales Supabase cuando aplique
+      let connectionWithCreds = activeConnection;
+      if (activeConnection.type === 'supabase') {
+        const creds = await ConnectionService.getDecryptedCredentials(activeConnection.id);
+        const supaCreds = {
+          projectUrl: creds.projectUrl || creds.project_url || creds.url || creds.supabaseUrl || creds.supabase_url,
+          anonKey: creds.anonKey || creds.anon_key || creds.key,
+          tableName: creds.tableName || creds.table_name || creds.table || 'reservas'
+        };
+        connectionWithCreds = { ...activeConnection, credentials: supaCreds };
+      }
+
       let result;
       if (editingProduct) {
-        // Actualizar producto existente (implementar método updateData si no existe)
+        if (activeConnection.type === 'powerautomate') {
+          setLoading(false);
+          Swal.fire({
+            icon: 'info',
+            title: 'Operación no soportada',
+            text: 'La edición no está disponible con la conexión Power Automate activa'
+          });
+          return;
+        }
+        // Actualizar producto existente
+        const recordId = resolveId(editingProduct);
+        console.log('🔎 ID detectado para update:', recordId, editingProduct);
         result = await DataOperationsService.updateData(
           activeConnection.type,
-          activeConnection,
-          editingProduct.ItemInternalId || editingProduct.id,
+          connectionWithCreds,
+          recordId,
           productData,
           'productos'
         );
       } else {
         // Crear nuevo producto
         result = await DataOperationsService.insertData(
-          activeConnection,
+          connectionWithCreds,
           [productData]
         );
       }
@@ -303,7 +408,7 @@ const GestionProductos = () => {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <FaCheckCircle className="text-green-500 mr-3" />
+                <HiOutlineCheck  className="text-green-500 mr-3 w-5 h-5" />
                 <div>
                   <span className="text-green-700 font-medium">Conectado a: {activeConnection?.name}</span>
                   <p className="text-green-600 text-sm">Tipo: {activeConnection?.type}</p>
@@ -314,7 +419,7 @@ const GestionProductos = () => {
                 className="text-green-600 hover:text-green-700"
                 title="Verificar conexión"
               >
-                <FaSync />
+                <HiArrowPathRoundedSquare />
               </button>
             </div>
           </div>
@@ -323,7 +428,7 @@ const GestionProductos = () => {
         return (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <FaExclamationTriangle className="text-yellow-500 mr-3" />
+              <HiOutlineExclamationTriangle  className="text-yellow-500 mr-3" />
               <div>
                 <span className="text-yellow-700 font-medium">Sin conexión activa</span>
                 <p className="text-yellow-600 text-sm">
@@ -337,7 +442,7 @@ const GestionProductos = () => {
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <FaExclamationTriangle className="text-red-500 mr-3" />
+              <HiOutlineExclamationTriangle className="text-red-500 mr-3" />
               <div>
                 <span className="text-red-700 font-medium">Error de conexión</span>
                 <p className="text-red-600 text-sm">
@@ -354,24 +459,24 @@ const GestionProductos = () => {
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
-      <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Gestión de Productos</h1>
-          <div className="flex gap-3">
+    <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Productos</h1>
+          <div className="flex gap-2">
             <button
               onClick={loadProductos}
               disabled={!activeConnection || loading}
-              className="flex items-center gap-2 px-4 py-2 bg-[#2c4b8b] text-white rounded hover:bg-[#2c4b8b] disabled:bg-gray-400 transition-colors"
+              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              <FaSync className={loading ? 'animate-spin' : ''} />
-              Actualizar
+              <HiArrowPathRoundedSquare className={loading ? 'animate-spin' : ''} />
+              Refrescar
             </button>
             <button
               onClick={handleCreate}
               disabled={!activeConnection}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 transition-colors"
+              className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] transition-colors"
             >
-              <FaPlus />
+              <HiOutlinePlus />
               Nuevo Producto
             </button>
           </div>
@@ -382,13 +487,13 @@ const GestionProductos = () => {
         {/* Barra de búsqueda */}
         <div className="mb-6">
           <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <HiOutlineMagnifyingGlass  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Buscar por código, destino o compañía..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:[#2c4b8b]"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#2c4b8b]"
             />
           </div>
         </div>
@@ -408,45 +513,31 @@ const GestionProductos = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
+              <table className="w-full min-w-[900px]">
+                <thead className="bg-[#2c4b8b] text-white">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Código Cupo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Destino
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Compañía
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Disponibilidad
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Precio
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Salida
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
+                    <th className="px-6 py-4 text-lg font-semibold">Código Cupo</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Destino</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Compañía</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Disponibilidad</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Precio</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Salida</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredProductos.map((producto, index) => (
                     <tr key={producto.ItemInternalId || producto.id || index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-md font-medium text-gray-900">
                         {producto.codigo_cupo}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-md text-gray-500">
                         {producto.destino}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-md text-gray-500">
                         {producto.compania}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-md text-gray-500">
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           parseInt(producto.disponibilidad) > 0
                             ? 'bg-green-100 text-green-800'
@@ -455,27 +546,27 @@ const GestionProductos = () => {
                           {producto.disponibilidad || 0}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         ${producto.precio || 0}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {producto.salida || 'N/A'}
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.fecha_salida || producto.salida || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center font-medium">
+                        <div className="flex space-x-2 text-center justify-center">
                           <button
                             onClick={() => handleEdit(producto)}
-                            className="text-[#2c4b8b] hover:text-blue-900"
+                            className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                             title="Editar"
                           >
-                            <FaEdit />
+                            <HiOutlinePencilSquare className='w-5 h-5' />
                           </button>
                           <button
                             onClick={() => handleDelete(producto)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                             title="Eliminar"
                           >
-                            <FaTrash />
+                            <HiOutlineTrash className='w-5 h-5' />
                           </button>
                         </div>
                       </td>
@@ -499,7 +590,7 @@ const GestionProductos = () => {
                   onClick={() => setShowModal(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  <FaTimes />
+                  <HiMiniXMark  />
                 </button>
               </div>
 
@@ -514,7 +605,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.codigo_cupo}
                       onChange={(e) => setFormData({...formData, codigo_cupo: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:[#2c4b8b]"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                       required
                     />
                   </div>
@@ -583,8 +674,8 @@ const GestionProductos = () => {
                     </label>
                     <input
                       type="date"
-                      value={formData.salida}
-                      onChange={(e) => setFormData({...formData, salida: e.target.value})}
+                      value={formData.fecha_salida}
+                      onChange={(e) => setFormData({...formData, fecha_salida: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
@@ -596,8 +687,8 @@ const GestionProductos = () => {
                     </label>
                     <input
                       type="date"
-                      value={formData.regreso}
-                      onChange={(e) => setFormData({...formData, regreso: e.target.value})}
+                      value={formData.fecha_regreso}
+                      onChange={(e) => setFormData({...formData, fecha_regreso: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
@@ -653,6 +744,73 @@ const GestionProductos = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
+
+                  {/* Neto 1 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Neto 1
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.neto_1}
+                      onChange={(e) => setFormData({...formData, neto_1: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
+                    />
+                  </div>
+
+                  {/* OP */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      OP
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.op}
+                      onChange={(e) => setFormData({...formData, op: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
+                    />
+                  </div>
+
+                  {/* Infant Fare */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tarifa Infante (inf_fare)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.inf_fare}
+                      onChange={(e) => setFormData({...formData, inf_fare: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
+                    />
+                  </div>
+
+                  {/* Equipaje (booleans) */}
+                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!!formData.carryon}
+                        onChange={(e) => setFormData({...formData, carryon: e.target.checked})}
+                      />
+                      <span className="text-sm text-gray-700">Carry-on</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!!formData.handbag}
+                        onChange={(e) => setFormData({...formData, handbag: e.target.checked})}
+                      />
+                      <span className="text-sm text-gray-700">Handbag</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!!formData.checkedbag}
+                        onChange={(e) => setFormData({...formData, checkedbag: e.target.checked})}
+                      />
+                      <span className="text-sm text-gray-700">Checked bag</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#2c4b8b]">
@@ -668,7 +826,6 @@ const GestionProductos = () => {
                     disabled={loading}
                     className="flex items-center gap-2 px-4 py-2 bg-[#2c4b8b] text-white rounded hover:bg-[#2a4a7b] disabled:bg-gray-400 transition-colors"
                   >
-                    <FaSave />
                     {loading ? 'Guardando...' : 'Guardar'}
                   </button>
                 </div>

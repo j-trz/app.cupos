@@ -6,7 +6,11 @@ class DataOperationsService {
   async insertSupabaseData(credentials, tableName, data, mapping) {
     try {
       const supabaseUrl =
-        credentials.url || credentials.supabaseUrl || credentials.project_url;
+        credentials.projectUrl ||
+        credentials.project_url ||
+        credentials.url ||
+        credentials.supabaseUrl ||
+        credentials.supabase_url;
       const anonKey =
         credentials.anonKey || credentials.anon_key || credentials.key;
 
@@ -14,7 +18,21 @@ class DataOperationsService {
         throw new Error("Credenciales de Supabase incompletas");
       }
 
-      const supabaseClient = createClient(supabaseUrl, anonKey);
+      const supabaseClient = createClient(supabaseUrl, anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: `sb-insert-${tableName}`,
+        },
+        global: {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+        },
+      });
 
       // Mapear datos según la configuración
       const mappedData = this.mapDataFields(data, mapping);
@@ -44,11 +62,28 @@ class DataOperationsService {
   async getSupabaseData(credentials, tableName, limit = 100) {
     try {
       const supabaseUrl =
-        credentials.url || credentials.supabaseUrl || credentials.project_url;
+        credentials.projectUrl ||
+        credentials.project_url ||
+        credentials.url ||
+        credentials.supabaseUrl ||
+        credentials.supabase_url;
       const anonKey =
         credentials.anonKey || credentials.anon_key || credentials.key;
 
-      const supabaseClient = createClient(supabaseUrl, anonKey);
+      const supabaseClient = createClient(supabaseUrl, anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: `sb-select-${tableName || "default"}`,
+        },
+        global: {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        },
+      });
 
       const { data, error } = await supabaseClient
         .from(tableName)
@@ -403,19 +438,27 @@ class DataOperationsService {
 
       switch (connectionData.type) {
         case "supabase": {
-          // Verificar si las credenciales están disponibles
-          if (
-            !credentials.projectUrl &&
-            !credentials.url &&
-            !credentials.supabaseUrl
-          ) {
-            console.warn(
-              "⚠️ Credenciales de Supabase no disponibles, usando fallback a Power Automate"
+          // Validación estricta: esta operación NO hace fallback a Power Automate
+          const hasUrl =
+            credentials.projectUrl ||
+            credentials.project_url ||
+            credentials.url ||
+            credentials.supabaseUrl ||
+            credentials.supabase_url;
+          const hasKey =
+            credentials.anonKey || credentials.anon_key || credentials.key;
+          const tableName =
+            credentials.tableName ||
+            credentials.table_name ||
+            credentials.table ||
+            "productos";
+
+          if (!hasUrl || !hasKey || !tableName) {
+            throw new Error(
+              "Credenciales de Supabase incompletas para inserción (se requieren projectUrl, anonKey y tableName)"
             );
-            return await this.insertPowerAutomateData({}, data, mapping);
           }
 
-          const tableName = credentials.tableName || "productos";
           return await this.insertSupabaseData(
             credentials,
             tableName,
@@ -469,19 +512,8 @@ class DataOperationsService {
       }
     } catch (error) {
       console.error("❌ Error en insertData:", error);
-
-      // Si hay error, intentar fallback a Power Automate
-      try {
-        console.warn(
-          "🔄 Intentando fallback a Power Automate debido a error en conexión principal"
-        );
-        return await this.insertPowerAutomateData({}, data, mapping);
-      } catch (fallbackError) {
-        console.error("❌ Error también en fallback:", fallbackError);
-        throw new Error(
-          `Error en conexión principal: ${error.message}. Error en fallback: ${fallbackError.message}`
-        );
-      }
+      // No hacer fallback automático: respetar la conexión configurada
+      throw error;
     }
   }
 
@@ -528,6 +560,7 @@ class DataOperationsService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
           ...(credentials.apiKey && {
             Authorization: `Bearer ${credentials.apiKey}`,
           }),
@@ -536,26 +569,27 @@ class DataOperationsService {
       });
 
       if (!response.ok) {
-        // Obtener más detalles del error
+        // Obtener más detalles del error (texto plano para evitar fallos de parseo)
         const errorText = await response.text();
         console.error("❌ Power Automate error details:", errorText);
 
-        // Intentar con formato alternativo si el primer intento falló
+        // Intentar con formato alternativo si el primer intento falló (p. ej. 400 Bad Request)
         if (response.status === 400) {
           console.warn(
             "🔄 Intentando con formato alternativo para Power Automate..."
           );
 
-          // Formato alternativo: enviar como string JSON o formato plano
+          // Formato alternativo: enviar objeto original o wrapper { data: [...] }
           const alternativePayload =
             Array.isArray(data) && data.length === 1
-              ? data[0] // Enviar el objeto original sin procesar
-              : { data: mappedData }; // Formato con wrapper
+              ? data[0]
+              : { data: mappedData };
 
           const retryResponse = await fetch(flowUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              Accept: "application/json",
               ...(credentials.apiKey && {
                 Authorization: `Bearer ${credentials.apiKey}`,
               }),
@@ -570,17 +604,25 @@ class DataOperationsService {
             );
           }
 
-          const retryResult = await retryResponse.json();
+          // Manejo robusto del cuerpo: puede venir vacío o no-JSON
+          const retryRaw = await retryResponse.text();
+          let retryParsed = null;
+          try {
+            retryParsed = retryRaw ? JSON.parse(retryRaw) : null;
+          } catch {
+            retryParsed = null;
+          }
+
           console.log(
             "✅ Datos enviados a Power Automate (formato alternativo):",
-            retryResult
+            retryParsed ?? (retryRaw || "(sin cuerpo)")
           );
 
           return {
             success: true,
             data: mappedData,
             count: mappedData.length,
-            response: retryResult,
+            response: retryParsed ?? retryRaw ?? null,
             message:
               "Datos enviados exitosamente a Power Automate (formato alternativo)",
           };
@@ -591,14 +633,25 @@ class DataOperationsService {
         );
       }
 
-      const result = await response.json();
-      console.log("✅ Datos enviados a Power Automate:", result);
+      // Manejo robusto del cuerpo de respuesta exitoso (puede ser vacío)
+      const raw = await response.text();
+      let parsed = null;
+      try {
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch {
+        parsed = null;
+      }
+
+      console.log(
+        "✅ Datos enviados a Power Automate:",
+        parsed ?? (raw || "(sin cuerpo)")
+      );
 
       return {
         success: true,
         data: mappedData,
         count: mappedData.length,
-        response: result,
+        response: parsed ?? raw ?? null,
         message: "Datos enviados exitosamente a Power Automate",
       };
     } catch (error) {
@@ -638,10 +691,66 @@ class DataOperationsService {
       switch (connectionType) {
         case "supabase": {
           const tableName = credentials.tableName || "productos";
+
+          // Resolver ID si no fue provisto (p.ej., cuando viene mapeado sin 'id')
+          let targetId = recordId;
+          if (!targetId || String(targetId).trim() === "") {
+            const supabaseUrl =
+              credentials.projectUrl ||
+              credentials.project_url ||
+              credentials.url ||
+              credentials.supabaseUrl ||
+              credentials.supabase_url;
+            const anonKey =
+              credentials.anonKey || credentials.anon_key || credentials.key;
+
+            if (!supabaseUrl || !anonKey) {
+              throw new Error("Credenciales de Supabase incompletas");
+            }
+
+            // Intento de resolución por clave de negocio: codigo_cupo
+            if (data && data.codigo_cupo) {
+              const supabaseClient = createClient(supabaseUrl, anonKey, {
+                auth: {
+                  persistSession: false,
+                  autoRefreshToken: false,
+                  detectSessionInUrl: false,
+                  storageKey: `sb-update-resolveid-${tableName}`,
+                },
+                global: {
+                  headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    Prefer: "return=minimal",
+                  },
+                },
+              });
+
+              const { data: rows, error: findErr } = await supabaseClient
+                .from(tableName)
+                .select("id")
+                .eq("codigo_cupo", data.codigo_cupo)
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+              if (findErr) {
+                throw new Error(
+                  `No se pudo resolver ID por codigo_cupo: ${findErr.message}`
+                );
+              }
+              targetId = rows?.[0]?.id || null;
+              console.log("🆔 ID resuelto por codigo_cupo:", targetId);
+            }
+          }
+
+          if (!targetId || String(targetId).trim() === "") {
+            throw new Error("Datos incompletos para actualización");
+          }
+
           return await this.updateSupabaseData(
             credentials,
             tableName,
-            recordId,
+            targetId,
             data
           );
         }
@@ -757,7 +866,11 @@ class DataOperationsService {
   async updateSupabaseData(credentials, tableName, recordId, data) {
     try {
       const supabaseUrl =
-        credentials.url || credentials.supabaseUrl || credentials.project_url;
+        credentials.projectUrl ||
+        credentials.project_url ||
+        credentials.url ||
+        credentials.supabaseUrl ||
+        credentials.supabase_url;
       const anonKey =
         credentials.anonKey || credentials.anon_key || credentials.key;
 
@@ -765,7 +878,21 @@ class DataOperationsService {
         throw new Error("Credenciales de Supabase incompletas");
       }
 
-      const supabaseClient = createClient(supabaseUrl, anonKey);
+      const supabaseClient = createClient(supabaseUrl, anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: `sb-update-${tableName}`,
+        },
+        global: {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+        },
+      });
 
       console.log("🔄 Actualizando datos en Supabase:", {
         tableName,
@@ -875,7 +1002,11 @@ class DataOperationsService {
   async deleteSupabaseData(credentials, tableName, recordId) {
     try {
       const supabaseUrl =
-        credentials.url || credentials.supabaseUrl || credentials.project_url;
+        credentials.projectUrl ||
+        credentials.project_url ||
+        credentials.url ||
+        credentials.supabaseUrl ||
+        credentials.supabase_url;
       const anonKey =
         credentials.anonKey || credentials.anon_key || credentials.key;
 
@@ -883,7 +1014,21 @@ class DataOperationsService {
         throw new Error("Credenciales de Supabase incompletas");
       }
 
-      const supabaseClient = createClient(supabaseUrl, anonKey);
+      const supabaseClient = createClient(supabaseUrl, anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: `sb-delete-${tableName}`,
+        },
+        global: {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+        },
+      });
 
       console.log("🗑️ Eliminando datos en Supabase:", { tableName, recordId });
 

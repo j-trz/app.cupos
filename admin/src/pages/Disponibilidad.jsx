@@ -244,8 +244,8 @@ export default function Disponibilidad() {
                       {item.disponibilidad || 0}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">{ReservationService.formatDate(item.salida)}</td>
-                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">{ReservationService.formatDate(item.regreso)}</td>
+                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">{ReservationService.formatDate(item.fecha_salida || item.salida)}</td>
+                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">{ReservationService.formatDate(item.fecha_regreso || item.regreso)}</td>
                   <td className="px-6 py-4 text-base whitespace-nowrap text-center">${item.precio ? parseFloat(item.precio).toFixed(2) : "0.00"}</td>
                   <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.temporada || ""}</td>
                   <td className="px-6 py-4 text-center">{item.ruta ? <button className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors" onClick={() => { setRutaSeleccionada(item.ruta); setPopupRutaOpen(true); }}>Ver vuelos</button> : ""}</td>
@@ -356,7 +356,7 @@ export default function Disponibilidad() {
                   </div>
                   <div>
                     <p className="text-sm text-[#2c4b8b]">Salida</p>
-                    <p className="font-medium">{ReservationService.formatDate(vueloSeleccionado.salida)}</p>
+                    <p className="font-medium">{ReservationService.formatDate(vueloSeleccionado.fecha_salida || vueloSeleccionado.salida)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-[#2c4b8b]">Precio</p>

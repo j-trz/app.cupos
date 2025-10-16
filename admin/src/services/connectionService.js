@@ -752,6 +752,43 @@ class ConnectionService {
 
         out[stdKey] = val;
       }
+
+      // Asegurar preservación de identificadores y metadatos clave aunque no estén en el mapping
+      const ensure = (k, v) => {
+        if (out[k] === undefined || out[k] === null || out[k] === "") {
+          out[k] = v;
+        }
+      };
+      ensure(
+        "ItemInternalId",
+        item.ItemInternalId ?? item.id ?? item._id ?? ""
+      );
+      ensure("@odata.etag", item["@odata.etag"] ?? "");
+
+      // Para productos, mantener también fechas normalizadas si el mapping las omitió
+      if (_dataType === "productos") {
+        ensure(
+          "fecha_salida",
+          item.fecha_salida ??
+            item.salida ??
+            item.Salida ??
+            item.departure_date ??
+            item.Departure ??
+            item["Fecha_Salida"] ??
+            ""
+        );
+        ensure(
+          "fecha_regreso",
+          item.fecha_regreso ??
+            item.regreso ??
+            item.Regreso ??
+            item.return_date ??
+            item.Return ??
+            item["Fecha_Regreso"] ??
+            ""
+        );
+      }
+
       return out;
     });
   }
@@ -1508,6 +1545,22 @@ class ConnectionService {
                 item["Fecha_Regreso"] ||
                 item.fecha_regreso ||
                 "",
+              fecha_salida:
+                item.fecha_salida ||
+                item["Fecha_Salida"] ||
+                item.salida ||
+                item.Salida ||
+                item.departure_date ||
+                item.Departure ||
+                "",
+              fecha_regreso:
+                item.fecha_regreso ||
+                item["Fecha_Regreso"] ||
+                item.regreso ||
+                item.Regreso ||
+                item.return_date ||
+                item.Return ||
+                "",
               precio: String(
                 item.precio ?? item.Precio ?? item.price ?? item.Price ?? "0"
               ),
@@ -1521,6 +1574,30 @@ class ConnectionService {
                 item.season ||
                 item.Season ||
                 "",
+              neto_1: String(item.neto_1 ?? item.Neto_1 ?? ""),
+              op: item.op ?? item.Op ?? "",
+              carryon: Boolean(
+                item.carryon ??
+                  item.CarryOn ??
+                  item.carry_on ??
+                  item.carryOn ??
+                  false
+              ),
+              handbag: Boolean(
+                item.handbag ??
+                  item.HandBag ??
+                  item.hand_bag ??
+                  item.handBag ??
+                  false
+              ),
+              checkedbag: Boolean(
+                item.checkedbag ??
+                  item.CheckedBag ??
+                  item.checked_bag ??
+                  item.checkedBag ??
+                  false
+              ),
+              inf_fare: String(item.inf_fare ?? item.Inf_Fare ?? ""),
             }))
           : [];
       }
@@ -1575,6 +1652,7 @@ class ConnectionService {
       return {
         "@odata.etag": "",
         ItemInternalId: item.id || "",
+        id: item.id,
         codigo_cupo:
           (item.cupo_code || item.codigo_cupo || "").trim?.() ||
           item.cupo_code ||
@@ -1585,11 +1663,25 @@ class ConnectionService {
         disponibilidad: String(item.availability || item.disponibilidad || "0"),
         salida,
         regreso,
+        fecha_salida: item.fecha_salida || salida,
+        fecha_regreso: item.fecha_regreso || regreso,
         precio: String(item.price || item.precio || "0"),
         ruta: item.route || item.ruta || "",
         pnr: item.pnr_code || item.pnr || "",
         ficha: item.ticket_number || item.ficha || "",
         temporada: item.season || item.temporada || "",
+        neto_1: String(item.neto_1 ?? item.Neto_1 ?? ""),
+        op: item.op || item.Op || "",
+        carryon: Boolean(
+          item.carryon ?? item.carry_on ?? item.carryOn ?? false
+        ),
+        handbag: Boolean(
+          item.handbag ?? item.hand_bag ?? item.handBag ?? false
+        ),
+        checkedbag: Boolean(
+          item.checkedbag ?? item.checked_bag ?? item.checkedBag ?? false
+        ),
+        inf_fare: String(item.inf_fare ?? item.Inf_Fare ?? ""),
       };
     } else {
       const vueloSalida =
@@ -1606,6 +1698,7 @@ class ConnectionService {
       return {
         "@odata.etag": "",
         ItemInternalId: item.id || "",
+        id: item.id,
         Estado: item.status || item.estado || "Solicitado",
         Pedido_ID: item.order_id || item.pedido_id || "",
         Agencia: item.agency || item.agencia || "",
