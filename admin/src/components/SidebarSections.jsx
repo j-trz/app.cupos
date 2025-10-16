@@ -1,6 +1,6 @@
 
 import { PiAirplaneInFlightFill } from "react-icons/pi";
-import { HiOutlineShare , HiOutlineShieldCheck , HiOutlineCube , HiOutlineUser, HiOutlineUserGroup, HiOutlineBellAlert, HiOutlineTicket } from "react-icons/hi2";
+import { HiOutlineShare , HiOutlineShieldCheck , HiOutlineCube , HiOutlineUser, HiOutlineUserGroup, HiOutlineBellAlert, HiOutlineTicket, HiOutlineBuildingOffice2 } from "react-icons/hi2";
 
 
 
@@ -40,6 +40,14 @@ export const SECCIONES = [
     icono: HiOutlineUserGroup ,
     ruta: '/admin/gestion-usuarios',
     descripcion: 'Administración y edición de usuarios.',
+    soloAdmin: true
+  },
+  {
+    id: 'gestion-agencias',
+    nombre: 'Agencias',
+    icono: HiOutlineBuildingOffice2,
+    ruta: '/admin/gestion-agencias',
+    descripcion: 'Administración de agencias y logos.',
     soloAdmin: true
   },
   {

@@ -15,8 +15,8 @@ import Solicitudes from "./pages/Solicitudes"; // eslint-disable-line no-unused-
 import Confirmaciones from "./pages/Confirmaciones"; // eslint-disable-line no-unused-vars
 import Seguridad from "./pages/Seguridad"; // eslint-disable-line no-unused-vars
 import Perfil from "./pages/Perfil"; // eslint-disable-line no-unused-vars
+import GestionAgencias from "./pages/GestionAgencias"; // eslint-disable-line no-unused-vars
 import { ensurePowerAutomateConnection } from "./utils/ensurePowerAutomateConnection";
-import ReservationService from "./services/reservationService";
 
 // Componente para rutas privadas
 function PrivateRoute({ children }) { // eslint-disable-line no-unused-vars
@@ -169,6 +169,14 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
           element={
             <AdminRoute>
               <GestionConexiones />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/gestion-agencias"
+          element={
+            <AdminRoute>
+              <GestionAgencias />
             </AdminRoute>
           }
         />

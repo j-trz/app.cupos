@@ -1,27 +1,56 @@
 
 import React, { useState, useEffect, Fragment } from "react";
 import { Dialog, Transition, Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/react';
-import { FaCheck, FaTimes, FaUserShield, FaUsers, FaUser } from "react-icons/fa";
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import { 
+  HiChevronDown, 
+  HiOutlineUser, 
+  HiOutlineUserGroup, 
+  HiOutlineShieldCheck, 
+  HiOutlineCheck,
+  HiMiniXMark,   
+} from "react-icons/hi2";
 import AuthorizationService from '../services/authorizationService';
+import AgencyService from '../services/agencyService';
 
 const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
-  const agencias = ["Jetmar Viajes", "Guamatur", "Hiperviajes", "Freeway", "T&T", "Tienda Viajes", "TravelOz","Destinico"];
+  const [agencias, setAgencias] = useState([]);
   const roles = AuthorizationService.getAvailableRoles();
   
   const [email, setEmail] = useState(usuario?.email || "");
   const [nombre, setNombre] = useState(usuario?.nombre || "");
-  const [agencia, setAgencia] = useState(usuario?.agencia || agencias[0]);
+  const [agencia, setAgencia] = useState(usuario?.agencia || "");
   const [agenciaPersonalizada, setAgenciaPersonalizada] = useState("");
   const [role, setRole] = useState(usuario?.role || AuthorizationService.ROLES.AGENCY_USER);
   const [password, setPassword] = useState("");
   const isEdit = !!usuario;
 
+  // Cargar agencias activas desde la tabla public.agencies
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const options = await AgencyService.listActiveAgencyOptions();
+        const names = (options || []).map(o => o.name).filter(Boolean);
+        if (active) setAgencias(names);
+      } catch {
+        // no-op
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  // Establecer agencia por defecto cuando cargue la lista (solo en creación)
+  useEffect(() => {
+    if (!isEdit && agencias.length > 0 && !agencia) {
+      setAgencia(agencias[0]);
+    }
+  }, [agencias, isEdit]);
+
   // Mapeo de iconos para roles
   const roleIcons = {
-    [AuthorizationService.ROLES.ADMIN]: FaUserShield,
-    [AuthorizationService.ROLES.AGENCY_ADMIN]: FaUsers,
-    [AuthorizationService.ROLES.AGENCY_USER]: FaUser
+    [AuthorizationService.ROLES.ADMIN]: HiOutlineShieldCheck,
+    [AuthorizationService.ROLES.AGENCY_ADMIN]: HiOutlineUserGroup,
+    [AuthorizationService.ROLES.AGENCY_USER]: HiOutlineUser
   };
 
   // Sincronizar estados cuando cambia la prop usuario
@@ -77,7 +106,7 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
         <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
           <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
           <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full">
-            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={onClose}><FaTimes className="w-6 h-6" /></button>
+            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={onClose}><HiMiniXMark className="w-6 h-6" /></button>
             <h2 className="text-xl font-bold mb-4 text-[#2c4b8b]">{isEdit ? "Editar Usuario" : "Crear Usuario"}</h2>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
@@ -95,7 +124,7 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
                     <div className="relative mt-1">
                       <ListboxButton className="w-full border px-3 py-2 rounded bg-white text-left flex items-center justify-between">
                         <span>{agencia}</span>
-                        <ChevronDownIcon className="w-5 h-5 text-gray-400 ml-2" aria-hidden="true" />
+                        <HiChevronDown className="w-5 h-5 text-gray-400 ml-2" aria-hidden="true" />
                       </ListboxButton>
                       <ListboxOptions anchor="bottom" className="absolute mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none z-10" style={{ width: '415px' }}>
                         {agencias.map((ag, idx) => (
@@ -137,7 +166,7 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
                           {React.createElement(roleIcons[role], { className: "w-4 h-4" })}
                           <span>{AuthorizationService.getRoleDescription(role)}</span>
                         </div>
-                        <ChevronDownIcon className="w-5 h-5 text-gray-400 ml-2" aria-hidden="true" />
+                        <HiChevronDown className="w-5 h-5 text-gray-400 ml-2" aria-hidden="true" />
                       </ListboxButton>
                       <ListboxOptions anchor="bottom" className="absolute mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none z-10" style={{ width: '415px' }}>
                         {roles.map((roleOption) => (
@@ -159,10 +188,10 @@ const UsuarioForm = ({ open, onClose, onSave, usuario }) => {
               </div>
               <div className="flex justify-between items-center mt-6">
                 <button type="button" className="bg-gray-200 text-[#2c4b8b] px-6 py-2 rounded font-semibold flex items-center gap-2 hover:bg-gray-300 transition" onClick={onClose}>
-                  <FaTimes className="w-5 h-5" /> Cerrar
+                  <HiMiniXMark className="w-5 h-5" /> Cerrar
                 </button>
                 <button type="submit" className="bg-[#2c4b8b] text-white px-6 py-2 rounded font-semibold flex items-center gap-2">
-                  <FaCheck className="w-5 h-5" /> {isEdit ? "Guardar cambios" : "Crear Usuario"}
+                  <HiOutlineCheck className="w-5 h-5" /> {isEdit ? "Guardar cambios" : "Crear Usuario"}
                 </button>
               </div>
             </form>

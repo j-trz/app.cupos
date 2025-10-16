@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Swal from 'sweetalert2';
 import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import UserService from '../services/userService';
+import AgencyService from '../services/agencyService';
 
 export default function CrearUsuario() {
   const [seccion, setSeccion] = useState("crear-usuario");
@@ -10,7 +11,23 @@ export default function CrearUsuario() {
   const [agencia, setAgencia] = useState("");
   const [password, setPassword] = useState("");
   const [admin, setAdmin] = useState(false);
+  const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Cargar agencias activas desde Supabase
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const options = await AgencyService.listActiveAgencyOptions();
+        const names = (options || []).map(o => o.name).filter(Boolean);
+        if (active) setAgencies(names);
+      } catch {
+        // no-op
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,14 +77,7 @@ export default function CrearUsuario() {
     }
   };
 
-  // Lista de agencias válidas (hardcoded por ahora)
-  const validAgencies = [
-    "Agencia Central",
-    "Agencia Norte",
-    "Agencia Sur",
-    "Agencia Este",
-    "Agencia Oeste"
-  ];
+  // Lista de agencias: cargada dinámicamente desde public.agencies
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
@@ -106,7 +116,7 @@ export default function CrearUsuario() {
           required
         >
           <option value="">Seleccionar agencia...</option>
-          {validAgencies.map((ag, index) => (
+          {agencies.map((ag, index) => (
             <option key={index} value={ag}>{ag}</option>
           ))}
         </select>

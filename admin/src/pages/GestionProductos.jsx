@@ -293,8 +293,8 @@ const GestionProductos = () => {
         return (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <div className="animate-spin text-blue-500 mr-3">⏳</div>
-              <span className="text-blue-700">Verificando conexión activa...</span>
+              <div className="animate-spin text-[#2c4b8b] mr-3">⏳</div>
+              <span className="text-[#2c4b8b]">Verificando conexión activa...</span>
             </div>
           </div>
         );
@@ -361,7 +361,7 @@ const GestionProductos = () => {
             <button
               onClick={loadProductos}
               disabled={!activeConnection || loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-[#2c4b8b] text-white rounded hover:bg-[#2c4b8b] disabled:bg-gray-400 transition-colors"
             >
               <FaSync className={loading ? 'animate-spin' : ''} />
               Actualizar
@@ -388,7 +388,7 @@ const GestionProductos = () => {
               placeholder="Buscar por código, destino o compañía..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:[#2c4b8b]"
             />
           </div>
         </div>
@@ -465,7 +465,7 @@ const GestionProductos = () => {
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleEdit(producto)}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="text-[#2c4b8b] hover:text-blue-900"
                             title="Editar"
                           >
                             <FaEdit />
@@ -489,10 +489,10 @@ const GestionProductos = () => {
 
         {/* Modal de formulario */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 bg-opacity-80 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto">
-              <div className="flex justify-between items-center p-6 border-b">
-                <h2 className="text-xl font-semibold">
+              <div className="flex justify-between items-center p-6 border-b border-[#2c4b8b]">
+                <h2 className="text-xl font-semibold text-[#2c4b8b]">
                   {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
                 </h2>
                 <button
@@ -514,7 +514,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.codigo_cupo}
                       onChange={(e) => setFormData({...formData, codigo_cupo: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:[#2c4b8b]"
                       required
                     />
                   </div>
@@ -528,7 +528,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.destino}
                       onChange={(e) => setFormData({...formData, destino: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                       required
                     />
                   </div>
@@ -542,7 +542,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.compania}
                       onChange={(e) => setFormData({...formData, compania: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                       required
                     />
                   </div>
@@ -557,7 +557,7 @@ const GestionProductos = () => {
                       min="0"
                       value={formData.disponibilidad}
                       onChange={(e) => setFormData({...formData, disponibilidad: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -572,7 +572,7 @@ const GestionProductos = () => {
                       step="0.01"
                       value={formData.precio}
                       onChange={(e) => setFormData({...formData, precio: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -585,7 +585,7 @@ const GestionProductos = () => {
                       type="date"
                       value={formData.salida}
                       onChange={(e) => setFormData({...formData, salida: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -598,7 +598,7 @@ const GestionProductos = () => {
                       type="date"
                       value={formData.regreso}
                       onChange={(e) => setFormData({...formData, regreso: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -611,7 +611,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.ruta}
                       onChange={(e) => setFormData({...formData, ruta: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -624,7 +624,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.pnr}
                       onChange={(e) => setFormData({...formData, pnr: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -637,7 +637,7 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.ficha}
                       onChange={(e) => setFormData({...formData, ficha: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
 
@@ -650,12 +650,12 @@ const GestionProductos = () => {
                       type="text"
                       value={formData.temporada}
                       onChange={(e) => setFormData({...formData, temporada: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#2c4b8b]">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
@@ -666,7 +666,7 @@ const GestionProductos = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#2c4b8b] text-white rounded hover:bg-[#2a4a7b] disabled:bg-gray-400 transition-colors"
                   >
                     <FaSave />
                     {loading ? 'Guardando...' : 'Guardar'}
