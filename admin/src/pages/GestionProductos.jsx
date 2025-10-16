@@ -15,6 +15,40 @@ import Swal from 'sweetalert2';
 import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
 import DataOperationsService from '../services/dataOperationsService';
+import { AIRLINE_LOGOS, AIRLINES } from '../components/ItineraryDetails.jsx';
+import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
+
+// Iconos inline para equipaje: verde = incluido, rojo con tachado = no incluido
+/* eslint-disable-next-line no-unused-vars */
+const IconCarryOn = ({ included }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={included ? '#16a34a' : '#ef4444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Carry-on">
+    <path d="M9 8V6a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v2" />
+    <rect x="6" y="8" width="12" height="10" rx="2" />
+    <line x1="10" y1="12" x2="10" y2="16" />
+    <line x1="14" y1="12" x2="14" y2="16" />
+    {!included ? <line x1="4" y1="20" x2="20" y2="4" stroke="#ef4444" /> : null}
+  </svg>
+);
+
+/* eslint-disable-next-line no-unused-vars */
+const IconHandbag = ({ included }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={included ? '#16a34a' : '#ef4444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Handbag">
+    <path d="M8 10a4 4 0 0 1 8 0" />
+    <rect x="5" y="10" width="14" height="9" rx="2" />
+    {!included ? <line x1="4" y1="20" x2="20" y2="4" stroke="#ef4444" /> : null}
+  </svg>
+);
+
+/* eslint-disable-next-line no-unused-vars */
+const IconCheckedBag = ({ included }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={included ? '#16a34a' : '#ef4444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Checked bag">
+    <rect x="7" y="6" width="10" height="12" rx="2" />
+    <path d="M10 6V4h4v2" />
+    <circle cx="9" cy="19" r="1" />
+    <circle cx="15" cy="19" r="1" />
+    {!included ? <line x1="4" y1="20" x2="20" y2="4" stroke="#ef4444" /> : null}
+  </svg>
+);
 
 const GestionProductos = () => {
   const [productos, setProductos] = useState([]);
@@ -25,6 +59,8 @@ const GestionProductos = () => {
   const [activeConnection, setActiveConnection] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [seccion, setSeccion] = useState('gestion-productos');
+  const [popupRutaOpen, setPopupRutaOpen] = useState(false);
+  const [rutaSeleccionada, setRutaSeleccionada] = useState(null);
 
   // Resolver ID robusto desde diferentes fuentes
   const resolveId = (obj) => {
@@ -513,7 +549,7 @@ const GestionProductos = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[1400px]">
                 <thead className="bg-[#2c4b8b] text-white">
                   <tr>
                     <th className="px-6 py-4 text-lg font-semibold">Código Cupo</th>
@@ -522,6 +558,15 @@ const GestionProductos = () => {
                     <th className="px-6 py-4 text-lg font-semibold">Disponibilidad</th>
                     <th className="px-6 py-4 text-lg font-semibold">Precio</th>
                     <th className="px-6 py-4 text-lg font-semibold">Salida</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Regreso</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Ruta</th>
+                    <th className="px-6 py-4 text-lg font-semibold">PNR</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Ficha</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Temporada</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Neto 1</th>
+                    <th className="px-6 py-4 text-lg font-semibold">OP</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Equipaje</th>
+                    <th className="px-6 py-4 text-lg font-semibold">Tarifa INF</th>
                     <th className="px-6 py-4 text-lg font-semibold">Acciones</th>
                   </tr>
                 </thead>
@@ -535,7 +580,15 @@ const GestionProductos = () => {
                         {producto.destino}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-md text-gray-500">
-                        {producto.compania}
+                        <div className="flex items-center justify-center">
+                          <img
+                            src={AIRLINE_LOGOS[(producto.compania || '').toUpperCase().trim()] || 'https://documents.sabre.com/static/images/tc/mail/icon-air.png'}
+                            alt={AIRLINES[(producto.compania || '').toUpperCase().trim()] || (producto.compania || '')}
+                            title={AIRLINES[(producto.compania || '').toUpperCase().trim()] || (producto.compania || '')}
+                            className="h-6 w-6 object-contain"
+                            onError={(e) => { e.currentTarget.src = 'https://documents.sabre.com/static/images/tc/mail/icon-air.png'; }}
+                          />
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-md text-gray-500">
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -551,6 +604,50 @@ const GestionProductos = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         {producto.fecha_salida || producto.salida || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.fecha_regreso || producto.regreso || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.ruta ? (
+                          <button
+                            className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
+                            onClick={() => { setRutaSeleccionada(producto.ruta); setPopupRutaOpen(true); }}
+                          >
+                            Ver itinerario
+                          </button>
+                        ) : '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.pnr || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.ficha || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.temporada || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        ${producto.neto_1 || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        {producto.op || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        <div className="flex items-center justify-center gap-3">
+                         <span title="Handbag">
+                            <IconHandbag included={!!producto.handbag} />
+                          </span>
+                          <span title="Carry-on">
+                            <IconCarryOn included={!!producto.carryon} />
+                          </span>
+                          <span title="Checked bag">
+                            <IconCheckedBag included={!!producto.checkedbag} />
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
+                        ${producto.inf_fare || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center font-medium">
                         <div className="flex space-x-2 text-center justify-center">
@@ -577,6 +674,19 @@ const GestionProductos = () => {
             </div>
           )}
         </div>
+
+        {/* Popup ruta - reutiliza el mismo componente/estilo que Disponibilidad */}
+        {popupRutaOpen && (
+          <div className="fixed inset-0 bg-black/60 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-[1200px] h-auto overflow-y-auto p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-[#2c4b8b]">Itinerario Aéreo</h2>
+                <button onClick={() => setPopupRutaOpen(false)} className="text-[#2c4b8b] hover:text-gray-600 text-2xl">&times;</button>
+              </div>
+              <ItineraryTable ruta={rutaSeleccionada} />
+            </div>
+          </div>
+        )}
 
         {/* Modal de formulario */}
         {showModal && (

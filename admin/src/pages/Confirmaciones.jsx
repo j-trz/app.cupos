@@ -5,6 +5,7 @@ import ReservationService from '../services/reservationService';
 import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
 import ItineraryDetails from '../components/ItineraryDetails';
+
   
 
 export default function Confirmaciones() {

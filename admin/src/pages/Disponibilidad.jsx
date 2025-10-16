@@ -4,7 +4,7 @@ import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import ReservationService from '../services/reservationService';
 import UserService from '../services/userService';
-import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import { HiArrowPathRoundedSquare } from "react-icons/hi2";// eslint-disable-line no-unused-vars
 
 
 export default function Disponibilidad() {
@@ -192,7 +192,7 @@ export default function Disponibilidad() {
             disabled={loading || refrescando}
             className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] disabled:opacity-50 transition-colors"
           >
-            <FaSync className={`${refrescando ? 'animate-spin' : ''}`} />
+            <HiArrowPathRoundedSquare className={`${refrescando ? 'animate-spin' : ''}`} />
             {refrescando ? 'Actualizando...' : 'Refrescar'}
           </button>
         </div>
@@ -221,7 +221,7 @@ export default function Disponibilidad() {
                 <tr>
                   <td colSpan={10} className="text-center py-10">
                     <div className="flex items-center justify-center gap-2 text-gray-500">
-                      <FaSync className="animate-spin" />
+                      <HiArrowPathRoundedSquare className="animate-spin" />
                       <span>Cargando datos de disponibilidad...</span>
                     </div>
                   </td>

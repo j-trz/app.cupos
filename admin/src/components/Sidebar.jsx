@@ -82,9 +82,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, seccion, setSecci
         
         {/* Mostrar rol actual en modo debug cuando sidebar esté abierto */}
         {sidebarOpen && import.meta.env.MODE === 'development' && (
-          <div className="text-xs text-gray-300 mt-4 px-4">
-            Rol: {AuthorizationService.getRoleDescription(userRole)}
-          </div>
+          <>
+            <div className="text-xs text-gray-300 mt-4 px-2">
+              Rol: {AuthorizationService.getRoleDescription(userRole)}
+            </div>
+     
+          </>
         )}
       </div>
       <div className="flex-1"></div>

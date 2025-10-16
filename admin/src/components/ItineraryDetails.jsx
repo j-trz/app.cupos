@@ -1,7 +1,7 @@
   import { useState, useEffect } from "react";
 
 // Diccionario de aerolíneas
-const AIRLINES = {
+export const AIRLINES = {
   'A3': 'Aegean Airlines',
   'AA': 'American Airlines',
   'AB': 'Air Berlin',
@@ -87,7 +87,7 @@ const AIRLINES = {
 };
 
 // Diccionario de imágenes de aerolíneas
-const AIRLINE_LOGOS = {
+export const AIRLINE_LOGOS = {
   'A3': 'https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/img_airlines/a3.png',
   'AA': 'https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/img_airlines/aa.png',
   'AB': 'https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/img_airlines/ab.png',
@@ -156,8 +156,8 @@ const AIRLINE_LOGOS = {
   
 };
 
-// Diccionario de aeropuertos
-const AIRPORTS = {
+ // Diccionario de aeropuertos
+export const AIRPORTS = {
   'MVD': 'Montevideo, Carrasco',
   'REC': 'Recife, Guararapes',
   'FOR': 'Fortaleza, Pinto Martins',
@@ -1160,13 +1160,9 @@ return (
               <div className="footer-title">Información general</div>
               <div className="footer-content">
                 Estimado cliente, te deseamos un muy buen viaje!<br />
-                Favor verifica la documentación con la cual estarás viajando<br />
-                (Visas y vacunas en caso de ser necesarias).<br />
-                No olvides solicitarle a tu asesor que ingrese tu número<br />
-                de viajero frecuente en la reserva.<br />
-                Te aconsejamos hacer el web check-in.<br />
-                No olvides pedir la factura a tu asesor.<br />
-                Estamos a las órdenes<br />
+                Favor verifica la documentación con la cual estarás viajando (Visas y vacunas en caso de ser necesarias).<br />
+                No olvides solicitarle a tu asesor que ingrese tu número de viajero frecuente en la reserva.<br />
+                Te aconsejamos hacer el web check-in.
                 <strong>¡Gracias por elegirnos!</strong>
               </div>
             </div>
