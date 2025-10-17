@@ -69,49 +69,78 @@ async function loadImageBitmap(url) {
 }
 
 async function segmentsToPngBlob(segments) {
-  // Layout fijo para consistencia
+  // Layout que replica el diseño visible (rounded-2xl, shadow, header azul, divide-y)
   const headers = ['Compañía','Nro Vuelo','Fecha','Origen','Destino','Salida','Llegada'];
   const colWidths = [220, 110, 110, 260, 260, 110, 110];
   const width = colWidths.reduce((a,b)=>a+b,0);
   const rowH = 48;
-  const headerH = 40;
+  const headerH = 48;
+  const radius = 12; // ~ rounded-xl para coincidir con el DOM
+  const pad = 24;    // margen para evitar cortar la sombra
 
   const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  const height = headerH + (segments.length * rowH);
+  const innerHeight = headerH + (segments.length * rowH);
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(width * dpr);
-  canvas.height = Math.round(height * dpr);
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
+  canvas.width = Math.round((width + pad * 2) * dpr);
+  canvas.height = Math.round((innerHeight + pad * 2) * dpr);
+  canvas.style.width = (width + pad * 2) + 'px';
+  canvas.style.height = (innerHeight + pad * 2) + 'px';
+
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
+  ctx.translate(pad, pad);
 
-  // Fondo
+  const roundRectPath = (c, x, y, w, h, r) => {
+    const rr = Math.min(r, w/2, h/2);
+    c.beginPath();
+    c.moveTo(x + rr, y);
+    c.arcTo(x + w, y, x + w, y + h, rr);
+    c.arcTo(x + w, y + h, x, y + h, rr);
+    c.arcTo(x, y + h, x, y, rr);
+    c.arcTo(x, y, x + w, y, rr);
+    c.closePath();
+  };
+
+  // Sombra de la tarjeta (shadow-xl)
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.20)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, height);
+  roundRectPath(ctx, 0, 0, width, innerHeight, radius);
+  ctx.fill();
+  ctx.restore();
 
-  // Header
+  // Clip a bordes redondeados
+  ctx.save();
+  roundRectPath(ctx, 0, 0, width, innerHeight, radius);
+  ctx.clip();
+
+  // Header azul
   ctx.fillStyle = '#2c4b8b';
   ctx.fillRect(0, 0, width, headerH);
   ctx.fillStyle = '#ffffff';
-  ctx.font = '600 13px Arial, sans-serif';
+  ctx.font = '600 14px Arial, sans-serif';
   ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
   let x = 0;
   for (let i = 0; i < headers.length; i++) {
-    ctx.fillText(headers[i], x + 12, headerH / 2);
+    const cx = x + colWidths[i] / 2;
+    ctx.fillText(headers[i], cx, headerH / 2);
     x += colWidths[i];
   }
 
-  // Líneas de columnas
+  // Líneas horizontales (divide-y)
   ctx.strokeStyle = '#e5e7eb';
   ctx.lineWidth = 1;
-  x = 0;
-  for (let i = 0; i < colWidths.length; i++) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
-    x += colWidths[i];
+  for (let r = 1; r <= segments.length; r++) {
+    const y = headerH + r * rowH;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
   }
-  ctx.beginPath(); ctx.moveTo(width - 1, 0); ctx.lineTo(width - 1, height); ctx.stroke();
 
   // Pre-cargar bitmaps de logos
   const bitmaps = await Promise.all(segments.map(async (s) => {
@@ -120,60 +149,61 @@ async function segmentsToPngBlob(segments) {
     return await loadImageBitmap(url);
   }));
 
-  // Filas
+  // Filas (text-center)
   ctx.fillStyle = '#111827';
-  ctx.font = '12px Arial, sans-serif';
+  ctx.font = '14px Arial, sans-serif';
+  ctx.textAlign = 'center';
+
   for (let r = 0; r < segments.length; r++) {
     const seg = segments[r];
     const yTop = headerH + r * rowH;
 
-    // línea horizontal
-    ctx.beginPath(); ctx.moveTo(0, yTop); ctx.lineTo(width, yTop); ctx.stroke();
-
-    const code = (seg.compania || '').toUpperCase().trim();
-    const name = AIRLINES[code] || code;
-    const originName = AIRPORTS[(seg.origen || '').toUpperCase().trim()] || (seg.origen || '');
-    const destName = AIRPORTS[(seg.destino || '').toUpperCase().trim()] || (seg.destino || '');
-
     let colX = 0;
-    // Columna Compañía: logo + nombre
+
+    // Compañía: solo logo centrado
     const logo = bitmaps[r];
+    const midY = yTop + rowH / 2;
+    const cx0 = colX + colWidths[0] / 2;
+    const size = 24;
     if (logo) {
-      const size = 24;
-      const midY = yTop + rowH / 2;
-      ctx.drawImage(logo, colX + 10, midY - size / 2, size, size);
-      ctx.fillText(name, colX + 10 + size + 8, midY);
+      ctx.drawImage(logo, cx0 - size / 2, midY - size / 2, size, size);
     } else {
-      ctx.fillText(name, colX + 12, yTop + rowH / 2);
+      ctx.fillStyle = '#9ca3af';
+      ctx.beginPath();
+      ctx.arc(cx0, midY, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#111827';
     }
     colX += colWidths[0];
 
+    const originName = AIRPORTS[(seg.origen || '').toUpperCase().trim()] || (seg.origen || '');
+    const destName = AIRPORTS[(seg.destino || '').toUpperCase().trim()] || (seg.destino || '');
+
     // Nro Vuelo
-    ctx.fillText(seg.vuelo || '', colX + 12, yTop + rowH / 2);
+    ctx.fillText(seg.vuelo || '', colX + colWidths[1] / 2, midY);
     colX += colWidths[1];
 
     // Fecha
-    ctx.fillText(seg.fecha || '', colX + 12, yTop + rowH / 2);
+    ctx.fillText(seg.fecha || '', colX + colWidths[2] / 2, midY);
     colX += colWidths[2];
 
     // Origen
-    ctx.fillText(originName, colX + 12, yTop + rowH / 2);
+    ctx.fillText(originName, colX + colWidths[3] / 2, midY);
     colX += colWidths[3];
 
     // Destino
-    ctx.fillText(destName, colX + 12, yTop + rowH / 2);
+    ctx.fillText(destName, colX + colWidths[4] / 2, midY);
     colX += colWidths[4];
 
     // Salida
-    ctx.fillText(seg.salida || '', colX + 12, yTop + rowH / 2);
+    ctx.fillText(seg.salida || '', colX + colWidths[5] / 2, midY);
     colX += colWidths[5];
 
     // Llegada
-    ctx.fillText(seg.llegada || '', colX + 12, yTop + rowH / 2);
+    ctx.fillText(seg.llegada || '', colX + colWidths[6] / 2, midY);
   }
 
-  // Borde inferior
-  ctx.beginPath(); ctx.moveTo(0, height - 1); ctx.lineTo(width, height - 1); ctx.stroke();
+  ctx.restore();
 
   return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png', 0.92));
 }
@@ -248,7 +278,7 @@ export default function ItineraryTable({ ruta, segments: inputSegments, classNam
             const originName = AIRPORTS[(v.origen || '').toUpperCase().trim()] || (v.origen || '');
             const destName = AIRPORTS[(v.destino || '').toUpperCase().trim()] || (v.destino || '');
             return (
-              <tr key={i} className="last:border-b-0 transition-all duration-150 hover:bg-[#e6f0fa]" style={{ height: '48px' }}>
+              <tr key={i} className="last:border-b-0 transition-all duration-150" style={{ height: '48px' }}>
                 <td className="px-4 py-2 text-sm text-center">
                   <div className="flex items-center justify-center">
                     <img

@@ -17,37 +17,27 @@ import ConnectionService from '../services/connectionService';
 import DataOperationsService from '../services/dataOperationsService';
 import { AIRLINE_LOGOS, AIRLINES } from '../components/ItineraryDetails.jsx';
 import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
+import { FaSuitcaseRolling } from 'react-icons/fa6';
+import { HiOutlineBriefcase } from "react-icons/hi2";
+import { MdOutlineLuggage } from "react-icons/md";
 
-// Iconos inline para equipaje: verde = incluido, rojo con tachado = no incluido
-/* eslint-disable-next-line no-unused-vars */
-const IconCarryOn = ({ included }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={included ? '#16a34a' : '#ef4444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Carry-on">
-    <path d="M9 8V6a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v2" />
-    <rect x="6" y="8" width="12" height="10" rx="2" />
-    <line x1="10" y1="12" x2="10" y2="16" />
-    <line x1="14" y1="12" x2="14" y2="16" />
-    {!included ? <line x1="4" y1="20" x2="20" y2="4" stroke="#ef4444" /> : null}
-  </svg>
-);
 
-/* eslint-disable-next-line no-unused-vars */
-const IconHandbag = ({ included }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={included ? '#16a34a' : '#ef4444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Handbag">
-    <path d="M8 10a4 4 0 0 1 8 0" />
-    <rect x="5" y="10" width="14" height="9" rx="2" />
-    {!included ? <line x1="4" y1="20" x2="20" y2="4" stroke="#ef4444" /> : null}
-  </svg>
-);
 
-/* eslint-disable-next-line no-unused-vars */
-const IconCheckedBag = ({ included }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={included ? '#16a34a' : '#ef4444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Checked bag">
-    <rect x="7" y="6" width="10" height="12" rx="2" />
-    <path d="M10 6V4h4v2" />
-    <circle cx="9" cy="19" r="1" />
-    <circle cx="15" cy="19" r="1" />
-    {!included ? <line x1="4" y1="20" x2="20" y2="4" stroke="#ef4444" /> : null}
-  </svg>
+
+// Iconos de equipaje usando react-icons con overlay de tachado cuando no está incluido
+const BaggageIcon = ({ included, children }) => (
+  <span className="relative inline-flex items-center justify-center">
+    <span className={included ? 'text-green-600' : 'text-gray-400'}>
+      {children}
+    </span>
+    {!included && (
+      <span className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-full h-full">
+          <line x1="10" y1="90" x2="90" y2="10" stroke="#ef4444" strokeWidth="10" />
+        </svg>
+      </span>
+    )}
+  </span>
 );
 
 const GestionProductos = () => {
@@ -635,14 +625,20 @@ const GestionProductos = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         <div className="flex items-center justify-center gap-3">
-                         <span title="Handbag">
-                            <IconHandbag included={!!producto.handbag} />
+                          <span title="Handbag">
+                            <BaggageIcon included={!!producto.handbag}>
+                              <HiOutlineBriefcase size={25} />
+                            </BaggageIcon>
                           </span>
                           <span title="Carry-on">
-                            <IconCarryOn included={!!producto.carryon} />
+                            <BaggageIcon included={!!producto.carryon}>
+                              <MdOutlineLuggage size={25} />
+                            </BaggageIcon>
                           </span>
                           <span title="Checked bag">
-                            <IconCheckedBag included={!!producto.checkedbag} />
+                            <BaggageIcon included={!!producto.checkedbag}>
+                              <FaSuitcaseRolling size={25} />
+                            </BaggageIcon>
                           </span>
                         </div>
                       </td>
