@@ -17,12 +17,10 @@ import ConnectionService from '../services/connectionService';
 import DataOperationsService from '../services/dataOperationsService';
 import { AIRLINE_LOGOS, AIRLINES } from '../components/ItineraryDetails.jsx';
 import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
+import FlightSegmentBuilder from '../components/FlightSegmentBuilder.jsx'; // eslint-disable-line no-unused-vars
 import { FaSuitcaseRolling } from 'react-icons/fa6';
 import { HiOutlineBriefcase } from "react-icons/hi2";
 import { MdOutlineLuggage } from "react-icons/md";
-
-
-
 
 // Iconos de equipaje usando react-icons con overlay de tachado cuando no está incluido
 const BaggageIcon = ({ included, children }) => (
@@ -684,255 +682,350 @@ const GestionProductos = () => {
           </div>
         )}
 
-        {/* Modal de formulario */}
+        {/* Modal de formulario mejorado */}
         {showModal && (
-          <div className="fixed inset-0 bg-black/50 bg-opacity-80 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto">
-              <div className="flex justify-between items-center p-6 border-b border-[#2c4b8b]">
-                <h2 className="text-xl font-semibold text-[#2c4b8b]">
-                  {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
-                </h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <HiMiniXMark  />
-                </button>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-8 py-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold text-[#2c4b8b]">
+                      {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Complete la información del producto. Los campos marcados con * son obligatorios.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <HiMiniXMark className="w-6 h-6 text-gray-500" />
+                  </button>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Código Cupo */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Código Cupo *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.codigo_cupo}
-                      onChange={(e) => setFormData({...formData, codigo_cupo: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                      required
-                    />
-                  </div>
-
-                  {/* Destino */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Destino *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.destino}
-                      onChange={(e) => setFormData({...formData, destino: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                      required
-                    />
-                  </div>
-
-                  {/* Compañía */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Compañía *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.compania}
-                      onChange={(e) => setFormData({...formData, compania: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                      required
-                    />
-                  </div>
-
-                  {/* Disponibilidad */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Disponibilidad
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.disponibilidad}
-                      onChange={(e) => setFormData({...formData, disponibilidad: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Precio */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Precio
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.precio}
-                      onChange={(e) => setFormData({...formData, precio: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Fecha Salida */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fecha Salida
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.fecha_salida}
-                      onChange={(e) => setFormData({...formData, fecha_salida: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Fecha Regreso */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fecha Regreso
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.fecha_regreso}
-                      onChange={(e) => setFormData({...formData, fecha_regreso: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Ruta */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ruta
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.ruta}
-                      onChange={(e) => setFormData({...formData, ruta: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* PNR */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      PNR
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.pnr}
-                      onChange={(e) => setFormData({...formData, pnr: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Ficha */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ficha
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.ficha}
-                      onChange={(e) => setFormData({...formData, ficha: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Temporada */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Temporada
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.temporada}
-                      onChange={(e) => setFormData({...formData, temporada: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Neto 1 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Neto 1
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.neto_1}
-                      onChange={(e) => setFormData({...formData, neto_1: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* OP */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      OP
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.op}
-                      onChange={(e) => setFormData({...formData, op: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Infant Fare */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tarifa Infante (inf_fare)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.inf_fare}
-                      onChange={(e) => setFormData({...formData, inf_fare: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-[#2c4b8b]"
-                    />
-                  </div>
-
-                  {/* Equipaje (booleans) */}
-                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <label className="inline-flex items-center gap-2">
+              <form onSubmit={handleSubmit} className="p-8">
+                {/* Sección de Información Básica */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="bg-[#2c4b8b] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm mr-2">1</span>
+                    Información Básica
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pl-9">
+                    {/* Código Cupo */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Código Cupo *
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={!!formData.carryon}
-                        onChange={(e) => setFormData({...formData, carryon: e.target.checked})}
+                        type="text"
+                        value={formData.codigo_cupo}
+                        onChange={(e) => setFormData({...formData, codigo_cupo: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        placeholder="Ej: ABC123"
+                        required
                       />
-                      <span className="text-sm text-gray-700">Carry-on</span>
-                    </label>
-                    <label className="inline-flex items-center gap-2">
+                    </div>
+
+                    {/* Destino */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Destino *
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={!!formData.handbag}
-                        onChange={(e) => setFormData({...formData, handbag: e.target.checked})}
+                        type="text"
+                        value={formData.destino}
+                        onChange={(e) => setFormData({...formData, destino: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        placeholder="Ej: Madrid"
+                        required
                       />
-                      <span className="text-sm text-gray-700">Handbag</span>
-                    </label>
-                    <label className="inline-flex items-center gap-2">
+                    </div>
+
+                    {/* Compañía */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Compañía *
+                      </label>
+                      <select
+                        value={formData.compania}
+                        onChange={(e) => setFormData({...formData, compania: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        required
+                      >
+                        <option value="">Seleccionar compañía</option>
+                        {Object.entries(AIRLINES).map(([code, name]) => (
+                          <option key={code} value={code}>{code} - {name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Disponibilidad */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Disponibilidad
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={!!formData.checkedbag}
-                        onChange={(e) => setFormData({...formData, checkedbag: e.target.checked})}
+                        type="number"
+                        min="0"
+                        value={formData.disponibilidad}
+                        onChange={(e) => setFormData({...formData, disponibilidad: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        placeholder="0"
                       />
-                      <span className="text-sm text-gray-700">Checked bag</span>
-                    </label>
+                    </div>
+
+                    {/* PNR */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        PNR
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.pnr}
+                        onChange={(e) => setFormData({...formData, pnr: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        placeholder="Ej: ABC123"
+                      />
+                    </div>
+
+                    {/* Ficha */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ficha
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.ficha}
+                        onChange={(e) => setFormData({...formData, ficha: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        placeholder="Número de ficha"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#2c4b8b]">
+                {/* Sección de Fechas y Precios */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="bg-[#2c4b8b] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm mr-2">2</span>
+                    Fechas y Precios
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pl-9">
+                    {/* Fecha Salida */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Fecha Salida
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha_salida}
+                        onChange={(e) => setFormData({...formData, fecha_salida: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Fecha Regreso */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Fecha Regreso
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha_regreso}
+                        onChange={(e) => setFormData({...formData, fecha_regreso: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Precio */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Precio
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.precio}
+                          onChange={(e) => setFormData({...formData, precio: e.target.value})}
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Neto 1 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Neto 1
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.neto_1}
+                          onChange={(e) => setFormData({...formData, neto_1: e.target.value})}
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Temporada */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Temporada
+                      </label>
+                      <select
+                        value={formData.temporada}
+                        onChange={(e) => setFormData({...formData, temporada: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                      >
+                        <option value="">Seleccionar</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Media">Media</option>
+                        <option value="Baja">Baja</option>
+                      </select>
+                    </div>
+
+                    {/* OP */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        OP
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.op}
+                        onChange={(e) => setFormData({...formData, op: e.target.value})}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                        placeholder="Operador"
+                      />
+                    </div>
+
+                    {/* Tarifa Infante */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tarifa Infante
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.inf_fare}
+                          onChange={(e) => setFormData({...formData, inf_fare: e.target.value})}
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sección de Ruta */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="bg-[#2c4b8b] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm mr-2">3</span>
+                    Ruta de Vuelo
+                  </h3>
+                  <div className="pl-9">
+                    <FlightSegmentBuilder 
+                      value={formData.ruta}
+                      onChange={(value) => setFormData({...formData, ruta: value})}
+                    />
+                  </div>
+                </div>
+
+                {/* Sección de Equipaje */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="bg-[#2c4b8b] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm mr-2">4</span>
+                    Configuración de Equipaje
+                  </h3>
+                  <div className="pl-9">
+                    <div className="bg-gray-50 p-6 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <label className="flex items-center space-x-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={!!formData.handbag}
+                            onChange={(e) => setFormData({...formData, handbag: e.target.checked})}
+                            className="w-5 h-5 text-[#2c4b8b] border-gray-300 rounded focus:ring-[#2c4b8b]"
+                          />
+                          <div className="flex items-center space-x-2">
+                            <HiOutlineBriefcase className={`w-6 h-6 ${formData.handbag ? 'text-green-600' : 'text-gray-400'}`} />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                              Handbag (Bolso de mano)
+                            </span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center space-x-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={!!formData.carryon}
+                            onChange={(e) => setFormData({...formData, carryon: e.target.checked})}
+                            className="w-5 h-5 text-[#2c4b8b] border-gray-300 rounded focus:ring-[#2c4b8b]"
+                          />
+                          <div className="flex items-center space-x-2">
+                            <MdOutlineLuggage className={`w-6 h-6 ${formData.carryon ? 'text-green-600' : 'text-gray-400'}`} />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                              Carry-on (Equipaje de mano)
+                            </span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center space-x-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={!!formData.checkedbag}
+                            onChange={(e) => setFormData({...formData, checkedbag: e.target.checked})}
+                            className="w-5 h-5 text-[#2c4b8b] border-gray-300 rounded focus:ring-[#2c4b8b]"
+                          />
+                          <div className="flex items-center space-x-2">
+                            <FaSuitcaseRolling className={`w-6 h-6 ${formData.checkedbag ? 'text-green-600' : 'text-gray-400'}`} />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                              Checked bag (Equipaje facturado)
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botones de acción */}
+                <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2c4b8b] text-white rounded hover:bg-[#2a4a7b] disabled:bg-gray-400 transition-colors"
+                    className="flex items-center gap-2 px-6 py-2.5 bg-[#2c4b8b] text-white rounded-lg hover:bg-[#1e355e] disabled:bg-gray-400 transition-colors font-medium"
                   >
-                    {loading ? 'Guardando...' : 'Guardar'}
+                    {loading ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <HiOutlineCheck className="w-5 h-5" />
+                        {editingProduct ? 'Actualizar' : 'Crear'} Producto
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

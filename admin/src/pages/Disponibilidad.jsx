@@ -4,8 +4,9 @@ import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import ReservationService from '../services/reservationService';
 import UserService from '../services/userService';
-import ItineraryTable from '../components/ItineraryTable.jsx';
+import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
 import { HiArrowPathRoundedSquare } from "react-icons/hi2";// eslint-disable-line no-unused-vars
+import { AIRLINES, AIRLINE_LOGOS } from '../components/ItineraryDetails';
 
 
 export default function Disponibilidad() {
@@ -234,7 +235,52 @@ export default function Disponibilidad() {
                 <tr key={idx} className="last:border-b-0 cursor-pointer transition-all duration-150 hover:bg-[#e6f0fa] group" style={{ height: '64px' }}>
                   <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.codigo_cupo}</td>
                   <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.destino}</td>
-                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">{item.compania}</td>
+                  <td className="px-6 py-4 text-base whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      {(() => {
+                        // Intentar obtener código IATA del campo compania
+                        let airlineCode = null;
+                        const compania = item.compania || '';
+                        
+                        // Si compania es un código IATA directo (2 caracteres)
+                        if (compania.length === 2) {
+                          airlineCode = compania.toUpperCase();
+                        }
+                        // Si incluye el código entre paréntesis o al inicio
+                        else {
+                          const match = compania.match(/^([A-Z]{2})\b/i) || compania.match(/\(([A-Z]{2})\)/i);
+                          if (match) {
+                            airlineCode = match[1].toUpperCase();
+                          }
+                        }
+                        
+                        const logoUrl = airlineCode ? AIRLINE_LOGOS[airlineCode] : null;
+                        const airlineName = airlineCode ? AIRLINES[airlineCode] : null;
+                        
+                        if (logoUrl) {
+                          return (
+                            <>
+                              <img
+                                src={logoUrl}
+                                alt={airlineName || compania}
+                                className="airline-logo"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  objectFit: 'contain',
+                                  flexShrink: 0
+                                }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </>
+                          );
+                        }
+                        return <span>{compania}</span>;
+                      })()}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-2 py-2 inline-flex text-md leading-5 font-semibold rounded-full ${
                       item.disponibilidad > 5 ? "bg-green-100 text-green-800" :
