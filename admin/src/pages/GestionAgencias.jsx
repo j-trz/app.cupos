@@ -97,7 +97,9 @@ export default function GestionAgencias() {
       is_active: !!agency.is_active,
     });
     setLogoFile(null);
-    const previewSrc = agency.logo_url || AgencyService.getLogoPublicUrl(agency.logo_path);
+    const version = agency.updated_at ? new Date(agency.updated_at).getTime() : Date.now();
+    const withVersion = (u) => (u ? (/\bv=/.test(u) ? u : `${u}${u.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}`) : null);
+    const previewSrc = withVersion(agency.logo_url) || AgencyService.getLogoPublicUrl(agency.logo_path, version);
     setLogoPreview(previewSrc || null);
     setModalOpen(true);
   }
@@ -340,13 +342,15 @@ export default function GestionAgencias() {
                     <td className="px-6 py-4 text-center align-middle">
                       <div className="flex items-center justify-center">
                         {(() => {
-                          const src = a.logo_url || AgencyService.getLogoPublicUrl(a.logo_path);
+                          const version = a.updated_at ? new Date(a.updated_at).getTime() : Date.now();
+                          const withVersion = (u) => (u ? (/\bv=/.test(u) ? u : `${u}${u.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}`) : null);
+                          const src = withVersion(a.logo_url) || AgencyService.getLogoPublicUrl(a.logo_path, version);
                           if (src) {
                             return (
                               <img
                                 src={src}
                                 alt={a.name}
-                                className="h-10 w-10 rounded-full object-cover"
+                                className="h-12 w-12 rounded-full object-cover bg-blue-100 p-2 text-center"
                                 onError={(e) => {
                                   e.currentTarget.onerror = null;
                                   e.currentTarget.src = icon;

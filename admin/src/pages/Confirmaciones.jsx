@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line no-unused-vars
 import ReservationService from '../services/reservationService';
-import { FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import { HiArrowPathRoundedSquare } from "react-icons/hi2";// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
-import ItineraryDetails from '../components/ItineraryDetails';
+import ItineraryDetails from '../components/ItineraryDetails'; // eslint-disable-line no-unused-vars
+import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
 
   
 
@@ -112,7 +113,7 @@ export default function Confirmaciones() {
             disabled={loading || refrescando}
             className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] disabled:opacity-50 transition-colors"
           >
-            <FaSync className={`${refrescando ? 'animate-spin' : ''}`} />
+            <HiArrowPathRoundedSquare className={`${refrescando ? 'animate-spin' : ''}`} />
             {refrescando ? 'Actualizando...' : 'Refrescar'}
           </button>
         </div>
@@ -156,7 +157,7 @@ export default function Confirmaciones() {
         {loading ? (
           <div className="text-center py-8">
             <div className="flex items-center justify-center gap-2 text-gray-500">
-              <FaSync className="animate-spin" />
+              <HiArrowPathRoundedSquare className="animate-spin" />
               <span>Cargando confirmaciones...</span>
             </div>
           </div>
@@ -221,65 +222,13 @@ export default function Confirmaciones() {
         {/* Popup Itinerario */}
         {popupItinerarioOpen && (
           <div className="fixed inset-0 bg-black/60 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-[800px] h-auto overflow-y-auto p-6">
+            <div className="bg-white rounded-lg shadow-xl w-[1200px] h-auto overflow-y-auto p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-[#2c4b8b]">Itinerario Aéreo</h2>
                 <button onClick={() => setPopupItinerarioOpen(false)} className="text-[#2c4b8b] hover:text-gray-600 text-2xl">&times;</button>
               </div>
               {itinerarioSeleccionado ? (
-                (() => {
-                  // Parsear itinerario similar a como se hace en Disponibilidad
-                  const tokens = String(itinerarioSeleccionado)
-                    .replace(/\n/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim()
-                    .split(' ');
-                  const vuelos = [];
-                  for (let i = 0; i < tokens.length; i += 7) {
-                    if (tokens.length - i >= 7) {
-                      vuelos.push({
-                        compania: tokens[i],
-                        vuelo: tokens[i+1],
-                        fecha: tokens[i+2],
-                        origen: tokens[i+3],
-                        destino: tokens[i+4],
-                        salida: tokens[i+5],
-                        llegada: tokens[i+6]
-                      });
-                    }
-                  }
-                  if (vuelos.length === 0) {
-                    return <div className="text-gray-500">No hay datos de itinerario disponibles.</div>;
-                  }
-                  return (
-                    <table className="w-full bg-white border-0 rounded-2xl shadow-xl">
-                      <thead>
-                        <tr className="bg-[#2c4b8b] text-white">
-                          <th className="px-4 py-3 text-sm font-semibold rounded-tl-2xl">Compañía</th>
-                          <th className="px-4 py-3 text-sm font-semibold">Nro Vuelo</th>
-                          <th className="px-4 py-3 text-sm font-semibold">Fecha</th>
-                          <th className="px-4 py-3 text-sm font-semibold">Origen</th>
-                          <th className="px-4 py-3 text-sm font-semibold">Destino</th>
-                          <th className="px-4 py-3 text-sm font-semibold">Salida</th>
-                          <th className="px-4 py-3 text-sm font-semibold rounded-tr-2xl">Llegada</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {vuelos.map((v, i) => (
-                          <tr key={i} className="last:border-b-0 transition-all duration-150 hover:bg-[#e6f0fa]" style={{ height: '48px' }}>
-                            <td className="px-4 py-2 text-sm text-center">{v.compania}</td>
-                            <td className="px-4 py-2 text-sm text-center">{v.vuelo}</td>
-                            <td className="px-4 py-2 text-sm text-center">{v.fecha}</td>
-                            <td className="px-4 py-2 text-sm text-center">{v.origen}</td>
-                            <td className="px-4 py-2 text-sm text-center">{v.destino}</td>
-                            <td className="px-4 py-2 text-sm text-center">{v.salida}</td>
-                            <td className="px-4 py-2 text-sm text-center">{v.llegada}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  );
-                })()
+                <ItineraryTable ruta={itinerarioSeleccionado} />
               ) : (
                 <div className="text-gray-500">No hay datos de itinerario disponibles.</div>
               )}

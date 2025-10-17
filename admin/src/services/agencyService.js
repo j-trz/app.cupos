@@ -1,5 +1,6 @@
 // Servicio de Agencias: CRUD + subida de logos (Supabase Storage)
 import { supabaseWithHeaders as supabase } from "./supabaseConfig";
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * Estructura de la tabla public.agencies:
@@ -8,9 +9,44 @@ import { supabaseWithHeaders as supabase } from "./supabaseConfig";
  * - main_color (text HEX), text_color (text HEX), created_at, updated_at
  */
 const BUCKET = "agency-logos";
+const supabaseUrlStorage = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKeyStorage = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Cliente dedicado para Storage (sin headers JSON globales)
+const supabaseStorage = createClient(supabaseUrlStorage, supabaseKeyStorage, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+});
 
+// Sincroniza el cliente de Storage con el token de la sesión actual
+async function ensureStorageAuth() {
+  try {
+    const { data: sessionData, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn("ensureStorageAuth: error al obtener sesión", error);
+      return;
+    }
+    const access_token = sessionData?.session?.access_token;
+    const refresh_token = sessionData?.session?.refresh_token;
+    if (!access_token || !refresh_token) return;
+    const { error: setErr } = await supabaseStorage.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+    if (setErr) {
+      console.warn(
+        "ensureStorageAuth: error al setear sesión en Storage",
+        setErr
+      );
+    }
+  } catch (e) {
+    console.warn("ensureStorageAuth: error inesperado", e);
+  }
+}
 // Utils
-const sanitizeFileName = (name = "") =>
+const _sanitizeFileName = (name = "") =>
   name
     .normalize("NFKD")
     .replace(/[^\w.-]+/g, "_")
@@ -19,6 +55,28 @@ const sanitizeFileName = (name = "") =>
 
 const ensureString = (v) =>
   typeof v === "string" ? v : v == null ? "" : String(v);
+
+const sanitizeFolderName = (code = "") =>
+  String(code || "unassigned")
+    .trim()
+    .replace(/[^\w-]+/g, "_");
+
+const getFileExtension = (file) => {
+  const name = ensureString(file?.name || "");
+  const type = ensureString(file?.type || "");
+  if (/png/i.test(type) || /\.png$/i.test(name)) return "png";
+  if (/jpe?g/i.test(type) || /\.(jpe?g)$/i.test(name)) return "jpg";
+  if (/webp/i.test(type) || /\.webp$/i.test(name)) return "webp";
+  if (/svg\+xml/i.test(type) || /\.svg$/i.test(name)) return "svg";
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  return ext || "png";
+};
+
+const buildLogoObjectPath = (agencyCode, file) => {
+  const folder = sanitizeFolderName(agencyCode);
+  const ext = getFileExtension(file);
+  return `agencies/${folder}/logo.${ext}`;
+};
 
 /**
  * Normaliza websites ingresados por el usuario:
@@ -54,10 +112,13 @@ const normalizeAgency = (row) => {
   };
 };
 
-const getLogoPublicUrl = (path) => {
+const getLogoPublicUrl = (path, version) => {
   if (!path) return null;
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data?.publicUrl || null;
+  const { data } = supabaseStorage.storage.from(BUCKET).getPublicUrl(path);
+  const base = data?.publicUrl || null;
+  if (!base) return null;
+  if (version == null) return base;
+  return `${base}?v=${encodeURIComponent(version)}`;
 };
 
 /**
@@ -67,16 +128,28 @@ const getLogoPublicUrl = (path) => {
 async function uploadLogo(file, { agencyId, agencyCode } = {}) {
   if (!file) return { path: null, url: null };
 
-  const fileName = sanitizeFileName(file.name || "logo.png");
-  const folder = ensureString(agencyId || agencyCode || "unassigned");
-  const objectPath = `agencies/${folder}/${Date.now()}-${fileName}`;
+  // Garantizar que usamos el CODE de la agencia como carpeta
+  let code = ensureString(agencyCode);
+  if (!code && agencyId) {
+    const { data: row } = await supabase
+      .from("agencies")
+      .select("code")
+      .eq("id", agencyId)
+      .single();
+    code = ensureString(row?.code);
+  }
+  if (!code) code = "unassigned";
 
-  const { data, error } = await supabase.storage
+  const folder = sanitizeFolderName(code);
+  const objectPath = buildLogoObjectPath(code, file);
+
+  await ensureStorageAuth();
+  const { data, error } = await supabaseStorage.storage
     .from(BUCKET)
     .upload(objectPath, file, {
-      upsert: true,
-      cacheControl: "3600",
-      contentType: file.type || "image/png",
+      upsert: true, // sobrescribe el único logo por agencia
+      cacheControl: "0", // evitar cache persistente
+      contentType: file.type || "application/octet-stream",
     });
 
   if (error) {
@@ -84,6 +157,24 @@ async function uploadLogo(file, { agencyId, agencyCode } = {}) {
     throw new Error(error.message || "No se pudo subir el logo");
   }
 
+  // Limpiar cualquier otro archivo en la carpeta de la agencia (mantener solo el logo actual)
+  try {
+    await ensureStorageAuth();
+    const { data: items } = await supabaseStorage.storage
+      .from(BUCKET)
+      .list(`agencies/${folder}`);
+    const toRemove = (items || [])
+      .map((it) => `agencies/${folder}/${it.name}`)
+      .filter((p) => p !== objectPath);
+    if (toRemove.length > 0) {
+      await ensureStorageAuth();
+      await supabaseStorage.storage.from(BUCKET).remove(toRemove);
+    }
+  } catch (e) {
+    console.warn("Ignorando error no crítico en limpieza de logos:", e);
+  }
+
+  // Guardar SIEMPRE la URL base (sin versión) en DB; el cache-busting se hace al LEER
   const url = getLogoPublicUrl(objectPath);
   return { path: data?.path || objectPath, url };
 }
@@ -227,18 +318,93 @@ async function updateAgency(id, updates = {}, logoFile = null) {
     payload.text_color = normalizeHexColor(updates.text_color);
   }
 
-  if (logoFile) {
-    const { data: current } = await supabase
-      .from("agencies")
-      .select("code")
-      .eq("id", id)
-      .single();
-    const upload = await uploadLogo(logoFile, {
-      agencyId: id,
-      agencyCode: current?.code,
-    });
-    payload.logo_path = upload.path || null;
-    payload.logo_url = upload.url || null;
+  {
+    // Obtener datos actuales si subimos nuevo logo o si cambia el código
+    let current = null;
+    if (logoFile || Object.prototype.hasOwnProperty.call(updates, "code")) {
+      const res = await supabase
+        .from("agencies")
+        .select("code, logo_path")
+        .eq("id", id)
+        .single();
+      current = res?.data || null;
+    }
+
+    if (logoFile) {
+      // Subida a ruta fija agencies/{CODE}/logo.{ext}, sobrescribiendo
+      const upload = await uploadLogo(logoFile, {
+        agencyId: id,
+        agencyCode: current?.code || updates?.code,
+      });
+      payload.logo_path = upload.path || null;
+      payload.logo_url = upload.url || null;
+    } else if (
+      Object.prototype.hasOwnProperty.call(updates, "code") &&
+      current?.logo_path &&
+      ensureString(updates.code).trim() &&
+      ensureString(updates.code).trim() !== ensureString(current.code)
+    ) {
+      // Mover el logo existente a la nueva carpeta basada en el nuevo código
+      const oldPath = current.logo_path;
+      const ext = (oldPath.split(".").pop() || "png").toLowerCase();
+      const newPath = `agencies/${sanitizeFolderName(
+        ensureString(updates.code).trim()
+      )}/logo.${ext}`;
+
+      await ensureStorageAuth();
+      const { error: moveError } = await supabaseStorage.storage
+        .from(BUCKET)
+        .move(oldPath, newPath);
+
+      if (!moveError) {
+        payload.logo_path = newPath;
+        // Guardar URL base (sin versión); el cache-busting se hace al LEER
+        payload.logo_url = getLogoPublicUrl(newPath);
+
+        // Limpieza: mantener un único logo en la carpeta destino
+        try {
+          const destFolder = sanitizeFolderName(
+            ensureString(updates.code).trim()
+          );
+          await ensureStorageAuth();
+          const { data: items } = await supabaseStorage.storage
+            .from(BUCKET)
+            .list(`agencies/${destFolder}`);
+          const toRemove = (items || [])
+            .map((it) => `agencies/${destFolder}/${it.name}`)
+            .filter((p) => p !== newPath);
+          if (toRemove.length > 0) {
+            await ensureStorageAuth();
+            await supabaseStorage.storage.from(BUCKET).remove(toRemove);
+          }
+        } catch (e) {
+          console.warn("Ignorando error no crítico en limpieza de logos:", e);
+        }
+
+        // Limpieza: si quedó algo en la carpeta del código anterior, eliminarlo
+        try {
+          const oldFolder = sanitizeFolderName(ensureString(current.code));
+          await ensureStorageAuth();
+          const { data: oldItems } = await supabaseStorage.storage
+            .from(BUCKET)
+            .list(`agencies/${oldFolder}`);
+          const toRemoveOld = (oldItems || []).map(
+            (it) => `agencies/${oldFolder}/${it.name}`
+          );
+          if (toRemoveOld.length > 0) {
+            await ensureStorageAuth();
+            await supabaseStorage.storage.from(BUCKET).remove(toRemoveOld);
+          }
+        } catch (e) {
+          console.warn("Ignorando error no crítico en limpieza de logos:", e);
+        }
+      } else {
+        console.warn(
+          "No se pudo mover el logo al nuevo código:",
+          moveError?.message || moveError
+        );
+      }
+    }
   }
 
   const { data, error } = await supabase

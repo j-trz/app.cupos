@@ -1,4 +1,6 @@
   import { useState, useEffect } from "react";
+  import AgencyService from "../services/agencyService";
+  import UserService from "../services/userService";
 
 // Diccionario de aerolíneas
 export const AIRLINES = {
@@ -505,288 +507,314 @@ export const AIRPORTS = {
 // Función para formatear fecha a formato 15DEC25
 const formatearFecha = (fechaStr) => {
   if (!fechaStr) return fechaStr;
-  
-  const meses = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 
-                 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  
-  // Si ya está en formato correcto, devolverla
-  if (/^\d{1,2}[A-Z]{3}\d{2}$/.test(fechaStr)) return fechaStr;
-  
+
+  const meses = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const s = String(fechaStr).trim();
+  if (!s) return fechaStr;
+
+  // Normalizar formatos tipo 15OCT25 / 15oct25 -> 15oct25
+  const m1 = s.match(/^(\d{1,2})([A-Za-z]{3})(\d{2})$/);
+  if (m1) {
+    const dia = m1[1].padStart(2, '0');
+    const mon = m1[2].toLowerCase();
+    const yy = m1[3];
+    return `${dia}${mon}${yy}`;
+  }
   try {
     let fecha;
-    
-    // Detectar formato dd/mm/aaaa o dd/mm/aa
-    if (fechaStr.includes('/')) {
-      const partes = fechaStr.split('/');
-      if (partes.length === 3) {
-        const [dia, mes] = partes;
-        let año = partes[2];
-        
-        // Convertir año de 2 dígitos a 4 dígitos si es necesario
-        if (año.length === 2) {
-          const añoNum = parseInt(año);
-          // Si es menor a 50, asumimos que es 20xx, sino 19xx
-          año = añoNum < 50 ? `20${año}` : `19${año}`;
-        }
-        
-        // Crear fecha en formato ISO (aaaa-mm-dd)
-        fecha = new Date(`${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`);
-      } else {
-        fecha = new Date(fechaStr);
+
+    // dd/mm/aaaa o dd/mm/aa
+    const mSlash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (mSlash) {
+      const [, d, m, yRaw] = mSlash;
+      let y = yRaw;
+      if (y.length === 2) {
+        const yn = parseInt(y, 10);
+        y = yn < 50 ? `20${y}` : `19${y}`;
       }
+      fecha = new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      // ISO aaaa-mm-dd
+      fecha = new Date(s.substring(0, 10));
     } else {
-      fecha = new Date(fechaStr);
+      // dd-mm-aaaa, dd.mm.aaaa, "15 Oct 2025", etc.
+      const mOther = s.match(/^(\d{1,2})[-.](\d{1,2})[-.](\d{2,4})$/);
+      if (mOther) {
+        const [, d, m, yRaw] = mOther;
+        let y = yRaw;
+        if (y.length === 2) {
+          const yn = parseInt(y, 10);
+          y = yn < 50 ? `20${y}` : `19${y}`;
+        }
+        fecha = new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      } else {
+        const parsed = new Date(s);
+        if (!isNaN(parsed.getTime())) {
+          fecha = parsed;
+        } else {
+          return fechaStr; // dejar como vino si no se puede interpretar
+        }
+      }
     }
-    
-    // Verificar que la fecha sea válida
-    if (isNaN(fecha.getTime())) {
-      return fechaStr;
-    }
-    
-    const dia = fecha.getDate().toString().padStart(2, '0');
-    const mes = meses[fecha.getMonth()];
-    const año = fecha.getFullYear().toString().slice(-2);
-    return `${dia}${mes}${año}`;
+
+    if (isNaN(fecha.getTime())) return fechaStr;
+
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const mon = meses[fecha.getMonth()];
+    const yy = String(fecha.getFullYear()).slice(-2);
+    return `${dia}${mon}${yy}`;
   } catch {
-    return fechaStr; // Si falla el parseo, devolver original
+    return fechaStr;
   }
 };
 
-// Función para manejar impresión/PDF
-const handlePrint = () => {
-  // Crear una nueva ventana para imprimir solo el contenido del itinerario
-  const printWindow = window.open('', '_blank');
-  const itineraryContent = document.querySelector('.itinerary-content').innerHTML;
-  
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Itinerario de Vuelo</title>
-      <style>
-        @page {
-          size: A4;
-          margin: 15mm;
-        }
-        body {
-          font-family: 'Montserrat', sans-serif;
-          margin: 0;
-          padding: 0;
-          background: white;
-          font-size: 12px;
-          line-height: 1.4;
-        }
-        .header-section {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 20px;
-          margin-bottom: 20px;
-          background: #2c4b8b;
-          border-radius: 8px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        }
-        .logo-section {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-        .company-info {
-          text-align: left;
-        }
-        .company-name {
-          font-weight: 700;
-          color: white;
-          font-size: 14px;
-        }
-        .company-details {
-          color: rgba(255,255,255,0.9);
-          font-size: 12px;
-        }
-        .title-section {
-          text-align: right;
-        }
-        .title {
-          margin: 0;
-          font-size: 24px;
-          color: white;
-          font-weight: bold;
-        }
-        .divider {
-          background: #2c4b8b;
-          height: 4px;
-          margin: 20px 0;
-        }
-        .passenger-section {
-          display: flex;
-          justify-content: space-between;
-          gap: 24px;
-          margin: 20px 0;
-          padding: 20px;
-          background: #f8f9fa;
-          border-radius: 8px;
-          border-left: 4px solid #2c4b8b;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .passenger-info, .confirmation-info {
-          color: #686868;
-          font-size: 12px;
-        }
-        .confirmation-info {
-          text-align: right;
-        }
-        .confirmation-number {
-          font-weight: 700;
-          font-size: 14px;
-        }
-        .separator {
-          margin: 16px 0;
-          border: none;
-          border-top: 1px solid #ccc;
-        }
-        .flight-item {
-          display: flex;
-          gap: 16px;
-          align-items: flex-start;
-          padding: 20px;
-          margin-bottom: 16px;
-          background: white;
-          border-radius: 8px;
-          border-left: 4px solid #2c4b8b;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .flight-icon {
-          width: 50px;
-          height: 50px;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f8f9fa;
-          border-radius: 8px;
-          border: 1px solid #e9ecef;
-        }
-        .flight-icon img {
-          max-width: 40px;
-          max-height: 40px;
-          object-fit: contain;
-        }
-        .flight-details {
-          flex: 1;
-        }
-        .flight-header {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 16px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid #eee;
-        }
-        .airline-name {
-          text-transform: camelcase;
-          color: #686868;
-          font-size: 16px;
-          font-weight: 700;
-        }
-        .flight-number {
-          color: #686868;
-          font-size: 12px;
-        }
-        .flight-code {
-          color: #2E6BA4;
-          font-weight: bold;
-        }
-        .flight-date {
-          text-align: right;
-          color: #686868;
-          font-size: 12px;
-        }
-        .flight-info {
-          display: flex;
-          gap: 24px;
-        }
-        .location-info {
-          width: 30%;
-        }
-        .location-label {
-          color: #686868;
-          font-weight: 700;
-          font-size: 11px;
-        }
-        .location-name {
-          color: #2E6BA4;
-          text-transform: camelcase;
-          font-size: 12px;
-          font-weight: 600;
-        }
-        .location-time {
-          color: #2E6BA4;
-          font-size: 11px;
-        }
-        .cabin-info {
-          flex: 1;
-          color: #686868;
-          font-size: 11px;
-        }
-        .flights-section {
-          background: #f8f9fa;
-          border-radius: 8px;
-          padding: 20px;
-          margin: 20px 0;
-          border-left: 4px solid #2c4b8b;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .flights-section h3 {
-          margin: 0 0 16px 0;
-          color: #323C46;
-          font-size: 16px;
-          font-weight: bold;
-        }
-        .footer-section {
-          margin-top: 30px;
-          padding: 20px;
-          background: #f8f9fa;
-          border-radius: 8px;
-          border-left: 4px solid #2c4b8b;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .footer-title {
-          font-size: 14px;
-          font-weight: bold;
-          color: #2c4b8b;
-          margin-bottom: 10px;
-        }
-        .footer-content {
-          font-size: 11px;
-          line-height: 1.5;
-          color: #686868;
-        }
-      </style>
-    </head>
-    <body>
-      ${itineraryContent}
-    </body>
-    </html>
-  `);
-  
-  printWindow.document.close();
-  printWindow.focus();
-  
-  // Esperar a que cargue y luego imprimir
-  setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 250);
-};
 
 export default function ItineraryDetails({ itineraryData = null }) {
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Branding por agencia (desde public.agencies)
+  const [brand, setBrand] = useState({
+    name: "Jetmar Viajes",
+    address: "Gral. Santander 1970",
+    phone: "598 2 1793",
+    email: "",
+    logo: null,
+    primary: "#2c4b8b",
+    text: "#ffffff",
+  });
+
+// Logs de montaje/desmontaje y cambios de itinerary
+useEffect(() => {
+  try {
+    console.log("[ItineraryDetails] mounted:", new Date().toISOString(), "path:", window.location?.pathname);
+  } catch (err) {
+    console.log("[ItineraryDetails] debug mount log failed:", err);
+  }
+  return () => {
+    try {
+      console.log("[ItineraryDetails] unmounted");
+    } catch (err) {
+      console.log("[ItineraryDetails] debug unmount log failed:", err);
+    }
+  };
+}, []);
+
+// Log cuando cambia el estado 'itinerary' y análisis de fechas
+useEffect(() => {
+  if (!itinerary) return;
+  console.log("[ItineraryDetails] itinerary state updated:", itinerary);
+  try {
+    const vuelos = Array.isArray(itinerary?.vuelos) ? itinerary.vuelos : [];
+    vuelos.forEach((v, idx) => {
+      const raw = v?.fecha;
+      let yearFromDate = null;
+      try {
+        const d = new Date(String(raw));
+        if (!isNaN(d)) yearFromDate = d.getFullYear();
+      } catch (err) {
+        console.log("[ItineraryDetails] debug Date parse failed:", err);
+      }
+      console.log(`[ItineraryDetails] vuelo[${idx}].fecha ->`, raw, "(type:", typeof raw + ")", "yearFromDate:", yearFromDate);
+    });
+  } catch (err) {
+    console.log("[ItineraryDetails] debug itinerary change log failed:", err);
+  }
+}, [itinerary]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const profile = await UserService.getCurrentUserProfile();
+        const agencyKey = profile?.agency || profile?.agencia || null;
+        if (!agencyKey) return;
+
+        const { data: list } = await AgencyService.listAgencies({
+          search: String(agencyKey),
+          activeOnly: true,
+          limit: 50,
+          from: 0,
+        });
+
+        const lower = String(agencyKey).toLowerCase();
+        const match =
+          (list || []).find(a => (a.code || "").toLowerCase() === lower) ||
+          (list || []).find(a => (a.name || "").toLowerCase() === lower) ||
+          (list || [])[0];
+
+        if (match && mounted) {
+          // Resolver URL absoluta del logo y forzar refresh con versión (updated_at)
+          const resolveLogoUrl = (url, path, versionTs) => {
+            try {
+              const ver = versionTs ?? Date.now();
+              if (url) {
+                // Si ya es absoluta, anexar ?v= si no existe para bust de caché
+                if (/^https?:\/\//i.test(url)) {
+                  return /\bv=/.test(url) ? url : `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(ver)}`;
+                }
+                // Si vino como path relativo en logo_url
+                const fromUrl = AgencyService.getLogoPublicUrl(url, ver);
+                if (fromUrl) return fromUrl;
+              }
+              if (path) {
+                const fromPath = AgencyService.getLogoPublicUrl(path, ver);
+                if (fromPath) return fromPath;
+              }
+            } catch { return null; }
+            return null;
+          };
+          const versionTs = match?.updated_at ? new Date(match.updated_at).getTime() : Date.now();
+          const logo = resolveLogoUrl(match.logo_url, match.logo_path, versionTs);
+          setBrand({
+            name: match.name || agencyKey,
+            address: match.address || "",
+            phone: match.phone || "",
+            email: match.email || "",
+            logo: logo || null,
+            primary: match.main_color || "#2c4b8b",
+            text: match.text_color || "#ffffff",
+          });
+        }
+      } catch {
+        // silencioso si no hay agencia
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const primary = brand.primary || "#2c4b8b";
+  const textColor = brand.text || "#ffffff";
+  const cssStyles = `
+    /* Estilos para que la previsualización coincida con la impresión */
+    .itinerary-content {
+      font-family: 'Montserrat', sans-serif;
+      background: white;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      margin-bottom: 20px;
+      background: ${primary};
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    .logo-section { display: flex; align-items: center; gap: 16px; }
+    .company-info { text-align: left; }
+    .company-name { font-weight: 700; color: ${textColor}; font-size: 14px; }
+    .company-details { color: rgba(255,255,255,0.9); font-size: 12px; }
+    .title-section { text-align: right; }
+    .title { margin: 0; font-size: 24px; color: ${textColor}; font-weight: bold; }
+    .divider { background: ${primary}; height: 4px; margin: 20px 0; }
+    .passenger-section {
+      display: flex; justify-content: space-between; gap: 24px;
+      margin: 20px 0; padding: 20px; background: #f8f9fa;
+      border-radius: 8px; border-left: 4px solid ${primary};
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .passenger-info, .confirmation-info { color: #686868; font-size: 12px; }
+    .confirmation-info { text-align: right; }
+    .confirmation-number { font-weight: 700; font-size: 14px; }
+    .separator { margin: 16px 0; border: none; border-top: 1px solid #ccc; }
+    .flight-item {
+      display: flex; gap: 16px; align-items: flex-start; padding: 20px; margin-bottom: 16px;
+      background: white; border-radius: 8px; border-left: 4px solid ${primary};
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .flight-icon {
+      width: 50px; height: 50px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;
+    }
+    .flight-icon img { max-width: 40px; max-height: 40px; object-fit: contain; }
+    .flight-details { flex: 1; }
+    .flight-header { display: flex; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
+    .airline-name { text-transform: camelcase; color: #686868; font-size: 16px; font-weight: 700; }
+    .flight-number { color: #686868; font-size: 12px; }
+    .flight-code { color: ${primary}; font-weight: bold; }
+    .flight-date { text-align: right; color: #686868; font-size: 12px; text-transform: uppercase;}
+    .flight-info { display: flex; gap: 24px; }
+    .location-info { width: 30%; }
+    .location-label { color: #686868; font-weight: 700; font-size: 11px; }
+    .location-name { color: ${primary}; text-transform: camelcase; font-size: 12px; font-weight: 600; }
+    .location-time { color: ${primary}; font-size: 11px; }
+    .cabin-info { flex: 1; color: #686868; font-size: 11px; }
+    .flights-section {
+      background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;
+      border-left: 4px solid ${primary}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .flights-section h3 { margin: 0 0 16px 0; color: #323C46; font-size: 16px; font-weight: bold; }
+    .footer-section {
+      margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;
+      border-left: 4px solid ${primary}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .footer-title { font-size: 14px; font-weight: bold; color: ${primary}; margin-bottom: 10px; }
+    .footer-content { font-size: 11px; line-height: 1.5; color: #686868; }
+    @media print { .no-print { display: none !important; } }
+  `;
+
+  // Impresión/PDF con branding de agencia
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    const itineraryContent = document.querySelector(".itinerary-content").innerHTML;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Itinerario</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>${cssStyles}</style>
+        <style>
+          @page { size: A4; margin: 15mm; }
+          body {
+            font-family: 'Montserrat', sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            margin: 0; padding: 0; background: white;
+            font-size: 12px; line-height: 1.4;
+          }
+        </style>
+      </head>
+      <body>
+        ${itineraryContent}
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   useEffect(() => {
     // Si se pasan datos directamente como prop, usarlos
+    console.log("[ItineraryDetails] effect start. itineraryData present:", Boolean(itineraryData), itineraryData);
     if (itineraryData) {
+      try {
+        console.log("[ItineraryDetails] itineraryData (prop):", itineraryData);
+        if (Array.isArray(itineraryData?.vuelos)) {
+          itineraryData.vuelos.forEach((v, idx) => {
+            console.log(`[ItineraryDetails] vuelo[${idx}].fecha (prop):`, v?.fecha);
+          });
+        }
+      } catch (err) {
+        console.log("[ItineraryDetails] debug prop parse error:", err);
+      }
       setItinerary(itineraryData);
       setLoading(false);
       return;
@@ -798,6 +826,17 @@ export default function ItineraryDetails({ itineraryData = null }) {
         const res = await fetch("/api/itinerary");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        // Debug: datos crudos desde API/DB
+        try {
+          console.log("[ItineraryDetails] /api/itinerary result:", data);
+          if (Array.isArray(data?.vuelos)) {
+            data.vuelos.forEach((v, idx) => {
+              console.log(`[ItineraryDetails] vuelo[${idx}].fecha (api):`, v?.fecha);
+            });
+          }
+        } catch (err) {
+          console.log("[ItineraryDetails] debug api parse error:", err);
+        }
         setItinerary(data);
       } catch (err) {
         console.error("Error fetching itinerary:", err);
@@ -817,215 +856,7 @@ const { localizadorReserva = "-", detallesViajero = [], vuelos = [] } = itinerar
 
 return (
   <div>
-    <style>{`
-      /* Estilos para que la previsualización coincida con la impresión */
-      .itinerary-content {
-        font-family: 'Montserrat', sans-serif;
-        background: white;
-        padding: 20px;
-        max-width: 800px;
-        margin: 0 auto;
-        font-size: 12px;
-        line-height: 1.4;
-        
-      }
-      .header-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px;
-        margin-bottom: 20px;
-        background: #2c4b8b;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-      }
-      .logo-section {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-      }
-      .company-info {
-        text-align: left;
-      }
-      .company-name {
-        font-weight: 700;
-        color: white;
-        font-size: 14px;
-      }
-      .company-details {
-        color: rgba(255,255,255,0.9);
-        font-size: 12px;
-      }
-      .title-section {
-        text-align: right;
-      }
-      .title {
-        margin: 0;
-        font-size: 24px;
-        color: white;
-        font-weight: bold;
-      }
-      .divider {
-        background: #2c4b8b;
-        height: 4px;
-        margin: 20px 0;
-      }
-      .passenger-section {
-        display: flex;
-        justify-content: space-between;
-        gap: 24px;
-        margin: 20px 0;
-        padding: 20px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border-left: 4px solid #2c4b8b;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      }
-      .passenger-info, .confirmation-info {
-        color: #686868;
-        font-size: 12px;
-      }
-      .confirmation-info {
-        text-align: right;
-      }
-      .confirmation-number {
-        font-weight: 700;
-        font-size: 14px;
-      }
-      .separator {
-        margin: 16px 0;
-        border: none;
-        border-top: 1px solid #ccc;
-      }
-      .flight-item {
-        display: flex;
-        gap: 16px;
-        align-items: flex-start;
-        padding: 20px;
-        margin-bottom: 16px;
-        background: white;
-        border-radius: 8px;
-        border-left: 4px solid #2c4b8b;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-      .flight-icon {
-        width: 50px;
-        height: 50px;
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
-      }
-      .flight-icon img {
-        max-width: 40px;
-        max-height: 40px;
-        object-fit: contain;
-      }
-      .flight-details {
-        flex: 1;
-        
-      }
-      .flight-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 16px;
-        padding-bottom: 12px;
-        border-bottom: 1px solid #eee;
-      }
-      .airline-name {
-        text-transform: camelcase;
-        color: #686868;
-        font-size: 16px;
-        font-weight: 700;
-      }
-      .flight-number {
-        color: #686868;
-        font-size: 12px;
-      }
-      .flight-code {
-        color: #2c4b8b;
-        font-weight: bold;
-      }
-      .flight-date {
-        text-align: right;
-        color: #686868;
-        font-size: 12px;
-      }
-      .flight-info {
-        display: flex;
-        gap: 24px;
-      }
-      .location-info {
-        width: 30%;
-      }
-      .location-label {
-        color: #686868;
-        font-weight: 700;
-        font-size: 11px;
-      }
-      .location-name {
-        color: #2c4b8b;
-        text-transform: camelcase;
-        font-size: 12px;
-        font-weight: 600;
-      }
-      .location-time {
-        color: #2c4b8b;
-        font-size: 11px;
-      }
-      .cabin-info {
-        flex: 1;
-        color: #686868;
-        font-size: 11px;
-      }
-      
-      .flights-section {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
-        border-left: 4px solid #2c4b8b;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      }
-      
-      .flights-section h3 {
-        margin: 0 0 16px 0;
-        color: #323C46;
-        font-size: 16px;
-        font-weight: bold;
-      }
-      
-      .footer-section {
-        margin-top: 30px;
-        padding: 20px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border-left: 4px solid #2c4b8b;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      }
-      
-      .footer-title {
-        font-size: 14px;
-        font-weight: bold;
-        color: #2c4b8b;
-        margin-bottom: 10px;
-      }
-      
-      .footer-content {
-        font-size: 11px;
-        line-height: 1.5;
-        color: #686868;
-      }
-      
-      @media print {
-        .no-print {
-          display: none !important;
-        }
-      }
-    `}</style>
+    <style>{cssStyles}</style>
     
     <div className="print-container">
       <div>
@@ -1059,11 +890,22 @@ return (
           <div className="itinerary-content">
             <div className="header-section">
               <div className="logo-section">
-                <img width={180} src="https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/media/logojetmar-png%20(2).png" alt="Logo" />
+                <img
+                  width={180}
+                  src={brand.logo || "https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/media/logojetmar-png%20(2).png"}
+                  alt="Logo"
+                  style={{ objectFit: "contain" ,"width":"120px","height":"auto"}}
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/media/logojetmar-png%20(2).png";
+                  }}
+                />
                 <div className="company-info">
-                  <div className="company-name">Jetmar Viajes</div>
-                  <div className="company-details">Gral. Santander 1970</div>
-                  <div className="company-details">598 2 1793</div>
+                  <div className="company-name">{brand.name}</div>
+                  {brand.address ? <div className="company-details">{brand.address}</div> : null}
+                  {brand.phone ? <div className="company-details">{brand.phone}</div> : null}
+                  {brand.email ? <div className="company-details">{brand.email}</div> : null}
                 </div>
               </div>
 
@@ -1076,7 +918,7 @@ return (
 
             <div className="passenger-section">
               <div className="passenger-info">
-                <div style={{color: "#2c4b8b"}}><strong>Pasajero:</strong></div>
+                <div style={{color: primary}}><strong>Pasajero:</strong></div>
                 <div>
                   {detallesViajero.length > 0 ? (
                     detallesViajero.map((v, idx) => (
@@ -1091,7 +933,7 @@ return (
               </div>
 
               <div className="confirmation-info">
-                <div style={{color: "#2c4b8b", fontWeight: "bold"}}>Confirmación:</div>
+                <div style={{color: primary, fontWeight: "bold"}}>Confirmación:</div>
                 <div className="confirmation-number">{localizadorReserva}</div>
               </div>
             </div>
@@ -1099,8 +941,8 @@ return (
             {/* <hr className="separator" /> */}
 
             <div className="flights-section">
-              <h3 style={{color: "#2c4b8b"}}>Detalles de vuelos</h3>
-              {vuelos.length === 0 && <div style={{ color: "#2c4b8b" }}>No hay vuelos para mostrar.</div>}
+              <h3 style={{color: primary}}>Detalles de vuelos</h3>
+              {vuelos.length === 0 && <div style={{ color: primary }}>No hay vuelos para mostrar.</div>}
 
               {vuelos.map((vuelo, i) => (
                 <div key={i} className="flight-item">
@@ -1127,7 +969,16 @@ return (
                         </div>
                       </div>
                       <div className="flight-date">
-                        {formatearFecha(vuelo.fecha)}
+                        {(() => {
+                          const raw = vuelo.fecha;
+                          const formatted = formatearFecha(raw);
+                          try {
+                            console.log("[ItineraryDetails] render fecha raw:", raw, "formatted:", formatted);
+                          } catch (err) {
+                            console.log("[ItineraryDetails] debug render log failed:", err);
+                          }
+                          return formatted;
+                        })()}
                       </div>
                     </div>
 
