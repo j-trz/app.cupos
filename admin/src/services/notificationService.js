@@ -149,12 +149,11 @@ class NotificationService {
   ) {
     try {
       if (ApiClient.isApiEnabled()) {
-        const queryParams = new URLSearchParams({
-          limit,
-          onlyUnread,
-          includeHidden
-        }).toString();
-        const data = await ApiClient.get(`/notifications?${queryParams}`);
+        // Solo enviar parámetros booleanos cuando son true (optimización)
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (onlyUnread) params.set('onlyUnread', 'true');
+        if (includeHidden) params.set('includeHidden', 'true');
+        const data = await ApiClient.get(`/notifications?${params.toString()}`);
         
         const notifications = (data.notifications || []).map((notification) => ({
           ...notification,

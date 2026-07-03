@@ -22,6 +22,11 @@ class ApiClient {
     }
   }
 
+  static clearToken() {
+    localStorage.removeItem('api_token');
+    localStorage.removeItem('api_user');
+  }
+
   static setSessionUser(user) {
     if (user) {
       localStorage.setItem('api_user', JSON.stringify(user));

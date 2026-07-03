@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import AuthorizationService from "./authorizationService";
 import dataApiService from './dataApiService';
+import ApiClient from './apiClient';
 
 /**
  * Servicio de usuarios con soporte para múltiples backends
@@ -13,12 +14,26 @@ export class UserService {
   }
 
   /**
+   * Verificar si estamos en modo API (backend flexible)
+   */
+  _isApiMode() {
+    return ApiClient.isApiEnabled() || this.useFlexibleBackend;
+  }
+
+  /**
    * Obtener todos los usuarios (con soporte para ambos backends)
    */
   async getAllUsers() {
-    if (this.useFlexibleBackend) {
-      // Usar el backend flexible
-      return await dataApiService.getData('profiles', {}, { order: 'created_at:desc' });
+    if (this._isApiMode()) {
+      // Usar el backend flexible - endpoint /api/users
+      try {
+        const response = await ApiClient.get('/users');
+        // El backend devuelve { success: true, users: [...] }
+        return response.users || [];
+      } catch (error) {
+        console.error('Error obteniendo usuarios desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();
@@ -56,9 +71,16 @@ export class UserService {
    * Crear un nuevo usuario
    */
   async createUser(userData) {
-    if (this.useFlexibleBackend) {
-      // Usar el backend flexible
-      return await dataApiService.insertData('profiles', userData);
+    if (this._isApiMode()) {
+      // Usar el backend flexible - endpoint POST /api/users
+      try {
+        const response = await ApiClient.post('/users', userData);
+        // El backend devuelve { success: true, userId: ... }
+        return response;
+      } catch (error) {
+        console.error('Error creando usuario desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();
@@ -80,9 +102,16 @@ export class UserService {
    * Actualizar un usuario existente
    */
   async updateUser(userId, updates) {
-    if (this.useFlexibleBackend) {
-      // Usar el backend flexible
-      return await dataApiService.updateData('profiles', userId, updates, 'id');
+    if (this._isApiMode()) {
+      // Usar el backend flexible - endpoint PUT /api/users/:id
+      try {
+        const response = await ApiClient.put(`/users/${userId}`, updates);
+        // El backend devuelve { success: true, message: ... }
+        return response;
+      } catch (error) {
+        console.error('Error actualizando usuario desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();
@@ -105,9 +134,16 @@ export class UserService {
    * Eliminar un usuario
    */
   async deleteUser(userId) {
-    if (this.useFlexibleBackend) {
-      // Usar el backend flexible
-      return await dataApiService.deleteData('profiles', userId, 'id');
+    if (this._isApiMode()) {
+      // Usar el backend flexible - endpoint DELETE /api/users/:id
+      try {
+        const response = await ApiClient.delete(`/users/${userId}`);
+        // El backend devuelve { success: true, message: ... }
+        return response;
+      } catch (error) {
+        console.error('Error eliminando usuario desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();
@@ -129,10 +165,15 @@ export class UserService {
    * Obtener un usuario por ID
    */
   async getUserById(userId) {
-    if (this.useFlexibleBackend) {
-      // Usar el backend flexible
-      const users = await dataApiService.getData('profiles', { id: { $eq: userId } });
-      return users[0] || null;
+    if (this._isApiMode()) {
+      // Usar el backend flexible - consultar directamente la tabla profiles
+      try {
+        const users = await dataApiService.getData('profiles', { id: { $eq: userId } });
+        return users[0] || null;
+      } catch (error) {
+        console.error('Error obteniendo usuario por ID desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();
@@ -154,15 +195,15 @@ export class UserService {
    * Bloquear usuarios
    */
   async lockUsers(userIds) {
-    if (this.useFlexibleBackend) {
-      // En el backend flexible, podríamos tener una tabla专门 para estados de usuario
+    if (this._isApiMode()) {
+      // En el backend flexible, actualizar el estado de bloqueo
       const updates = userIds.map(userId => ({
         id: userId,
         locked: true,
         locked_at: new Date().toISOString()
       }));
 
-      // Actualizar múltiples usuarios (esto requeriría extensión del servicio de datos)
+      // Actualizar múltiples usuarios
       const results = [];
       for (const update of updates) {
         results.push(await dataApiService.updateData('profiles', update.id, {
@@ -192,12 +233,16 @@ export class UserService {
    * Desbloquear un usuario
    */
   async unlockUser(userId) {
-    if (this.useFlexibleBackend) {
-      // Usar el backend flexible
-      return await dataApiService.updateData('profiles', userId, {
-        locked: false,
-        locked_at: null
-      }, 'id');
+    if (this._isApiMode()) {
+      // Usar el backend flexible - endpoint POST /api/users/:id/unlock
+      try {
+        const response = await ApiClient.post(`/users/${userId}/unlock`);
+        // El backend devuelve { success: true, message: ... }
+        return response;
+      } catch (error) {
+        console.error('Error desbloqueando usuario desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();
@@ -219,24 +264,16 @@ export class UserService {
    * Obtener usuarios con 2FA habilitado
    */
   async getUsersWith2FA() {
-    if (this.useFlexibleBackend) {
-      // Consultar usuarios con 2FA habilitado desde la tabla de estado de seguridad
-      const securityStatuses = await dataApiService.getData('user_security_status', {
-        two_factor_enabled: { $eq: true }
-      });
-
-      const userIds = securityStatuses.map(status => status.user_id);
-      if (userIds.length === 0) return [];
-
-      // Obtener perfiles de usuarios
-      const userProfiles = await dataApiService.getData('profiles', {
-        id: { $in: userIds }
-      });
-
-      return userProfiles.map(profile => ({
-        ...profile,
-        security_status: securityStatuses.find(status => status.user_id === profile.id) || {}
-      }));
+    if (this._isApiMode()) {
+      // Usar el backend flexible - endpoint GET /api/users/2fa
+      try {
+        const response = await ApiClient.get('/users/2fa');
+        // El backend devuelve { success: true, users: [...] }
+        return response.users || [];
+      } catch (error) {
+        console.error('Error obteniendo usuarios con 2FA desde API:', error);
+        throw error;
+      }
     } else {
       // Usar Supabase directamente (funcionalidad existente)
       const { data: { user } } = await supabase.auth.getUser();

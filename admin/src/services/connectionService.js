@@ -386,7 +386,8 @@ class ConnectionService {
   static async setActiveConnection(connectionId) {
     try {
       if (ApiClient.isApiEnabled()) {
-        await ApiClient.put(`/connections/${connectionId}/activate`, {});
+        // El backend espera POST para activate, no PUT
+        await ApiClient.post(`/connections/${connectionId}/activate`);
         return { success: true, message: "Conexión activada correctamente" };
       }
 
