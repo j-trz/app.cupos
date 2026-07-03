@@ -13,9 +13,9 @@
     "clean": "rm -rf dist node_modules/.vite",
     "analyze": "vite build --mode analyze",
     "type-check": "tsc --noEmit",
-    "test:build": "npm run build && npm run preview",
-    "deps:update": "npm update",
-    "deps:audit": "npm audit && npm audit fix"
+    "test:build": "pnpm run build && pnpm run preview",
+    "deps:update": "pnpm update",
+    "deps:audit": "pnpm audit && pnpm audit fix"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",

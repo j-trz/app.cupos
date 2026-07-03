@@ -10,7 +10,6 @@ import { requireAuth, isAdmin, isAgencyAdminOrAdmin } from './middleware/auth.js
 import * as authController from './controllers/authController.js';
 import * as userController from './controllers/userController.js';
 import * as connectionController from './controllers/connectionController.js';
-import * as powerAutomateController from './controllers/powerAutomateController.js';
 import * as notificationController from './controllers/notificationController.js';
 import * as dataController from './controllers/dataController.js';
 
@@ -58,14 +57,6 @@ connectionRouter.post('/:id/activate', isAdmin, connectionController.activateCon
 connectionRouter.post('/:id/test', isAdmin, connectionController.testConnection);
 app.use('/api/connections', connectionRouter);
 
-// Rutas de Proxy Power Automate (/api/power-automate-proxy)
-const proxyRouter = express.Router();
-proxyRouter.use(requireAuth);
-proxyRouter.get('/availability', powerAutomateController.getAvailability);
-proxyRouter.get('/requests', powerAutomateController.getRequests);
-proxyRouter.get('/confirmations', isAgencyAdminOrAdmin, powerAutomateController.getConfirmations);
-proxyRouter.post('/submit-reservation', powerAutomateController.submitReservation);
-app.use('/api/power-automate-proxy', proxyRouter);
 
 // Rutas de Notificaciones (/api/notifications)
 const notificationRouter = express.Router();
