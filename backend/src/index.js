@@ -16,7 +16,7 @@ import * as dataController from './controllers/dataController.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middlewares globales
 app.use(cors({ origin: '*' })); // Permitir acceso del frontend desde cualquier origen
