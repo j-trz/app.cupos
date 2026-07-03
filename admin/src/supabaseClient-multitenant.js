@@ -3,12 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 // 🔐 BACKEND PRINCIPAL - Para Edge Functions, autenticación y seguridad
 const backendUrl =
   import.meta.env.VITE_BACKEND_SUPABASE_URL ||
-  "https://hdsmvuwrdwfivujjnubr.supabase.co";
-const backendKey = import.meta.env.VITE_BACKEND_SUPABASE_ANON_KEY;
+  "https://ernkkvbbwbzwbobymuxf.supabase.co";
+const backendKey = import.meta.env.VITE_BACKEND_SUPABASE_PUBLISHABLE_KEY;
 
 // 📊 BASE DE DATOS DEL USUARIO - Para datos dinámicos (configurable por usuario)
 const userDbUrl = import.meta.env.VITE_SUPABASE_URL;
-const userDbKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const userDbKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Cliente para el backend principal (Edge Functions, auth, seguridad)
 export const supabaseBackend = createClient(backendUrl, backendKey);

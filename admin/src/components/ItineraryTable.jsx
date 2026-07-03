@@ -6,6 +6,36 @@ const FALLBACK_LOGO = 'https://documents.sabre.com/static/images/tc/mail/icon-ai
 
 function parseRuta(ruta) {
   if (!ruta) return [];
+
+  // Si `ruta` viene como JSON (string) o como objeto con campo `vuelos`, lo mapeamos
+  try {
+    let parsed = ruta;
+    if (typeof ruta === 'string') {
+      // intentar parsear JSON; si falla, seguimos con el parser de tokens original
+      try {
+        parsed = JSON.parse(ruta);
+      } catch {
+        parsed = ruta;
+      }
+    }
+
+    if (parsed && typeof parsed === 'object' && parsed.vuelos && Array.isArray(parsed.vuelos)) {
+      return parsed.vuelos.map((v) => ({
+        compania: v.aerolinea || v.compania || '',
+        vuelo: v.numeroVuelo || v.vuelo || '',
+        fecha: v.fecha || '',
+        origen: v.origen || '',
+        destino: v.destino || '',
+        salida: v.horaSalida || v.salida || '',
+        llegada: v.horaLlegada || v.llegada || '',
+        clase: v.clase || v.cabina || ''
+      }));
+    }
+  } catch {
+    // Si algo falla, caemos al parser string por compatibilidad
+  }
+
+  // Compatibilidad hacia atrás: parsear string plano con tokens
   const tokens = String(ruta)
     .replace(/\n/g, ' ')
     .replace(/\s+/g, ' ')

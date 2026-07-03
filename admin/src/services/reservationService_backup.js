@@ -1,7 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { cacheService } from "./cacheService";
 import ConnectionService from "./connectionService";
-import AuthorizationService from "./authorizationService";
 
 class ReservationService {
   /**

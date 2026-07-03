@@ -6,6 +6,7 @@ import SecurityService from "../services/securityService";
 import TwoFactorService from "../services/twoFactorService";
 import TwoFactorSetup from "./TwoFactorSetup"; // eslint-disable-line no-unused-vars
 import TwoFactorVerify from "./TwoFactorVerify"; // eslint-disable-line no-unused-vars
+import ApiClient from "../services/apiClient";
 
 /**
  * Componente de login con funcionalidades de seguridad avanzadas
@@ -109,7 +110,18 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
       );
 
       if (result.success) {
-        // Login exitoso - verificar estado 2FA
+        // Modo API backend: saltar 2FA (el backend maneja la auth completa)
+        if (ApiClient.isApiEnabled() && result._apiToken) {
+          ApiClient.setToken(result._apiToken);
+          localStorage.setItem('api_token', result._apiToken);
+          console.log('✅ [API MODE] Login exitoso, omitiendo flujo 2FA');
+          if (onLoginSuccess) {
+            onLoginSuccess({ user: result.user, session: result.session });
+          }
+          return;
+        }
+
+        // Login exitoso (modo Supabase) - verificar estado 2FA
         console.log("✅ Login exitoso - verificando 2FA");
         
         const user = result.user;

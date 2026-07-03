@@ -119,15 +119,20 @@ class DataSourceService {
       const { connection: connWithCreds } =
         await ConnectionService.getConnection(connection.id, userPassword);
 
-      // Crear cliente de Supabase
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(
+      // Crear cliente de Supabase (reusar cliente cacheado)
+      const { createCustomSupabaseClient } = await import("../supabaseClient");
+      const supabase = createCustomSupabaseClient(
         connWithCreds.credentials.url,
-        connWithCreds.credentials.apiKey
+        connWithCreds.credentials.apiKey,
+        { storageKey: `sb-getsupabase-${connection.id || "anon"}` }
       );
 
-      // Obtener datos de la tabla configurada
-      const tableName = connection.column_mapping?.tableName || "solicitudes";
+      // Obtener nombre de tabla (priorizar credenciales si el usuario lo definió)
+      const tableName =
+        connWithCreds.credentials?.tableName ||
+        connWithCreds.credentials?.table_name ||
+        connection.column_mapping?.tableName ||
+        "solicitudes";
       const { data, error } = await supabase
         .from(tableName)
         .select("*")

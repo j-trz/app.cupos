@@ -4,7 +4,7 @@ import DataSourceInfo from '../components/DataSourceInfo';// eslint-disable-line
 import ReservationService from '../services/reservationService';
 import { HiArrowPathRoundedSquare } from "react-icons/hi2";// eslint-disable-line no-unused-vars
 import Swal from 'sweetalert2';
-import ItineraryTable from '../components/ItineraryTable.jsx';
+import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
 
 export default function Solicitudes() {
   const [seccion, setSeccion] = useState("solicitudes");

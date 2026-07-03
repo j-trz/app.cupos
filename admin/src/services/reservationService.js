@@ -3,6 +3,7 @@ import { cacheService } from "./cacheService";
 import ConnectionService from "./connectionService";
 import AuthorizationService from "./authorizationService";
 import NotificationService from "./notificationService";
+import ApiClient from "./apiClient";
 
 class ReservationService {
   /**
@@ -27,6 +28,28 @@ class ReservationService {
 
   static async _fetchAvailability() {
     try {
+      if (ApiClient.isApiEnabled()) {
+        console.log("🌐 Obteniendo disponibilidad desde API backend flexible...");
+        const result = await ApiClient.get("/power-automate-proxy/availability");
+        
+        if (!result.success) {
+          throw new Error(result.error || "Error al obtener disponibilidad");
+        }
+
+        const availabilityData = (result.data || []).map((producto) => {
+          const disponibilidad = parseInt(producto.disponibilidad || 0);
+          if (disponibilidad <= 5 && disponibilidad > 0) {
+            NotificationService.notifyLowAvailability(producto, 5);
+          }
+          return producto;
+        });
+
+        return {
+          success: true,
+          data: availabilityData
+        };
+      }
+
       // TEMPORAL: Obtener datos directamente sin Edge Function
       console.log("🔄 [TEMPORAL] Obteniendo disponibilidad directamente...");
 
@@ -137,6 +160,44 @@ class ReservationService {
 
   static async _fetchRequests() {
     try {
+      if (ApiClient.isApiEnabled()) {
+        console.log("🌐 Obteniendo solicitudes desde API backend flexible...");
+        const result = await ApiClient.get("/power-automate-proxy/requests");
+        
+        if (!result.success) {
+          throw new Error(result.error || "Error al obtener solicitudes");
+        }
+
+        const requestsData = (result.data || []).map((item) => ({
+          "@odata.etag": item["@odata.etag"] || "",
+          ItemInternalId: item.ItemInternalId || "",
+          Pedido_ID: item.Pedido_ID || item.Numero_Pedido || item.ItemInternalId || "",
+          Agencia: item.Agencia || "",
+          Contacto_Nombre: item.Contacto_Nombre || item.Usuario_Nombre || "",
+          Vuelo_Destino: item.Vuelo_Destino || item.Destino || "",
+          Nombre_Pasajero: item.Nombre_Pasajero || item.Pasajero_Nombre || "",
+          Apellido_Pasajero: item.Apellido_Pasajero || item.Pasajero_Apellido || "",
+          Temporada: item.Temporada || "",
+          Vuelo_Salida: item.Vuelo_Salida || item.Fecha_Salida || "",
+          Estado: "Solicitado",
+          Ruta: item.Ruta || "",
+          Fecha_Registro: item.Fecha_Registro || item.Created || "",
+          Vuelo_Codigo: item.Vuelo_Codigo || "",
+          Vuelo_Compania: item.Vuelo_Compania || "",
+          Vuelo_Precio: item.Vuelo_Precio || "",
+          Usuario_Email: item.Usuario_Email || "",
+          Pnr: item.Pnr || "",
+          Ficha: item.Ficha || "",
+          Neto_1: item.Neto_1 || "",
+          Op: item.Op || "",
+        }));
+
+        return {
+          success: true,
+          data: requestsData
+        };
+      }
+
       // Obtener filtros según el rol del usuario
       const filters = await AuthorizationService.getDataFilters();
       if (!filters.canView) {
@@ -295,6 +356,44 @@ class ReservationService {
 
   static async _fetchConfirmations() {
     try {
+      if (ApiClient.isApiEnabled()) {
+        console.log("🌐 Obteniendo confirmaciones desde API backend flexible...");
+        const result = await ApiClient.get("/power-automate-proxy/confirmations");
+        
+        if (!result.success) {
+          throw new Error(result.error || "Error al obtener confirmaciones");
+        }
+
+        const confirmationsData = (result.data || []).map((item) => ({
+          "@odata.etag": item["@odata.etag"] || "",
+          ItemInternalId: item.ItemInternalId || "",
+          Pedido_ID: item.Pedido_ID || item.Numero_Pedido || item.ItemInternalId || "",
+          Agencia: item.Agencia || "",
+          Contacto_Nombre: item.Contacto_Nombre || item.Usuario_Nombre || "",
+          Vuelo_Destino: item.Vuelo_Destino || item.Destino || "",
+          Nombre_Pasajero: item.Nombre_Pasajero || item.Pasajero_Nombre || "",
+          Apellido_Pasajero: item.Apellido_Pasajero || item.Pasajero_Apellido || "",
+          Temporada: item.Temporada || "",
+          Vuelo_Salida: item.Vuelo_Salida || item.Fecha_Salida || "",
+          Estado: "Confirmado",
+          Ruta: item.Ruta || "",
+          Fecha_Registro: item.Fecha_Registro || item.Created || "",
+          Vuelo_Codigo: item.Vuelo_Codigo || "",
+          Vuelo_Compania: item.Vuelo_Compania || "",
+          Vuelo_Precio: item.Vuelo_Precio || "",
+          Usuario_Email: item.Usuario_Email || "",
+          Pnr: item.Pnr || "",
+          Ficha: item.Ficha || "",
+          Neto_1: item.Neto_1 || "",
+          Op: item.Op || "",
+        }));
+
+        return {
+          success: true,
+          data: confirmationsData
+        };
+      }
+
       // Verificar permisos para ver confirmaciones
       // CORRECCIÓN: agency_user SÍ puede ver sus propias confirmaciones
       const canViewConfirmations =
@@ -416,51 +515,68 @@ class ReservationService {
         throw new Error(`Datos inválidos: ${validationErrors.join(", ")}`);
       }
 
-      // Obtener la conexión activa para determinar cómo enviar
-      const activeConnection = await ConnectionService.getActiveConnection();
-
-      if (!activeConnection) {
-        throw new Error("No hay conexión activa configurada");
-      }
-
       let result;
 
-      // Enviar según el tipo de conexión activa
-      if (activeConnection.type === "powerautomate") {
-        const { data, error } = await supabase.functions.invoke(
-          "power-automate-proxy",
-          {
-            body: {
-              action: "submit-reservation",
-              payload: reservationData,
-            },
-          }
-        );
-
-        if (error) {
-          throw new Error(error.message || "Error al enviar reserva");
-        }
+      if (ApiClient.isApiEnabled()) {
+        console.log("🌐 Enviando reserva a través de la API backend flexible...");
+        const data = await ApiClient.post("/power-automate-proxy/submit-reservation", {
+          payload: reservationData
+        });
 
         if (!data.success) {
-          throw new Error(data.error || "Error desconocido al enviar reserva");
+          throw new Error(data.error || "Error al enviar reserva");
         }
 
         result = {
           success: true,
           results: data.results,
-          referenceId: data.referenceId,
+          referenceId: data.referenceId || reservationData.pedidoId
         };
       } else {
-        // Para otros tipos de conexión, usar el sistema genérico
-        const submitResult = await ConnectionService.submitReservation(
-          reservationData
-        );
+        // Obtener la conexión activa para determinar cómo enviar
+        const activeConnection = await ConnectionService.getActiveConnection();
 
-        if (!submitResult.success) {
-          throw new Error(submitResult.error || "Error al enviar reserva");
+        if (!activeConnection) {
+          throw new Error("No hay conexión activa configurada");
         }
 
-        result = submitResult;
+        // Enviar según el tipo de conexión activa
+        if (activeConnection.type === "powerautomate") {
+          const { data, error } = await supabase.functions.invoke(
+            "power-automate-proxy",
+            {
+              body: {
+                action: "submit-reservation",
+                payload: reservationData,
+              },
+            }
+          );
+
+          if (error) {
+            throw new Error(error.message || "Error al enviar reserva");
+          }
+
+          if (!data.success) {
+            throw new Error(data.error || "Error desconocido al enviar reserva");
+          }
+
+          result = {
+            success: true,
+            results: data.results,
+            referenceId: data.referenceId,
+          };
+        } else {
+          // Para otros tipos de conexión, usar el sistema genérico
+          const submitResult = await ConnectionService.submitReservation(
+            reservationData
+          );
+
+          if (!submitResult.success) {
+            throw new Error(submitResult.error || "Error al enviar reserva");
+          }
+
+          result = submitResult;
+        }
       }
 
       // Invalidar cache después de enviar reserva

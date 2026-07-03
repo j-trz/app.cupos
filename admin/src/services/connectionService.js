@@ -1,9 +1,10 @@
 import { supabase } from "../supabaseClient";
 import { supabaseWithHeaders } from "./supabaseConfig";
 // No longer using client-side encryption for this service's core logic
-// import EncryptionService from "./encryptionService";
+// import EncryptionService from "./encryptionService"
 import DataValidator from "./dataValidator";
 import AuthorizationService from "./authorizationService";
+import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar conexiones a APIs externas de forma segura
@@ -16,6 +17,12 @@ class ConnectionService {
    */
   static async createConnection(connectionData) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        const result = await ApiClient.post("/connections", connectionData);
+        if (!result.success) throw new Error(result.error || "Error al crear conexión");
+        return { success: true, connection: result.connection };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -144,6 +151,11 @@ class ConnectionService {
    */
   static async getUserConnections() {
     try {
+      if (ApiClient.isApiEnabled()) {
+        const result = await ApiClient.get("/connections");
+        return { success: true, connections: result.connections || [] };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -333,6 +345,11 @@ class ConnectionService {
    */
   static async deleteConnection(connectionId) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        await ApiClient.delete(`/connections/${connectionId}`);
+        return { success: true, message: "Conexión eliminada correctamente" };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -368,6 +385,11 @@ class ConnectionService {
    */
   static async setActiveConnection(connectionId) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        await ApiClient.put(`/connections/${connectionId}/activate`, {});
+        return { success: true, message: "Conexión activada correctamente" };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -1426,22 +1448,10 @@ class ConnectionService {
         throw new Error("Credenciales de Supabase incompletas");
       }
 
-      // Importar dinámicamente para evitar problemas de dependencias
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabaseClient = createClient(projectUrl, anonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-          storageKey: `sb-temp-${dataType}-${tableName || "default"}`,
-        },
-        global: {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Prefer: "return=minimal",
-          },
-        },
+      // Usar helper para crear/reusar clientes supabase y evitar múltiples GoTrueClient
+      const { createCustomSupabaseClient } = await import("../supabaseClient");
+      const supabaseClient = createCustomSupabaseClient(projectUrl, anonKey, {
+        storageKey: `sb-temp-${dataType}-${tableName || "default"}`,
       });
 
       // Determinar tabla según credenciales
@@ -2109,6 +2119,11 @@ class ConnectionService {
    */
   static async testConnection(connection) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        const result = await ApiClient.post(`/connections/${connection.id}/test`, {});
+        return result;
+      }
+
       // Verificar sesión
       const {
         data: { user },

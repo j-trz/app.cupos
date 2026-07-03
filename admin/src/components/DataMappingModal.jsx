@@ -179,11 +179,14 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       // Crear cliente Supabase con headers correctos
       const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey);
 
-      // Obtener nombre de tabla configurado o usar por defecto
+      // Obtener nombre de tabla configurado (priorizar credenciales explícitas)
       const cm = typeof connection.column_mapping === 'string'
         ? JSON.parse(connection.column_mapping)
         : connection.column_mapping;
-      const tableName = cm?.tableName || 'reservas';
+
+      // Prioridad: credenciales.tableName > connection.column_mapping.tableName > 'reservas'
+      const tableNameFromCreds = (creds && (creds.tableName || creds.table_name || creds.table)) || null;
+      const tableName = tableNameFromCreds || cm?.tableName || 'reservas';
       
       console.log('🔍 Obteniendo estructura de columnas para tabla:', tableName);
       

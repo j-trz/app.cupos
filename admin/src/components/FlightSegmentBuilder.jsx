@@ -1,35 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HiOutlinePlus, HiOutlineTrash, HiOutlineArrowRight } from 'react-icons/hi2'; // eslint-disable-line no-unused-vars
 import { AIRLINES, AIRLINE_LOGOS, AIRPORTS } from './ItineraryDetails';
 
 const FlightSegmentBuilder = ({ value, onChange, disabled }) => {
   const [segments, setSegments] = useState([]);
   const [showBuilder, setShowBuilder] = useState(false);
+  const suppressEmit = useRef(false);
 
   // Parsear el valor inicial cuando cambia
   useEffect(() => {
-    if (value && typeof value === 'string') {
+    if (!value) {
+      // If incoming value is empty, clear segments but suppress emit
+      suppressEmit.current = true;
+      setSegments([]);
+      return;
+    }
+
+    // Accept either a JSON string or an already-parsed object
+    if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value);
-        if (parsed.vuelos && Array.isArray(parsed.vuelos)) {
-          setSegments(parsed.vuelos);
-        }
+        if (parsed && parsed.vuelos && Array.isArray(parsed.vuelos)) {
+            // Prevent re-emitting the same parsed value back to parent
+            suppressEmit.current = true;
+            setSegments(parsed.vuelos);
+          }
       } catch {
         // Si no es JSON válido, intentar parsear formato legacy
-        console.log('Parsing legacy format:', value);
+        console.warn('Parsing legacy format:', value);
+      }
+    } else if (typeof value === 'object') {
+      if (value.vuelos && Array.isArray(value.vuelos)) {
+        suppressEmit.current = true;
+        setSegments(value.vuelos);
       }
     }
   }, [value]);
 
   // Actualizar el valor cuando cambian los segmentos
   useEffect(() => {
+    // If segments were just set from incoming value, suppress the echo
+    if (suppressEmit.current) {
+      suppressEmit.current = false;
+      return;
+    }
+
     if (segments.length > 0) {
       const rutaObj = {
         localizadorReserva: "",
         detallesViajero: [],
         vuelos: segments
       };
-      onChange(JSON.stringify(rutaObj));
+      // Emitir el objeto; el padre decidirá cómo normalizar/serializarlo
+      onChange(rutaObj);
     } else {
       onChange('');
     }

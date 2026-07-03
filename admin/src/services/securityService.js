@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import AuthorizationService from "./authorizationService";
+import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar funcionalidades de seguridad avanzadas
@@ -96,6 +97,36 @@ class SecurityService {
    */
   static async validateLogin(email, password, metadata = {}) {
     const { ipAddress, userAgent } = metadata;
+
+    // Modo API backend local: delegar todo al backend
+    if (ApiClient.isApiEnabled()) {
+      try {
+        const data = await ApiClient.post('/auth/login', { email, password });
+        if (data.token) {
+          return {
+            success: true,
+            user: {
+              id: data.user?.id,
+              email: data.user?.email,
+            },
+            session: { access_token: data.token },
+            _apiToken: data.token,
+          };
+        }
+        return {
+          success: false,
+          error: 'invalid_credentials',
+          message: data.error || 'Credenciales inválidas',
+        };
+      } catch (error) {
+        console.error('[API MODE] Error en login:', error);
+        return {
+          success: false,
+          error: 'system_error',
+          message: error.message || 'Error del sistema. Intente nuevamente.',
+        };
+      }
+    }
 
     try {
       // 1. Verificar estado de bloqueo antes del intento

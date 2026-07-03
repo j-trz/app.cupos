@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'; // eslint-disable-line no-unused-vars
 import { supabase } from '../supabaseClient';
 import AuthorizationService from '../services/authorizationService';
+import ApiClient from '../services/apiClient';
 
 const AuthContext = createContext({});
 
@@ -45,8 +46,88 @@ export const AuthProvider = ({ children }) => {
     console.log('🧹 Perfil persistido limpiado');
   };
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MODO API BACKEND LOCAL (VITE_API_URL configurado)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Inicializar sesión en modo API local
+   * Recupera el token JWT y el perfil guardados en localStorage
+   */
+  const initializeApiAuth = () => {
+    const token = localStorage.getItem('api_token');
+    if (!token) return false;
+
+    ApiClient.setToken(token);
+
+    const persisted = getPersistedProfile();
+    if (persisted) {
+      // Reconstruir objeto "user" mínimo compatible con el resto del contexto
+      const minUser = {
+        id: persisted.id,
+        email: persisted.email,
+      };
+      setUser(minUser);
+      setProfile(persisted);
+      console.log('✅ [API MODE] Sesión restaurada desde localStorage:', persisted.role);
+      return true;
+    }
+    return false;
+  };
+
+  /**
+   * Login local a través de la API backend
+   */
+  const signInWithApi = async (email, password) => {
+    const data = await ApiClient.post('/auth/login', { email, password });
+
+    if (!data.token) throw new Error(data.error || 'Credenciales inválidas');
+
+    // Guardar token
+    ApiClient.setToken(data.token);
+    localStorage.setItem('api_token', data.token);
+
+    const userProfile = {
+      id: data.user?.id,
+      email: data.user?.email,
+      role: data.user?.role || AuthorizationService.ROLES.AGENCY_USER,
+      agency: data.user?.agency || null,
+      nombre: data.user?.nombre || null,
+      apellido: data.user?.apellido || null,
+    };
+
+    const minUser = { id: userProfile.id, email: userProfile.email };
+    setUser(minUser);
+    setProfile(userProfile);
+    persistProfile(userProfile);
+    console.log('✅ [API MODE] Login exitoso:', userProfile.role);
+    return { user: minUser, profile: userProfile };
+  };
+
+  /**
+   * Cierre de sesión en modo API local
+   */
+  const signOutApi = () => {
+    ApiClient.clearToken();
+    localStorage.removeItem('api_token');
+    handleSignOut();
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MODO SUPABASE (por defecto cuando no hay VITE_API_URL)
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // Inicializar sesión al montar
   useEffect(() => {
+    if (ApiClient.isApiEnabled()) {
+      // Modo API local
+      initializeApiAuth();
+      setIsLoading(false);
+      setIsInitialized(true);
+      return;
+    }
+
+    // Modo Supabase
     initializeAuth();
 
     // Escuchar cambios de autenticación
@@ -59,17 +140,14 @@ export const AuthProvider = ({ children }) => {
         } else if (event === 'SIGNED_OUT') {
           handleSignOut();
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          // En refresh de token, mantener datos y verificar perfil si es necesario
           setUser(session.user);
           
-          // Si no tenemos perfil o solo tenemos el perfil por defecto, intentar recargar
           if (!profile || profile.role === AuthorizationService.ROLES.AGENCY_USER) {
             const persisted = getPersistedProfile();
             if (persisted) {
               setProfile(persisted);
               console.log('🔄 Perfil restaurado desde localStorage después de token refresh');
             } else {
-              // Intentar obtener perfil real
               try {
                 const userProfile = await AuthorizationService.getCurrentUserProfile();
                 if (userProfile && userProfile.id) {
@@ -92,14 +170,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
-   * Inicializar autenticación
+   * Inicializar autenticación (modo Supabase)
    */
   const initializeAuth = async () => {
     try {
       console.log('🔄 Inicializando autenticación...');
       setIsLoading(true);
       
-      // Verificar sesión actual
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -126,7 +203,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Manejar inicio de sesión exitoso
+   * Manejar inicio de sesión exitoso (modo Supabase)
    */
   const handleSignIn = async (authUser, fromInitialize = false) => {
     try {
@@ -139,13 +216,11 @@ export const AuthProvider = ({ children }) => {
       setUser(authUser);
       console.log('👤 Usuario establecido:', authUser.email);
       
-      // Primero intentar usar perfil persistido si existe
       const persistedProfile = getPersistedProfile();
       if (persistedProfile && persistedProfile.id === authUser.id) {
         setProfile(persistedProfile);
         console.log('✅ Perfil cargado desde localStorage:', persistedProfile.role);
         
-        // Verificar en background si hay actualizaciones
         AuthorizationService.getCurrentUserProfile()
           .then(realProfile => {
             if (realProfile && realProfile.id && realProfile.role !== persistedProfile.role) {
@@ -158,10 +233,9 @@ export const AuthProvider = ({ children }) => {
             console.warn('⚠️ Error verificando perfil en background:', error);
           });
         
-        return; // Salir temprano, ya tenemos el perfil
+        return;
       }
       
-      // Si no hay perfil persistido, crear uno temporal de agency_user
       const defaultProfile = {
         id: authUser.id,
         email: authUser.email,
@@ -172,11 +246,10 @@ export const AuthProvider = ({ children }) => {
       setProfile(defaultProfile);
       console.log('⏳ Perfil temporal establecido, obteniendo perfil real...');
       
-      // Intentar obtener perfil real con timeout más largo
       try {
         const profilePromise = AuthorizationService.getCurrentUserProfile();
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), 8000) // Aumentado a 8 segundos
+          setTimeout(() => reject(new Error('Timeout')), 8000)
         );
         
         const userProfile = await Promise.race([profilePromise, timeoutPromise]);
@@ -201,13 +274,11 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Error crítico en handleSignIn:', error);
       
-      // Intentar usar perfil persistido como fallback
       const persistedProfile = getPersistedProfile();
       if (persistedProfile && persistedProfile.id === authUser.id) {
         setProfile(persistedProfile);
         console.log('🔧 Perfil de emergencia desde localStorage:', persistedProfile.role);
       } else {
-        // Último recurso: perfil temporal
         const fallbackProfile = {
           id: authUser.id,
           email: authUser.email,
@@ -241,6 +312,10 @@ export const AuthProvider = ({ children }) => {
    */
   const signOut = async () => {
     try {
+      if (ApiClient.isApiEnabled()) {
+        signOutApi();
+        return;
+      }
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error) {
@@ -257,8 +332,7 @@ export const AuthProvider = ({ children }) => {
       setProfile(updatedProfile);
       persistProfile(updatedProfile);
       
-      // Actualizar cache
-      if (user?.id) {
+      if (user?.id && !ApiClient.isApiEnabled()) {
         AuthorizationService._profileCache.set(user.id, updatedProfile);
         AuthorizationService._cacheExpiry.set(
           user.id,
@@ -316,7 +390,6 @@ export const AuthProvider = ({ children }) => {
       return hasAgencyAdminAccess();
     }
 
-    // Rutas públicas para usuarios autenticados
     return true;
   };
 
@@ -327,6 +400,7 @@ export const AuthProvider = ({ children }) => {
     isInitialized,
     isAuthenticated: !!user,
     signOut,
+    signInWithApi,   // Disponible para la pantalla de login cuando VITE_API_URL está activo
     updateProfile,
     // Verificaciones de rol optimizadas
     isAdmin,
@@ -338,7 +412,9 @@ export const AuthProvider = ({ children }) => {
     // Info útil
     userRole: profile?.role || AuthorizationService.ROLES.AGENCY_USER,
     userAgency: profile?.agency || null,
-    userEmail: user?.email || null
+    userEmail: user?.email || null,
+    // Flag de modo de autenticación
+    isApiMode: ApiClient.isApiEnabled(),
   };
 
   return (

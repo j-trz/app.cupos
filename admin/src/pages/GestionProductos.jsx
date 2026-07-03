@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 /* eslint-disable no-unused-vars */
 import {
   HiOutlinePlus,  
@@ -14,16 +14,22 @@ import {
 import Swal from 'sweetalert2';
 import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
+import { createCustomSupabaseClient } from '../supabaseClient';
 import DataOperationsService from '../services/dataOperationsService';
+import AgencyService from '../services/agencyService';
 import { AIRLINE_LOGOS, AIRLINES } from '../components/ItineraryDetails.jsx';
 import ItineraryTable from '../components/ItineraryTable.jsx'; // eslint-disable-line no-unused-vars
 import FlightSegmentBuilder from '../components/FlightSegmentBuilder.jsx'; // eslint-disable-line no-unused-vars
-import { FaSuitcaseRolling } from 'react-icons/fa6';
-import { HiOutlineBriefcase } from "react-icons/hi2";
-import { MdOutlineLuggage } from "react-icons/md";
+import UserService from '../services/userService';
+import { FaSuitcaseRolling } from 'react-icons/fa6';// eslint-disable-line no-unused-vars
+import { HiOutlineBriefcase } from "react-icons/hi2";// eslint-disable-line no-unused-vars
+import { MdOutlineLuggage } from "react-icons/md";// eslint-disable-line no-unused-vars
+import { LuGitBranchPlus } from "react-icons/lu";// eslint-disable-line no-unused-vars
+
 
 // Iconos de equipaje usando react-icons con overlay de tachado cuando no está incluido
-const BaggageIcon = ({ included, children }) => (
+// Prefijamos con _ para evitar la regla no-unused-vars cuando ESLint analiza exports
+const _BaggageIcon = ({ included, children }) => (
   <span className="relative inline-flex items-center justify-center">
     <span className={included ? 'text-green-600' : 'text-gray-400'}>
       {children}
@@ -49,6 +55,11 @@ const GestionProductos = () => {
   const [seccion, setSeccion] = useState('gestion-productos');
   const [popupRutaOpen, setPopupRutaOpen] = useState(false);
   const [rutaSeleccionada, setRutaSeleccionada] = useState(null);
+  const [agencias, setAgencias] = useState([]);
+  const [distribucionesMap, setDistribucionesMap] = useState({}); // productId -> distribucion record
+  const [agencyView, setAgencyView] = useState('Global'); // 'Global' or agency name to preview
+  const [showDistribuirModal, setShowDistribuirModal] = useState(false);
+  const [distribucion, setDistribucion] = useState({}); // { agenciaName: cantidad }
 
   // Resolver ID robusto desde diferentes fuentes
   const resolveId = (obj) => {
@@ -85,49 +96,20 @@ const GestionProductos = () => {
     inf_fare: ''
   });
 
-  useEffect(() => {
-    checkActiveConnection();
-  }, []);
-
-  useEffect(() => {
-    if (activeConnection) {
-      loadProductos();
-    }
-  }, [activeConnection]);
-
-  const checkActiveConnection = async () => {
-    try {
-      setConnectionStatus('checking');
-      const connection = await ConnectionService.getActiveConnection('productos');
-      
-      if (connection) {
-        setActiveConnection(connection);
-        setConnectionStatus('connected');
-        console.log('✅ Conexión activa detectada:', connection);
-      } else {
-        setConnectionStatus('no_connection');
-        console.warn('⚠️ No hay conexión activa configurada');
-      }
-    } catch (error) {
-      setConnectionStatus('error');
-      console.error('❌ Error verificando conexión activa:', error);
-    }
-  };
-
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     if (!activeConnection) return;
 
     setLoading(true);
     try {
-      console.log('🔄 Cargando productos desde conexión activa...');
-      
+      console.warn('🔄 Cargando productos desde conexión activa...');
+
       // Usar ConnectionService para obtener datos de productos
       const result = await ConnectionService.getDataFromActiveConnection('productos');
-      
+
       if (result.success && result.data) {
         setProductos(result.data);
-        console.log(`✅ ${result.data.length} productos cargados exitosamente`);
-        
+        console.warn(`✅ ${result.data.length} productos cargados exitosamente`);
+
         // Mostrar warning si hay problemas de validación
         if (result.validationWarning) {
           Swal.fire({
@@ -150,6 +132,81 @@ const GestionProductos = () => {
       setProductos([]);
     } finally {
       setLoading(false);
+    }
+  }, [activeConnection]);
+
+  // Cargar distribuciones desde tabla separada 'distribuciones'
+  const loadDistribuciones = useCallback(async () => {
+    if (!activeConnection) return;
+    try {
+      console.warn('🔄 Cargando distribuciones desde la tabla de distribuciones...');
+      const res = await ConnectionService.getDataFromActiveConnection('distribuciones');
+      if (res && res.success && Array.isArray(res.data)) {
+        const map = {};
+        res.data.forEach(r => {
+          // intentar asociar al producto por campos comunes
+          const pid = r.product_id ?? r.productId ?? r.product ? (r.product_id ?? r.productId ?? r.product) : null;
+          if (pid) {
+            map[String(pid)] = r;
+          }
+        });
+        setDistribucionesMap(map);
+        console.warn('✅ Distribuciones cargadas:', Object.keys(map).length);
+      } else {
+        console.warn('⚠️ No hay distribuciones en la conexión o no se pudo leer');
+        setDistribucionesMap({});
+      }
+    } catch (err) {
+      console.error('❌ Error cargando distribuciones:', err);
+      setDistribucionesMap({});
+    }
+  }, [activeConnection]);
+
+  useEffect(() => {
+    checkActiveConnection();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (activeConnection) {
+        await loadProductos();
+        await loadDistribuciones();
+      }
+    })();
+  }, [activeConnection, loadProductos, loadDistribuciones]);
+
+  // Cargar agencias al montar (por si se necesita antes de conexión)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await AgencyService.listAgencies({ activeOnly: true, limit: 500 });
+        if (!mounted) return;
+        const list = (res && res.data) ? res.data.map(a => a.name) : [];
+        if (mounted) setAgencias(list);
+      } catch {
+        if (mounted) setAgencias(UserService.getValidAgencies());
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const checkActiveConnection = async () => {
+    try {
+      setConnectionStatus('checking');
+      const connection = await ConnectionService.getActiveConnection('productos');
+      
+      if (connection) {
+        setActiveConnection(connection);
+        setConnectionStatus('connected');
+  console.warn('✅ Conexión activa detectada:', connection);
+      } else {
+        setConnectionStatus('no_connection');
+        console.warn('⚠️ No hay conexión activa configurada');
+      }
+    } catch (error) {
+      setConnectionStatus('error');
+      console.error('❌ Error verificando conexión activa:', error);
     }
   };
 
@@ -201,6 +258,112 @@ const GestionProductos = () => {
     setShowModal(true);
   };
 
+  const openDistribuir = (producto) => {
+    setEditingProduct(producto);
+    // Inicializar distribución: por defecto dejamos en undefined (ilimitado)
+    // y solo prellenamos las agencias que ya tienen un valor explícito.
+    const init = {};
+    agencias.forEach(a => { init[a] = undefined; });
+    // Si producto tiene campo distribucion por agencia, aplicarlo
+    if (producto.distribucion && typeof producto.distribucion === 'object') {
+      Object.entries(producto.distribucion).forEach(([k, v]) => {
+        // v === null/''/undefined -> unlimited
+        init[k] = v === null || v === '' ? undefined : Number(v) || undefined;
+      });
+    }
+    setDistribucion(init);
+    setShowDistribuirModal(true);
+  };
+
+  const handleDistributeStock = async (e) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    // No descontamos stock al guardar una distribución: los caps son límites de visibilidad
+    // y no se suman. Simplemente persistimos la configuración de caps por agencia.
+
+    try {
+      setLoading(true);
+      // Persistir distribuciones en una tabla separada 'distribuciones' en lugar de
+      // sobrescribir el producto directamente. Mantendremos product.disponibilidad
+      // como el total base; la disponibilidad por agencia se calcula en la UI.
+      let connWithCreds = activeConnection;
+      if (activeConnection.type === 'supabase') {
+        const creds = await ConnectionService.getDecryptedCredentials(activeConnection.id);
+        const supaCreds = {
+          projectUrl: creds.projectUrl || creds.project_url || creds.url || creds.supabaseUrl || creds.supabase_url,
+          anonKey: creds.anonKey || creds.anon_key || creds.key,
+          tableName: creds.tableName || creds.table_name || creds.table || 'reservas'
+        };
+        connWithCreds = { ...activeConnection, credentials: supaCreds };
+      }
+
+      const recordId = resolveId(editingProduct);
+      // Para operaciones específicas sobre la tabla 'distribuciones' no
+      // asumimos el tableName por defecto de la conexión. Creamos un objeto
+      // temporal con credentials.tableName = 'distribuciones' para pasar
+      // explícitamente el destino al servicio de datos.
+      const connForDistrib = {
+        ...connWithCreds,
+        credentials: {
+          ...(connWithCreds.credentials || {}),
+          tableName: 'distribuciones'
+        }
+      };
+
+      // Usar la función RPC SECURITY DEFINER en la base: fn_upsert_distribucion
+      // Construir cliente Supabase desde las credenciales desencriptadas
+      if (connForDistrib && connForDistrib.credentials) {
+        const creds = connForDistrib.credentials;
+        const supabaseUrl = creds.projectUrl || creds.project_url || creds.url || creds.supabaseUrl || creds.supabase_url;
+        const anonKey = creds.anonKey || creds.anon_key || creds.key;
+        if (!supabaseUrl || !anonKey) throw new Error('Credenciales Supabase incompletas para RPC');
+        // crear cliente temporal que reutiliza el storageKey por tabla
+        const supabase = createCustomSupabaseClient(
+          supabaseUrl,
+          anonKey,
+          { storageKey: `sb-rpc-distribuciones` }
+        );
+
+        // Sanitize payload: representamos 'unlimited' as null
+        const distribForRpc = {};
+        Object.entries(distribucion || {}).forEach(([k, v]) => {
+          if (v === undefined || v === null || v === '') {
+            distribForRpc[k] = null; // means unlimited for that agency
+          } else if (!Number.isNaN(Number(v))) {
+            distribForRpc[k] = Number(v);
+          }
+        });
+
+        const payload = {
+          p_product_id: Number(recordId),
+          p_distribucion: distribForRpc,
+          p_total_asignado: null,
+          p_updated_at: new Date().toISOString()
+        };
+
+        console.warn('🔄 Llamando RPC fn_upsert_distribucion con payload:', payload);
+        const { error: rpcErr } = await supabase.rpc('fn_upsert_distribucion', payload);
+        if (rpcErr) {
+          // mostrar mensaje más legible si viene de la DB
+          throw new Error(rpcErr.message || JSON.stringify(rpcErr));
+        }
+      } else {
+        throw new Error('Conexión para distribuciones no configurada');
+      }
+
+      // Éxito
+      await loadDistribuciones();
+      setShowDistribuirModal(false);
+      Swal.fire({ icon: 'success', title: 'Distribución guardada', timer: 1600, showConfirmButton: false });
+    } catch (error) {
+      console.error('Error guardando distribución:', error);
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo guardar la distribución' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDelete = async (producto) => {
     if (!activeConnection) {
       Swal.fire({
@@ -238,8 +401,8 @@ const GestionProductos = () => {
 
     if (result.isConfirmed) {
       try {
-        console.log('🗑️ Eliminando producto:', producto);
-        console.log('🆔 ID detectado para delete:', resolveId(producto));
+  console.warn('🗑️ Eliminando producto:', producto);
+  console.warn('🆔 ID detectado para delete:', resolveId(producto));
         
         // Usar DataOperationsService para eliminar (solo Supabase)
         // Preparar credenciales si la conexión es Supabase
@@ -322,14 +485,14 @@ const GestionProductos = () => {
         ficha: formData.ficha,
         temporada: formData.temporada,
         neto_1: formData.neto_1,
-        op: formData.op,
+  op: formData.op !== '' && formData.op != null ? String(Number(formData.op).toFixed(2)) : null,
         carryon: Boolean(formData.carryon),
         handbag: Boolean(formData.handbag),
         checkedbag: Boolean(formData.checkedbag),
         inf_fare: formData.inf_fare
       };
 
-      console.log(editingProduct ? '✏️ Actualizando producto:' : '➕ Creando producto:', productData);
+  console.warn(editingProduct ? '✏️ Actualizando producto:' : '➕ Creando producto:', productData);
 
       // Validar conexión para creación: solo Supabase soportado
       if (!editingProduct && activeConnection.type !== 'supabase') {
@@ -367,7 +530,7 @@ const GestionProductos = () => {
         }
         // Actualizar producto existente
         const recordId = resolveId(editingProduct);
-        console.log('🔎 ID detectado para update:', recordId, editingProduct);
+  console.warn('🔎 ID detectado para update:', recordId, editingProduct);
         result = await DataOperationsService.updateData(
           activeConnection.type,
           connectionWithCreds,
@@ -409,6 +572,40 @@ const GestionProductos = () => {
       setLoading(false);
     }
   };
+
+  // Memoized handler para cambios de ruta (evita recrear la función en cada render)
+  const handleRutaChange = useCallback((value) => {
+    setFormData(prev => {
+      // Normalizar a string JSON canónica
+      let newRuta = '';
+      try {
+        if (!value) newRuta = '';
+        else if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            newRuta = JSON.stringify(parsed);
+          } catch {
+            newRuta = value;
+          }
+        } else if (typeof value === 'object') {
+          newRuta = JSON.stringify(value);
+        } else {
+          newRuta = String(value);
+        }
+      } catch {
+        newRuta = String(value);
+      }
+
+      try {
+        const prevRutaCanonical = prev.ruta ? JSON.stringify(JSON.parse(prev.ruta)) : '';
+        if (prevRutaCanonical === newRuta) return prev;
+      } catch {
+        if (prev.ruta === newRuta) return prev;
+      }
+
+      return { ...prev, ruta: newRuta };
+    });
+  }, []);
 
   const filteredProductos = productos.filter(producto =>
     (producto.codigo_cupo?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -486,7 +683,7 @@ const GestionProductos = () => {
     <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Productos</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <button
               onClick={loadProductos}
               disabled={!activeConnection || loading}
@@ -503,6 +700,14 @@ const GestionProductos = () => {
               <HiOutlinePlus />
               Nuevo Producto
             </button>
+            {/* Selector de vista por agencia */}
+            <div className="flex items-center space-x-2 ml-3">
+              <label className="text-sm text-gray-600">Ver disponibilidad:</label>
+              <select value={agencyView} onChange={(e) => setAgencyView(e.target.value)} className="px-2 py-1 border rounded">
+                <option value="Global">Global</option>
+                {agencias.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -579,13 +784,52 @@ const GestionProductos = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-md text-gray-500">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          parseInt(producto.disponibilidad) > 0
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {producto.disponibilidad || 0}
-                        </span>
+                        {
+                          (() => {
+                            const pid = String(resolveId(producto) ?? '');
+                            const distRecord = distribucionesMap[pid];
+                            const base = Number(producto.disponibilidad || 0);
+                            // helper to sum distribuciones object
+                            const sumDistrib = (obj) => Object.values(obj || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+
+                            let displayValue = base;
+                            let assignedNote = null;
+
+                            if (agencyView === 'Global') {
+                              if (distRecord && distRecord.distribucion && typeof distRecord.distribucion === 'object') {
+                                const total = sumDistrib(distRecord.distribucion);
+                                displayValue = total;
+                                assignedNote = `Asignado: ${total}`;
+                              } else {
+                                displayValue = base;
+                              }
+                            } else {
+                              // view by specific agency
+                              if (distRecord && distRecord.distribucion && typeof distRecord.distribucion === 'object') {
+                                const val = Number(distRecord.distribucion[agencyView] || 0);
+                                displayValue = val;
+                                const total = sumDistrib(distRecord.distribucion);
+                                assignedNote = `Asignado total: ${total}`;
+                              } else {
+                                // no distribuciones -> show base availability as full
+                                displayValue = base;
+                              }
+                            }
+
+                            const badgeClass = displayValue > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+
+                            return (
+                              <>
+                                <span className={`px-2 py-1 rounded-full text-xs ${badgeClass}`}>
+                                  {displayValue}
+                                </span>
+                                {assignedNote && (
+                                  <div className="text-xs text-gray-500 mt-1">{assignedNote}</div>
+                                )}
+                              </>
+                            );
+                          })()
+                        }
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         ${producto.precio || 0}
@@ -597,14 +841,19 @@ const GestionProductos = () => {
                         {producto.fecha_regreso || producto.regreso || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
-                        {producto.ruta ? (
-                          <button
-                            className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
-                            onClick={() => { setRutaSeleccionada(producto.ruta); setPopupRutaOpen(true); }}
-                          >
-                            Ver itinerario
-                          </button>
-                        ) : '—'}
+                        {(
+                          producto.ruta && (
+                            (typeof producto.ruta === 'string' && producto.ruta.trim() !== '') ||
+                            (typeof producto.ruta === 'object' && Array.isArray(producto.ruta.vuelos) && producto.ruta.vuelos.length > 0)
+                          )
+                        ) ? (
+                            <button
+                              className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
+                              onClick={() => { setRutaSeleccionada(producto.ruta); setPopupRutaOpen(true); }}
+                            >
+                              Ver itinerario
+                            </button>
+                          ) : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         {producto.pnr || '—'}
@@ -619,24 +868,24 @@ const GestionProductos = () => {
                         ${producto.neto_1 || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
-                        {producto.op || '—'}
+                        {producto.op ? `$${producto.op}` : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         <div className="flex items-center justify-center gap-3">
                           <span title="Handbag">
-                            <BaggageIcon included={!!producto.handbag}>
+                            <_BaggageIcon included={!!producto.handbag}>
                               <HiOutlineBriefcase size={25} />
-                            </BaggageIcon>
+                            </_BaggageIcon>
                           </span>
                           <span title="Carry-on">
-                            <BaggageIcon included={!!producto.carryon}>
+                            <_BaggageIcon included={!!producto.carryon}>
                               <MdOutlineLuggage size={25} />
-                            </BaggageIcon>
+                            </_BaggageIcon>
                           </span>
                           <span title="Checked bag">
-                            <BaggageIcon included={!!producto.checkedbag}>
+                            <_BaggageIcon included={!!producto.checkedbag}>
                               <FaSuitcaseRolling size={25} />
-                            </BaggageIcon>
+                            </_BaggageIcon>
                           </span>
                         </div>
                       </td>
@@ -658,6 +907,13 @@ const GestionProductos = () => {
                             title="Eliminar"
                           >
                             <HiOutlineTrash className='w-5 h-5' />
+                          </button>
+                          <button
+                            onClick={() => openDistribuir(producto)}
+                            className="text-[#767c87] px-3 py-1 rounded text-sm hover:text-[#2c4b8b] transition-colors"
+                            title="Distribuir stock"
+                          >
+                            <LuGitBranchPlus className='w-5 h-5'/>
                           </button>
                         </div>
                       </td>
@@ -897,15 +1153,20 @@ const GestionProductos = () => {
                     {/* OP */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        OP
+                        OP (monto)
                       </label>
-                      <input
-                        type="text"
-                        value={formData.op}
-                        onChange={(e) => setFormData({...formData, op: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
-                        placeholder="Operador"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.op}
+                          onChange={(e) => setFormData({...formData, op: e.target.value})}
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
                     </div>
 
                     {/* Tarifa Infante */}
@@ -936,9 +1197,9 @@ const GestionProductos = () => {
                     Ruta de Vuelo
                   </h3>
                   <div className="pl-9">
-                    <FlightSegmentBuilder 
+                    <FlightSegmentBuilder
                       value={formData.ruta}
-                      onChange={(value) => setFormData({...formData, ruta: value})}
+                      onChange={handleRutaChange}
                     />
                   </div>
                 </div>
@@ -1033,6 +1294,39 @@ const GestionProductos = () => {
           </div>
         )}
       </div>
+
+      {/* Modal distribuir stock */}
+      {showDistribuirModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#2c4b8b]">Distribuir Stock por Agencia</h3>
+              <button onClick={() => setShowDistribuirModal(false)} className="text-gray-500">&times;</button>
+            </div>
+            <form onSubmit={handleDistributeStock} className="space-y-4">
+              <div className="text-sm text-gray-600">Disponibilidad total: <strong>{editingProduct?.disponibilidad || 0}</strong></div>
+              <div className="grid grid-cols-1 gap-3">
+                {agencias.map((a) => (
+                  <label key={a} className="flex items-center justify-between">
+                    <span>{a}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={distribucion[a] ?? 0}
+                      onChange={(e) => setDistribucion({...distribucion, [a]: Number(e.target.value)})}
+                      className="w-28 px-3 py-1 border rounded"
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end gap-3 mt-4">
+                <button type="button" onClick={() => setShowDistribuirModal(false)} className="px-4 py-2 border rounded">Cancelar</button>
+                <button type="submit" disabled={loading} className="px-4 py-2 bg-[#2c4b8b] text-white rounded">Guardar distribución</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

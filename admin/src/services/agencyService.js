@@ -10,7 +10,7 @@ import { createClient } from "@supabase/supabase-js";
  */
 const BUCKET = "agency-logos";
 const supabaseUrlStorage = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKeyStorage = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKeyStorage = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Cliente dedicado para Storage (sin headers JSON globales)
 const supabaseStorage = createClient(supabaseUrlStorage, supabaseKeyStorage, {
   auth: {

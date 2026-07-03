@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import AuthorizationService from "./authorizationService";
+import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar notificaciones del sistema
@@ -66,6 +67,25 @@ class NotificationService {
     data = {},
   }) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        const config = this.NOTIFICATION_CONFIG[type];
+        const res = await ApiClient.post("/notifications", {
+          type,
+          title: title || config.title,
+          message,
+          icon: config.icon,
+          color: config.color,
+          priority: config.priority,
+          targetUserId,
+          targetRole,
+          data
+        });
+        return {
+          success: true,
+          notification: { id: res.notificationId }
+        };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -101,7 +121,7 @@ class NotificationService {
 
       if (error) throw error;
 
-      console.log(`✅ Notificación creada: ${type} - ${message}`);
+      console.log(`` + `✅ Notificación creada: ${type} - ${message}`);
       return {
         success: true,
         notification,
@@ -128,6 +148,27 @@ class NotificationService {
     includeHidden = false
   ) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        const queryParams = new URLSearchParams({
+          limit,
+          onlyUnread,
+          includeHidden
+        }).toString();
+        const data = await ApiClient.get(`/notifications?${queryParams}`);
+        
+        const notifications = (data.notifications || []).map((notification) => ({
+          ...notification,
+          id: notification.notification_id,
+          data: this.safeParseJSON(notification.data),
+        }));
+
+        return {
+          success: true,
+          notifications,
+          unreadCount: notifications.filter((n) => !n.is_read && !n.is_hidden).length,
+        };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -175,6 +216,11 @@ class NotificationService {
    */
   static async markAsRead(notificationId, readStatus = true) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        await ApiClient.put(`/notifications/${notificationId}/read`, { isRead: readStatus });
+        return { success: true };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -204,6 +250,11 @@ class NotificationService {
    */
   static async markAllAsRead() {
     try {
+      if (ApiClient.isApiEnabled()) {
+        const data = await ApiClient.put("/notifications/read-all", {});
+        return { success: true, updatedCount: data.updatedCount || 0 };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -234,6 +285,11 @@ class NotificationService {
    */
   static async hideNotification(notificationId, hiddenStatus = true) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        await ApiClient.put(`/notifications/${notificationId}/hide`, { isHidden: hiddenStatus });
+        return { success: true };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -266,6 +322,11 @@ class NotificationService {
    */
   static async deleteNotification(notificationId) {
     try {
+      if (ApiClient.isApiEnabled()) {
+        await ApiClient.delete(`/notifications/${notificationId}`);
+        return { success: true };
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();

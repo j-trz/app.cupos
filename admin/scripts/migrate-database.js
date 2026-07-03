@@ -6,11 +6,11 @@ const path = require("path");
 require("dotenv").config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Necesita la clave de servicio
+const supabaseServiceKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY; // Necesita la clave de servicio
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error(
-    "Error: VITE_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son requeridos"
+    "Error: VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY son requeridos"
   );
   process.exit(1);
 }

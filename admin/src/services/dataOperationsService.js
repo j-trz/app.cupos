@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { createCustomSupabaseClient } from "../supabaseClient";
 
 class DataOperationsService {
   // ==================== SUPABASE OPERATIONS ====================
@@ -18,20 +19,9 @@ class DataOperationsService {
         throw new Error("Credenciales de Supabase incompletas");
       }
 
-      const supabaseClient = createClient(supabaseUrl, anonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-          storageKey: `sb-insert-${tableName}`,
-        },
-        global: {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-          },
-        },
+      const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey, {
+        headers: { Prefer: "return=representation" },
+        storageKey: `sb-insert-${tableName}`,
       });
 
       // Mapear datos según la configuración
@@ -70,19 +60,8 @@ class DataOperationsService {
       const anonKey =
         credentials.anonKey || credentials.anon_key || credentials.key;
 
-      const supabaseClient = createClient(supabaseUrl, anonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-          storageKey: `sb-select-${tableName || "default"}`,
-        },
-        global: {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        },
+      const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey, {
+        storageKey: `sb-select-${tableName || "default"}`,
       });
 
       const { data, error } = await supabaseClient

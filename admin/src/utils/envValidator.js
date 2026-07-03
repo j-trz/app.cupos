@@ -4,7 +4,7 @@
  */
 
 // Variables de entorno requeridas
-const REQUIRED_ENV_VARS = ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"];
+const REQUIRED_ENV_VARS = ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"];
 
 // Variables de entorno opcionales con valores por defecto
 const OPTIONAL_ENV_VARS = {
