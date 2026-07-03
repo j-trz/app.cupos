@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import ApiClient from "./apiClient";
 
 class AuthorizationService {
   /**
@@ -67,9 +68,40 @@ class AuthorizationService {
 
   /**
    * Obtener el perfil completo del usuario actual (con cache)
+   * En modo API usa el backend, en modo Supabase usa la base de datos directa
    */
   static async getCurrentUserProfile() {
     try {
+      // MODO API: Obtener perfil desde el backend
+      if (ApiClient.isApiEnabled()) {
+        // Verificar cache primero
+        const sessionUser = ApiClient.getSessionUser();
+        if (sessionUser && this._isCacheValid(sessionUser.id)) {
+          const cached = this._profileCache.get(sessionUser.id);
+          if (cached) {
+            return cached;
+          }
+        }
+
+        // Obtener perfil fresco desde la API
+        const response = await ApiClient.get('/auth/profile');
+        if (!response || !response.profile) {
+          console.error("Error getting user profile from API:", response);
+          return null;
+        }
+
+        const profile = response.profile;
+
+        // Guardar en cache
+        if (profile.id) {
+          this._profileCache.set(profile.id, profile);
+          this._cacheExpiry.set(profile.id, Date.now() + this.CACHE_DURATION);
+        }
+
+        return profile;
+      }
+
+      // MODO SUPABASE: Obtener perfil directamente de la base de datos
       const {
         data: { user },
       } = await supabase.auth.getUser();

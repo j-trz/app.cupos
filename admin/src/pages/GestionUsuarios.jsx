@@ -13,7 +13,7 @@ export default function GestionUsuarios() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
-  
+
   // Estados para paginación y filtros
   const [pagination, setPagination] = useState({
     page: 1,
@@ -41,7 +41,7 @@ export default function GestionUsuarios() {
         sortBy,
         sortOrder,
       });
-      
+
       if (result.success) {
         setUsuarios(result.users || []);
         setPagination(result.pagination);
@@ -79,7 +79,7 @@ export default function GestionUsuarios() {
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
     });
-    
+
     if (confirm.isConfirmed) {
       try {
         setLoading(true);
@@ -111,7 +111,7 @@ export default function GestionUsuarios() {
   const handleSave = async (data) => {
     try {
       setLoading(true);
-      
+
       // Validar datos antes de enviar
       const validationErrors = UserService.validateUserData(data, !!editUser);
       if (validationErrors.length > 0) {
@@ -124,16 +124,16 @@ export default function GestionUsuarios() {
       }
 
       if (editUser) {
-        // Editar usuario
-        const result = await UserService.updateUser({
-          id: editUser.id,
+        // Editar usuario - pasar userId y updates por separado
+        const updates = {
           email: data.email,
           nombre: data.nombre,
           agencia: data.agencia,
           admin: data.admin,
           role: data.role
-        });
-        
+        };
+        const result = await UserService.updateUser(editUser.id, updates);
+
         if (result.success) {
           setUsuarios(usuarios.map(u => u.id === editUser.id ? { ...u, ...data } : u));
           Swal.fire({
@@ -154,7 +154,7 @@ export default function GestionUsuarios() {
           admin: data.admin,
           role: data.role
         });
-        
+
         if (result.success) {
           // Refrescar la lista de usuarios para obtener los datos completos
           await fetchUsuarios();
@@ -167,7 +167,7 @@ export default function GestionUsuarios() {
           throw new Error(result.error || 'Error al crear usuario');
         }
       }
-      
+
       setModalOpen(false);
       setEditUser(null);
     } catch (error) {
@@ -226,7 +226,7 @@ export default function GestionUsuarios() {
             </button>
           </div>
         </div>
-        
+
         {/* Barra de búsqueda y filtros */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="relative flex-1 max-w-md">
@@ -324,7 +324,7 @@ export default function GestionUsuarios() {
                       {u.admin ? <FaUserShield className="w-6 h-6 text-green-600 inline" /> : <span className="text-gray-400">-</span>}
                     </td>
                     <td className="px-6 py-4 flex gap-3 justify-center">
-                      <Listbox value={null} onChange={action => { if(action==='edit') handleEditar(u); if(action==='delete') handleEliminar(u.id); }}>
+                      <Listbox value={null} onChange={action => { if (action === 'edit') handleEditar(u); if (action === 'delete') handleEliminar(u.id); }}>
                         <div className="relative">
                           <ListboxButton className="flex items-center px-3 py-2 rounded-lg bg-[#e6f0fa] hover:bg-[#2c4b8b] hover:text-white transition-colors shadow group-hover:bg-[#2c4b8b] group-hover:text-white">
                             <FaEllipsisV className="w-5 h-5" />
@@ -355,16 +355,15 @@ export default function GestionUsuarios() {
               <button
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={!pagination.hasPrevPage}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                  pagination.hasPrevPage
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${pagination.hasPrevPage
                     ? 'border-[#2c4b8b] text-[#2c4b8b] hover:bg-[#2c4b8b] hover:text-white'
                     : 'border-gray-300 text-gray-400 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 <FaChevronLeft className="w-4 h-4" />
                 Anterior
               </button>
-              
+
               {/* Números de página */}
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
@@ -378,31 +377,29 @@ export default function GestionUsuarios() {
                   } else {
                     pageNumber = pagination.page - 2 + i;
                   }
-                  
+
                   return (
                     <button
                       key={pageNumber}
                       onClick={() => handlePageChange(pageNumber)}
-                      className={`px-3 py-2 rounded-lg border transition-colors ${
-                        pagination.page === pageNumber
+                      className={`px-3 py-2 rounded-lg border transition-colors ${pagination.page === pageNumber
                           ? 'bg-[#2c4b8b] text-white border-[#2c4b8b]'
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
+                        }`}
                     >
                       {pageNumber}
                     </button>
                   );
                 })}
               </div>
-              
+
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={!pagination.hasNextPage}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                  pagination.hasNextPage
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${pagination.hasNextPage
                     ? 'border-[#2c4b8b] text-[#2c4b8b] hover:bg-[#2c4b8b] hover:text-white'
                     : 'border-gray-300 text-gray-400 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 Siguiente
                 <FaChevronRight className="w-4 h-4" />
@@ -410,12 +407,12 @@ export default function GestionUsuarios() {
             </div>
           </div>
         )}
-        
-        <UsuarioForm 
-          open={modalOpen} 
-          onClose={() => { setModalOpen(false); setEditUser(null); }} 
-          onSave={handleSave} 
-          usuario={editUser} 
+
+        <UsuarioForm
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setEditUser(null); }}
+          onSave={handleSave}
+          usuario={editUser}
         />
       </div>
     </Layout>

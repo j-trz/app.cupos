@@ -64,12 +64,11 @@ export default function Topbar({ setSidebarOpen }) {
         <FaBars size={24} />
       </button>
       <img
-        src="https://hdsmvuwrdwfivujjnubr.supabase.co/storage/v1/object/public/media/Je_logo-01.png"
+        src="https://jetmar.com.uy/assets/jetmar-logo.svg"
         alt="Logo"
-        className="h-10 mr-4 hidden md:block"
+        className="h-8 mr-4 hidden md:block"
       />
-      <span className="text-xl font-bold text-[#2c4b8b]">Panel cupos</span>
-      
+
       {/* Área central con saludo personalizado */}
       <div className="flex-1 flex justify-center items-center">
         {!loading && (
@@ -91,14 +90,14 @@ export default function Topbar({ setSidebarOpen }) {
       <div className="ml-auto flex items-center gap-3 relative">
         {/* Componente de notificaciones */}
         <NotificationDropdown />
-        
+
         {/* Saludo compacto para pantallas medianas */}
         {!loading && (
           <span className="text-sm text-gray-600 hidden md:block lg:hidden">
             Hola, {userName}
           </span>
         )}
-        
+
         {/* Botón de logout */}
         <button
           className="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors"

@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar autenticación de doble factor (2FA)
@@ -42,7 +43,7 @@ class TwoFactorService {
         .single();
 
       if (dbError && dbError.code !== "PGRST116") {
-        // Ignoreor "no rows" error
+        // Ignorar "no rows" error
         console.warn("Error fetching security status:", dbError);
       }
 
@@ -513,72 +514,134 @@ class TwoFactorService {
    */
   static async get2FAStatus(userId) {
     try {
-      // Verificar factores MFA activos en Supabase Auth
-      const { data: factors } = await supabase.auth.mfa.listFactors();
+      if (ApiClient.isApiEnabled()) {
+        console.log("🌐 Obteniendo estado 2FA desde API backend...");
 
-      const verifiedTotpFactor = factors?.totp?.find(
-        (factor) => factor.status === "verified"
-      );
+        // Obtener información de la base de datos
+        const filters = JSON.stringify({ user_id: userId });
+        const result = await ApiClient.get(
+          `/data?table=user_security_status&filters=${encodeURIComponent(
+            filters
+          )}`
+        );
 
-      const unverifiedTotpFactor = factors?.totp?.find(
-        (factor) => factor.status === "unverified"
-      );
+        // El backend devuelve un array directamente
+        const securityStatus = Array.isArray(result)
+          ? result[0]
+          : result?.data || {};
 
-      // Obtener información de la base de datos
-      const { data: securityStatus, error } = await supabase
-        .from("user_security_status")
-        .select(
-          "two_factor_enabled, backup_codes, created_at, two_factor_secret"
-        )
-        .eq("user_id", userId)
-        .single();
+        // Simular la respuesta de Supabase Auth
+        // NOTA: el backend API no expone factores MFA reales todavía;
+        // si se necesita esto en el futuro, agregar la llamada correspondiente aquí.
+        const factors = { totp: [] };
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error getting 2FA status:", error);
+        const verifiedTotpFactor = factors.totp.find(
+          (factor) => factor.status === "verified"
+        );
+        const unverifiedTotpFactor = factors.totp.find(
+          (factor) => factor.status === "unverified"
+        );
+
+        const dbEnabled = securityStatus?.two_factor_enabled || false;
+        const authEnabled = !!verifiedTotpFactor;
+
+        let actualEnabled = authEnabled && dbEnabled;
+        let factorId = verifiedTotpFactor?.id || null;
+
+        // Si hay un factor no verificado, considerar que necesita completar configuración
+        if (unverifiedTotpFactor && !verifiedTotpFactor) {
+          console.log(
+            "🔄 Factor no verificado encontrado, requiere completar configuración"
+          );
+          actualEnabled = false;
+          factorId = null;
+        }
+
+        // Si la DB dice que está habilitado pero no hay factor activo, deshabilitar en DB
+        if (dbEnabled && !authEnabled) {
+          console.warn("🔄 Sincronizando estado 2FA: deshabilitando en DB");
+          await this.updateSecurityStatus(userId, {
+            two_factor_enabled: false,
+            two_factor_secret: null,
+            backup_codes: [],
+          });
+          actualEnabled = false;
+          factorId = null;
+        }
+
         return {
-          enabled: false,
-          createdAt: null,
-          backupCodesCount: 0,
-          factorId: null,
-          hasUnverifiedFactor: false,
+          enabled: actualEnabled,
+          createdAt: securityStatus?.created_at || null,
+          backupCodesCount: securityStatus?.backup_codes?.length || 0,
+          factorId: factorId,
+          hasUnverifiedFactor: !!unverifiedTotpFactor,
+        };
+      } else {
+        // Modo Supabase
+        const { data: factors } = await supabase.auth.mfa.listFactors();
+
+        const verifiedTotpFactor = factors?.totp?.find(
+          (factor) => factor.status === "verified"
+        );
+        const unverifiedTotpFactor = factors?.totp?.find(
+          (factor) => factor.status === "unverified"
+        );
+
+        // Obtener información de la base de datos
+        const { data: securityStatus, error } = await supabase
+          .from("user_security_status")
+          .select(
+            "two_factor_enabled, backup_codes, created_at, two_factor_secret"
+          )
+          .eq("user_id", userId)
+          .single();
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Error getting 2FA status:", error);
+          return {
+            enabled: false,
+            createdAt: null,
+            backupCodesCount: 0,
+            factorId: null,
+            hasUnverifiedFactor: false,
+          };
+        }
+
+        const dbEnabled = securityStatus?.two_factor_enabled || false;
+        const authEnabled = !!verifiedTotpFactor;
+
+        let actualEnabled = authEnabled && dbEnabled;
+        let factorId = verifiedTotpFactor?.id || null;
+
+        // Si hay un factor no verificado, considerar que necesita completar configuración
+        if (unverifiedTotpFactor && !verifiedTotpFactor) {
+          console.log(
+            "🔄 Factor no verificado encontrado, requiere completar configuración"
+          );
+          actualEnabled = false;
+          factorId = null;
+        }
+
+        // Si la DB dice que está habilitado pero no hay factor activo, deshabilitar en DB
+        if (dbEnabled && !authEnabled) {
+          console.warn("🔄 Sincronizando estado 2FA: deshabilitando en DB");
+          await this.updateSecurityStatus(userId, {
+            two_factor_enabled: false,
+            two_factor_secret: null,
+            backup_codes: [],
+          });
+          actualEnabled = false;
+          factorId = null;
+        }
+
+        return {
+          enabled: actualEnabled,
+          createdAt: securityStatus?.created_at || null,
+          backupCodesCount: securityStatus?.backup_codes?.length || 0,
+          factorId: factorId,
+          hasUnverifiedFactor: !!unverifiedTotpFactor,
         };
       }
-
-      // Si hay discrepancia entre la DB y Supabase Auth, sincronizar
-      const dbEnabled = securityStatus?.two_factor_enabled || false;
-      const authEnabled = !!verifiedTotpFactor;
-
-      let actualEnabled = authEnabled && dbEnabled;
-      let factorId = verifiedTotpFactor?.id || null;
-
-      // Si hay un factor no verificado, considerar que necesita configuración
-      if (unverifiedTotpFactor && !verifiedTotpFactor) {
-        console.log(
-          "🔄 Factor no verificado encontrado, requiere completar configuración"
-        );
-        actualEnabled = false;
-        factorId = null;
-      }
-
-      // Si la DB dice que está habilitado pero no hay factor activo, deshabilitar en DB
-      if (dbEnabled && !authEnabled) {
-        console.warn("🔄 Sincronizando estado 2FA: deshabilitando en DB");
-        await this.updateSecurityStatus(userId, {
-          two_factor_enabled: false,
-          two_factor_secret: null,
-          backup_codes: [],
-        });
-        actualEnabled = false;
-        factorId = null;
-      }
-
-      return {
-        enabled: actualEnabled,
-        createdAt: securityStatus?.created_at || null,
-        backupCodesCount: securityStatus?.backup_codes?.length || 0,
-        factorId: factorId,
-        hasUnverifiedFactor: !!unverifiedTotpFactor,
-      };
     } catch (error) {
       console.error("Error in get2FAStatus:", error);
       return {
@@ -639,14 +702,17 @@ class TwoFactorService {
 
           users = securityData.map((securityItem) => {
             const rawProfile =
-              profilesData?.find((p) => p.id === securityItem.user_id) || null;
+              profilesData?.find((p) => p.id === securityItem.user_id) ||
+              null;
             const profile = rawProfile
               ? {
                   ...rawProfile,
                   full_name:
                     rawProfile.full_name ||
                     rawProfile.nombre ||
-                    (rawProfile.email ? rawProfile.email.split("@")[0] : "N/A"),
+                    (rawProfile.email
+                      ? rawProfile.email.split("@")[0]
+                      : "N/A"),
                   agency: rawProfile.agency || rawProfile.agencia || null,
                 }
               : {

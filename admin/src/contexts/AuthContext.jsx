@@ -113,6 +113,20 @@ export const AuthProvider = ({ children }) => {
     handleSignOut();
   };
 
+  /**
+   * Sincronizar estado del contexto después del login en modo API
+   * Este método debe llamarse después de que SecurityLogin complete el login
+   */
+  const syncApiAuth = (userProfile) => {
+    if (!userProfile) return;
+
+    const minUser = { id: userProfile.id, email: userProfile.email };
+    setUser(minUser);
+    setProfile(userProfile);
+    persistProfile(userProfile);
+    console.log('✅ [API MODE] Contexto sincronizado:', userProfile.role);
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
   // MODO SUPABASE (por defecto cuando no hay VITE_API_URL)
   // ─────────────────────────────────────────────────────────────────────────────
@@ -134,14 +148,14 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Auth state changed:', event);
-        
+
         if (event === 'SIGNED_IN' && session?.user) {
           await handleSignIn(session.user, false);
         } else if (event === 'SIGNED_OUT') {
           handleSignOut();
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           setUser(session.user);
-          
+
           if (!profile || profile.role === AuthorizationService.ROLES.AGENCY_USER) {
             const persisted = getPersistedProfile();
             if (persisted) {
@@ -176,9 +190,9 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔄 Inicializando autenticación...');
       setIsLoading(true);
-      
+
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) {
         console.error('❌ Error getting session:', error);
         handleSignOut();
@@ -208,19 +222,19 @@ export const AuthProvider = ({ children }) => {
   const handleSignIn = async (authUser, fromInitialize = false) => {
     try {
       console.log(`🔄 handleSignIn iniciado (fromInitialize: ${fromInitialize})`);
-      
+
       if (!fromInitialize) {
         setIsLoading(true);
       }
-      
+
       setUser(authUser);
       console.log('👤 Usuario establecido:', authUser.email);
-      
+
       const persistedProfile = getPersistedProfile();
       if (persistedProfile && persistedProfile.id === authUser.id) {
         setProfile(persistedProfile);
         console.log('✅ Perfil cargado desde localStorage:', persistedProfile.role);
-        
+
         AuthorizationService.getCurrentUserProfile()
           .then(realProfile => {
             if (realProfile && realProfile.id && realProfile.role !== persistedProfile.role) {
@@ -232,28 +246,28 @@ export const AuthProvider = ({ children }) => {
           .catch(error => {
             console.warn('⚠️ Error verificando perfil en background:', error);
           });
-        
+
         return;
       }
-      
+
       const defaultProfile = {
         id: authUser.id,
         email: authUser.email,
         role: AuthorizationService.ROLES.AGENCY_USER,
         agency: null
       };
-      
+
       setProfile(defaultProfile);
       console.log('⏳ Perfil temporal establecido, obteniendo perfil real...');
-      
+
       try {
         const profilePromise = AuthorizationService.getCurrentUserProfile();
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Timeout')), 8000)
         );
-        
+
         const userProfile = await Promise.race([profilePromise, timeoutPromise]);
-        
+
         if (userProfile && userProfile.id) {
           setProfile(userProfile);
           persistProfile(userProfile);
@@ -270,10 +284,10 @@ export const AuthProvider = ({ children }) => {
         console.warn('⚠️ Error/timeout obteniendo perfil de BD:', profileError.message);
         console.log('✅ Continuando con perfil temporal');
       }
-      
+
     } catch (error) {
       console.error('❌ Error crítico en handleSignIn:', error);
-      
+
       const persistedProfile = getPersistedProfile();
       if (persistedProfile && persistedProfile.id === authUser.id) {
         setProfile(persistedProfile);
@@ -331,7 +345,7 @@ export const AuthProvider = ({ children }) => {
       const updatedProfile = { ...profile, ...updates };
       setProfile(updatedProfile);
       persistProfile(updatedProfile);
-      
+
       if (user?.id && !ApiClient.isApiEnabled()) {
         AuthorizationService._profileCache.set(user.id, updatedProfile);
         AuthorizationService._cacheExpiry.set(
@@ -401,6 +415,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
     signOut,
     signInWithApi,   // Disponible para la pantalla de login cuando VITE_API_URL está activo
+    syncApiAuth,     // Sincronizar contexto después del login en modo API
     updateProfile,
     // Verificaciones de rol optimizadas
     isAdmin,

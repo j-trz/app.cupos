@@ -1,26 +1,49 @@
 import React from "react";// eslint-disable-line no-unused-vars
 import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabaseClient';
+import ApiClient from '../services/apiClient';
+import { useAuth } from '../contexts/AuthContext';
 import SecurityLogin from "../components/SecurityLogin";// eslint-disable-line no-unused-vars
 
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
+  const { syncApiAuth } = useAuth();
 
   const handleLoginSuccess = async ({ user }) => {
     try {
-      // Obtener perfil del usuario desde la base de datos
-      const { data: perfilData, error: perfilError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      let perfil = user;
 
-      if (perfilError || !perfilData) {
-        console.error('Error obteniendo perfil:', perfilError);
-        return;
+      // En modo API, necesitamos sincronizar el contexto
+      if (ApiClient.isApiEnabled()) {
+        const userProfile = {
+          id: user.id,
+          email: user.email,
+          role: user.role || 'agency_user',
+          agency: user.agency || null,
+          nombre: user.nombre || null,
+          apellido: user.apellido || null,
+          admin: user.admin || false,
+        };
+
+        // Sincronizar el contexto con el perfil del usuario
+        syncApiAuth(userProfile);
+        perfil = userProfile;
+      } else {
+        // En modo Supabase, obtenemos el perfil completo desde la base de datos
+        const { data: perfilData, error: perfilError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (perfilError || !perfilData) {
+          console.error('Error obteniendo perfil desde Supabase:', perfilError);
+          return;
+        }
+        perfil = perfilData;
       }
 
-      const perfil = perfilData;
+      console.log('✅ Perfil obtenido:', perfil);
 
       // Ejecutar callback de login si existe
       if (typeof onLogin === 'function') onLogin();

@@ -108,6 +108,10 @@ class SecurityService {
             user: {
               id: data.user?.id,
               email: data.user?.email,
+              nombre: data.user?.nombre,
+              agencia: data.user?.agencia,
+              role: data.user?.role,
+              admin: data.user?.admin,
             },
             session: { access_token: data.token },
             _apiToken: data.token,

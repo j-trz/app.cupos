@@ -354,17 +354,18 @@ class ReservationService {
     }
   }
 
-  static async _fetchConfirmations() {
+  static async _fetchConfirmations(userId) {
     try {
       if (ApiClient.isApiEnabled()) {
-        console.log("🌐 Obteniendo confirmaciones desde API backend flexible...");
-        const result = await ApiClient.get("/power-automate-proxy/confirmations");
+        console.log("🌐 Obteniendo confirmaciones desde API backend...");
+        // Usar el endpoint /api/data con filtro de user_id y Estado = Confirmado
+        const filters = JSON.stringify({ user_id: userId, Estado: "Confirmado" });
+        const result = await ApiClient.get(`/data?table=pedidos&filters=${encodeURIComponent(filters)}`);
         
-        if (!result.success) {
-          throw new Error(result.error || "Error al obtener confirmaciones");
-        }
+        // El backend devuelve un array directamente
+        const rawData = Array.isArray(result) ? result : (result?.data || []);
 
-        const confirmationsData = (result.data || []).map((item) => ({
+        const confirmationsData = rawData.map((item) => ({
           "@odata.etag": item["@odata.etag"] || "",
           ItemInternalId: item.ItemInternalId || "",
           Pedido_ID: item.Pedido_ID || item.Numero_Pedido || item.ItemInternalId || "",
@@ -375,7 +376,7 @@ class ReservationService {
           Apellido_Pasajero: item.Apellido_Pasajero || item.Pasajero_Apellido || "",
           Temporada: item.Temporada || "",
           Vuelo_Salida: item.Vuelo_Salida || item.Fecha_Salida || "",
-          Estado: "Confirmado",
+          Estado: item.Estado || "Confirmado",
           Ruta: item.Ruta || "",
           Fecha_Registro: item.Fecha_Registro || item.Created || "",
           Vuelo_Codigo: item.Vuelo_Codigo || "",
