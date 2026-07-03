@@ -81,6 +81,18 @@
                 margin-left: 0 !important;
             }
         }
+
+        /* Estilos para bloques de código */
+        pre {
+            border-radius: 0.75rem;
+            overflow-x: auto;
+            font-size: 0.8125rem;
+            line-height: 1.6;
+        }
+
+        pre code {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        }
     </style>
 </head>
 
@@ -189,177 +201,1246 @@
                         operaciones de base de datos con autenticación JWT.</p>
                 </div>
 
-                <!-- Base URL -->
+                <!-- Autenticación y Headers -->
                 <section class="mb-12">
-                    <div class="rounded-xl p-5"
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-3" style="color: #1e355e;">
+                        <div class="w-0.5 h-7 rounded-full" style="background-color: #2c4b8b;"></div>
+                        Autenticación y Headers
+                    </h2>
+                    <div class="rounded-xl p-6 w-full"
                         style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                        <h2 class="font-semibold mb-2" style="color: #1e355e;">Base URL</h2>
-                        <code class="text-sm font-mono px-3 py-1.5 rounded-lg"
-                            style="background-color: #1e355e; color: #e6f0fa;">https://tu-backend.com/api/data</code>
-                        <p class="text-xs mt-2" style="color: #6b7280;">Todas las rutas requieren un header <code
-                                class="text-xs">Authorization: Bearer <JWT></code></p>
+                        <p class="text-sm mb-4" style="color: #4b5563;">Todas las rutas de la API requieren
+                            autenticación mediante token JWT en el header <code
+                                class="font-mono text-xs px-1.5 py-0.5 rounded"
+                                style="background-color: #1e355e; color: #e6f0fa;">Authorization</code>. El token se
+                            obtiene al iniciar sesión en el endpoint <code
+                                class="font-mono text-xs px-1.5 py-0.5 rounded"
+                                style="background-color: #1e355e; color: #e6f0fa;">POST /api/auth/login</code>.</p>
+
+                        <div class="grid sm:grid-cols-2 gap-4 mb-4">
+                            <div class="p-4 rounded-xl" style="background-color: #f9fafb;">
+                                <h3 class="font-semibold text-sm mb-2" style="color: #1e355e;">Headers Requeridos</h3>
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="px-2 py-0.5 rounded text-xs font-mono font-bold text-white"
+                                            style="background-color: #2c4b8b;">Authorization</span>
+                                        <code class="text-xs font-mono"
+                                            style="color: #6b7280;">Bearer <JWT_TOKEN></code>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="px-2 py-0.5 rounded text-xs font-mono font-bold text-white"
+                                            style="background-color: #2c4b8b;">Content-Type</span>
+                                        <code class="text-xs font-mono" style="color: #6b7280;">application/json</code>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-4 rounded-xl" style="background-color: #f9fafb;">
+                                <h3 class="font-semibold text-sm mb-2" style="color: #1e355e;">Códigos de Respuesta</h3>
+                                <div class="space-y-1 text-sm">
+                                    <div><span class="font-mono font-bold text-green-600">200</span> <span
+                                            style="color: #6b7280;">- OK</span></div>
+                                    <div><span class="font-mono font-bold text-blue-600">201</span> <span
+                                            style="color: #6b7280;">- Creado</span></div>
+                                    <div><span class="font-mono font-bold text-yellow-600">400</span> <span
+                                            style="color: #6b7280;">- Error de validación</span></div>
+                                    <div><span class="font-mono font-bold text-red-600">401</span> <span
+                                            style="color: #6b7280;">- No autenticado</span></div>
+                                    <div><span class="font-mono font-bold text-red-600">403</span> <span
+                                            style="color: #6b7280;">- Sin permisos</span></div>
+                                    <div><span class="font-mono font-bold text-red-600">404</span> <span
+                                            style="color: #6b7280;">- No encontrado</span></div>
+                                    <div><span class="font-mono font-bold text-red-600">500</span> <span
+                                            style="color: #6b7280;">- Error interno</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 rounded-xl" style="background-color: #f9fafb;">
+                            <h3 class="font-semibold text-sm mb-2" style="color: #1e355e;">Obtener Token JWT</h3>
+                            <p class="text-xs mb-2" style="color: #6b7280;">Inicia sesión para obtener el token:</p>
+                            <pre class="text-sm p-4 rounded-xl text-white" style="background-color: #1e355e;"><code>curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@ejemplo.com", "password": "tu_contraseña"}'</code></pre>
+                        </div>
                     </div>
                 </section>
 
-
-
+                <!-- Base URL -->
+                <section class="mb-12">
+                    <div class="rounded-xl p-5 w-full"
+                        style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <h2 class="font-semibold mb-2" style="color: #1e355e;">Base URL</h2>
+                        <code class="text-sm font-mono px-3 py-1.5 rounded-lg"
+                            style="background-color: #1e355e; color: #e6f0fa;">http://localhost:5000/api</code>
+                        <p class="text-xs mt-2" style="color: #6b7280;">Para uso local con el backend levantado en el
+                            puerto 5000.</p>
+                    </div>
+                </section>
 
                 <!-- Endpoints -->
                 <section class="mb-12">
                     <div class="w-full">
+
+                        <!-- ============================================================ -->
                         <!-- GET -->
+                        <!-- ============================================================ -->
                         <div id="endpoint-get">
                             <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;">
                                 <div class="w-0.5 h-7 rounded-full" style="background-color: #22c55e;"></div>
                                 Endpoints GET
                             </h2>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #22c55e;">GET</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data/availability</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Obtener disponibilidad de datos
-                                    </p>
+
+                            <!-- /api/data -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #22c55e;">GET</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Obtener datos con filtros,
+                                                paginación y ordenamiento</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #22c55e;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Query Parameters</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Parámetro</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Requerido</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3"><span
+                                                            class="text-red-500 font-medium">Sí</span></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre de la tabla
+                                                        (ej: productos, solicitudes)</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">filters</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">JSON</td>
+                                                    <td class="py-2 px-3">No</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Filtros en formato
+                                                        JSON con operadores</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">limit</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number</td>
+                                                    <td class="py-2 px-3">No</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Máximo de registros a
+                                                        retornar</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">offset</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number</td>
+                                                    <td class="py-2 px-3">No</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Desplazamiento para
+                                                        paginación</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">order</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3">No</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Orden: "campo:ASC" o
+                                                        "campo:DESC"</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X GET "http://localhost:5000/api/data?table=productos&filters=%7B%22destino%22:%7B%22%24ilike%22:%22Paris%22%7D%7D&limit=10&order=precio:ASC" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json"</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                    </h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>[
+  {
+    "id": 1,
+    "destino": "Paris",
+    "origen": "Montevideo",
+    "precio": 850.00,
+    "disponibilidad": 15,
+    "compania": "Air France",
+    "salida": "2026-07-15T10:00:00Z",
+    "created_at": "2026-07-01T12:00:00Z"
+  },
+  {
+    "id": 2,
+    "destino": "Paris",
+    "origen": "Buenos Aires",
+    "precio": 720.00,
+    "disponibilidad": 8,
+    "compania": "Air France",
+    "salida": "2026-07-16T14:30:00Z",
+    "created_at": "2026-07-01T12:00:00Z"
+  }
+]</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs mb-2" style="color: #6b7280;"><strong>Method:</strong> GET
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data</code></p>
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Params (Query):</strong>
+                                            table = productos, filters = {"destino":{"$ilike":"Paris"}}, limit = 10,
+                                            order = precio:ASC</p>
+                                        <p class="text-xs mt-1" style="color: #6b7280;"><strong>Headers:</strong>
+                                            Authorization: Bearer <token>, Content-Type: application/json</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #22c55e;">GET</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data/confirmation</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Confirmar una reserva</p>
+                            </details>
+
+                            <!-- /api/data/availability -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #22c55e;">GET</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data/availability</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Obtener disponibilidad de
+                                                datos</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #22c55e;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Query Parameters</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Parámetro</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Tabla de
+                                                        disponibilidad (opcional)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">filters</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">JSON</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Filtros para consultar
+                                                        disponibilidad</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X GET "http://localhost:5000/api/data/availability?table=productos&filters=%7B%22disponibilidad%22:%7B%22%24gt%22:0%7D%7D" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json"</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                    </h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "destino": "Paris",
+      "compania": "Air France",
+      "disponibilidad": 15,
+      "salida": "2026-07-15T10:00:00Z",
+      "precio": 850.00
+    }
+  ],
+  "total": 1
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> GET
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data/availability?table=productos&filters={"disponibilidad":{"$gt":0}}</code>
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #22c55e;">GET</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data/schema/:table</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Obtener esquema de columnas de
-                                        una
-                                        tabla
-                                    </p>
+                            </details>
+
+                            <!-- /api/data/confirmation -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #22c55e;">GET</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data/confirmation</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Confirmar una reserva</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #22c55e;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Query Parameters</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Parámetro</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">id</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">ID de la reserva a
+                                                        confirmar</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre de la tabla
+                                                        donde se encuentra la reserva</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X GET "http://localhost:5000/api/data/confirmation?id=42&table=solicitudes" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json"</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                    </h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "success": true,
+  "message": "Reserva confirmada exitosamente",
+  "data": {
+    "id": 42,
+    "pedido_id": "PED-2026-0042",
+    "estado": "Confirmado",
+    "localizador": "ABC123XYZ",
+    "confirmado_por": "admin@ejemplo.com",
+    "confirmado_en": "2026-07-03T12:30:00Z"
+  }
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> GET
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data/confirmation?id=42&table=solicitudes</code>
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #22c55e;">GET</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Obtener datos con filtros,
-                                        paginación y
-                                        ordenamiento</p>
+                            </details>
+
+                            <!-- /api/data/schema/:table -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #22c55e;">GET</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data/schema/:table</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Obtener esquema de columnas
+                                                de una tabla</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #22c55e;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Parámetros de Ruta
+                                    </h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Parámetro</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre de la tabla
+                                                        (ej: productos, solicitudes)</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X GET "http://localhost:5000/api/data/schema/productos" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                    </h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>[
+  {
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "nextval('productos_id_seq'::regclass)",
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "destino",
+    "data_type": "character varying",
+    "is_nullable": "NO",
+    "column_default": null,
+    "character_maximum_length": 255
+  },
+  {
+    "column_name": "precio",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null,
+    "character_maximum_length": null
+  },
+  {
+    "column_name": "disponibilidad",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0",
+    "character_maximum_length": null
+  }
+]</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> GET
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data/schema/productos</code>
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #22c55e;">GET</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data/tables</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Lista de todas las tablas
-                                        disponibles en
-                                        la base de datos</p>
+                            </details>
+
+                            <!-- /api/data/tables -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #22c55e;">GET</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data/tables</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Lista de todas las tablas
+                                                disponibles en la base de datos</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #22c55e;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X GET "http://localhost:5000/api/data/tables" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                    </h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>[
+  "profiles",
+  "agencies",
+  "data_connections",
+  "api_credentials",
+  "connection_data_types",
+  "solicitudes",
+  "productos",
+  "notifications",
+  "user_security_status",
+  "user_sessions",
+  "admin_actions"
+]</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> GET
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data/tables</code>
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
+                            </details>
                         </div>
+
+                        <!-- ============================================================ -->
                         <!-- POST -->
+                        <!-- ============================================================ -->
                         <div id="endpoint-post" class="my-[70px]">
                             <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;"
                                 id="post-endpoints">
                                 <div class="w-0.5 h-7 rounded-full" style="background-color: #3b82f6;"></div>
                                 Endpoints POST
                             </h2>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #3b82f6;">POST</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Insertar nuevos registros en una
-                                        tabla
-                                    </p>
+
+                            <!-- POST /api/data -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #3b82f6;">POST</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Insertar nuevos registros en
+                                                una tabla</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #3b82f6;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Body (JSON)</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Campo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre de la tabla
+                                                    </td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">operation</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Debe ser <code
+                                                            class="font-mono text-xs">"insert"</code></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">data</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">object</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Objeto con los campos
+                                                        y valores a insertar</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Body (JSON
+                                        de Entrada)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>{
+  "table": "productos",
+  "operation": "insert",
+  "data": {
+    "destino": "Madrid",
+    "origen": "Montevideo",
+    "precio": 650.00,
+    "disponibilidad": 20,
+    "compania": "Iberia",
+    "salida": "2026-08-10T08:00:00Z",
+    "created_at": "2026-07-03T12:00:00Z"
+  }
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X POST "http://localhost:5000/api/data" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table": "productos",
+    "operation": "insert",
+    "data": {
+      "destino": "Madrid",
+      "origen": "Montevideo",
+      "precio": 650.00,
+      "disponibilidad": 20,
+      "compania": "Iberia",
+      "salida": "2026-08-10T08:00:00Z"
+    }
+  }'</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                        (JSON de Salida)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "id": 15,
+  "destino": "Madrid",
+  "origen": "Montevideo",
+  "precio": 650.00,
+  "disponibilidad": 20,
+  "compania": "Iberia",
+  "salida": "2026-08-10T08:00:00Z",
+  "created_at": "2026-07-03T12:00:00Z"
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> POST
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data</code></p>
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Body (raw JSON):</strong>
+                                            Copiar el JSON de entrada de arriba</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 content-center text-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #3b82f6;">POST</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data/query</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Consultas SQL personalizadas
-                                        (solo
-                                        lectura, con validación de seguridad)</p>
+                            </details>
+
+                            <!-- POST /api/data/query -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #3b82f6;">POST</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data/query</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Consultas SQL personalizadas
+                                                (solo lectura, con validación de seguridad)</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #3b82f6;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Body (JSON)</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Campo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">query</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Consulta SQL (solo
+                                                        SELECT permitido)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">params</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">array</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Parámetros para la
+                                                        consulta parametrizada</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div class="p-3 rounded-xl mb-4 flex items-start gap-2"
+                                        style="background-color: #fef3c7;">
+                                        <svg class="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor"
+                                            viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd"
+                                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                        <p class="text-xs" style="color: #92400e;">Solo se permiten consultas <code
+                                                class="font-mono text-xs">SELECT</code>. Comandos como <code
+                                                class="font-mono text-xs">DROP</code>, <code
+                                                class="font-mono text-xs">ALTER</code>, <code
+                                                class="font-mono text-xs">DELETE</code>, <code
+                                                class="font-mono text-xs">INSERT</code>, <code
+                                                class="font-mono text-xs">UPDATE</code> están bloqueados por seguridad.
+                                        </p>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Body (JSON
+                                        de Entrada)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>{
+  "query": "SELECT p.id, p.destino, p.precio, a.nombre AS agencia FROM productos p JOIN agencies a ON a.id = p.agencia_id WHERE p.precio > $1 AND p.disponibilidad > $2 ORDER BY p.precio ASC",
+  "params": [500, 0]
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X POST "http://localhost:5000/api/data/query" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM productos WHERE precio > $1 ORDER BY precio ASC LIMIT 5",
+    "params": [300]
+  }'</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                        (JSON de Salida)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>[
+  {
+    "id": 3,
+    "destino": "Santiago",
+    "precio": 350.00,
+    "disponibilidad": 12
+  },
+  {
+    "id": 7,
+    "destino": "Lima",
+    "precio": 420.00,
+    "disponibilidad": 5
+  },
+  {
+    "id": 1,
+    "destino": "Paris",
+    "precio": 850.00,
+    "disponibilidad": 15
+  }
+]</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> POST
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data/query</code>
+                                        </p>
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Body (raw JSON):</strong>
+                                            {"query": "SELECT * FROM productos WHERE precio > $1", "params": [300]}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #3b82f6;">POST</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data/reservation</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Realizar una reserva</p>
+                            </details>
+
+                            <!-- POST /api/data/reservation -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #3b82f6;">POST</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data/reservation</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Realizar una reserva</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #3b82f6;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Body (JSON)</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Campo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">pedidoId</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Identificador único
+                                                        del pedido</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">productoId</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">ID del producto a
+                                                        reservar</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">cantidad</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Cantidad de cupos a
+                                                        reservar</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">contacto</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">object</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Datos de contacto
+                                                        (nombre, email, agencia)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">vuelo</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">object</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Datos del vuelo
+                                                        (origen, destino, fecha)</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Body (JSON
+                                        de Entrada)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>{
+  "pedidoId": "PED-2026-0050",
+  "productoId": 1,
+  "cantidad": 2,
+  "contacto": {
+    "nombre": "Juan Pérez",
+    "email": "juan@ejemplo.com",
+    "agencia": "Agencia Central"
+  },
+  "vuelo": {
+    "origen": "Montevideo",
+    "destino": "Paris",
+    "fecha": "2026-07-15",
+    "compania": "Air France"
+  }
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X POST "http://localhost:5000/api/data/reservation" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pedidoId": "PED-2026-0050",
+    "productoId": 1,
+    "cantidad": 2,
+    "contacto": {
+      "nombre": "Juan Pérez",
+      "email": "juan@ejemplo.com",
+      "agencia": "Agencia Central"
+    },
+    "vuelo": {
+      "origen": "Montevideo",
+      "destino": "Paris",
+      "fecha": "2026-07-15",
+      "compania": "Air France"
+    }
+  }'</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                        (JSON de Salida)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "success": true,
+  "message": "Reserva realizada exitosamente",
+  "data": {
+    "pedidoId": "PED-2026-0050",
+    "estado": "Pendiente",
+    "localizador": "LOC-A1B2C3",
+    "fecha_reserva": "2026-07-03T12:00:00Z",
+    "cantidad": 2,
+    "total_estimado": 1700.00
+  }
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> POST
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data/reservation</code>
+                                        </p>
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Body (raw JSON):</strong>
+                                            Copiar el JSON de entrada de arriba</p>
+                                    </div>
                                 </div>
-                            </div>
+                            </details>
                         </div>
+
+                        <!-- ============================================================ -->
                         <!-- PUT -->
+                        <!-- ============================================================ -->
                         <div id="enpoint-put" class="my-[70px]">
                             <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;"
                                 id="put-endpoints">
                                 <div class="w-0.5 h-7 rounded-full" style="background-color: #f59e0b;"></div>
                                 Endpoints PUT
                             </h2>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #f59e0b;">PUT</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Actualizar registros existentes
-                                    </p>
+
+                            <!-- PUT /api/data -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #f59e0b;">PUT</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Actualizar registros
+                                                existentes</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #f59e0b;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Body (JSON)</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Campo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre de la tabla
+                                                    </td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">operation</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Debe ser <code
+                                                            class="font-mono text-xs">"update"</code></td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">data</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">object</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Campos a actualizar
+                                                        con sus nuevos valores</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">id</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number/string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">ID del registro a
+                                                        actualizar</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">idField</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre del campo ID
+                                                        (opcional, default: "id")</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Body (JSON
+                                        de Entrada)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>{
+  "table": "productos",
+  "operation": "update",
+  "data": {
+    "precio": 720.00,
+    "disponibilidad": 12
+  },
+  "id": 1,
+  "idField": "id"
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X PUT "http://localhost:5000/api/data" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table": "productos",
+    "operation": "update",
+    "data": {
+      "precio": 720.00,
+      "disponibilidad": 12
+    },
+    "id": 1
+  }'</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                        (JSON de Salida)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "id": 1,
+  "destino": "Paris",
+  "origen": "Montevideo",
+  "precio": 720.00,
+  "disponibilidad": 12,
+  "compania": "Air France",
+  "salida": "2026-07-15T10:00:00Z"
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> PUT
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data</code></p>
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Body (raw JSON):</strong>
+                                            Copiar el JSON de entrada de arriba</p>
+                                    </div>
                                 </div>
-                            </div>
+                            </details>
                         </div>
+
+                        <!-- ============================================================ -->
                         <!-- DELETE -->
+                        <!-- ============================================================ -->
                         <div id="endpoint-delete">
                             <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;"
                                 id="delete-endpoints">
                                 <div class="w-0.5 h-7 rounded-full" style="background-color: #ef4444;"></div>
                                 Endpoints DELETE
                             </h2>
-                            <div class="flex items-stretch rounded-xl overflow-hidden w-full my-2"
-                                style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                                <span
-                                    class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
-                                    style="background-color: #ef4444;">DELETE</span>
-                                <div class="p-4 flex-1">
-                                    <code class="font-mono text-sm font-semibold"
-                                        style="color: #1e355e;">/api/data</code>
-                                    <p class="text-sm mt-1" style="color: #6b7280;">Eliminar registros por ID</p>
+
+                            <!-- DELETE /api/data -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #ef4444;">DELETE</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/data</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Eliminar registros por ID
+                                            </p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #ef4444;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Body (JSON)</h4>
+                                    <div class="overflow-x-auto mb-4">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Campo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Tipo</th>
+                                                    <th class="text-left py-2 px-3 font-semibold"
+                                                        style="color: #1e355e;">Descripción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">table</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre de la tabla
+                                                    </td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">operation</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Debe ser <code
+                                                            class="font-mono text-xs">"delete"</code></td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">id</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">number/string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">ID del registro a
+                                                        eliminar</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                            style="color: #2c4b8b;">idField</code></td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">string</td>
+                                                    <td class="py-2 px-3" style="color: #6b7280;">Nombre del campo ID
+                                                        (opcional, default: "id")</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Body (JSON
+                                        de Entrada)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>{
+  "table": "productos",
+  "operation": "delete",
+  "id": 15,
+  "idField": "id"
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Petición
+                                        (curl)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>curl -X DELETE "http://localhost:5000/api/data" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table": "productos",
+    "operation": "delete",
+    "id": 15
+  }'</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta
+                                        (JSON de Salida)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "message": "Registro eliminado exitosamente",
+  "deleted": {
+    "id": 15,
+    "destino": "Madrid",
+    "origen": "Montevideo",
+    "precio": 650.00,
+    "disponibilidad": 20,
+    "compania": "Iberia"
+  }
+}</code></pre>
+
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Postman</h4>
+                                    <div class="rounded-xl p-4" style="background-color: #f9fafb;">
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Method:</strong> DELETE
+                                            &nbsp;|&nbsp; <strong>URL:</strong> <code
+                                                class="font-mono text-xs">http://localhost:5000/api/data</code></p>
+                                        <p class="text-xs" style="color: #6b7280;"><strong>Body (raw JSON):</strong>
+                                            {"table": "productos", "operation": "delete", "id": 15}</p>
+                                    </div>
                                 </div>
-                            </div>
+                            </details>
                         </div>
+
                     </div>
                 </section>
 
@@ -424,6 +1505,116 @@
                     </div>
                 </details>
 
+                <!-- Postman Collection -->
+                <section class="mb-12">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-3" style="color: #1e355e;">
+                        <div class="w-0.5 h-7 rounded-full" style="background-color: #2c4b8b;"></div>
+                        Configuración en Postman
+                    </h2>
+                    <div class="rounded-xl p-6 w-full"
+                        style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <ol class="text-sm space-y-3" style="color: #4b5563;">
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">1</span>
+                                <span>Abre Postman y crea una nueva <strong>Collection</strong> llamada "Sistema de
+                                    Cupos API".</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">2</span>
+                                <span>Ve a la pestaña <strong>Variables</strong> de la colección y configura:</span>
+                            </li>
+                        </ol>
+                        <div class="overflow-x-auto my-4">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr style="border-bottom: 2px solid rgba(44,75,139,0.2);">
+                                        <th class="text-left py-2 px-3 font-semibold" style="color: #1e355e;">Variable
+                                        </th>
+                                        <th class="text-left py-2 px-3 font-semibold" style="color: #1e355e;">Initial
+                                            Value</th>
+                                        <th class="text-left py-2 px-3 font-semibold" style="color: #1e355e;">Current
+                                            Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                style="color: #2c4b8b;">base_url</code></td>
+                                        <td class="py-2 px-3" style="color: #6b7280;">http://localhost:5000</td>
+                                        <td class="py-2 px-3" style="color: #6b7280;">http://localhost:5000</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3"><code class="font-mono text-xs"
+                                                style="color: #2c4b8b;">token</code></td>
+                                        <td class="py-2 px-3" style="color: #6b7280;">(dejar vacío)</td>
+                                        <td class="py-2 px-3" style="color: #6b7280;">(se obtiene al hacer login)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <ol class="text-sm space-y-3" start="3" style="color: #4b5563;">
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">3</span>
+                                <span>En la pestaña <strong>Authorization</strong> de la colección, selecciona <code
+                                        class="font-mono text-xs">Bearer Token</code> y en el campo Token ingresa <code
+                                        class="font-mono text-xs">{<!-- -->{token}}</code> (referencia a la
+                                    variable).</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">4</span>
+                                <span>Crea una request <strong>Login</strong> dentro de la colección:</span>
+                            </li>
+                        </ol>
+                        <div class="rounded-xl p-4 my-4" style="background-color: #f9fafb;">
+                            <p class="text-xs mb-1" style="color: #6b7280;"><strong>Method:</strong> POST &nbsp;|&nbsp;
+                                <strong>URL:</strong> <code class="font-mono text-xs">{{base_url}}/api/auth/login</code>
+                            </p>
+                            <p class="text-xs" style="color: #6b7280;"><strong>Body (raw JSON):</strong> {"email":
+                                "admin@ejemplo.com", "password": "tu_contraseña"}</p>
+                        </div>
+                        <ol class="text-sm space-y-3" start="5" style="color: #4b5563;">
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">5</span>
+                                <span>En la pestaña <strong>Tests</strong> de la request Login, pega este script para
+                                    guardar automáticamente el token:</span>
+                            </li>
+                        </ol>
+                        <pre class="text-sm p-4 rounded-xl text-white mb-4" style="background-color: #1e355e;"><code>// Guardar token JWT automáticamente después del login
+if (pm.response.code === 200) {
+    var jsonData = pm.response.json();
+    pm.collectionVariables.set("token", jsonData.token);
+    console.log("✅ Token guardado exitosamente");
+}</code></pre>
+                        <ol class="text-sm space-y-3" start="6" style="color: #4b5563;">
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">6</span>
+                                <span>Crea el resto de las requests (GET /api/data, POST /api/data, etc.) usando <code
+                                        class="font-mono text-xs">{<!-- -->{base_url}}/api/data</code> como URL. Todas
+                                    heredarán el token de la colección.</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="font-bold text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                                    style="background-color: #2c4b8b;">7</span>
+                                <span>Ejecuta primero <strong>Login</strong> para obtener el token, luego el resto de
+                                    las requests funcionarán automáticamente.</span>
+                            </li>
+                        </ol>
+                    </div>
+                </section>
+
                 <!-- Back -->
                 <a href="index.html" class="inline-flex items-center gap-2 text-sm font-medium hover:underline"
                     style="color: #2c4b8b;">
@@ -458,6 +1649,16 @@
         const scrollTopBtn = document.getElementById('scrollTop');
         window.addEventListener('scroll', () => { if (window.scrollY > 300) { scrollTopBtn.classList.remove('opacity-0', 'invisible'); scrollTopBtn.classList.add('opacity-100', 'visible'); } else { scrollTopBtn.classList.add('opacity-0', 'invisible'); scrollTopBtn.classList.remove('opacity-100', 'visible'); } });
         scrollTopBtn.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+        // Manejar detalles con animación de flecha
+        document.querySelectorAll('details.group').forEach(detail => {
+            detail.addEventListener('toggle', () => {
+                const svg = detail.querySelector('.group-open\\:rotate-180');
+                if (svg) {
+                    svg.style.transform = detail.open ? 'rotate(180deg)' : 'rotate(0deg)';
+                }
+            });
+        });
     </script>
 </body>
 

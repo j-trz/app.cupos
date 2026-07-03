@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'; // No es estrictamente necesario en Node 18+, pero nos asegura compatibilidad. En Node 18 fetch es nativo global.
+// Node 18+ tiene fetch nativo global, no se necesita node-fetch
 import { query } from '../db.js';
 
 // Helpers para testear conexiones a proveedores externos

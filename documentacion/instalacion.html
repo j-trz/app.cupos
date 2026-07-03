@@ -331,21 +331,84 @@ cp .env.example .env.local
                         <div class="w-0.5 h-7 rounded-full" style="background-color: #2c4b8b;"></div>
                         Configurar Backend
                     </h2>
-                    <div class="rounded-xl p-5"
+                    <div class="rounded-xl p-5 w-full"
                         style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                         <pre class="text-sm"><code># Navegar al backend
-cd ../backend
+cd backend
 
-# Instalar dependencias
-npm install
+# Instalar dependencias con pnpm
+pnpm install
 
-# Configurar .env
+# Configurar .env (copiar y editar con tus credenciales)
 cp .env.example .env
 
-# Ejecutar
-npm start</code></pre>
-                        <p class="text-xs mt-3" style="color: #6b7280;">El backend escuchará en http://localhost:3000
-                            por defecto.</p>
+# Iniciar en modo desarrollo (con recarga automática)
+pnpm dev
+
+# O iniciar en modo producción
+pnpm start</code></pre>
+                        <p class="text-xs mt-3" style="color: #6b7280;">El backend escuchará en
+                            <strong>http://localhost:5000</strong> por defecto. El endpoint de health check: <code
+                                class="font-mono text-xs">http://localhost:5000/health</code></p>
+                    </div>
+                </section>
+
+                <!-- Variables de Entorno -->
+                <section class="mb-12">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;">
+                        <div class="w-0.5 h-7 rounded-full" style="background-color: #2c4b8b;"></div>
+                        Variables de Entorno (.env)
+                    </h2>
+                    <div class="rounded-xl p-5 w-full"
+                        style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <p class="text-sm mb-3" style="color: #4b5563;">El archivo <code
+                                class="font-mono text-xs">backend/.env</code> debe contener las siguientes variables:
+                        </p>
+                        <pre class="text-sm"><code># Puerto del servidor (opcional, default: 5000)
+PORT=5000
+
+# Conexión a la base de datos PostgreSQL
+DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/nombre_bd
+
+# O configurar por separado
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=form_cupos
+PGUSER=postgres
+PGPASSWORD=tu_contraseña
+
+# Secreto para JWT (cambiar por una clave segura)
+JWT_SECRET=mi_clave_secreta_segura_123
+
+# (Opcional) Supabase JWT Secret si usas Supabase Auth
+# SUPABASE_JWT_SECRET=tu_supabase_jwt_secret</code></pre>
+                    </div>
+                </section>
+
+                <!-- Probar Backend -->
+                <section class="mb-12">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;">
+                        <div class="w-0.5 h-7 rounded-full" style="background-color: #2c4b8b;"></div>
+                        Probar el Backend
+                    </h2>
+                    <div class="rounded-xl p-5 w-full"
+                        style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <p class="text-sm mb-3" style="color: #4b5563;">Una vez que el backend esté corriendo, verifica
+                            que funciona:</p>
+                        <pre class="text-sm"><code># 1. Health Check (no requiere autenticación)
+curl http://localhost:5000/health
+
+# 2. Iniciar sesión para obtener token JWT
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@ejemplo.com", "password": "tu_contraseña"}'
+
+# 3. Consultar tablas disponibles (requiere token)
+curl -X GET http://localhost:5000/api/data/tables \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."</code></pre>
+                        <p class="text-xs mt-2" style="color: #6b7280;">Si todo funciona, verás la respuesta <code
+                                class="font-mono text-xs">{"status":"OK","message":"API Backend flexible funcionando correctamente."}</code>
+                            en el health check.</p>
                     </div>
                 </section>
 
@@ -355,7 +418,7 @@ npm start</code></pre>
                         <div class="w-0.5 h-7 rounded-full" style="background-color: #2c4b8b;"></div>
                         Migrar Base de Datos
                     </h2>
-                    <div class="rounded-xl p-5"
+                    <div class="rounded-xl p-5 w-full"
                         style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                         <pre class="text-sm"><code># Desde la carpeta admin/
 supabase db push
