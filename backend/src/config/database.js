@@ -106,7 +106,7 @@ const initializeDatabase = async () => {
     // Crear tabla themes
     await query(`
       CREATE TABLE IF NOT EXISTS themes (
-        id SERIAL PRIMARY KEY,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(255) NOT NULL UNIQUE,
         colors JSONB,
         fonts JSONB,
@@ -119,9 +119,9 @@ const initializeDatabase = async () => {
     // Crear tabla agency_themes
     await query(`
       CREATE TABLE IF NOT EXISTS agency_themes (
-        id SERIAL PRIMARY KEY,
-        agency_id INT NOT NULL,
-        theme_id INT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        agency_id UUID NOT NULL,
+        theme_id UUID NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (agency_id) REFERENCES agencies(id) ON DELETE CASCADE,

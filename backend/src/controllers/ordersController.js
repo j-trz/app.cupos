@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 
 // Crear una nueva reserva
-exports.createReservation = async (req, res) => {
+export const createReservation = async (req, res) => {
   try {
     const {
       estado, pedido_id, agencia, contacto_nombre, contacto_email, contacto_telefono,
@@ -38,7 +38,7 @@ exports.createReservation = async (req, res) => {
 };
 
 // Obtener todas las reservas
-exports.getAllReservations = async (req, res) => {
+export const getAllReservations = async (req, res) => {
   try {
     const result = await query('SELECT * FROM reservations');
     res.status(200).json(result.rows);
@@ -49,7 +49,7 @@ exports.getAllReservations = async (req, res) => {
 };
 
 // Obtener una reserva por ID
-exports.getReservationById = async (req, res) => {
+export const getReservationById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('SELECT * FROM reservations WHERE id = $1', [id]);
@@ -64,7 +64,7 @@ exports.getReservationById = async (req, res) => {
 };
 
 // Actualizar una reserva por ID
-exports.updateReservation = async (req, res) => {
+export const updateReservation = async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -100,7 +100,7 @@ exports.updateReservation = async (req, res) => {
 };
 
 // Eliminar una reserva por ID
-exports.deleteReservation = async (req, res) => {
+export const deleteReservation = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('DELETE FROM reservations WHERE id = $1 RETURNING *', [id]);

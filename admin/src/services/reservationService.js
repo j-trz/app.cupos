@@ -29,8 +29,10 @@ class ReservationService {
     try {
       if (ApiClient.isApiEnabled()) {
         console.log("🌐 Obteniendo disponibilidad desde API backend flexible...");
-        const result = await ApiClient.get("/power-automate-proxy/availability");
-        
+        // Ruta real registrada en index.js: app.use('/api/products', productRouter)
+        // No existe /api/availability; los cupos se sirven desde /api/products.
+        const result = await ApiClient.get("/products");
+
         if (!result.success) {
           throw new Error(result.error || "Error al obtener disponibilidad");
         }
@@ -45,54 +47,14 @@ class ReservationService {
 
         return {
           success: true,
-          data: availabilityData
+          data: availabilityData,
         };
       }
 
-      // TEMPORAL: Obtener datos directamente sin Edge Function
-      console.log("🔄 [TEMPORAL] Obteniendo disponibilidad directamente...");
-
-      // Primero intentar con el sistema de conexiones
-      let result;
-      try {
-        result = await ConnectionService.getDataFromActiveConnection(
-          "productos"
-        );
-      } catch (connectionError) {
-        console.error("❌ Error con sistema de conexiones:", connectionError);
-
-        // FALLBACK TEMPORAL: Usar URL directa de Power Automate
-        console.warn("⚠️ [TEMPORAL] Usando fallback directo a Power Automate");
-        const powerAutomateUrl = import.meta.env.VITE_POWERAUTOMATE_GET_URL;
-
-        if (!powerAutomateUrl) {
-          throw new Error(
-            "URL de Power Automate no configurada en variables de entorno"
-          );
-        }
-
-        try {
-          const response = await fetch(powerAutomateUrl, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          const data = await response.json();
-          result = {
-            success: true,
-            data: data || [],
-          };
-        } catch (fetchError) {
-          console.error("❌ Error en fallback directo:", fetchError);
-          throw new Error(
-            "No se pudo obtener disponibilidad de ninguna fuente"
-          );
-        }
-      }
+      // Modo legado (API backend deshabilitada): usar la conexión activa configurada
+      const result = await ConnectionService.getDataFromActiveConnection(
+        "productos"
+      );
 
       if (!result.success) {
         throw new Error(
@@ -100,32 +62,13 @@ class ReservationService {
         );
       }
 
-      console.log(
-        "Datos de productos recibidos directamente:",
-        result.data.slice(0, 3)
-      );
-
-      // Los datos ya vienen como productos, solo necesitamos procesar notificaciones
       const availabilityData = result.data.map((producto) => {
-        // Notificar si hay pocos lugares disponibles
         const disponibilidad = parseInt(producto.disponibilidad || 0);
         if (disponibilidad <= 5 && disponibilidad > 0) {
           NotificationService.notifyLowAvailability(producto, 5);
         }
-
-        console.log("✅ Producto procesado:", {
-          codigo: producto.codigo_cupo,
-          destino: producto.destino,
-          compania: producto.compania,
-          disponibilidad: producto.disponibilidad,
-        });
-
         return producto;
       });
-
-      console.log(
-        `✅ Procesados ${availabilityData.length} productos de disponibilidad`
-      );
 
       return {
         success: true,
@@ -161,8 +104,9 @@ class ReservationService {
     try {
       if (ApiClient.isApiEnabled()) {
         console.log("🌐 Obteniendo solicitudes desde API backend flexible...");
-        const result = await ApiClient.get("/power-automate-proxy/requests");
-        
+        // Ruta real registrada en index.js: app.use('/api/orders', orderRouter)
+        const result = await ApiClient.get("/orders");
+
         if (!result.success) {
           throw new Error(result.error || "Error al obtener solicitudes");
         }
@@ -193,7 +137,7 @@ class ReservationService {
 
         return {
           success: true,
-          data: requestsData
+          data: requestsData,
         };
       }
 
@@ -217,74 +161,46 @@ class ReservationService {
       console.log("Datos para solicitudes:", result.data.slice(0, 3));
       console.log("Filtros aplicados:", filters);
 
-      // DEBUG: Mostrar campos disponibles y valores de Estado
-      console.log("🔍 DEBUG - Campos disponibles en los datos:");
-      if (result.data.length > 0) {
-        console.log("Primer registro completo:", result.data[0]);
-        console.log("Valores únicos de Estado:", [
-          ...new Set(result.data.map((item) => item.Estado)),
-        ]);
-      }
-
       // Filtrar solo solicitudes (Estado !== "Confirmado")
       const filteredByStatus = result.data.filter((item) => {
         const estado = item.Estado || item.estado || "";
         return estado !== "Confirmado";
       });
 
-      console.log(
-        `🔍 Filtrados ${filteredByStatus.length} registros con estado Solicitado de ${result.data.length} totales`
-      );
-
       // Transformar datos de pedidos a estructura de solicitudes
-      let requestsData = filteredByStatus.map((item) => {
-        const estado = item.Estado || item.estado || "";
-        console.log(
-          `Procesando solicitud ${item.ItemInternalId}: Estado="${estado}"`
-        );
+      let requestsData = filteredByStatus.map((item) => ({
+        "@odata.etag": item["@odata.etag"] || "",
+        ItemInternalId: item.ItemInternalId || "",
+        Pedido_ID:
+          item.Pedido_ID || item.Numero_Pedido || item.ItemInternalId || "",
+        Agencia: item.Agencia || "",
+        Contacto_Nombre: item.Contacto_Nombre || item.Usuario_Nombre || "",
+        Vuelo_Destino: item.Vuelo_Destino || item.Destino || "",
+        Nombre_Pasajero: item.Nombre_Pasajero || item.Pasajero_Nombre || "",
+        Apellido_Pasajero:
+          item.Apellido_Pasajero || item.Pasajero_Apellido || "",
+        Temporada: item.Temporada || "",
+        Vuelo_Salida: item.Vuelo_Salida || item.Fecha_Salida || "",
+        Estado: "Solicitado", // Forzar estado para solicitudes
+        Ruta: item.Ruta || "",
+        Fecha_Registro: item.Fecha_Registro || item.Created || "",
+        Vuelo_Codigo: item.Vuelo_Codigo || "",
+        Vuelo_Compania: item.Vuelo_Compania || "",
+        Vuelo_Precio: item.Vuelo_Precio || "",
+        Usuario_Email: item.Usuario_Email || "",
+        Pnr: item.Pnr || "",
+        Ficha: item.Ficha || "",
+        Neto_1: item.Neto_1 || "",
+        Op: item.Op || "",
+      }));
 
-        // Mapear campos de pedidos a estructura esperada por Solicitudes.jsx
-        return {
-          "@odata.etag": item["@odata.etag"] || "",
-          ItemInternalId: item.ItemInternalId || "",
-          Pedido_ID:
-            item.Pedido_ID || item.Numero_Pedido || item.ItemInternalId || "",
-          Agencia: item.Agencia || "",
-          Contacto_Nombre: item.Contacto_Nombre || item.Usuario_Nombre || "",
-          Vuelo_Destino: item.Vuelo_Destino || item.Destino || "",
-          Nombre_Pasajero: item.Nombre_Pasajero || item.Pasajero_Nombre || "",
-          Apellido_Pasajero:
-            item.Apellido_Pasajero || item.Pasajero_Apellido || "",
-          Temporada: item.Temporada || "",
-          Vuelo_Salida: item.Vuelo_Salida || item.Fecha_Salida || "",
-          Estado: "Solicitado", // Forzar estado para solicitudes
-          Ruta: item.Ruta || "",
-          Fecha_Registro: item.Fecha_Registro || item.Created || "",
-          // Campos adicionales de contexto
-          Vuelo_Codigo: item.Vuelo_Codigo || "",
-          Vuelo_Compania: item.Vuelo_Compania || "",
-          Vuelo_Precio: item.Vuelo_Precio || "",
-          Usuario_Email: item.Usuario_Email || "",
-          Pnr: item.Pnr || "",
-          Ficha: item.Ficha || "",
-          Neto_1: item.Neto_1 || "",
-          Op: item.Op || "",
-        };
-      });
-
-      console.log(
-        `✅ Transformados ${requestsData.length} pedidos con estado Solicitado a estructura de solicitudes`
-      );
-
-      // SEGUNDO: Aplicar filtros según el rol
+      // Aplicar filtros según el rol
       switch (filters.filterType) {
         case "all":
-          // Admin: ve todas las solicitudes
           console.log("🔓 Admin - mostrando todas las solicitudes");
           break;
 
         case "agency":
-          // Agency Admin: solo solicitudes de su agencia actual
           requestsData = requestsData.filter(
             (item) => item.Agencia === filters.agencia
           );
@@ -294,16 +210,12 @@ class ReservationService {
           break;
 
         case "user": {
-          // Agency User: solo sus propias solicitudes Y de su agencia actual
-          // AMBAS condiciones deben cumplirse:
-          // 1. La solicitud pertenece a su agencia actual
-          // 2. La solicitud fue creada por él (mismo email)
           const profile = await AuthorizationService.getCurrentUserProfile();
           if (profile?.email && filters.agencia) {
             requestsData = requestsData.filter(
               (item) =>
-                item.Agencia === filters.agencia && // Agencia actual
-                item.Usuario_Email === profile.email // Su email
+                item.Agencia === filters.agencia &&
+                item.Usuario_Email === profile.email
             );
             console.log(
               `🔒 Agency User - filtradas ${requestsData.length} solicitudes de agencia="${filters.agencia}" y email="${profile.email}"`
@@ -357,12 +269,13 @@ class ReservationService {
     try {
       if (ApiClient.isApiEnabled()) {
         console.log("🌐 Obteniendo confirmaciones desde API backend...");
-        // Usar el endpoint /api/data con filtro de user_id y Estado = Confirmado
+        // Ruta real registrada en index.js: app.use('/api/data', dataRouter)
         const filters = JSON.stringify({ user_id: userId, Estado: "Confirmado" });
-        const result = await ApiClient.get(`/data?table=pedidos&filters=${encodeURIComponent(filters)}`);
-        
-        // El backend devuelve un array directamente
-        const rawData = Array.isArray(result) ? result : (result?.data || []);
+        const result = await ApiClient.get(
+          `/data?table=reservations&filters=${encodeURIComponent(filters)}`
+        );
+
+        const rawData = Array.isArray(result) ? result : result?.data || [];
 
         const confirmationsData = rawData.map((item) => ({
           "@odata.etag": item["@odata.etag"] || "",
@@ -390,26 +303,22 @@ class ReservationService {
 
         return {
           success: true,
-          data: confirmationsData
+          data: confirmationsData,
         };
       }
 
       // Verificar permisos para ver confirmaciones
-      // CORRECCIÓN: agency_user SÍ puede ver sus propias confirmaciones
       const canViewConfirmations =
         (await AuthorizationService.hasPermission("view_agency_data")) ||
         (await AuthorizationService.hasPermission("view_all_data")) ||
-        (await AuthorizationService.hasPermission("view_own_data")); // Agregar permiso para datos propios
+        (await AuthorizationService.hasPermission("view_own_data"));
 
       if (!canViewConfirmations) {
         throw new Error("No tienes permisos para ver confirmaciones");
       }
 
-      // Obtener filtros según el rol del usuario
       const filters = await AuthorizationService.getDataFilters();
-      console.log("🔍 Permisos para confirmaciones - Filtros:", filters);
 
-      // Obtener datos específicos de pedidos
       const result = await ConnectionService.getDataFromActiveConnection(
         "pedidos"
       );
@@ -420,23 +329,14 @@ class ReservationService {
         );
       }
 
-      console.log("Datos para confirmaciones:", result.data.slice(0, 3));
-      console.log("Filtros aplicados:", filters);
+      let confirmationsData = result.data.filter((item) => item.Estado === "Confirmado");
 
-      // Filtrar solo confirmaciones (Estado === "Confirmado")
-      let confirmationsData = result.data.filter((item) => {
-        return item.Estado === "Confirmado";
-      });
-
-      // Aplicar filtros según el rol
       switch (filters.filterType) {
         case "all":
-          // Admin: ve todas las confirmaciones
           console.log("🔓 Admin - mostrando todas las confirmaciones");
           break;
 
         case "agency":
-          // Agency Admin: solo confirmaciones de su agencia actual
           confirmationsData = confirmationsData.filter(
             (item) => item.Agencia === filters.agencia
           );
@@ -446,33 +346,12 @@ class ReservationService {
           break;
 
         case "user": {
-          // Agency User: solo sus propias confirmaciones Y de su agencia actual
-          // AMBAS condiciones deben cumplirse:
-          // 1. La confirmación pertenece a su agencia actual
-          // 2. La confirmación fue creada por él (mismo email)
           const profile = await AuthorizationService.getCurrentUserProfile();
           if (profile?.email && filters.agencia) {
-            // Log antes del filtrado para debugging
-            console.log(
-              `🔍 Agency User confirmaciones - Datos antes del filtro:`,
-              {
-                totalConfirmaciones: confirmationsData.length,
-                agenciaFiltro: filters.agencia,
-                emailFiltro: profile.email,
-                primerasConfirmaciones: confirmationsData
-                  .slice(0, 3)
-                  .map((item) => ({
-                    id: item.ItemInternalId,
-                    agencia: item.Agencia,
-                    email: item.Usuario_Email,
-                  })),
-              }
-            );
-
             confirmationsData = confirmationsData.filter(
               (item) =>
-                item.Agencia === filters.agencia && // Agencia actual
-                item.Usuario_Email === profile.email // Su email
+                item.Agencia === filters.agencia &&
+                item.Usuario_Email === profile.email
             );
             console.log(
               `🔒 Agency User - filtradas ${confirmationsData.length} confirmaciones de agencia="${filters.agencia}" y email="${profile.email}"`
@@ -489,10 +368,6 @@ class ReservationService {
         default:
           confirmationsData = [];
       }
-
-      console.log(
-        `✅ Filtradas ${confirmationsData.length} confirmaciones según rol (${filters.filterType}) de ${result.data.length} pedidos totales`
-      );
 
       return {
         success: true,
@@ -516,9 +391,10 @@ class ReservationService {
       }
 
       console.log("🌐 Enviando reserva a través de la API backend flexible...");
-      const data = await ApiClient.post("/power-automate-proxy/submit-reservation", {
-        payload: reservationData
-      });
+      // Ruta real registrada en index.js:
+      // orderRouter.post('/', isAdmin, ordersController.createReservation) montado en /api/orders
+      // Antes se posteaba a la raíz ("/"), que no existe como ruta.
+      const data = await ApiClient.post("/orders", reservationData);
 
       if (!data.success) {
         throw new Error(data.error || "Error al enviar reserva");
@@ -527,7 +403,7 @@ class ReservationService {
       const result = {
         success: true,
         results: data.results,
-        referenceId: data.referenceId || reservationData.pedidoId
+        referenceId: data.referenceId || reservationData.pedidoId,
       };
 
       // Invalidar cache después de enviar reserva
@@ -572,7 +448,6 @@ class ReservationService {
   static validateReservationData(data) {
     const errors = [];
 
-    // Validar estructura básica
     if (!data.pedidoId) {
       errors.push("ID de pedido es requerido");
     }
@@ -594,7 +469,6 @@ class ReservationService {
         errors.push("Teléfono de contacto es requerido");
       if (!data.contacto.agencia) errors.push("Agencia es requerida");
 
-      // Validar formato de email
       if (
         data.contacto.email &&
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contacto.email)
@@ -630,7 +504,6 @@ class ReservationService {
           errors.push(`Tipo de pasajero ${index + 1} no válido`);
         }
 
-        // Validar fecha de nacimiento
         if (pasajero.nacimiento) {
           const fechaNacimiento = new Date(pasajero.nacimiento);
           const hoy = new Date();
@@ -654,7 +527,6 @@ class ReservationService {
   static formatDate(fecha) {
     if (!fecha) return "";
 
-    // Si es número, asume timestamp
     if (!isNaN(fecha) && typeof fecha !== "string") {
       const d = new Date(fecha);
       return d instanceof Date && !isNaN(d)
@@ -662,7 +534,6 @@ class ReservationService {
         : "";
     }
 
-    // Si es string tipo yyyy-mm-dd
     if (typeof fecha === "string" && /^\d{4}-\d{2}-\d{2}/.test(fecha)) {
       const d = new Date(fecha);
       return d instanceof Date && !isNaN(d)
@@ -670,7 +541,6 @@ class ReservationService {
         : fecha;
     }
 
-    // Si es string tipo ISO
     if (typeof fecha === "string" && !isNaN(Date.parse(fecha))) {
       const d = new Date(Date.parse(fecha));
       return d instanceof Date && !isNaN(d)
@@ -755,11 +625,9 @@ class ReservationService {
    */
   static async confirmRequest(pedidoId, adminUser = {}) {
     try {
-      // En un sistema real, aquí actualizaríamos el estado en la fuente de datos
-      // Por ahora, simulamos la confirmación y enviamos la notificación
-
       // Obtener datos del pedido para la notificación
-      const requestsData = await this.getRequests();
+      const requestsResult = await this.getRequests();
+      const requestsData = requestsResult.data || [];
       const pedido = requestsData.find(
         (item) =>
           item.ItemInternalId === pedidoId || item.Pedido_ID === pedidoId
@@ -767,6 +635,21 @@ class ReservationService {
 
       if (!pedido) {
         throw new Error("Pedido no encontrado");
+      }
+
+      // Persistir el cambio de estado en el backend real.
+      // Ruta registrada en index.js: orderRouter.put('/:id', isAdmin, ordersController.updateReservation)
+      // montada en /api/orders/:id.
+      if (ApiClient.isApiEnabled()) {
+        const updateResult = await ApiClient.put(`/orders/${pedidoId}`, {
+          Estado: "Confirmado",
+        });
+
+        if (!updateResult.success) {
+          throw new Error(
+            updateResult.error || "Error al confirmar el pedido en el backend"
+          );
+        }
       }
 
       // Notificar confirmación del pedido

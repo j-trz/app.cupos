@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 
 // Crear un nuevo tema
-exports.createTheme = async (req, res) => {
+export const createTheme = async (req, res) => {
   try {
     const { name, colors, fonts, logo } = req.body;
     
@@ -17,24 +17,24 @@ exports.createTheme = async (req, res) => {
     
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al crear el tema', details: err.message });
+    console.error('💥 Error al crear el tema:', err.stack);
+    res.status(500).json({ error: 'Error al crear el tema', details: err.message || 'Detalles no disponibles' });
   }
 };
 
 // Obtener todos los temas
-exports.getAllThemes = async (req, res) => {
+export const getAllThemes = async (req, res) => {
   try {
     const result = await query('SELECT * FROM themes');
     res.status(200).json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al obtener los temas', details: err.message });
+    console.error('💥 Error al obtener los temas:', err.stack);
+    res.status(500).json({ error: 'Error al obtener los temas', details: err.message || 'Detalles no disponibles' });
   }
 };
 
 // Obtener un tema por ID
-exports.getThemeById = async (req, res) => {
+export const getThemeById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('SELECT * FROM themes WHERE id = $1', [id]);
@@ -43,13 +43,13 @@ exports.getThemeById = async (req, res) => {
     }
     res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al obtener el tema', details: err.message });
+    console.error('💥 Error al obtener el tema:', err.stack);
+    res.status(500).json({ error: 'Error al obtener el tema', details: err.message || 'Detalles no disponibles' });
   }
 };
 
 // Actualizar un tema por ID
-exports.updateTheme = async (req, res) => {
+export const updateTheme = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, colors, fonts, logo } = req.body;
@@ -64,13 +64,13 @@ exports.updateTheme = async (req, res) => {
     }
     res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al actualizar el tema', details: err.message });
+    console.error('💥 Error al actualizar el tema:', err.stack);
+    res.status(500).json({ error: 'Error al actualizar el tema', details: err.message || 'Detalles no disponibles' });
   }
 };
 
 // Eliminar un tema por ID
-exports.deleteTheme = async (req, res) => {
+export const deleteTheme = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('DELETE FROM themes WHERE id = $1 RETURNING *', [id]);
@@ -79,7 +79,7 @@ exports.deleteTheme = async (req, res) => {
     }
     res.status(200).json({ message: 'Tema eliminado exitosamente', deleted: result.rows[0] });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al eliminar el tema', details: err.message });
+    console.error('💥 Error al eliminar el tema:', err.stack);
+    res.status(500).json({ error: 'Error al eliminar el tema', details: err.message || 'Detalles no disponibles' });
   }
 };

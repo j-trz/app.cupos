@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 
 // Crear un nuevo producto
-exports.createProduct = async (req, res) => {
+export const createProduct = async (req, res) => {
   try {
     const {
       codigo_cupo, destino, compania, disponibilidad, salida, regreso,
@@ -35,7 +35,7 @@ exports.createProduct = async (req, res) => {
 };
 
 // Obtener todos los productos
-exports.getAllProducts = async (req, res) => {
+export const getAllProducts = async (req, res) => {
   try {
     const result = await query('SELECT * FROM products');
     res.status(200).json(result.rows);
@@ -46,7 +46,7 @@ exports.getAllProducts = async (req, res) => {
 };
 
 // Obtener un producto por ID
-exports.getProductById = async (req, res) => {
+export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('SELECT * FROM products WHERE id = $1', [id]);
@@ -61,7 +61,7 @@ exports.getProductById = async (req, res) => {
 };
 
 // Actualizar un producto por ID
-exports.updateProduct = async (req, res) => {
+export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -94,7 +94,7 @@ exports.updateProduct = async (req, res) => {
 };
 
 // Eliminar un producto por ID
-exports.deleteProduct = async (req, res) => {
+export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);

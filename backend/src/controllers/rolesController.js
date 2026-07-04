@@ -12,8 +12,8 @@ exports.createRole = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al crear el rol' });
+    console.error('💥 Error al crear el rol:', err.stack);
+    res.status(500).json({ error: 'Error al crear el rol', details: err.message || 'Detalles no disponibles' });
   }
 };
 
@@ -23,8 +23,8 @@ exports.getAllRoles = async (req, res) => {
     const result = await query('SELECT * FROM roles');
     res.status(200).json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al obtener los roles' });
+    console.error('💥 Error al obtener los roles:', err.stack);
+    res.status(500).json({ error: 'Error al obtener los roles', details: err.message || 'Detalles no disponibles' });
   }
 };
 
@@ -38,8 +38,8 @@ exports.getRoleById = async (req, res) => {
     }
     res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al obtener el rol' });
+    console.error('💥 Error al obtener el rol:', err.stack);
+    res.status(500).json({ error: 'Error al obtener el rol', details: err.message || 'Detalles no disponibles' });
   }
 };
 
@@ -59,8 +59,8 @@ exports.updateRole = async (req, res) => {
     }
     res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al actualizar el rol' });
+    console.error('💥 Error al actualizar el rol:', err.stack);
+    res.status(500).json({ error: 'Error al actualizar el rol', details: err.message || 'Detalles no disponibles' });
   }
 };
 
@@ -74,7 +74,7 @@ exports.deleteRole = async (req, res) => {
     }
     res.status(200).json({ message: 'Rol eliminado exitosamente', deleted: result.rows[0] });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al eliminar el rol' });
+    console.error('💥 Error al eliminar el rol:', err.stack);
+    res.status(500).json({ error: 'Error al eliminar el rol', details: err.message || 'Detalles no disponibles' });
   }
 };

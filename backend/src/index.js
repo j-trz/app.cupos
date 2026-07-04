@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import * as themesController from './controllers/themesController.js';
+import * as productsController from './controllers/productsController.js';
 import dotenv from 'dotenv';
 
 // Importar middlewares de autenticación
@@ -12,6 +14,7 @@ import * as userController from './controllers/userController.js';
 import * as connectionController from './controllers/connectionController.js';
 import * as notificationController from './controllers/notificationController.js';
 import * as dataController from './controllers/dataController.js';
+import * as ordersController from './controllers/ordersController.js';
 
 dotenv.config();
 
@@ -25,7 +28,7 @@ app.use(morgan('dev'));
 
 // Ruta de salud de la API
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'API Backend flexible funcionando correctamente.' });
+  res.status(200).json({ status: 'OK', message: 'API Backend funcionando correctamente.' });
 });
 
 // Rutas de Autenticación (/api/auth)
@@ -57,7 +60,6 @@ connectionRouter.post('/:id/activate', isAdmin, connectionController.activateCon
 connectionRouter.post('/:id/test', isAdmin, connectionController.testConnection);
 app.use('/api/connections', connectionRouter);
 
-
 // Rutas de Notificaciones (/api/notifications)
 const notificationRouter = express.Router();
 notificationRouter.use(requireAuth);
@@ -81,14 +83,44 @@ dataRouter.get('/schema/:table', dataController.getTableSchema);
 dataRouter.get('/tables', dataController.getTables);
 app.use('/api/data', dataRouter);
 
+// Rutas de Productos (/api/products)
+const productRouter = express.Router();
+productRouter.use(requireAuth);
+productRouter.post('/', isAdmin, productsController.createProduct);
+productRouter.get('/', isAdmin, productsController.getAllProducts);
+productRouter.get('/:id', isAdmin, productsController.getProductById);
+productRouter.put('/:id', isAdmin, productsController.updateProduct);
+productRouter.delete('/:id', isAdmin, productsController.deleteProduct);
+app.use('/api/products', productRouter);
+
+// Rutas de Temas (/api/themes)
+const themeRouter = express.Router();
+themeRouter.use(requireAuth);
+themeRouter.post('/', isAdmin, themesController.createTheme);
+themeRouter.get('/', isAdmin, themesController.getAllThemes);
+themeRouter.get('/:id', isAdmin, themesController.getThemeById);
+themeRouter.put('/:id', isAdmin, themesController.updateTheme);
+themeRouter.delete('/:id', isAdmin, themesController.deleteTheme);
+app.use('/api/themes', themeRouter);
+
+// Rutas de Ordenes (/api/orders)
+const orderRouter = express.Router();
+orderRouter.use(requireAuth);
+orderRouter.post('/', isAdmin, ordersController.createReservation);
+orderRouter.get('/', isAdmin, ordersController.getAllReservations);
+orderRouter.get('/:id', isAdmin, ordersController.getReservationById);
+orderRouter.put('/:id', isAdmin, ordersController.updateReservation);
+orderRouter.delete('/:id', isAdmin, ordersController.deleteReservation);
+app.use('/api/orders', orderRouter);
+
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
   console.error('💥 Error no controlado en Express:', err.stack);
-  res.status(500).json({ error: 'Ocurrió un error en el servidor.', details: err.message });
+  res.status(err.status || 500).json({ error: err.message || 'Ocurrió un error en el servidor.', details: err.details || 'Detalles no disponibles' });
 });
 
 // Levantar el servidor
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend flexible escuchando en el puerto ${PORT}`);
+  console.log(`🚀 Servidor backend escuchando en el puerto ${PORT}`);
   console.log(`📡 URL Base de la API: http://localhost:${PORT}/api`);
 });
