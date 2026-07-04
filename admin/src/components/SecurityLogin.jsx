@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabaseClient";
 import { FaEye, FaEyeSlash, FaLock, FaShieldAlt, FaClock, FaExclamationTriangle } from "react-icons/fa"; // eslint-disable-line no-unused-vars
 import SecurityService from "../services/securityService";
 import TwoFactorService from "../services/twoFactorService";
@@ -21,16 +20,16 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   // Estados de seguridad
   const [securityInfo, setSecurityInfo] = useState(null);
   const [countdown, setCountdown] = useState(0);
-  
+
   // Estados de 2FA
   const [loginStep, setLoginStep] = useState("login"); // login, setup2fa, verify2fa
   const [pendingUser, setPendingUser] = useState(null);
   const [force2FASetup, setForce2FASetup] = useState(false);
-  
+
   const navigate = useNavigate();
 
   // Countdown para desbloqueo automático
@@ -50,7 +49,7 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
       ...prev,
       [name]: value
     }));
-    
+
     // Limpiar errores al escribir
     if (error) setError("");
   };
@@ -60,13 +59,13 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
    */
   const formatTimeRemaining = (lockedUntil) => {
     if (!lockedUntil) return "";
-    
+
     const now = new Date();
     const unlockTime = new Date(lockedUntil);
     const diffMs = unlockTime - now;
-    
+
     if (diffMs <= 0) return "0 minutos";
-    
+
     const minutes = Math.ceil(diffMs / (1000 * 60));
     return `${minutes} minuto${minutes !== 1 ? 's' : ''}`;
   };
@@ -76,11 +75,11 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
    */
   const startCountdown = (lockedUntil) => {
     if (!lockedUntil) return;
-    
+
     const now = new Date();
     const unlockTime = new Date(lockedUntil);
     const diffSeconds = Math.ceil((unlockTime - now) / 1000);
-    
+
     if (diffSeconds > 0) {
       setCountdown(diffSeconds);
     }
@@ -123,14 +122,9 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
 
         // Login exitoso (modo Supabase) - verificar estado 2FA
         console.log("✅ Login exitoso - verificando 2FA");
-        
+
         const user = result.user;
         setPendingUser(user);
-
-        // Asegurar que la sesión esté establecida antes de listar factores
-        try {
-          await supabase.auth.getSession();
-        } catch (e) { console.warn("Supabase session fetch failed (non-fatal):", e?.message || e); }
 
         // Verificar si el usuario tiene 2FA configurado (con reintento corto)
         let twoFactorStatus = await TwoFactorService.get2FAStatus(user.id);
@@ -140,9 +134,9 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
           await new Promise((r) => setTimeout(r, 300));
           twoFactorStatus = await TwoFactorService.get2FAStatus(user.id);
         }
-        
+
         console.log("🔍 Estado 2FA completo:", twoFactorStatus);
-        
+
         if (twoFactorStatus.enabled && twoFactorStatus.factorId) {
           // Usuario tiene 2FA válido - solicitar verificación
           console.log("🔐 Usuario con 2FA válido - solicitando verificación", twoFactorStatus.factorId);
@@ -188,7 +182,7 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
         });
         startCountdown(result.lockedUntil);
         break;
-        
+
       case "invalid_credentials":
         setError(result.message);
         if (result.attemptsRemaining !== undefined) {
@@ -199,7 +193,7 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
           });
         }
         break;
-        
+
       default:
         setError(result.message || "Error desconocido");
     }
@@ -210,21 +204,21 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
    */
   const handle2FASetupComplete = async () => {
     console.log("✅ 2FA configurado exitosamente");
-    
+
     try {
       // Obtener el estado 2FA actualizado después de la configuración
       const updatedStatus = await TwoFactorService.get2FAStatus(pendingUser.id);
       console.log("🔄 Estado 2FA actualizado:", updatedStatus);
-      
+
       if (updatedStatus.enabled && updatedStatus.factorId) {
         // Actualizar el usuario con el factorId correcto
         setPendingUser({
           ...pendingUser,
           currentFactorId: updatedStatus.factorId
         });
-        
+
         console.log("✅ Usuario actualizado con factorId:", updatedStatus.factorId);
-        
+
         // Ahora solicitar verificación inmediata
         setLoginStep("verify2fa");
         setForce2FASetup(false);
@@ -245,7 +239,7 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
    */
   const handle2FAVerifySuccess = async () => {
     console.log("✅ 2FA verificado exitosamente");
-    
+
     // Completar login
     await completeLogin();
   };
@@ -257,10 +251,10 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
     try {
       // Crear sesión de seguridad
       await SecurityService.createUserSession(pendingUser.id);
-      
+
       // Inicializar monitoreo de actividad
       SecurityService.initActivityMonitoring();
-      
+
       // Callback para la aplicación padre
       if (onLoginSuccess) {
         onLoginSuccess({
@@ -271,7 +265,7 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
         // Navegación por defecto
         navigate("/dashboard", { replace: true });
       }
-      
+
     } catch (error) {
       console.error("Error completing login:", error);
       setError("Error al completar el login");
@@ -372,7 +366,7 @@ export default function SecurityLogin({ onLoginSuccess, fullPage = true }) {
               </div>
             </div>
           )}
-          
+
           <TwoFactorSetup
             onComplete={handle2FASetupComplete}
             onCancel={force2FASetup ? null : handleCancel2FA} // No permitir cancelar si es obligatorio

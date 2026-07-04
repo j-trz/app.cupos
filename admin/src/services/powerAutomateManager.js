@@ -1,5 +1,5 @@
 import ConnectionService from "./connectionService";
-import { supabase } from "../supabaseClient";
+import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar conexiones Power Automate automáticamente
@@ -12,9 +12,7 @@ class PowerAutomateManager {
    */
   static async createDefaultPowerAutomateConnection(userPassword) {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = ApiClient.getSessionUser();
       if (!user) throw new Error("Usuario no autenticado");
 
       // Verificar si ya tiene una conexión Power Automate

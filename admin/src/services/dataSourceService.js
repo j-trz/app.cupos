@@ -1,4 +1,5 @@
 import ConnectionService from "./connectionService";
+import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar fuentes de datos configurables
@@ -83,16 +84,23 @@ class DataSourceService {
   /**
    * Obtener datos de Power Automate usando conexión configurada
    */
-  static async getPowerAutomateDataFromConnection(connection, userPassword) {
+  static async getPowerAutomateDataFromConnection(connection, _userPassword) {
     try {
-      // Obtener credenciales desencriptadas
-      const { connection: connWithCreds } =
-        await ConnectionService.getConnection(connection.id, userPassword);
+      // Obtener credenciales desencriptadas desde el backend
+      const credentials = await ConnectionService.getDecryptedCredentials(connection.id);
 
-      const response = await fetch(connWithCreds.credentials.flowUrl, {
+      const flowUrl = credentials.flowUrl || credentials.url;
+      if (!flowUrl) {
+        throw new Error("URL del Flow no encontrada en credenciales");
+      }
+
+      const response = await fetch(flowUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(credentials.apiKey && {
+            Authorization: `Bearer ${credentials.apiKey}`,
+          }),
         },
         body: JSON.stringify({}),
       });
@@ -111,35 +119,29 @@ class DataSourceService {
   }
 
   /**
-   * Obtener datos de Supabase
+   * Obtener datos de Supabase (vía backend proxy)
    */
-  static async getSupabaseData(connection, userPassword) {
+  static async getSupabaseData(connection, _userPassword) {
     try {
-      // Obtener credenciales desencriptadas
-      const { connection: connWithCreds } =
-        await ConnectionService.getConnection(connection.id, userPassword);
-
-      // Crear cliente de Supabase (reusar cliente cacheado)
-      const { createCustomSupabaseClient } = await import("../supabaseClient");
-      const supabase = createCustomSupabaseClient(
-        connWithCreds.credentials.url,
-        connWithCreds.credentials.apiKey,
-        { storageKey: `sb-getsupabase-${connection.id || "anon"}` }
-      );
+      // Obtener credenciales desencriptadas desde el backend
+      const credentials = await ConnectionService.getDecryptedCredentials(connection.id);
 
       // Obtener nombre de tabla (priorizar credenciales si el usuario lo definió)
       const tableName =
-        connWithCreds.credentials?.tableName ||
-        connWithCreds.credentials?.table_name ||
+        credentials?.tableName ||
+        credentials?.table_name ||
         connection.column_mapping?.tableName ||
         "solicitudes";
-      const { data, error } = await supabase
-        .from(tableName)
-        .select("*")
-        .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      const result = await ApiClient.post("/connections/external-fetch", {
+        credentials,
+        operation: "select",
+        tableName,
+        orderBy: "created_at",
+        ascending: false,
+      });
 
+      const data = result.data || [];
       return this.mapDataToStandardFormat(data, connection.column_mapping);
     } catch (error) {
       console.error("Error fetching Supabase data:", error);
@@ -150,22 +152,23 @@ class DataSourceService {
   /**
    * Obtener datos de Smartsheet
    */
-  static async getSmartsheetData(connection, userPassword) {
+  static async getSmartsheetData(connection, _userPassword) {
     try {
-      // Obtener credenciales desencriptadas
-      const { connection: connWithCreds } =
-        await ConnectionService.getConnection(connection.id, userPassword);
+      // Obtener credenciales desencriptadas desde el backend
+      const credentials = await ConnectionService.getDecryptedCredentials(connection.id);
 
       const sheetId = connection.column_mapping?.sheetId;
       if (!sheetId) {
         throw new Error("Sheet ID no configurado");
       }
 
+      const apiToken = credentials.apiToken || credentials.token || credentials.apiKey;
+
       const response = await fetch(
         `https://api.smartsheet.com/2.0/sheets/${sheetId}`,
         {
           headers: {
-            Authorization: `Bearer ${connWithCreds.credentials.apiToken}`,
+            Authorization: `Bearer ${apiToken}`,
             "Content-Type": "application/json",
           },
         }

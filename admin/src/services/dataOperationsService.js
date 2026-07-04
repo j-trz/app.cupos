@@ -1,48 +1,27 @@
-import { createClient } from "@supabase/supabase-js";
-import { createCustomSupabaseClient } from "../supabaseClient";
+import ApiClient from "./apiClient";
 
 class DataOperationsService {
   // ==================== SUPABASE OPERATIONS ====================
 
   async insertSupabaseData(credentials, tableName, data, mapping) {
     try {
-      const supabaseUrl =
-        credentials.projectUrl ||
-        credentials.project_url ||
-        credentials.url ||
-        credentials.supabaseUrl ||
-        credentials.supabase_url;
-      const anonKey =
-        credentials.anonKey || credentials.anon_key || credentials.key;
-
-      if (!supabaseUrl || !anonKey) {
-        throw new Error("Credenciales de Supabase incompletas");
-      }
-
-      const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey, {
-        headers: { Prefer: "return=representation" },
-        storageKey: `sb-insert-${tableName}`,
-      });
-
       // Mapear datos según la configuración
       const mappedData = this.mapDataFields(data, mapping);
 
-      console.log("🔄 Insertando datos en Supabase:", {
+      console.log("🔄 Insertando datos en Supabase (vía backend):", {
         tableName,
         mappedData,
       });
 
-      const { data: insertedData, error } = await supabaseClient
-        .from(tableName)
-        .insert(mappedData)
-        .select();
+      const result = await ApiClient.post("/connections/external-fetch", {
+        credentials,
+        operation: "insert",
+        tableName,
+        data: mappedData,
+      });
 
-      if (error) {
-        throw new Error(`Error inserting data: ${error.message}`);
-      }
-
-      console.log("✅ Datos insertados en Supabase:", insertedData);
-      return { success: true, data: insertedData, count: insertedData.length };
+      console.log("✅ Datos insertados en Supabase:", result.data);
+      return { success: true, data: result.data, count: result.data?.length || 0 };
     } catch (error) {
       console.error("❌ Error en operación Supabase:", error);
       throw error;
@@ -51,29 +30,14 @@ class DataOperationsService {
 
   async getSupabaseData(credentials, tableName, limit = 100) {
     try {
-      const supabaseUrl =
-        credentials.projectUrl ||
-        credentials.project_url ||
-        credentials.url ||
-        credentials.supabaseUrl ||
-        credentials.supabase_url;
-      const anonKey =
-        credentials.anonKey || credentials.anon_key || credentials.key;
-
-      const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey, {
-        storageKey: `sb-select-${tableName || "default"}`,
+      const result = await ApiClient.post("/connections/external-fetch", {
+        credentials,
+        operation: "select",
+        tableName,
+        limit,
       });
 
-      const { data, error } = await supabaseClient
-        .from(tableName)
-        .select("*")
-        .limit(limit);
-
-      if (error) {
-        throw new Error(`Error fetching data: ${error.message}`);
-      }
-
-      return { success: true, data, count: data.length };
+      return { success: true, data: result.data, count: result.data?.length || 0 };
     } catch (error) {
       console.error("❌ Error obteniendo datos Supabase:", error);
       throw error;
@@ -670,66 +634,11 @@ class DataOperationsService {
       switch (connectionType) {
         case "supabase": {
           const tableName = credentials.tableName || "productos";
-
-          // Resolver ID si no fue provisto (p.ej., cuando viene mapeado sin 'id')
-          let targetId = recordId;
-          if (!targetId || String(targetId).trim() === "") {
-            const supabaseUrl =
-              credentials.projectUrl ||
-              credentials.project_url ||
-              credentials.url ||
-              credentials.supabaseUrl ||
-              credentials.supabase_url;
-            const anonKey =
-              credentials.anonKey || credentials.anon_key || credentials.key;
-
-            if (!supabaseUrl || !anonKey) {
-              throw new Error("Credenciales de Supabase incompletas");
-            }
-
-            // Intento de resolución por clave de negocio: codigo_cupo
-            if (data && data.codigo_cupo) {
-              const supabaseClient = createClient(supabaseUrl, anonKey, {
-                auth: {
-                  persistSession: false,
-                  autoRefreshToken: false,
-                  detectSessionInUrl: false,
-                  storageKey: `sb-update-resolveid-${tableName}`,
-                },
-                global: {
-                  headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                    Prefer: "return=minimal",
-                  },
-                },
-              });
-
-              const { data: rows, error: findErr } = await supabaseClient
-                .from(tableName)
-                .select("id")
-                .eq("codigo_cupo", data.codigo_cupo)
-                .order("created_at", { ascending: false })
-                .limit(1);
-
-              if (findErr) {
-                throw new Error(
-                  `No se pudo resolver ID por codigo_cupo: ${findErr.message}`
-                );
-              }
-              targetId = rows?.[0]?.id || null;
-              console.log("🆔 ID resuelto por codigo_cupo:", targetId);
-            }
-          }
-
-          if (!targetId || String(targetId).trim() === "") {
-            throw new Error("Datos incompletos para actualización");
-          }
-
+          // La resolución por codigo_cupo se delega al backend proxy
           return await this.updateSupabaseData(
             credentials,
             tableName,
-            targetId,
+            recordId,
             data
           );
         }
@@ -844,53 +753,34 @@ class DataOperationsService {
 
   async updateSupabaseData(credentials, tableName, recordId, data) {
     try {
-      const supabaseUrl =
-        credentials.projectUrl ||
-        credentials.project_url ||
-        credentials.url ||
-        credentials.supabaseUrl ||
-        credentials.supabase_url;
-      const anonKey =
-        credentials.anonKey || credentials.anon_key || credentials.key;
+      const payload = {
+        credentials,
+        operation: "update",
+        tableName,
+        recordId,
+        data,
+      };
 
-      if (!supabaseUrl || !anonKey) {
-        throw new Error("Credenciales de Supabase incompletas");
+      // Si no hay recordId pero hay codigo_cupo, el backend puede resolverlo
+      if ((!recordId || String(recordId).trim() === "") && data?.codigo_cupo) {
+        payload.resolveBy = "codigo_cupo";
+        payload.resolveValue = data.codigo_cupo;
       }
 
-      const supabaseClient = createClient(supabaseUrl, anonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-          storageKey: `sb-update-${tableName}`,
-        },
-        global: {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-          },
-        },
-      });
+      if (!recordId && !payload.resolveBy) {
+        throw new Error("Datos incompletos para actualización");
+      }
 
-      console.log("🔄 Actualizando datos en Supabase:", {
+      console.log("🔄 Actualizando datos en Supabase (vía backend):", {
         tableName,
         recordId,
         data,
       });
 
-      const { data: updatedData, error } = await supabaseClient
-        .from(tableName)
-        .update(data)
-        .eq("id", recordId)
-        .select();
+      const result = await ApiClient.post("/connections/external-fetch", payload);
 
-      if (error) {
-        throw new Error(`Error updating data: ${error.message}`);
-      }
-
-      console.log("✅ Datos actualizados en Supabase:", updatedData);
-      return { success: true, data: updatedData, count: updatedData.length };
+      console.log("✅ Datos actualizados en Supabase:", result.data);
+      return { success: true, data: result.data, count: result.data?.length || 0 };
     } catch (error) {
       console.error("❌ Error en updateSupabaseData:", error);
       throw error;
@@ -980,49 +870,17 @@ class DataOperationsService {
 
   async deleteSupabaseData(credentials, tableName, recordId) {
     try {
-      const supabaseUrl =
-        credentials.projectUrl ||
-        credentials.project_url ||
-        credentials.url ||
-        credentials.supabaseUrl ||
-        credentials.supabase_url;
-      const anonKey =
-        credentials.anonKey || credentials.anon_key || credentials.key;
+      console.log("🗑️ Eliminando datos en Supabase (vía backend):", { tableName, recordId });
 
-      if (!supabaseUrl || !anonKey) {
-        throw new Error("Credenciales de Supabase incompletas");
-      }
-
-      const supabaseClient = createClient(supabaseUrl, anonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-          storageKey: `sb-delete-${tableName}`,
-        },
-        global: {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-          },
-        },
+      const result = await ApiClient.post("/connections/external-fetch", {
+        credentials,
+        operation: "delete",
+        tableName,
+        recordId,
       });
 
-      console.log("🗑️ Eliminando datos en Supabase:", { tableName, recordId });
-
-      const { data: deletedData, error } = await supabaseClient
-        .from(tableName)
-        .delete()
-        .eq("id", recordId)
-        .select();
-
-      if (error) {
-        throw new Error(`Error deleting data: ${error.message}`);
-      }
-
-      console.log("✅ Datos eliminados en Supabase:", deletedData);
-      return { success: true, data: deletedData, count: deletedData.length };
+      console.log("✅ Datos eliminados en Supabase:", result.data);
+      return { success: true, data: result.data, count: result.data?.length || 0 };
     } catch (error) {
       console.error("❌ Error en deleteSupabaseData:", error);
       throw error;

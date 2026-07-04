@@ -1,4 +1,3 @@
-import { supabase } from "../supabaseClient";
 import { cacheService } from "./cacheService";
 import ConnectionService from "./connectionService";
 import AuthorizationService from "./authorizationService";
@@ -516,69 +515,20 @@ class ReservationService {
         throw new Error(`Datos inválidos: ${validationErrors.join(", ")}`);
       }
 
-      let result;
+      console.log("🌐 Enviando reserva a través de la API backend flexible...");
+      const data = await ApiClient.post("/power-automate-proxy/submit-reservation", {
+        payload: reservationData
+      });
 
-      if (ApiClient.isApiEnabled()) {
-        console.log("🌐 Enviando reserva a través de la API backend flexible...");
-        const data = await ApiClient.post("/power-automate-proxy/submit-reservation", {
-          payload: reservationData
-        });
-
-        if (!data.success) {
-          throw new Error(data.error || "Error al enviar reserva");
-        }
-
-        result = {
-          success: true,
-          results: data.results,
-          referenceId: data.referenceId || reservationData.pedidoId
-        };
-      } else {
-        // Obtener la conexión activa para determinar cómo enviar
-        const activeConnection = await ConnectionService.getActiveConnection();
-
-        if (!activeConnection) {
-          throw new Error("No hay conexión activa configurada");
-        }
-
-        // Enviar según el tipo de conexión activa
-        if (activeConnection.type === "powerautomate") {
-          const { data, error } = await supabase.functions.invoke(
-            "power-automate-proxy",
-            {
-              body: {
-                action: "submit-reservation",
-                payload: reservationData,
-              },
-            }
-          );
-
-          if (error) {
-            throw new Error(error.message || "Error al enviar reserva");
-          }
-
-          if (!data.success) {
-            throw new Error(data.error || "Error desconocido al enviar reserva");
-          }
-
-          result = {
-            success: true,
-            results: data.results,
-            referenceId: data.referenceId,
-          };
-        } else {
-          // Para otros tipos de conexión, usar el sistema genérico
-          const submitResult = await ConnectionService.submitReservation(
-            reservationData
-          );
-
-          if (!submitResult.success) {
-            throw new Error(submitResult.error || "Error al enviar reserva");
-          }
-
-          result = submitResult;
-        }
+      if (!data.success) {
+        throw new Error(data.error || "Error al enviar reserva");
       }
+
+      const result = {
+        success: true,
+        results: data.results,
+        referenceId: data.referenceId || reservationData.pedidoId
+      };
 
       // Invalidar cache después de enviar reserva
       cacheService.invalidatePattern("availability");

@@ -5,13 +5,13 @@ import ConnectionService from "../services/connectionService";
 import { FaSync, FaTable, FaDatabase, FaCheckCircle } from 'react-icons/fa';
 import { SiMongodb, SiTableau, SiSupabase } from 'react-icons/si';
 import { TiVendorMicrosoft } from 'react-icons/ti';
-import { HiOutlinePencilSquare, HiOutlinePlus, HiOutlineCircleStack, HiOutlineCheck,HiOutlineTrash } from "react-icons/hi2";
+import { HiOutlinePencilSquare, HiOutlinePlus, HiOutlineCircleStack, HiOutlineCheck, HiOutlineTrash } from "react-icons/hi2";
 
 
 import Swal from 'sweetalert2';
 import DataMappingModal from "../components/DataMappingModal";
 import DataTypeConnectionManager from "../components/DataTypeConnectionManager";
-import { supabase } from "../supabaseClient";
+import dataApiService from "../services/dataApiService";
 
 export default function GestionConexiones() {
   const [seccion, setSeccion] = useState("gestion-conexiones");
@@ -44,11 +44,8 @@ export default function GestionConexiones() {
     let active = true;
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('agencia')
-          .not('agencia', 'is', null);
-        if (!error && data && active) {
+        const data = await dataApiService.getData('profiles', {}, { fields: 'agencia' });
+        if (data && active) {
           const unique = Array.from(new Set(data.map(d => d.agencia).filter(Boolean)));
           setAgencies(unique);
         }
@@ -132,16 +129,16 @@ export default function GestionConexiones() {
           scope: formData.scope,
           target_agency: formData.scope === 'agency' ? (formData.target_agency || '') : null
         };
-        
+
         // Solo enviar credenciales si hay valores no vacíos
         const hasCredentials = Object.keys(formData.credentials).some(
           key => formData.credentials[key] && formData.credentials[key].trim() !== ''
         );
-        
+
         if (hasCredentials) {
           updateData.credentials = formData.credentials;
         }
-        
+
         await ConnectionService.updateConnection(formData.id, updateData);
       } else {
         // Crear nueva conexión
@@ -251,14 +248,14 @@ export default function GestionConexiones() {
               onClick={() => setAssignManagerOpen(true)}
               className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] transition-colors"
             >
-              <HiOutlineCircleStack  />
+              <HiOutlineCircleStack />
               Asignar a sección
             </button>
             <button
               onClick={() => abrirModal()}
               className="flex items-center gap-2 bg-[#2c4b8b] text-white px-4 py-2 rounded hover:bg-[#1e355e] transition-colors"
             >
-              <HiOutlinePlus  />
+              <HiOutlinePlus />
               Nueva Conexión
             </button>
           </div>
@@ -360,14 +357,14 @@ export default function GestionConexiones() {
                         className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Probar Conexión"
                       >
-                        <HiOutlineCheck  className="inline" />
+                        <HiOutlineCheck className="inline" />
                       </button>
                       <button
                         onClick={() => { setMappingConnection(connection); setMappingOpen(true); }}
                         className=" text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Configurar Mapeo"
                       >
-                        <HiOutlineCircleStack   className="inline" />
+                        <HiOutlineCircleStack className="inline" />
                       </button>
                       <button
                         onClick={() => abrirModal(connection)}
@@ -381,7 +378,7 @@ export default function GestionConexiones() {
                         className="text-[#767c87] px-3 py-1 rounded text-xl hover:text-[#2c4b8b] transition-colors"
                         title="Eliminar"
                       >
-                        <HiOutlineTrash  className="inline" />
+                        <HiOutlineTrash className="inline" />
                       </button>
                     </div>
                   </td>
@@ -400,7 +397,7 @@ export default function GestionConexiones() {
                 </h2>
                 <button onClick={cerrarModal} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Tipo de Conexión</label>
@@ -426,7 +423,7 @@ export default function GestionConexiones() {
                             onClick={() => {
                               const initialCreds = {};
                               type.fields.forEach(f => { initialCreds[f.name] = ""; });
-                              setFormData({...formData, type: type.type, credentials: initialCreds});
+                              setFormData({ ...formData, type: type.type, credentials: initialCreds });
                               setShowTypeDropdown(false);
                             }}
                             className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
@@ -445,7 +442,7 @@ export default function GestionConexiones() {
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 border rounded"
                     required
                   />
@@ -455,7 +452,7 @@ export default function GestionConexiones() {
                   <label className="block text-sm font-medium mb-2">Descripción</label>
                   <textarea
                     value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-3 py-2 border rounded"
                     rows={2}
                   />
@@ -522,7 +519,7 @@ export default function GestionConexiones() {
                     )}
                   </div>
                 </div>
- 
+
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={cerrarModal} className="flex-1 px-4 py-2 border rounded">Cancelar</button>
                   <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-[#2c4b8b] text-white rounded disabled:opacity-50">

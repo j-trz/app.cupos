@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { FaBars } from "react-icons/fa";
-import { GoSignOut } from "react-icons/go";
+import { FaBars } from "react-icons/fa";// eslint-disable-line no-unused-vars
+import { GoSignOut } from "react-icons/go";// eslint-disable-line no-unused-vars
 import { useNavigate } from "react-router-dom";
 import Swal from 'sweetalert2';
-import { supabase } from '../supabaseClient';
 import AuthorizationService from '../services/authorizationService';
-import NotificationDropdown from './NotificationDropdown';
+import ApiClient from '../services/apiClient';
+import NotificationDropdown from './NotificationDropdown';// eslint-disable-line no-unused-vars
 
 export default function Topbar({ setSidebarOpen }) {
   const navigate = useNavigate();
@@ -50,7 +50,8 @@ export default function Topbar({ setSidebarOpen }) {
       cancelButtonText: 'Cancelar'
     });
     if (result.isConfirmed) {
-      await supabase.auth.signOut();
+      ApiClient.clearSession();
+      ApiClient.clearToken();
       navigate("/login");
     }
   };

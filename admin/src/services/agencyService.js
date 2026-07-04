@@ -1,6 +1,5 @@
-// Servicio de Agencias: CRUD + subida de logos (Supabase Storage)
-import { supabaseWithHeaders as supabase } from "./supabaseConfig";
-import { createClient } from "@supabase/supabase-js";
+// Servicio de Agencias: CRUD + subida de logos (Backend API)
+import axios from "axios";
 
 /**
  * Estructura de la tabla public.agencies:
@@ -8,43 +7,10 @@ import { createClient } from "@supabase/supabase-js";
  * - email, phone, address, website, is_active (bool), logo_url, logo_path
  * - main_color (text HEX), text_color (text HEX), created_at, updated_at
  */
-const BUCKET = "agency-logos";
-const supabaseUrlStorage = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKeyStorage = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-// Cliente dedicado para Storage (sin headers JSON globales)
-const supabaseStorage = createClient(supabaseUrlStorage, supabaseKeyStorage, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-});
+// No se necesita configuración de Supabase Storage
 
 // Sincroniza el cliente de Storage con el token de la sesión actual
-async function ensureStorageAuth() {
-  try {
-    const { data: sessionData, error } = await supabase.auth.getSession();
-    if (error) {
-      console.warn("ensureStorageAuth: error al obtener sesión", error);
-      return;
-    }
-    const access_token = sessionData?.session?.access_token;
-    const refresh_token = sessionData?.session?.refresh_token;
-    if (!access_token || !refresh_token) return;
-    const { error: setErr } = await supabaseStorage.auth.setSession({
-      access_token,
-      refresh_token,
-    });
-    if (setErr) {
-      console.warn(
-        "ensureStorageAuth: error al setear sesión en Storage",
-        setErr
-      );
-    }
-  } catch (e) {
-    console.warn("ensureStorageAuth: error inesperado", e);
-  }
-}
+// No se necesita sincronización de autenticación con Supabase Storage
 // Utils
 const _sanitizeFileName = (name = "") =>
   name
@@ -114,9 +80,7 @@ const normalizeAgency = (row) => {
 
 const getLogoPublicUrl = (path, version) => {
   if (!path) return null;
-  const { data } = supabaseStorage.storage.from(BUCKET).getPublicUrl(path);
-  const base = data?.publicUrl || null;
-  if (!base) return null;
+  const base = `http://localhost:3000/logos/${path}`;
   if (version == null) return base;
   return `${base}?v=${encodeURIComponent(version)}`;
 };
@@ -131,11 +95,8 @@ async function uploadLogo(file, { agencyId, agencyCode } = {}) {
   // Garantizar que usamos el CODE de la agencia como carpeta
   let code = ensureString(agencyCode);
   if (!code && agencyId) {
-    const { data: row } = await supabase
-      .from("agencies")
-      .select("code")
-      .eq("id", agencyId)
-      .single();
+    const response = await axios.get(`http://localhost:3000/agencies/${agencyId}`);
+    const row = response.data;
     code = ensureString(row?.code);
   }
   if (!code) code = "unassigned";
@@ -143,14 +104,15 @@ async function uploadLogo(file, { agencyId, agencyCode } = {}) {
   const folder = sanitizeFolderName(code);
   const objectPath = buildLogoObjectPath(code, file);
 
-  await ensureStorageAuth();
-  const { data, error } = await supabaseStorage.storage
-    .from(BUCKET)
-    .upload(objectPath, file, {
-      upsert: true, // sobrescribe el único logo por agencia
-      cacheControl: "0", // evitar cache persistente
-      contentType: file.type || "application/octet-stream",
-    });
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axios.post(`http://localhost:3000/agencies/${agencyId}/logo`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  const data = response.data;
+  const error = response.status >= 400 ? response.statusText : null;
 
   if (error) {
     console.error("Error subiendo logo:", error);
@@ -159,17 +121,7 @@ async function uploadLogo(file, { agencyId, agencyCode } = {}) {
 
   // Limpiar cualquier otro archivo en la carpeta de la agencia (mantener solo el logo actual)
   try {
-    await ensureStorageAuth();
-    const { data: items } = await supabaseStorage.storage
-      .from(BUCKET)
-      .list(`agencies/${folder}`);
-    const toRemove = (items || [])
-      .map((it) => `agencies/${folder}/${it.name}`)
-      .filter((p) => p !== objectPath);
-    if (toRemove.length > 0) {
-      await ensureStorageAuth();
-      await supabaseStorage.storage.from(BUCKET).remove(toRemove);
-    }
+    // No se necesita limpieza de logos en el backend
   } catch (e) {
     console.warn("Ignorando error no crítico en limpieza de logos:", e);
   }
@@ -185,46 +137,33 @@ async function uploadLogo(file, { agencyId, agencyCode } = {}) {
  */
 async function listAgencies(params = {}) {
   const { search = "", activeOnly = false, limit = 200, from = 0 } = params;
-  let query = supabase
-    .from("agencies")
-    .select("*", { count: "exact" })
-    .order("name", { ascending: true });
-
-  const trimmed = search.trim();
-  if (trimmed) {
-    // or(name.ilike.%q%,code.ilike.%q%,address.ilike.%q%)
-    const pattern = `%${trimmed}%`;
-    query = query.or(
-      `name.ilike.${pattern},code.ilike.${pattern},address.ilike.${pattern}`
-    );
-  }
-  if (activeOnly) {
-    query = query.eq("is_active", true);
-  }
-
-  // Paginación simple
-  query = query.range(from, from + limit - 1);
-
-  const { data, error, count } = await query;
-  if (error) {
-    console.error("Error listando agencias:", error);
-    throw new Error(error.message || "No se pudo listar agencias");
+  const response = await axios.get(`http://localhost:3000/agencies`, {
+    params: {
+      search,
+      activeOnly,
+      limit,
+      from
+    }
+  });
+  const data = response.data.data;
+  const total = response.data.total;
+  if (response.status >= 400) {
+    console.error("Error listando agencias:", response.statusText);
+    throw new Error(response.statusText || "No se pudo listar agencias");
   }
   return {
     data: (data || []).map(normalizeAgency),
-    total: count ?? (data || []).length,
+    total: total ?? (data || []).length,
   };
 }
 
 async function getAgencyById(id) {
-  const { data, error } = await supabase
-    .from("agencies")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const response = await axios.get(`http://localhost:3000/agencies/${id}`);
+  const data = response.data;
+  const error = response.status >= 400 ? response.statusText : null;
   if (error) {
     console.error("Error obteniendo agencia:", error);
-    throw new Error(error.message || "No se pudo obtener la agencia");
+    throw new Error(error || "No se pudo obtener la agencia");
   }
   return normalizeAgency(data);
 }
@@ -263,29 +202,24 @@ async function createAgency(input) {
   const normalizedMainColor = normalizeHexColor(main_color);
   const normalizedTextColor = normalizeHexColor(text_color);
 
-  const { data, error } = await supabase
-    .from("agencies")
-    .insert([
-      {
-        code,
-        name,
-        email,
-        phone,
-        address,
-        website: normalizedWebsite,
-        main_color: normalizedMainColor,
-        text_color: normalizedTextColor,
-        is_active,
-        logo_path,
-        logo_url,
-      },
-    ])
-    .select("*")
-    .single();
-
+  const response = await axios.post(`http://localhost:3000/agencies`, {
+    code,
+    name,
+    email,
+    phone,
+    address,
+    website: normalizedWebsite,
+    main_color: normalizedMainColor,
+    text_color: normalizedTextColor,
+    is_active,
+    logo_path,
+    logo_url,
+  });
+  const data = response.data;
+  const error = response.status >= 400 ? response.statusText : null;
   if (error) {
     console.error("Error creando agencia:", error);
-    throw new Error(error.message || "No se pudo crear la agencia");
+    throw new Error(error || "No se pudo crear la agencia");
   }
   return normalizeAgency(data);
 }
@@ -322,12 +256,9 @@ async function updateAgency(id, updates = {}, logoFile = null) {
     // Obtener datos actuales si subimos nuevo logo o si cambia el código
     let current = null;
     if (logoFile || Object.prototype.hasOwnProperty.call(updates, "code")) {
-      const res = await supabase
-        .from("agencies")
-        .select("code, logo_path")
-        .eq("id", id)
-        .single();
-      current = res?.data || null;
+      const response = await axios.get(`http://localhost:3000/agencies/${id}`);
+      const res = response.data;
+      current = res || null;
     }
 
     if (logoFile) {
@@ -344,79 +275,16 @@ async function updateAgency(id, updates = {}, logoFile = null) {
       ensureString(updates.code).trim() &&
       ensureString(updates.code).trim() !== ensureString(current.code)
     ) {
-      // Mover el logo existente a la nueva carpeta basada en el nuevo código
-      const oldPath = current.logo_path;
-      const ext = (oldPath.split(".").pop() || "png").toLowerCase();
-      const newPath = `agencies/${sanitizeFolderName(
-        ensureString(updates.code).trim()
-      )}/logo.${ext}`;
-
-      await ensureStorageAuth();
-      const { error: moveError } = await supabaseStorage.storage
-        .from(BUCKET)
-        .move(oldPath, newPath);
-
-      if (!moveError) {
-        payload.logo_path = newPath;
-        // Guardar URL base (sin versión); el cache-busting se hace al LEER
-        payload.logo_url = getLogoPublicUrl(newPath);
-
-        // Limpieza: mantener un único logo en la carpeta destino
-        try {
-          const destFolder = sanitizeFolderName(
-            ensureString(updates.code).trim()
-          );
-          await ensureStorageAuth();
-          const { data: items } = await supabaseStorage.storage
-            .from(BUCKET)
-            .list(`agencies/${destFolder}`);
-          const toRemove = (items || [])
-            .map((it) => `agencies/${destFolder}/${it.name}`)
-            .filter((p) => p !== newPath);
-          if (toRemove.length > 0) {
-            await ensureStorageAuth();
-            await supabaseStorage.storage.from(BUCKET).remove(toRemove);
-          }
-        } catch (e) {
-          console.warn("Ignorando error no crítico en limpieza de logos:", e);
-        }
-
-        // Limpieza: si quedó algo en la carpeta del código anterior, eliminarlo
-        try {
-          const oldFolder = sanitizeFolderName(ensureString(current.code));
-          await ensureStorageAuth();
-          const { data: oldItems } = await supabaseStorage.storage
-            .from(BUCKET)
-            .list(`agencies/${oldFolder}`);
-          const toRemoveOld = (oldItems || []).map(
-            (it) => `agencies/${oldFolder}/${it.name}`
-          );
-          if (toRemoveOld.length > 0) {
-            await ensureStorageAuth();
-            await supabaseStorage.storage.from(BUCKET).remove(toRemoveOld);
-          }
-        } catch (e) {
-          console.warn("Ignorando error no crítico en limpieza de logos:", e);
-        }
-      } else {
-        console.warn(
-          "No se pudo mover el logo al nuevo código:",
-          moveError?.message || moveError
-        );
-      }
+      // No se necesita mover logos en el backend
     }
   }
 
-  const { data, error } = await supabase
-    .from("agencies")
-    .update(payload)
-    .eq("id", id)
-    .select("*")
-    .single();
-
+  const response = await axios.put(`http://localhost:3000/agencies/${id}`, payload);
+  const data = response.data;
+  const error = response.status >= 400 ? response.statusText : null;
   if (error) {
     console.error("Error actualizando agencia:", error);
-    throw new Error(error.message || "No se pudo actualizar la agencia");
+    throw new Error(error || "No se pudo actualizar la agencia");
   }
   return normalizeAgency(data);
 }
@@ -429,23 +297,19 @@ async function deleteAgency(id, { hard = false } = {}) {
   if (!id) throw new Error("id es obligatorio");
 
   if (hard) {
-    const { error } = await supabase.from("agencies").delete().eq("id", id);
-    if (error) {
-      console.error("Error eliminando agencia (hard):", error);
-      throw new Error(error.message || "No se pudo eliminar la agencia");
+    const response = await axios.delete(`http://localhost:3000/agencies/${id}`);
+    if (response.status >= 400) {
+      console.error("Error eliminando agencia (hard):", response.statusText);
+      throw new Error(response.statusText || "No se pudo eliminar la agencia");
     }
     return { success: true };
   } else {
-    const { data, error } = await supabase
-      .from("agencies")
-      .update({ is_active: false })
-      .eq("id", id)
-      .select("*")
-      .single();
-
+    const response = await axios.patch(`http://localhost:3000/agencies/${id}`, { is_active: false });
+    const data = response.data;
+    const error = response.status >= 400 ? response.statusText : null;
     if (error) {
       console.error("Error desactivando agencia:", error);
-      throw new Error(error.message || "No se pudo desactivar la agencia");
+      throw new Error(error || "No se pudo desactivar la agencia");
     }
     return normalizeAgency(data);
   }
@@ -455,15 +319,12 @@ async function deleteAgency(id, { hard = false } = {}) {
  * Retorna lista simple {id, code, name} (activas) para selects
  */
 async function listActiveAgencyOptions() {
-  const { data, error } = await supabase
-    .from("agencies")
-    .select("id, code, name")
-    .eq("is_active", true)
-    .order("name", { ascending: true });
-
+  const response = await axios.get(`http://localhost:3000/agencies/active`);
+  const data = response.data;
+  const error = response.status >= 400 ? response.statusText : null;
   if (error) {
     console.error("Error listando opciones de agencia:", error);
-    throw new Error(error.message || "No se pudo listar agencias activas");
+    throw new Error(error || "No se pudo listar agencias activas");
   }
   return data || [];
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { FaDatabase, FaCog, FaCheck, FaTimes, FaPlus, FaTrash } from 'react-icons/fa';
-import { supabase } from '../supabaseClient';
+import React, { useState, useEffect } from 'react';// eslint-disable-line no-unused-vars
+import { FaDatabase, FaCog, FaCheck, FaTimes, FaPlus, FaTrash } from 'react-icons/fa';// eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
+import dataApiService from '../services/dataApiService';
+import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 
 /**
@@ -54,27 +55,14 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
 
   const loadDataTypeAssignments = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = ApiClient.getSessionUser();
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from('connection_data_types')
-        .select(`
-          *,
-          connection:data_connections(id, name, type, description)
-        `)
-        .eq('user_id', user.id)
-        .order('data_type');
-
-      if (error) {
-        if (error.code === '42P01') {
-          // Tabla no existe, mostrar mensaje informativo
-          console.log('Tabla connection_data_types no existe aún');
-          setDataTypeAssignments([]);
-          return;
-        }
-        throw error;
-      }
+      const filters = JSON.stringify({ user_id: user.id });
+      const data = await dataApiService.getData('connection_data_types', JSON.parse(filters), {
+        orderBy: 'data_type',
+        ascending: true
+      });
 
       setDataTypeAssignments(data || []);
     } catch (error) {
@@ -94,7 +82,7 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = ApiClient.getSessionUser();
       if (!user) return;
 
       // Verificar si ya existe asignación para este tipo de datos
@@ -115,31 +103,21 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
         if (!result.isConfirmed) return;
 
         // Actualizar asignación existente
-        const { error } = await supabase
-          .from('connection_data_types')
-          .update({
-            connection_id: newAssignment.connectionId,
-            is_active: newAssignment.isActive,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-          .eq('data_type', newAssignment.dataType);
-
-        if (error) throw error;
+        await dataApiService.updateData('connection_data_types', existingAssignment.id, {
+          connection_id: newAssignment.connectionId,
+          is_active: newAssignment.isActive,
+          updated_at: new Date().toISOString()
+        });
       } else {
         // Crear nueva asignación
-        const { error } = await supabase
-          .from('connection_data_types')
-          .insert([{
-            user_id: user.id,
-            connection_id: newAssignment.connectionId,
-            data_type: newAssignment.dataType,
-            is_active: newAssignment.isActive,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-
-        if (error) throw error;
+        await dataApiService.insertData('connection_data_types', {
+          user_id: user.id,
+          connection_id: newAssignment.connectionId,
+          data_type: newAssignment.dataType,
+          is_active: newAssignment.isActive,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
       }
 
       // Limpiar formulario y recargar datos
@@ -177,12 +155,7 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
     if (!result.isConfirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('connection_data_types')
-        .delete()
-        .eq('id', assignmentId);
-
-      if (error) throw error;
+      await dataApiService.deleteData('connection_data_types', assignmentId);
 
       await loadDataTypeAssignments();
 
@@ -205,15 +178,10 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
 
   const handleToggleActive = async (assignmentId, currentStatus) => {
     try {
-      const { error } = await supabase
-        .from('connection_data_types')
-        .update({
-          is_active: !currentStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', assignmentId);
-
-      if (error) throw error;
+      await dataApiService.updateData('connection_data_types', assignmentId, {
+        is_active: !currentStatus,
+        updated_at: new Date().toISOString()
+      });
 
       await loadDataTypeAssignments();
     } catch (error) {
@@ -370,16 +338,14 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
                     {dataTypeAssignments.map(assignment => (
                       <div
                         key={assignment.id}
-                        className={`border rounded-lg p-4 ${
-                          assignment.is_active ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
-                        }`}
+                        className={`border rounded-lg p-4 ${assignment.is_active ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-full ${
-                                assignment.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-                              }`}>
+                              <div className={`p-2 rounded-full ${assignment.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                                }`}>
                                 <FaDatabase />
                               </div>
                               <div>
@@ -399,11 +365,10 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleToggleActive(assignment.id, assignment.is_active)}
-                              className={`p-2 rounded-full ${
-                                assignment.is_active
-                                  ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                              }`}
+                              className={`p-2 rounded-full ${assignment.is_active
+                                ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                }`}
                               title={assignment.is_active ? 'Desactivar' : 'Activar'}
                             >
                               {assignment.is_active ? <FaCheck /> : <FaTimes />}

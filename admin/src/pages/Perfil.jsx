@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";// eslint-disable-line no-unused-vars
 import Layout from "../components/Layout";// eslint-disable-line no-unused-vars
 import TwoFactorManager from "../components/TwoFactorManager";// eslint-disable-line no-unused-vars
-import {FaEnvelope, FaBuilding } from "react-icons/fa";// eslint-disable-line no-unused-vars
-import { supabase } from "../supabaseClient";// eslint-disable-line no-unused-vars
+import { FaEnvelope, FaBuilding } from "react-icons/fa";// eslint-disable-line no-unused-vars
 import AuthorizationService from "../services/authorizationService";
-import { HiOutlineUser, HiOutlineShieldCheck, HiOutlineCog6Tooth   } from "react-icons/hi2";// eslint-disable-line no-unused-vars
+import { HiOutlineUser, HiOutlineShieldCheck, HiOutlineCog6Tooth } from "react-icons/hi2";// eslint-disable-line no-unused-vars
 
 /**
  * Página de perfil del usuario con gestión de seguridad
@@ -22,7 +21,7 @@ export default function Perfil() {
     try {
       setLoading(true);
       const profile = await AuthorizationService.getCurrentUserProfile();
-      
+
       if (profile) {
         setUserProfile(profile);
       }
@@ -98,7 +97,7 @@ export default function Perfil() {
 
                 {/* Rol */}
                 <div className="flex items-center gap-3">
-                  <HiOutlineCog6Tooth  ooth  className="text-gray-400" />
+                  <HiOutlineCog6Tooth ooth className="text-gray-400" />
                   <div>
                     <p className="text-sm text-gray-500">Rol</p>
                     <p className="font-medium">

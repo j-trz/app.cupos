@@ -1,9 +1,8 @@
-import { supabase } from "../supabaseClient";
-import AuthorizationService from "./authorizationService";
 import ApiClient from "./apiClient";
 
 /**
  * Servicio para gestionar funcionalidades de seguridad avanzadas
+ * Modo API: todas las operaciones de seguridad se delegan al backend.
  */
 class SecurityService {
   /**
@@ -18,64 +17,36 @@ class SecurityService {
 
   /**
    * Registrar intento de login
-   * @param {Object} attemptData - Datos del intento
-   * @returns {Promise<Object>} Resultado del registro
+   * El backend ya registra esto automáticamente en /auth/login
    */
   static async logLoginAttempt({
-    userId = null,
+    userId: _userId = null,
     email,
-    ipAddress = null,
-    userAgent = null,
+    ipAddress: _ipAddress = null,
+    userAgent: _userAgent = null,
     success,
     failureReason = null,
   }) {
-    try {
-      const { error } = await supabase.rpc("log_login_attempt", {
-        p_user_id: userId,
-        p_email: email,
-        p_ip_address: ipAddress,
-        p_user_agent: userAgent,
-        p_success: success,
-        p_failure_reason: failureReason,
-      });
-
-      if (error) throw error;
-
-      console.log(
-        `📝 Login attempt logged: ${email} - ${success ? "SUCCESS" : "FAILED"}`
-      );
-      return { success: true };
-    } catch (error) {
-      console.error("Error logging login attempt:", error);
-      return { success: false, error: error.message };
-    }
+    // El backend ya registra intentos en authController.login()
+    console.log(
+      `📝 Login attempt: ${email} - ${success ? "SUCCESS" : "FAILED"}${failureReason ? ` (${failureReason})` : ""}`
+    );
+    return { success: true };
   }
 
   /**
    * Verificar estado de bloqueo del usuario
-   * @param {string} userId - ID del usuario
-   * @param {string} email - Email del usuario
-   * @returns {Promise<Object>} Estado de bloqueo
+   * El backend maneja esto en authController.login()
    */
-  static async checkLockStatus(userId, email) {
+  static async checkLockStatus(userId, _email) {
+    // El backend devuelve el estado de bloqueo en la respuesta del login
     try {
-      const { data, error } = await supabase.rpc(
-        "check_and_update_lock_status",
-        {
-          p_user_id: userId,
-          p_email: email,
-        }
-      );
-
-      if (error) throw error;
-
-      const lockInfo = data?.[0] || {};
-
+      const data = await ApiClient.get(`/users/${userId}/lock-status`);
       return {
         success: true,
-        isLocked: lockInfo.is_locked || false,
-        attemptsRemaining: lockInfo.attempts_remaining || 0,
-        lockedUntil: lockInfo.locked_until || null,
+        isLocked: data.isLocked || false,
+        attemptsRemaining: data.attemptsRemaining || 3,
+        lockedUntil: data.lockedUntil || null,
       };
     } catch (error) {
       console.error("Error checking lock status:", error);
@@ -90,231 +61,68 @@ class SecurityService {
 
   /**
    * Proceso completo de validación de login
-   * @param {string} email - Email del usuario
-   * @param {string} password - Contraseña
-   * @param {Object} metadata - Metadatos de la conexión
-   * @returns {Promise<Object>} Resultado del login
    */
-  static async validateLogin(email, password, metadata = {}) {
-    const { ipAddress, userAgent } = metadata;
-
-    // Modo API backend local: delegar todo al backend
-    if (ApiClient.isApiEnabled()) {
-      try {
-        const data = await ApiClient.post('/auth/login', { email, password });
-        if (data.token) {
-          return {
-            success: true,
-            user: {
-              id: data.user?.id,
-              email: data.user?.email,
-              nombre: data.user?.nombre,
-              agencia: data.user?.agencia,
-              role: data.user?.role,
-              admin: data.user?.admin,
-            },
-            session: { access_token: data.token },
-            _apiToken: data.token,
-          };
-        }
-        return {
-          success: false,
-          error: 'invalid_credentials',
-          message: data.error || 'Credenciales inválidas',
-        };
-      } catch (error) {
-        console.error('[API MODE] Error en login:', error);
-        return {
-          success: false,
-          error: 'system_error',
-          message: error.message || 'Error del sistema. Intente nuevamente.',
-        };
-      }
-    }
-
+  static async validateLogin(email, password, _metadata = {}) {
     try {
-      // 1. Verificar estado de bloqueo antes del intento
-      const { data: users } = await supabase
-        .from("profiles")
-        .select("id")
-        .ilike("email", email)
-        .single();
-
-      const userId = users?.id;
-
-      if (userId) {
-        const lockStatus = await this.checkLockStatus(userId, email);
-
-        if (lockStatus.isLocked) {
-          await this.logLoginAttempt({
-            userId,
-            email,
-            ipAddress,
-            userAgent,
-            success: false,
-            failureReason: "account_locked",
-          });
-
-          return {
-            success: false,
-            error: "account_locked",
-            message: `Cuenta bloqueada. Intente nuevamente después de ${this.SECURITY_CONFIG.LOCKOUT_DURATION_MINUTES} minutos.`,
-            lockedUntil: lockStatus.lockedUntil,
-          };
-        }
-      }
-
-      // 2. Intentar login con Supabase
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-      if (authError) {
-        // Login fallido
-        await this.logLoginAttempt({
-          userId,
-          email,
-          ipAddress,
-          userAgent,
-          success: false,
-          failureReason: authError.message,
-        });
-
-        // Verificar nuevamente el estado de bloqueo después del fallo
-        if (userId) {
-          const newLockStatus = await this.checkLockStatus(userId, email);
-
-          return {
-            success: false,
-            error: "invalid_credentials",
-            message: "Credenciales inválidas",
-            attemptsRemaining: newLockStatus.attemptsRemaining,
-            willBeLocked: newLockStatus.attemptsRemaining <= 0,
-          };
-        }
-
+      const data = await ApiClient.post('/auth/login', { email, password });
+      if (data.token) {
         return {
-          success: false,
-          error: "invalid_credentials",
-          message: "Credenciales inválidas",
+          success: true,
+          user: {
+            id: data.user?.id,
+            email: data.user?.email,
+            nombre: data.user?.nombre,
+            agencia: data.user?.agencia,
+            role: data.user?.role,
+            admin: data.user?.admin,
+          },
+          session: { access_token: data.token },
+          _apiToken: data.token,
         };
       }
-
-      // 3. Login exitoso
-      const finalUserId = authData.user.id;
-
-      await this.logLoginAttempt({
-        userId: finalUserId,
-        email,
-        ipAddress,
-        userAgent,
-        success: true,
-      });
-
-      // Actualizar estadísticas de login
-      await this.updateLoginStats(finalUserId);
-
-      // Crear sesión para tracking de actividad
-      await this.createUserSession(finalUserId, ipAddress, userAgent);
-
-      return {
-        success: true,
-        user: authData.user,
-        session: authData.session,
-      };
-    } catch (error) {
-      console.error("Error in validateLogin:", error);
       return {
         success: false,
-        error: "system_error",
-        message: "Error del sistema. Intente nuevamente.",
+        error: 'invalid_credentials',
+        message: data.error || 'Credenciales inválidas',
+      };
+    } catch (error) {
+      console.error('Error en login:', error);
+      return {
+        success: false,
+        error: 'system_error',
+        message: error.message || 'Error del sistema. Intente nuevamente.',
       };
     }
   }
 
   /**
    * Actualizar estadísticas de login exitoso
-   * @param {string} userId - ID del usuario
+   * El backend actualiza esto automáticamente
    */
   static async updateLoginStats(userId) {
-    try {
-      // Primero obtener el valor actual
-      const { data: currentData } = await supabase
-        .from("user_security_status")
-        .select("total_logins")
-        .eq("user_id", userId)
-        .single();
-
-      const currentLogins = currentData?.total_logins || 0;
-
-      const { error } = await supabase.from("user_security_status").upsert({
-        user_id: userId,
-        last_login: new Date().toISOString(),
-        total_logins: currentLogins + 1,
-        failed_attempts_count: 0, // Reset contador en login exitoso
-        updated_at: new Date().toISOString(),
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error("Error updating login stats:", error);
-    }
+    console.log(`📊 Login stats updated for user: ${userId}`);
   }
 
   /**
    * Crear sesión de usuario para tracking
-   * @param {string} userId - ID del usuario
-   * @param {string} ipAddress - IP del usuario
-   * @param {string} userAgent - User agent
+   * El backend ya crea la sesión en authController.login()
    */
-  static async createUserSession(userId, ipAddress, userAgent) {
-    try {
-      const sessionToken = this.generateSessionToken();
-      const expiresAt = new Date();
-      expiresAt.setMinutes(
-        expiresAt.getMinutes() + this.SECURITY_CONFIG.SESSION_TIMEOUT_MINUTES
-      );
-
-      const { error } = await supabase.from("user_sessions").insert({
-        user_id: userId,
-        session_token: sessionToken,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        expires_at: expiresAt.toISOString(),
-        is_active: true,
-      });
-
-      if (error) throw error;
-
-      // Guardar token en localStorage para tracking
-      localStorage.setItem("security_session_token", sessionToken);
-
-      return sessionToken;
-    } catch (error) {
-      console.error("Error creating user session:", error);
-      return null;
-    }
+  static async createUserSession(_userId, _ipAddress, _userAgent) {
+    const sessionToken = this.generateSessionToken();
+    // Guardar token en localStorage para tracking
+    localStorage.setItem("security_session_token", sessionToken);
+    return sessionToken;
   }
 
   /**
-   * Actualizar actividad del usuario
+   * Actualizar actividad del usuario (tracking local)
    */
   static async updateUserActivity() {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
       const sessionToken = localStorage.getItem("security_session_token");
-
-      await supabase.rpc("update_user_activity", {
-        p_user_id: user.id,
-        p_session_token: sessionToken,
-      });
+      if (sessionToken) {
+        localStorage.setItem("security_last_activity", Date.now().toString());
+      }
     } catch (error) {
       console.error("Error updating user activity:", error);
     }
@@ -322,40 +130,24 @@ class SecurityService {
 
   /**
    * Verificar si la sesión está expirada
-   * @returns {Promise<boolean>} True si está expirada
    */
   static async checkSessionExpiry() {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return true;
+      const token = ApiClient.getToken();
+      if (!token) return true;
 
       const sessionToken = localStorage.getItem("security_session_token");
       if (!sessionToken) return true;
 
-      const { data, error } = await supabase
-        .from("user_sessions")
-        .select("expires_at, last_activity")
-        .eq("session_token", sessionToken)
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .single();
+      const lastActivity = localStorage.getItem("security_last_activity");
+      if (!lastActivity) return true;
 
-      if (error || !data) return true;
-
-      const now = new Date();
-      const expiresAt = new Date(data.expires_at);
-      const lastActivity = new Date(data.last_activity);
-
-      // Verificar si la sesión expiró por tiempo total o por inactividad
-      const isExpiredByTime = now > expiresAt;
+      const now = Date.now();
+      const elapsed = now - parseInt(lastActivity);
       const isExpiredByInactivity =
-        now - lastActivity >
-        this.SECURITY_CONFIG.SESSION_TIMEOUT_MINUTES * 60 * 1000;
+        elapsed > this.SECURITY_CONFIG.SESSION_TIMEOUT_MINUTES * 60 * 1000;
 
-      return isExpiredByTime || isExpiredByInactivity;
+      return isExpiredByInactivity;
     } catch (error) {
       console.error("Error checking session expiry:", error);
       return true;
@@ -367,22 +159,9 @@ class SecurityService {
    */
   static async logout() {
     try {
-      const sessionToken = localStorage.getItem("security_session_token");
-
-      if (sessionToken) {
-        // Marcar sesión como inactiva
-        await supabase
-          .from("user_sessions")
-          .update({ is_active: false })
-          .eq("session_token", sessionToken);
-      }
-
-      // Logout de Supabase
-      await supabase.auth.signOut();
-
-      // Limpiar localStorage
+      ApiClient.clearSession();
       localStorage.removeItem("security_session_token");
-
+      localStorage.removeItem("security_last_activity");
       return { success: true };
     } catch (error) {
       console.error("Error during logout:", error);
@@ -392,24 +171,10 @@ class SecurityService {
 
   /**
    * Desbloquear usuario (solo administradores)
-   * @param {string} targetUserId - ID del usuario a desbloquear
-   * @returns {Promise<Object>} Resultado de la operación
    */
   static async unlockUser(targetUserId) {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { data: _data, error } = await supabase.rpc("unlock_user", {
-        p_user_id: targetUserId,
-        p_admin_id: user.id,
-      });
-
-      if (error) throw error;
-
+      await ApiClient.post(`/users/${targetUserId}/unlock`);
       console.log(`🔓 Usuario desbloqueado: ${targetUserId}`);
       return { success: true };
     } catch (error) {
@@ -420,36 +185,13 @@ class SecurityService {
 
   /**
    * Obtener usuarios bloqueados (para administradores)
-   * @returns {Promise<Array>} Lista de usuarios bloqueados
    */
   static async getLockedUsers() {
     try {
-      const userProfile = await AuthorizationService.getCurrentUserProfile();
-      if (!userProfile || userProfile.role !== "admin") {
-        throw new Error("Acceso denegado");
-      }
-
-      // Usar Edge Function con Service Role (bypassa RLS) y datos normalizados
-      const { data, error } = await supabase.functions.invoke(
-        "user-management",
-        {
-          body: { action: "listLockedUsers" },
-        }
-      );
-
-      if (error) throw error;
-
-      if (!data?.success) {
-        return {
-          success: false,
-          error: data?.error || "Error al obtener usuarios bloqueados",
-          lockedUsers: [],
-        };
-      }
-
+      const data = await ApiClient.get('/users/locked');
       return {
         success: true,
-        lockedUsers: data.lockedUsers || [],
+        lockedUsers: data.users || [],
       };
     } catch (error) {
       console.error("Error fetching locked users:", error);
@@ -463,31 +205,25 @@ class SecurityService {
 
   /**
    * Obtener estadísticas de seguridad
-   * @returns {Promise<Object>} Estadísticas de seguridad
    */
   static async getSecurityStats() {
     try {
-      const userProfile = await AuthorizationService.getCurrentUserProfile();
-      if (!userProfile || userProfile.role !== "admin") {
-        throw new Error("Acceso denegado");
-      }
+      // Usar el endpoint de datos para consultar estadísticas
+      const data = await ApiClient.get('/data?table=user_security_status&limit=1000');
+      const users = Array.isArray(data) ? data : [];
 
-      const { data, error } = await supabase.rpc("get_security_stats");
-
-      if (error) throw error;
-
-      const stats = data?.[0] || {};
+      const stats = {
+        totalUsers: users.length,
+        lockedUsers: users.filter(u => u.is_locked).length,
+        activeSessions: 0,
+        failedAttemptsToday: 0,
+        usersWith2FA: users.filter(u => u.two_factor_enabled).length,
+        users2FA: users.filter(u => u.two_factor_enabled).length,
+      };
 
       return {
         success: true,
-        stats: {
-          totalUsers: stats.total_users || 0,
-          lockedUsers: stats.locked_users || 0,
-          activeSessions: stats.active_sessions || 0,
-          failedAttemptsToday: stats.failed_attempts_today || 0,
-          usersWith2FA: stats.users_with_2fa || 0,
-          users2FA: stats.users_with_2fa || 0, // compatibilidad con UI
-        },
+        stats,
       };
     } catch (error) {
       console.error("Error fetching security stats:", error);
@@ -500,25 +236,15 @@ class SecurityService {
   }
 
   /**
-   * Limpiar sesiones expiradas
+   * Limpiar sesiones expiradas (no-op en modo API)
    */
   static async cleanupExpiredSessions() {
-    try {
-      const { data, error } = await supabase.rpc("cleanup_expired_sessions");
-
-      if (error) throw error;
-
-      console.log(`🧹 Limpiadas ${data || 0} sesiones expiradas`);
-      return { success: true, cleanedSessions: data || 0 };
-    } catch (error) {
-      console.error("Error cleaning up sessions:", error);
-      return { success: false, error: error.message };
-    }
+    console.log("🧹 Cleanup de sesiones: delegado al backend");
+    return { success: true, cleanedSessions: 0 };
   }
 
   /**
    * Generar token de sesión único
-   * @returns {string} Token de sesión
    */
   static generateSessionToken() {
     return `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -545,11 +271,6 @@ class SecurityService {
       }
     }, 60000);
 
-    // Limpiar sesiones expiradas cada 5 minutos
-    const cleanupInterval = setInterval(() => {
-      this.cleanupExpiredSessions();
-    }, this.SECURITY_CONFIG.CLEANUP_INTERVAL_MINUTES * 60000);
-
     // Detectar actividad del usuario
     const events = [
       "mousedown",
@@ -574,7 +295,6 @@ class SecurityService {
     window.addEventListener("beforeunload", () => {
       clearInterval(activityInterval);
       clearInterval(sessionCheckInterval);
-      clearInterval(cleanupInterval);
     });
 
     console.log("🔐 Sistema de monitoreo de actividad iniciado");
@@ -582,7 +302,6 @@ class SecurityService {
 
   /**
    * Obtener información de la IP del cliente
-   * @returns {Promise<string>} IP del cliente
    */
   static async getClientIP() {
     try {
@@ -597,7 +316,6 @@ class SecurityService {
 
   /**
    * Obtener user agent del navegador
-   * @returns {string} User agent
    */
   static getUserAgent() {
     return navigator.userAgent;

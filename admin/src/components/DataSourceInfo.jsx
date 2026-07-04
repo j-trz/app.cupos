@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import AuthorizationService from '../services/authorizationService';
 import DataSourceService from '../services/dataSourceService';
-import { FaDatabase, FaInfoCircle, FaSync } from 'react-icons/fa';
-import { TiVendorMicrosoft } from 'react-icons/ti';
-import { SiSupabase, SiMongodb, SiTableau } from 'react-icons/si';
+import { FaDatabase, FaInfoCircle, FaSync } from 'react-icons/fa';// eslint-disable-line no-unused-vars
+import { TiVendorMicrosoft } from 'react-icons/ti';// eslint-disable-line no-unused-vars
+import { SiSupabase, SiMongodb, SiTableau } from 'react-icons/si';// eslint-disable-line no-unused-vars
 
 /**
  * Componente para mostrar información de la fuente de datos activa
@@ -26,17 +26,8 @@ export default function DataSourceInfo() {
 
   async function checkUserRole() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        
-        const userRole = profile?.role || 'user';
-        setIsAdmin(userRole === 'admin');
-      }
+      const role = await AuthorizationService.getCurrentUserUserRole();
+      setIsAdmin(role === 'admin');
     } catch (error) {
       console.error('Error checking user role:', error);
       setIsAdmin(false);
@@ -98,40 +89,27 @@ export default function DataSourceInfo() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {getDataSourceIcon(dataSourceInfo.type)}
-            <FaInfoCircle className="text-blue-600" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-blue-900">
-                Fuente: {dataSourceInfo.name}
-              </span>
-              {dataSourceInfo.status && (
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(dataSourceInfo.status)}`}>
-                  {dataSourceInfo.status}
-                </span>
-              )}
-              {dataSourceInfo.isDefault && (
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                  Por defecto
-                </span>
-              )}
+            <div>
+              <div className="font-semibold text-sm text-gray-800">
+                {dataSourceInfo.name}
+              </div>
+              <div className="text-xs text-gray-600">
+                {dataSourceInfo.description || `Tipo: ${dataSourceInfo.type}`}
+              </div>
             </div>
-            <p className="text-xs text-blue-700">
-              {dataSourceInfo.description}
-              {dataSourceInfo.lastTested && (
-                <span className="ml-2">
-                  • Última prueba: {new Date(dataSourceInfo.lastTested).toLocaleDateString('es-ES')}
-                </span>
-              )}
-            </p>
           </div>
+          {dataSourceInfo.status && (
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(dataSourceInfo.status)}`}>
+              {dataSourceInfo.status}
+            </span>
+          )}
         </div>
         <button
           onClick={fetchDataSourceInfo}
-          className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-          title="Actualizar información"
+          className="text-gray-500 hover:text-gray-700 p-1 rounded"
+          title="Actualizar"
         >
-          <FaSync className="text-sm" />
+          <FaSync className="w-3 h-3" />
         </button>
       </div>
     </div>

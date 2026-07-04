@@ -1,5 +1,5 @@
 import ConnectionService from "../services/connectionService";
-import { supabase } from "../supabaseClient";
+import ApiClient from "../services/apiClient";
 
 /**
  * Función para asegurar que existe una conexión Power Automate
@@ -8,24 +8,17 @@ import { supabase } from "../supabaseClient";
 export async function ensurePowerAutomateConnection() {
   try {
     // Verificar si el usuario está autenticado
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = ApiClient.getSessionUser();
     if (!user) return;
 
     // Verificar si el usuario es admin
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, admin")
-      .eq("id", user.id)
-      .single();
-
-    const isAdmin = profile?.role === "admin" || profile?.admin === true;
+    const isAdmin = user.role === "admin" || user.admin === true;
     if (!isAdmin) return; // Solo admins pueden crear conexiones
 
     // Verificar si ya existe una conexión Power Automate
     const result = await ConnectionService.getUserConnections();
-    const hasPowerAutomate = result.connections.some(
+    const connections = result.connections || [];
+    const hasPowerAutomate = connections.some(
       (conn) => conn.type === "powerautomate"
     );
 

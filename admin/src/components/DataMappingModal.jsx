@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
-import {FaColumns, FaTimes, FaArrowRight, FaPlay, FaExclamationTriangle, FaSave, FaChevronDown, FaCheck} from "react-icons/fa"; // eslint-disable-line no-unused-vars
+import { FaColumns, FaTimes, FaArrowRight, FaPlay, FaExclamationTriangle, FaSave, FaChevronDown, FaCheck } from "react-icons/fa"; // eslint-disable-line no-unused-vars
 import { Listbox } from '@headlessui/react'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
-import { createCustomSupabaseClient } from '../supabaseClient';
+import ApiClient from '../services/apiClient';
 
 const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
   const [mapping, setMapping] = useState({});
@@ -153,32 +153,6 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
         throw new Error('No se encontraron credenciales para esta conexión');
       }
 
-      // Obtener URL y clave - pueden estar con diferentes nombres
-      const supabaseUrl =
-        creds.url ||
-        creds.supabaseUrl ||
-        creds.project_url ||
-        creds.projectUrl;
-      
-      const anonKey =
-        creds.anonKey ||
-        creds.anon_key ||
-        creds.key ||
-        creds.apiKey;
-
-      console.log('🔍 URLs y claves encontradas:', {
-        supabaseUrl,
-        hasAnonKey: !!anonKey,
-        anonKeyLength: anonKey ? anonKey.length : 0
-      });
-
-      if (!supabaseUrl || !anonKey) {
-        throw new Error(`Credenciales incompletas. URL: ${!!supabaseUrl}, Key: ${!!anonKey}`);
-      }
-
-      // Crear cliente Supabase con headers correctos
-      const supabaseClient = createCustomSupabaseClient(supabaseUrl, anonKey);
-
       // Obtener nombre de tabla configurado (priorizar credenciales explícitas)
       const cm = typeof connection.column_mapping === 'string'
         ? JSON.parse(connection.column_mapping)
@@ -187,96 +161,51 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       // Prioridad: credenciales.tableName > connection.column_mapping.tableName > 'reservas'
       const tableNameFromCreds = (creds && (creds.tableName || creds.table_name || creds.table)) || null;
       const tableName = tableNameFromCreds || cm?.tableName || 'reservas';
-      
-      console.log('🔍 Obteniendo estructura de columnas para tabla:', tableName);
-      
-      // Intentar obtener todas las columnas de la tabla usando múltiples estrategias
+
+      console.log('🔍 Obteniendo estructura de columnas para tabla (vía backend):', tableName);
+
+      // Intentar obtener todas las columnas de la tabla usando el backend proxy
       let allColumns = [];
       let hasData = false;
-      
+      const dataError = null;
+
       try {
         // Estrategia 1: Intentar obtener datos existentes para inferir estructura
         console.log(`🔍 Estrategia 1: Obteniendo datos de tabla ${tableName}`);
-        const { data: sampleData, error: dataError } = await supabaseClient
-          .from(tableName)
-          .select('*')
-          .limit(5);
-        
-        if (!dataError && sampleData && sampleData.length > 0) {
+        const selectResult = await ApiClient.post('/connections/external-fetch', {
+          credentials: creds,
+          operation: 'select',
+          tableName,
+          limit: 5
+        });
+
+        const sampleData = selectResult?.data || [];
+
+        if (sampleData.length > 0) {
           // Tabla tiene datos - usar estructura real
           const firstRow = sampleData[0];
           allColumns = Object.keys(firstRow);
           hasData = true;
           console.log(`✅ Tabla ${tableName} tiene datos. Columnas encontradas:`, allColumns);
-        } else if (!dataError && sampleData && sampleData.length === 0) {
-          // Tabla vacía pero existe - intentar inferir estructura
-          console.log(`📋 Tabla ${tableName} existe pero está vacía`);
-          
-          // Estrategia 2: Intentar INSERT con rollback para inferir columnas
-          try {
-            const testInsert = await supabaseClient
-              .from(tableName)
-              .insert({})
-              .select();
-            
-            // Si el insert falló, el error nos dirá qué columnas son requeridas
-            if (testInsert.error) {
-              console.log('💡 Error de insert nos da información de estructura:', testInsert.error.message);
-              // Analizar mensaje de error para extraer columnas requeridas
-              if (testInsert.error.message.includes('violates not-null constraint')) {
-                const match = testInsert.error.message.match(/column "([^"]+)"/);
-                if (match) {
-                  allColumns = [match[1], 'id', 'created_at', 'updated_at'];
-                }
-              } else if (testInsert.error.message.includes('row-level security policy')) {
-                // RLS está activo - usar estructura común para la tabla
-                console.log('🔒 RLS Policy detectado - usando estructura común');
-                allColumns = ['id', 'created_at', 'updated_at', 'codigo_cupo', 'destino', 'compania', 'disponibilidad', 'precio'];
-              }
-            }
-          } catch (insertError) {
-            console.log('ℹ️ Insert test failed (expected):', insertError.message);
-            // Si hay error de autenticación, usar estructura común
-            if (insertError.message.includes('401') || insertError.message.includes('Unauthorized')) {
-              console.log('🔑 Error de autenticación - usando estructura común');
-              allColumns = ['id', 'created_at', 'updated_at', 'codigo_cupo', 'destino', 'compania', 'disponibilidad', 'precio'];
-            }
-          }
-          
-          // Si no tenemos columnas aún, usar estructura básica
-          if (allColumns.length === 0) {
-            allColumns = ['id', 'created_at', 'updated_at'];
-          }
         } else {
-          // Error al acceder a la tabla - manejar casos comunes
-          console.warn(`⚠️ Error accediendo a tabla ${tableName}:`, dataError?.message);
-          
-          if (dataError?.message.includes('401') || dataError?.message.includes('JWT')) {
-            // Error de autenticación
-            console.log('🔑 Problema de autenticación detectado');
-            allColumns = ['id', 'created_at', 'updated_at', 'codigo_cupo', 'destino', 'compania', 'disponibilidad', 'precio', 'fecha_salida', 'fecha_regreso'];
-          } else if (dataError?.message.includes('relation') || dataError?.message.includes('does not exist')) {
-            // Tabla no existe
-            throw new Error(`Tabla ${tableName} no encontrada: ${dataError?.message}`);
-          } else {
-            // Otros errores - usar estructura de ejemplo
-            allColumns = ['id', 'created_at', 'updated_at', 'campo_1', 'campo_2', 'campo_3'];
-          }
+          // Tabla vacía pero existe - usar estructura común
+          console.log(`📋 Tabla ${tableName} existe pero está vacía`);
+          allColumns = ['id', 'created_at', 'updated_at', 'codigo_cupo', 'destino', 'compania', 'disponibilidad', 'precio'];
         }
-        
+
         // Filtrar columnas del sistema - ser menos restrictivo
         const systemColumns = ['id', 'created_at', 'updated_at'];
         const userColumns = allColumns.filter(col =>
           !systemColumns.includes(col.toLowerCase())
         );
-        
+
         // Si no hay columnas de usuario, mostrar algunas básicas
         if (userColumns.length === 0) {
           console.log('⚠️ No se encontraron columnas de usuario, agregando campos de ejemplo');
           userColumns.push('codigo_cupo', 'destino', 'compania', 'disponibilidad', 'precio');
           allColumns.push(...userColumns);
         }
-        
+
         // Crear estructura de respuesta
         const columnStructure = userColumns.map(column => {
           const sampleValue = hasData && sampleData && sampleData[0] ? sampleData[0][column] : null;
@@ -287,27 +216,27 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
             mapeable: true
           };
         });
-        
+
         console.log('✅ Estructura final para mapeo:', {
           total_columnas: allColumns.length,
           columnas_mapeables: userColumns.length,
           estructura: columnStructure
         });
-        
+
         setSampleData([{
           info: `Estructura de tabla: ${tableName}`,
           total_columnas: allColumns.length,
           columnas_mapeables: userColumns.length,
           columnas_disponibles: columnStructure,
-          estado: hasData ? 'Tabla con datos existentes' : dataError ? 'Tabla con permisos limitados' : 'Tabla vacía lista para datos',
+          estado: hasData ? 'Tabla con datos existentes' : 'Tabla vacía lista para datos',
           tiene_datos: hasData,
           todas_las_columnas: allColumns,
           problema_permisos: !!dataError
         }]);
-        
+
         const iconType = dataError ? 'warning' : hasData ? 'success' : 'info';
         const titleText = dataError ? 'Tabla con permisos limitados' : hasData ? 'Tabla con datos detectada' : 'Tabla vacía detectada';
-        
+
         Swal.fire({
           icon: iconType,
           title: titleText,
@@ -320,10 +249,10 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
           `,
           timer: 6000
         });
-        
+
       } catch (error) {
         console.warn('⚠️ Error al obtener estructura de tabla:', error);
-        
+
         // Fallback: Tabla nueva - mostrar que se creará automáticamente
         setSampleData([{
           info: `Nueva tabla: ${tableName}`,
@@ -340,7 +269,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
           total_columnas: 'Se definirá según mapeo',
           nota: 'Estructura se creará automáticamente con los campos que mapees'
         }]);
-        
+
         Swal.fire({
           icon: 'info',
           title: 'Tabla nueva',
@@ -352,8 +281,8 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
           timer: 5000
         });
       }
-      
-      
+
+
     } catch (error) {
       console.error('❌ Error loading Supabase data:', error);
       Swal.fire({
@@ -377,7 +306,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
         console.debug('getDecryptedCredentials falló en loadRealConnectionData', e?.message);
       }
       if (!credentials) throw new Error('No se encontró una conexión activa para este tipo de datos');
-      
+
       console.log(`🔍 Cargando datos reales para ${connection.type}:`, {
         hasCredentials: !!credentials,
         credentialsKeys: credentials ? Object.keys(credentials) : 'none'
@@ -388,7 +317,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       }
 
       let sampleData = [];
-      
+
       switch (connection.type) {
         case 'mongodb':
           sampleData = await loadMongoDBData(credentials);
@@ -402,11 +331,11 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
         default:
           throw new Error(`Tipo de conexión ${connection.type} no soportado`);
       }
-      
+
       // Mostrar alerta específica para Smartsheet sobre CORS
       if (connection.type === 'smartsheet' && sampleData[0]?.cors_blocked) {
         console.log('⚠️ CORS detectado para Smartsheet - mostrando estructura estimada');
-        
+
         Swal.fire({
           icon: 'info',
           title: 'Smartsheet - Estructura Estimada',
@@ -421,7 +350,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
         });
       } else {
         console.log(`✅ Datos cargados para ${connection.type}:`, sampleData);
-        
+
         Swal.fire({
           icon: 'success',
           title: `${connection.type} conectado`,
@@ -434,9 +363,9 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       }
 
       setSampleData(sampleData);
-      
+
       console.log(`✅ Datos reales cargados para ${connection.type}:`, sampleData);
-      
+
     } catch (error) {
       console.error(`❌ Error loading ${connection.type} data:`, error);
       Swal.fire({
@@ -460,7 +389,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       }
 
       console.log('🔍 Obteniendo estructura de colección MongoDB:', { database, collection });
-      
+
       // Retornar estructura de campos disponibles para mapeo
       return [
         {
@@ -498,11 +427,11 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       }
 
       console.log('🔍 Detectando estructura de Smartsheet...');
-      
+
       // NOTA: Las llamadas directas a Smartsheet API desde el frontend están bloqueadas por CORS
       // En un entorno de producción, estas llamadas se harían desde el backend
       console.log('⚠️ Llamadas directas a Smartsheet API bloqueadas por CORS - usando estructura estimada');
-      
+
       // Estructura inteligente basada en el contexto de la aplicación
       const smartsheetColumns = [
         { id: 1, nombre: 'Código_Cupo', tipo: 'TEXT_NUMBER', indice: 0 },
@@ -538,10 +467,10 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
 
     } catch (error) {
       console.log('⚠️ Error procesando Smartsheet:', error.message);
-      
+
       // Obtener sheetId de las credenciales si está disponible
       const sheetId = credentials?.sheetId || credentials?.sheet_id || 'N/A';
-      
+
       // Fallback básico
       const basicColumns = [
         { id: 1, nombre: 'ID', tipo: 'TEXT_NUMBER', indice: 0 },
@@ -584,7 +513,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
 
       // Retornar estructura de campos disponibles para mapeo
       // En implementación real: POST to /api/3.19/auth/signin, luego GET datasource fields
-      
+
       return [
         {
           info: `Estructura de fuente de datos: ${datasourceName}`,
@@ -617,7 +546,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
 
   const loadMockData = () => {
     let sample = [];
-    
+
     switch (connection.type) {
       case 'supabase':
         sample = [
@@ -649,7 +578,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
           { Pedido_ID: 'ORD001', Nombre_Pasajero: 'María', Agencia: 'Turismo Global' }
         ];
     }
-    
+
     setSampleData(sample);
   };
 
@@ -707,7 +636,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
 
       // Guardar siempre como JSON string para compatibilidad con la columna (text/json)
       await onSave(connection.id, { column_mapping: JSON.stringify(fullMapping) });
-      
+
       Swal.fire({
         icon: 'success',
         title: 'Mapeo guardado',
@@ -729,9 +658,9 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
 
   const getSourceFields = () => {
     if (sampleData.length === 0) return [];
-    
+
     const firstItem = sampleData[0];
-    
+
     // Detectar si es estructura de columnas o datos reales
     if (firstItem.campos_disponibles || firstItem.columnas_disponibles) {
       // Es estructura de base de datos - extraer nombres de campos
@@ -742,7 +671,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
             return firstItem.columnas_disponibles.map(col => col.nombre || col.column_name || col);
           }
           break;
-          
+
         case 'mongodb':
           if (firstItem.campos_disponibles && Array.isArray(firstItem.campos_disponibles)) {
             // Filtrar campos de sistema de MongoDB
@@ -751,14 +680,14 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
               .map(field => field.nombre);
           }
           break;
-          
+
         case 'smartsheet':
           if (firstItem.columnas_disponibles && Array.isArray(firstItem.columnas_disponibles)) {
             // Para Smartsheet, usar índices de celdas: cells[0], cells[1], etc.
             return firstItem.columnas_disponibles.map((col, index) => `cells[${index}]`);
           }
           break;
-          
+
         case 'tableau':
           if (firstItem.campos_disponibles && Array.isArray(firstItem.campos_disponibles)) {
             return firstItem.campos_disponibles.map(field => field.nombre);
@@ -766,19 +695,19 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
           break;
       }
     }
-    
+
     // Fallback: datos reales o estructura plana
     if (connection.type === 'smartsheet' && firstItem.cells) {
       // Para Smartsheet con datos reales, mostrar posiciones de celdas
       return firstItem.cells.map((_, index) => `cells[${index}]`);
     }
-    
+
     // Para datos reales o estructura plana, usar las claves del objeto
     // Filtrar campos de sistema y metadatos
     const systemFields = ['info', 'estado', 'nota', 'total_columnas', 'total_campos',
-                         'mapeo_disponible', 'columnas_mapeables', 'columnas_sistema',
-                         'tiene_datos', 'id', 'created_at', 'updated_at'];
-    
+      'mapeo_disponible', 'columnas_mapeables', 'columnas_sistema',
+      'tiene_datos', 'id', 'created_at', 'updated_at'];
+
     return Object.keys(firstItem).filter(key =>
       !systemFields.includes(key.toLowerCase())
     );
@@ -811,22 +740,20 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
             <div className="flex gap-4">
               <button
                 onClick={() => setDataType('products')}
-                className={`px-4 py-2 rounded flex items-center gap-2 transition-colors ${
-                  dataType === 'products'
-                    ? 'bg-[#2c4b8b] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded flex items-center gap-2 transition-colors ${dataType === 'products'
+                  ? 'bg-[#2c4b8b] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 <FaColumns />
                 Productos/Disponibilidad
               </button>
               <button
                 onClick={() => setDataType('orders')}
-                className={`px-4 py-2 rounded flex items-center gap-2 transition-colors ${
-                  dataType === 'orders'
-                    ? 'bg-[#2c4b8b] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded flex items-center gap-2 transition-colors ${dataType === 'orders'
+                  ? 'bg-[#2c4b8b] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 <FaColumns />
                 Pedidos/Reservas
@@ -847,7 +774,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                   <FaArrowRight className="text-[#2c4b8b]" />
                   Configuración de Mapeo
                 </h3>
-                
+
                 <div className="space-y-3 max-h-[600px] overflow-y-auto border rounded p-4">
                   {currentFields.map(field => (
                     <div key={field.key} className="border-b pb-3 last:border-b-0">
@@ -879,8 +806,7 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                               key=""
                               value=""
                               className={({ active }) =>
-                                `relative cursor-default select-none py-2 pl-3 pr-9 ${
-                                  active ? 'bg-[#2c4b8b] text-white' : 'text-gray-900'
+                                `relative cursor-default select-none py-2 pl-3 pr-9 ${active ? 'bg-[#2c4b8b] text-white' : 'text-gray-900'
                                 }`
                               }
                             >
@@ -897,14 +823,13 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
                                 </>
                               )}
                             </Listbox.Option>
-                            
+
                             {getSourceFields().map((sourceField) => (
                               <Listbox.Option
                                 key={sourceField}
                                 value={sourceField}
                                 className={({ active }) =>
-                                  `relative cursor-default select-none py-2 pl-3 pr-9 ${
-                                    active ? 'bg-[#2c4b8b] text-white' : 'text-gray-900'
+                                  `relative cursor-default select-none py-2 pl-3 pr-9 ${active ? 'bg-[#2c4b8b] text-white' : 'text-gray-900'
                                   }`
                                 }
                               >

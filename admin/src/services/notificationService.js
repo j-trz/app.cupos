@@ -1,5 +1,3 @@
-import { supabase } from "../supabaseClient";
-import AuthorizationService from "./authorizationService";
 import ApiClient from "./apiClient";
 
 /**
@@ -55,8 +53,6 @@ class NotificationService {
 
   /**
    * Crear una nueva notificación
-   * @param {Object} notificationData - Datos de la notificación
-   * @returns {Promise<Object>} Resultado de la creación
    */
   static async createNotification({
     type,
@@ -67,64 +63,21 @@ class NotificationService {
     data = {},
   }) {
     try {
-      if (ApiClient.isApiEnabled()) {
-        const config = this.NOTIFICATION_CONFIG[type];
-        const res = await ApiClient.post("/notifications", {
-          type,
-          title: title || config.title,
-          message,
-          icon: config.icon,
-          color: config.color,
-          priority: config.priority,
-          targetUserId,
-          targetRole,
-          data
-        });
-        return {
-          success: true,
-          notification: { id: res.notificationId }
-        };
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      // Validar tipo de notificación
-      if (!Object.values(this.NOTIFICATION_TYPES).includes(type)) {
-        throw new Error(`Tipo de notificación inválido: ${type}`);
-      }
-
       const config = this.NOTIFICATION_CONFIG[type];
-
-      const notificationData = {
+      const res = await ApiClient.post("/notifications", {
         type,
         title: title || config.title,
         message,
         icon: config.icon,
         color: config.color,
         priority: config.priority,
-        data: JSON.stringify(data),
-        target_user_id: targetUserId,
-        target_role: targetRole,
-        created_by: user.id,
-        created_at: new Date().toISOString(),
-        read: false,
-      };
-
-      const { data: notification, error } = await supabase
-        .from("notifications")
-        .insert([notificationData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      console.log(`` + `✅ Notificación creada: ${type} - ${message}`);
+        targetUserId,
+        targetRole,
+        data
+      });
       return {
         success: true,
-        notification,
+        notification: { id: res.notificationId }
       };
     } catch (error) {
       console.error("Error creating notification:", error);
@@ -137,10 +90,6 @@ class NotificationService {
 
   /**
    * Obtener notificaciones para el usuario actual con estados personales
-   * @param {number} limit - Límite de notificaciones a obtener
-   * @param {boolean} onlyUnread - Solo notificaciones no leídas
-   * @param {boolean} includeHidden - Incluir notificaciones ocultas
-   * @returns {Promise<Array>} Lista de notificaciones con estados personales
    */
   static async getNotifications(
     limit = 50,
@@ -148,53 +97,21 @@ class NotificationService {
     includeHidden = false
   ) {
     try {
-      if (ApiClient.isApiEnabled()) {
-        // Solo enviar parámetros booleanos cuando son true (optimización)
-        const params = new URLSearchParams({ limit: String(limit) });
-        if (onlyUnread) params.set('onlyUnread', 'true');
-        if (includeHidden) params.set('includeHidden', 'true');
-        const data = await ApiClient.get(`/notifications?${params.toString()}`);
-        
-        const notifications = (data.notifications || []).map((notification) => ({
-          ...notification,
-          id: notification.notification_id,
-          data: this.safeParseJSON(notification.data),
-        }));
-
-        return {
-          success: true,
-          notifications,
-          unreadCount: notifications.filter((n) => !n.is_read && !n.is_hidden).length,
-        };
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      // Usar función SQL para obtener notificaciones con estados personales
-      const { data, error } = await supabase.rpc("get_user_notifications", {
-        user_uuid: user.id,
-        limit_count: limit,
-        only_unread: onlyUnread,
-        include_hidden: includeHidden,
-      });
-
-      if (error) throw error;
-
-      // Parsear datos JSON de forma segura y mapear notification_id a id
-      const notifications = data.map((notification) => ({
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (onlyUnread) params.set('onlyUnread', 'true');
+      if (includeHidden) params.set('includeHidden', 'true');
+      const data = await ApiClient.get(`/notifications?${params.toString()}`);
+      
+      const notifications = (data.notifications || []).map((notification) => ({
         ...notification,
-        id: notification.notification_id, // Mapear para compatibilidad con frontend
+        id: notification.notification_id,
         data: this.safeParseJSON(notification.data),
       }));
 
       return {
         success: true,
         notifications,
-        unreadCount: notifications.filter((n) => !n.is_read && !n.is_hidden)
-          .length,
+        unreadCount: notifications.filter((n) => !n.is_read && !n.is_hidden).length,
       };
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -209,33 +126,10 @@ class NotificationService {
 
   /**
    * Marcar notificación como leída para el usuario actual
-   * @param {string} notificationId - ID de la notificación
-   * @param {boolean} readStatus - Estado de lectura (true = leída, false = no leída)
-   * @returns {Promise<Object>} Resultado de la actualización
    */
   static async markAsRead(notificationId, readStatus = true) {
     try {
-      if (ApiClient.isApiEnabled()) {
-        await ApiClient.put(`/notifications/${notificationId}/read`, { isRead: readStatus });
-        return { success: true };
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { data: _data, error } = await supabase.rpc(
-        "mark_notification_read",
-        {
-          user_uuid: user.id,
-          notification_uuid: notificationId,
-          read_status: readStatus,
-        }
-      );
-
-      if (error) throw error;
-
+      await ApiClient.put(`/notifications/${notificationId}/read`, { isRead: readStatus });
       return { success: true };
     } catch (error) {
       console.error("Error marking notification as read:", error);
@@ -245,31 +139,11 @@ class NotificationService {
 
   /**
    * Marcar todas las notificaciones como leídas para el usuario actual
-   * @returns {Promise<Object>} Resultado de la actualización
    */
   static async markAllAsRead() {
     try {
-      if (ApiClient.isApiEnabled()) {
-        const data = await ApiClient.put("/notifications/read-all", {});
-        return { success: true, updatedCount: data.updatedCount || 0 };
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { data, error } = await supabase.rpc(
-        "mark_all_user_notifications_read",
-        {
-          user_uuid: user.id,
-        }
-      );
-
-      if (error) throw error;
-
-      console.log(`✅ Marcadas ${data || 0} notificaciones como leídas`);
-      return { success: true, updatedCount: data || 0 };
+      const data = await ApiClient.put("/notifications/read-all", {});
+      return { success: true, updatedCount: data.updatedCount || 0 };
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       return { success: false, error: error.message };
@@ -277,36 +151,11 @@ class NotificationService {
   }
 
   /**
-   * Ocultar notificación para el usuario actual (equivalente a eliminar personalmente)
-   * @param {string} notificationId - ID de la notificación
-   * @param {boolean} hiddenStatus - Estado de ocultamiento (true = oculta, false = visible)
-   * @returns {Promise<Object>} Resultado de la ocultación
+   * Ocultar notificación para el usuario actual
    */
   static async hideNotification(notificationId, hiddenStatus = true) {
     try {
-      if (ApiClient.isApiEnabled()) {
-        await ApiClient.put(`/notifications/${notificationId}/hide`, { isHidden: hiddenStatus });
-        return { success: true };
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { data: _data, error } = await supabase.rpc("hide_notification", {
-        user_uuid: user.id,
-        notification_uuid: notificationId,
-        hidden_status: hiddenStatus,
-      });
-
-      if (error) throw error;
-
-      console.log(
-        `✅ Notificación ${
-          hiddenStatus ? "ocultada" : "restaurada"
-        } para el usuario`
-      );
+      await ApiClient.put(`/notifications/${notificationId}/hide`, { isHidden: hiddenStatus });
       return { success: true };
     } catch (error) {
       console.error("Error hiding notification:", error);
@@ -316,37 +165,10 @@ class NotificationService {
 
   /**
    * Eliminar notificación completamente (solo administradores)
-   * @param {string} notificationId - ID de la notificación
-   * @returns {Promise<Object>} Resultado de la eliminación
    */
   static async deleteNotification(notificationId) {
     try {
-      if (ApiClient.isApiEnabled()) {
-        await ApiClient.delete(`/notifications/${notificationId}`);
-        return { success: true };
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      // Verificar permisos de administrador
-      const userProfile = await AuthorizationService.getCurrentUserProfile();
-      if (!userProfile || userProfile.role !== "admin") {
-        throw new Error(
-          "Solo los administradores pueden eliminar notificaciones completamente"
-        );
-      }
-
-      const { error } = await supabase
-        .from("notifications")
-        .delete()
-        .eq("id", notificationId);
-
-      if (error) throw error;
-
-      console.log("✅ Notificación eliminada completamente por administrador");
+      await ApiClient.delete(`/notifications/${notificationId}`);
       return { success: true };
     } catch (error) {
       console.error("Error deleting notification:", error);
@@ -361,7 +183,7 @@ class NotificationService {
     return await this.createNotification({
       type: this.NOTIFICATION_TYPES.NEW_REQUEST,
       message: `Nueva solicitud de ${requestData.Contacto_Nombre} para ${requestData.Vuelo_Destino}`,
-      targetRole: "admin", // Solo para administradores
+      targetRole: "admin",
       data: {
         requestId: requestData.ItemInternalId,
         destination: requestData.Vuelo_Destino,
@@ -378,8 +200,8 @@ class NotificationService {
     return await this.createNotification({
       type: this.NOTIFICATION_TYPES.REQUEST_CONFIRMED,
       message: `Solicitud confirmada: ${requestData.Vuelo_Destino} para ${requestData.Nombre_Pasajero}`,
-      targetUserId: requestData.Usuario_Email ? null : null, // Enviar al usuario específico si se puede identificar
-      targetRole: "agency_admin", // Y también a administradores de agencia
+      targetUserId: requestData.Usuario_Email ? null : null,
+      targetRole: "agency_admin",
       data: {
         requestId: requestData.ItemInternalId,
         destination: requestData.Vuelo_Destino,
@@ -396,7 +218,7 @@ class NotificationService {
     return await this.createNotification({
       type: this.NOTIFICATION_TYPES.NEW_PRODUCT,
       message: `Nuevo destino disponible: ${productData.destino} con ${productData.compania}`,
-      targetRole: null, // Para todos los usuarios
+      targetRole: null,
       data: {
         productId: productData.ItemInternalId,
         destination: productData.destino,
@@ -417,7 +239,7 @@ class NotificationService {
       return await this.createNotification({
         type: this.NOTIFICATION_TYPES.LOW_AVAILABILITY,
         message: `¡Solo quedan ${availability} lugares para ${productData.destino}!`,
-        targetRole: null, // Para todos los usuarios
+        targetRole: null,
         data: {
           productId: productData.ItemInternalId,
           destination: productData.destino,
@@ -433,51 +255,12 @@ class NotificationService {
 
   /**
    * Suscribirse a notificaciones en tiempo real
-   * @param {Function} callback - Función a ejecutar cuando llegue una notificación
-   * @returns {Function} Función para cancelar la suscripción
+   * En modo API, el backend no soporta websockets todavía.
+   * Se retorna un no-op.
    */
-  static async subscribeToNotifications(callback) {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        console.warn(
-          "Usuario no autenticado para suscripción de notificaciones"
-        );
-        return () => {};
-      }
-
-      const subscription = supabase
-        .channel("notifications")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "notifications",
-          },
-          (payload) => {
-            console.log("Nueva notificación recibida:", payload.new);
-            if (callback && typeof callback === "function") {
-              callback(payload.new);
-            }
-          }
-        )
-        .subscribe();
-
-      console.log("✅ Suscrito a notificaciones en tiempo real");
-
-      // Retornar función para cancelar suscripción
-      return () => {
-        subscription.unsubscribe();
-        console.log("❌ Suscripción a notificaciones cancelada");
-      };
-    } catch (error) {
-      console.error("Error subscribing to notifications:", error);
-      return () => {};
-    }
+  static async subscribeToNotifications(_callback) {
+    console.log("⚠️ Suscripción en tiempo real no disponible en modo API. Usando polling.");
+    return () => {};
   }
 
   /**
@@ -485,12 +268,6 @@ class NotificationService {
    */
   static async getNotificationStats() {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      // Obtener todas las notificaciones del usuario (incluyendo ocultas para estadísticas)
       const { notifications } = await this.getNotifications(1000, false, true);
 
       const stats = {
@@ -500,7 +277,6 @@ class NotificationService {
         byType: {},
       };
 
-      // Agrupar por tipo (solo notificaciones no ocultas)
       const visibleNotifications = notifications.filter((n) => !n.is_hidden);
       Object.values(this.NOTIFICATION_TYPES).forEach((type) => {
         const typeNotifications = visibleNotifications.filter(
@@ -528,27 +304,13 @@ class NotificationService {
 
   /**
    * Obtener conteo rápido de notificaciones no leídas
-   * @returns {Promise<number>} Número de notificaciones no leídas
    */
   static async getUnreadCount() {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { data, error } = await supabase.rpc(
-        "get_user_unread_notifications_count",
-        {
-          user_uuid: user.id,
-        }
-      );
-
-      if (error) throw error;
-
+      const data = await ApiClient.get("/notifications/unread-count");
       return {
         success: true,
-        unreadCount: data || 0,
+        unreadCount: data.unreadCount || 0,
       };
     } catch (error) {
       console.error("Error fetching unread count:", error);
@@ -562,16 +324,12 @@ class NotificationService {
 
   /**
    * Parsear JSON de forma segura
-   * @param {string|object} data - Datos a parsear
-   * @returns {object} Objeto parseado o vacío
    */
   static safeParseJSON(data) {
     if (!data) return {};
 
-    // Si ya es un objeto, devolverlo tal como está
     if (typeof data === "object") return data;
 
-    // Si es string, intentar parsearlo
     if (typeof data === "string") {
       try {
         return JSON.parse(data);

@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 /* eslint-disable no-unused-vars */
 import {
-  HiOutlinePlus,  
-  HiOutlinePencilSquare,  
-  HiOutlineTrash,  
-  HiArrowPathRoundedSquare,  
-  HiOutlineMagnifyingGlass,  
-  HiMiniXMark,  
-  HiOutlineExclamationTriangle,  
-  HiOutlineCheck,  
+  HiOutlinePlus,
+  HiOutlinePencilSquare,
+  HiOutlineTrash,
+  HiArrowPathRoundedSquare,
+  HiOutlineMagnifyingGlass,
+  HiMiniXMark,
+  HiOutlineExclamationTriangle,
+  HiOutlineCheck,
 } from "react-icons/hi2";
 /* eslint-enable no-unused-vars */
 import Swal from 'sweetalert2';
 import Layout from '../components/Layout'; // eslint-disable-line no-unused-vars
 import ConnectionService from '../services/connectionService';
-import { createCustomSupabaseClient } from '../supabaseClient';
+import ApiClient from '../services/apiClient';
 import DataOperationsService from '../services/dataOperationsService';
 import AgencyService from '../services/agencyService';
 import { AIRLINE_LOGOS, AIRLINES } from '../components/ItineraryDetails.jsx';
@@ -195,11 +195,11 @@ const GestionProductos = () => {
     try {
       setConnectionStatus('checking');
       const connection = await ConnectionService.getActiveConnection('productos');
-      
+
       if (connection) {
         setActiveConnection(connection);
         setConnectionStatus('connected');
-  console.warn('✅ Conexión activa detectada:', connection);
+        console.warn('✅ Conexión activa detectada:', connection);
       } else {
         setConnectionStatus('no_connection');
         console.warn('⚠️ No hay conexión activa configurada');
@@ -311,19 +311,9 @@ const GestionProductos = () => {
         }
       };
 
-      // Usar la función RPC SECURITY DEFINER en la base: fn_upsert_distribucion
-      // Construir cliente Supabase desde las credenciales desencriptadas
+      // Usar la función RPC fn_upsert_distribucion vía backend proxy
       if (connForDistrib && connForDistrib.credentials) {
         const creds = connForDistrib.credentials;
-        const supabaseUrl = creds.projectUrl || creds.project_url || creds.url || creds.supabaseUrl || creds.supabase_url;
-        const anonKey = creds.anonKey || creds.anon_key || creds.key;
-        if (!supabaseUrl || !anonKey) throw new Error('Credenciales Supabase incompletas para RPC');
-        // crear cliente temporal que reutiliza el storageKey por tabla
-        const supabase = createCustomSupabaseClient(
-          supabaseUrl,
-          anonKey,
-          { storageKey: `sb-rpc-distribuciones` }
-        );
 
         // Sanitize payload: representamos 'unlimited' as null
         const distribForRpc = {};
@@ -336,15 +326,21 @@ const GestionProductos = () => {
         });
 
         const payload = {
-          p_product_id: Number(recordId),
-          p_distribucion: distribForRpc,
-          p_total_asignado: null,
-          p_updated_at: new Date().toISOString()
+          credentials: creds,
+          operation: 'rpc',
+          rpcName: 'fn_upsert_distribucion',
+          rpcParams: {
+            p_product_id: Number(recordId),
+            p_distribucion: distribForRpc,
+            p_total_asignado: null,
+            p_updated_at: new Date().toISOString()
+          }
         };
 
-        console.warn('🔄 Llamando RPC fn_upsert_distribucion con payload:', payload);
-        const { error: rpcErr } = await supabase.rpc('fn_upsert_distribucion', payload);
-        if (rpcErr) {
+        console.warn('🔄 Llamando RPC fn_upsert_distribucion vía backend con payload:', payload);
+        try {
+          await ApiClient.post('/connections/external-fetch', payload);
+        } catch (rpcErr) {
           // mostrar mensaje más legible si viene de la DB
           throw new Error(rpcErr.message || JSON.stringify(rpcErr));
         }
@@ -401,9 +397,9 @@ const GestionProductos = () => {
 
     if (result.isConfirmed) {
       try {
-  console.warn('🗑️ Eliminando producto:', producto);
-  console.warn('🆔 ID detectado para delete:', resolveId(producto));
-        
+        console.warn('🗑️ Eliminando producto:', producto);
+        console.warn('🆔 ID detectado para delete:', resolveId(producto));
+
         // Usar DataOperationsService para eliminar (solo Supabase)
         // Preparar credenciales si la conexión es Supabase
         let connWithCreds = activeConnection;
@@ -448,7 +444,7 @@ const GestionProductos = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!activeConnection) {
       Swal.fire({
         icon: 'error',
@@ -470,7 +466,7 @@ const GestionProductos = () => {
 
     try {
       setLoading(true);
-      
+
       // Preparar datos según estructura estándar
       const productData = {
         codigo_cupo: formData.codigo_cupo,
@@ -485,14 +481,14 @@ const GestionProductos = () => {
         ficha: formData.ficha,
         temporada: formData.temporada,
         neto_1: formData.neto_1,
-  op: formData.op !== '' && formData.op != null ? String(Number(formData.op).toFixed(2)) : null,
+        op: formData.op !== '' && formData.op != null ? String(Number(formData.op).toFixed(2)) : null,
         carryon: Boolean(formData.carryon),
         handbag: Boolean(formData.handbag),
         checkedbag: Boolean(formData.checkedbag),
         inf_fare: formData.inf_fare
       };
 
-  console.warn(editingProduct ? '✏️ Actualizando producto:' : '➕ Creando producto:', productData);
+      console.warn(editingProduct ? '✏️ Actualizando producto:' : '➕ Creando producto:', productData);
 
       // Validar conexión para creación: solo Supabase soportado
       if (!editingProduct && activeConnection.type !== 'supabase') {
@@ -530,7 +526,7 @@ const GestionProductos = () => {
         }
         // Actualizar producto existente
         const recordId = resolveId(editingProduct);
-  console.warn('🔎 ID detectado para update:', recordId, editingProduct);
+        console.warn('🔎 ID detectado para update:', recordId, editingProduct);
         result = await DataOperationsService.updateData(
           activeConnection.type,
           connectionWithCreds,
@@ -549,12 +545,12 @@ const GestionProductos = () => {
       if (result.success) {
         await loadProductos(); // Recargar lista
         setShowModal(false);
-        
+
         Swal.fire({
           icon: 'success',
           title: editingProduct ? 'Producto actualizado' : 'Producto creado',
-          text: editingProduct ? 
-            'El producto se actualizó correctamente' : 
+          text: editingProduct ?
+            'El producto se actualizó correctamente' :
             'El producto se creó correctamente',
           timer: 2000
         });
@@ -629,7 +625,7 @@ const GestionProductos = () => {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <HiOutlineCheck  className="text-green-500 mr-3 w-5 h-5" />
+                <HiOutlineCheck className="text-green-500 mr-3 w-5 h-5" />
                 <div>
                   <span className="text-green-700 font-medium">Conectado a: {activeConnection?.name}</span>
                   <p className="text-green-600 text-sm">Tipo: {activeConnection?.type}</p>
@@ -649,7 +645,7 @@ const GestionProductos = () => {
         return (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
-              <HiOutlineExclamationTriangle  className="text-yellow-500 mr-3" />
+              <HiOutlineExclamationTriangle className="text-yellow-500 mr-3" />
               <div>
                 <span className="text-yellow-700 font-medium">Sin conexión activa</span>
                 <p className="text-yellow-600 text-sm">
@@ -680,9 +676,9 @@ const GestionProductos = () => {
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
-    <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Productos</h1>
+      <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Productos</h1>
           <div className="flex gap-2 items-center">
             <button
               onClick={loadProductos}
@@ -716,7 +712,7 @@ const GestionProductos = () => {
         {/* Barra de búsqueda */}
         <div className="mb-6">
           <div className="relative">
-            <HiOutlineMagnifyingGlass  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Buscar por código, destino o compañía..."
@@ -847,13 +843,13 @@ const GestionProductos = () => {
                             (typeof producto.ruta === 'object' && Array.isArray(producto.ruta.vuelos) && producto.ruta.vuelos.length > 0)
                           )
                         ) ? (
-                            <button
-                              className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
-                              onClick={() => { setRutaSeleccionada(producto.ruta); setPopupRutaOpen(true); }}
-                            >
-                              Ver itinerario
-                            </button>
-                          ) : '—'}
+                          <button
+                            className="bg-[#2c4b8b] text-white px-3 py-1 rounded text-sm hover:bg-[#1e355e] transition-colors"
+                            onClick={() => { setRutaSeleccionada(producto.ruta); setPopupRutaOpen(true); }}
+                          >
+                            Ver itinerario
+                          </button>
+                        ) : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-md text-center text-gray-500">
                         {producto.pnr || '—'}
@@ -913,7 +909,7 @@ const GestionProductos = () => {
                             className="text-[#767c87] px-3 py-1 rounded text-sm hover:text-[#2c4b8b] transition-colors"
                             title="Distribuir stock"
                           >
-                            <LuGitBranchPlus className='w-5 h-5'/>
+                            <LuGitBranchPlus className='w-5 h-5' />
                           </button>
                         </div>
                       </td>
@@ -977,7 +973,7 @@ const GestionProductos = () => {
                       <input
                         type="text"
                         value={formData.codigo_cupo}
-                        onChange={(e) => setFormData({...formData, codigo_cupo: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, codigo_cupo: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                         placeholder="Ej: ABC123"
                         required
@@ -992,7 +988,7 @@ const GestionProductos = () => {
                       <input
                         type="text"
                         value={formData.destino}
-                        onChange={(e) => setFormData({...formData, destino: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, destino: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                         placeholder="Ej: Madrid"
                         required
@@ -1006,7 +1002,7 @@ const GestionProductos = () => {
                       </label>
                       <select
                         value={formData.compania}
-                        onChange={(e) => setFormData({...formData, compania: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, compania: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                         required
                       >
@@ -1026,7 +1022,7 @@ const GestionProductos = () => {
                         type="number"
                         min="0"
                         value={formData.disponibilidad}
-                        onChange={(e) => setFormData({...formData, disponibilidad: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, disponibilidad: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                         placeholder="0"
                       />
@@ -1040,7 +1036,7 @@ const GestionProductos = () => {
                       <input
                         type="text"
                         value={formData.pnr}
-                        onChange={(e) => setFormData({...formData, pnr: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, pnr: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                         placeholder="Ej: ABC123"
                       />
@@ -1054,7 +1050,7 @@ const GestionProductos = () => {
                       <input
                         type="text"
                         value={formData.ficha}
-                        onChange={(e) => setFormData({...formData, ficha: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, ficha: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                         placeholder="Número de ficha"
                       />
@@ -1077,7 +1073,7 @@ const GestionProductos = () => {
                       <input
                         type="date"
                         value={formData.fecha_salida}
-                        onChange={(e) => setFormData({...formData, fecha_salida: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, fecha_salida: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                       />
                     </div>
@@ -1090,7 +1086,7 @@ const GestionProductos = () => {
                       <input
                         type="date"
                         value={formData.fecha_regreso}
-                        onChange={(e) => setFormData({...formData, fecha_regreso: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, fecha_regreso: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                       />
                     </div>
@@ -1107,7 +1103,7 @@ const GestionProductos = () => {
                           min="0"
                           step="0.01"
                           value={formData.precio}
-                          onChange={(e) => setFormData({...formData, precio: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                           className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                           placeholder="0.00"
                         />
@@ -1126,7 +1122,7 @@ const GestionProductos = () => {
                           min="0"
                           step="0.01"
                           value={formData.neto_1}
-                          onChange={(e) => setFormData({...formData, neto_1: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, neto_1: e.target.value })}
                           className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                           placeholder="0.00"
                         />
@@ -1140,7 +1136,7 @@ const GestionProductos = () => {
                       </label>
                       <select
                         value={formData.temporada}
-                        onChange={(e) => setFormData({...formData, temporada: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, temporada: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                       >
                         <option value="">Seleccionar</option>
@@ -1162,7 +1158,7 @@ const GestionProductos = () => {
                           min="0"
                           step="0.01"
                           value={formData.op}
-                          onChange={(e) => setFormData({...formData, op: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, op: e.target.value })}
                           className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                           placeholder="0.00"
                         />
@@ -1181,7 +1177,7 @@ const GestionProductos = () => {
                           min="0"
                           step="0.01"
                           value={formData.inf_fare}
-                          onChange={(e) => setFormData({...formData, inf_fare: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, inf_fare: e.target.value })}
                           className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2c4b8b] focus:border-transparent"
                           placeholder="0.00"
                         />
@@ -1217,7 +1213,7 @@ const GestionProductos = () => {
                           <input
                             type="checkbox"
                             checked={!!formData.handbag}
-                            onChange={(e) => setFormData({...formData, handbag: e.target.checked})}
+                            onChange={(e) => setFormData({ ...formData, handbag: e.target.checked })}
                             className="w-5 h-5 text-[#2c4b8b] border-gray-300 rounded focus:ring-[#2c4b8b]"
                           />
                           <div className="flex items-center space-x-2">
@@ -1232,7 +1228,7 @@ const GestionProductos = () => {
                           <input
                             type="checkbox"
                             checked={!!formData.carryon}
-                            onChange={(e) => setFormData({...formData, carryon: e.target.checked})}
+                            onChange={(e) => setFormData({ ...formData, carryon: e.target.checked })}
                             className="w-5 h-5 text-[#2c4b8b] border-gray-300 rounded focus:ring-[#2c4b8b]"
                           />
                           <div className="flex items-center space-x-2">
@@ -1247,7 +1243,7 @@ const GestionProductos = () => {
                           <input
                             type="checkbox"
                             checked={!!formData.checkedbag}
-                            onChange={(e) => setFormData({...formData, checkedbag: e.target.checked})}
+                            onChange={(e) => setFormData({ ...formData, checkedbag: e.target.checked })}
                             className="w-5 h-5 text-[#2c4b8b] border-gray-300 rounded focus:ring-[#2c4b8b]"
                           />
                           <div className="flex items-center space-x-2">
@@ -1313,7 +1309,7 @@ const GestionProductos = () => {
                       type="number"
                       min="0"
                       value={distribucion[a] ?? 0}
-                      onChange={(e) => setDistribucion({...distribucion, [a]: Number(e.target.value)})}
+                      onChange={(e) => setDistribucion({ ...distribucion, [a]: Number(e.target.value) })}
                       className="w-28 px-3 py-1 border rounded"
                     />
                   </label>
