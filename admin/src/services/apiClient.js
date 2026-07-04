@@ -51,6 +51,18 @@ class ApiClient {
   }
 
   static async request(endpoint, options = {}) {
+    // Bloquear endpoints de 'connections' en el cliente: la gestión de conexiones
+    // fue removida del frontend y debe gestionarse desde el panel de administración
+    // del backend o mediante operaciones directas de DB por administradores.
+    const forbiddenPrefixes = ['/connections', '/connections/', '/power-automate-proxy', '/connections/external-fetch'];
+    for (const p of forbiddenPrefixes) {
+      if (String(endpoint).startsWith(p)) {
+        const err = new Error('El soporte de conexiones desde el cliente fue removido. Use el panel de administración del backend o /api/data para importación de datos.');
+        console.error(`❌ Petición bloqueada a endpoint prohibido (${endpoint}):`, err.message);
+        throw err;
+      }
+    }
+
     const url = `${this.getBaseUrl()}${endpoint}`;
     const token = this.getToken();
 

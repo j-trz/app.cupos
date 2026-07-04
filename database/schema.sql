@@ -159,6 +159,105 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Tabla de productos y cupos
+CREATE TABLE IF NOT EXISTS public.products (
+    id SERIAL PRIMARY KEY,
+    codigo_cupo VARCHAR(255) NOT NULL,
+    destino VARCHAR(255) NOT NULL,
+    compania VARCHAR(255) NOT NULL,
+    disponibilidad INTEGER NOT NULL,
+    salida DATE,
+    regreso DATE,
+    fecha_salida DATE,
+    fecha_regreso DATE,
+    precio NUMERIC(10, 2),
+    ruta VARCHAR(255),
+    pnr VARCHAR(255),
+    ficha VARCHAR(255),
+    temporada VARCHAR(255),
+    bloqueo_temporal_minutos INTEGER NULL,
+    email_warning_enabled BOOLEAN DEFAULT TRUE,
+    is_blocked_for_sale BOOLEAN DEFAULT FALSE,
+    op VARCHAR(255),
+    carryon BOOLEAN DEFAULT FALSE,
+    handbag BOOLEAN DEFAULT FALSE,
+    checkedbag BOOLEAN DEFAULT FALSE,
+    inf_fare NUMERIC(10, 2),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.reservations (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER REFERENCES public.products(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    estado VARCHAR(255) NOT NULL DEFAULT 'bloqueo_temporal',
+    bloqueo_expira_at TIMESTAMPTZ NULL,
+    precio_venta NUMERIC(10, 2) NOT NULL,
+    neto_1 NUMERIC(10, 2) NOT NULL,
+    pedido_id VARCHAR(255) NOT NULL,
+    agencia VARCHAR(255) NOT NULL,
+    contacto_nombre VARCHAR(255) NOT NULL,
+    contacto_email VARCHAR(255) NOT NULL,
+    contacto_telefono VARCHAR(255),
+    vuelo_codigo VARCHAR(255) NOT NULL,
+    vuelo_destino VARCHAR(255) NOT NULL,
+    vuelo_compania VARCHAR(255) NOT NULL,
+    vuelo_salida DATE NOT NULL,
+    vuelo_precio NUMERIC(10, 2),
+    nombre_pasajero VARCHAR(255) NOT NULL,
+    apellido_pasajero VARCHAR(255) NOT NULL,
+    documento_pasajero VARCHAR(255) NOT NULL,
+    nacimiento_pasajero DATE,
+    nacionalidad_pasajero VARCHAR(255),
+    tipo_pasajero VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.system_settings (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.email_templates (
+    id SERIAL PRIMARY KEY,
+    event_code VARCHAR(255) UNIQUE NOT NULL,
+    subject TEXT NOT NULL,
+    body_html TEXT NOT NULL,
+    placeholders TEXT[] DEFAULT '{}',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.email_log (
+    id SERIAL PRIMARY KEY,
+    template_id INTEGER REFERENCES public.email_templates(id) ON DELETE SET NULL,
+    recipient_email VARCHAR(255) NOT NULL,
+    subject TEXT NOT NULL,
+    body_html TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('sent', 'failed', 'retrying')),
+    error_message TEXT,
+    sent_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.alert_rules (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER REFERENCES public.products(id) ON DELETE CASCADE,
+    threshold_quantity INTEGER NOT NULL,
+    actions TEXT[] NOT NULL,
+    send_email_to_admin BOOLEAN DEFAULT FALSE,
+    send_email_to_agency BOOLEAN DEFAULT FALSE,
+    metadata JSONB DEFAULT '{}'::JSONB,
+    is_active BOOLEAN DEFAULT TRUE,
+    last_triggered_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ====================================================================
 -- 3) Índices para Optimización de Consultas
 -- ====================================================================
@@ -215,6 +314,21 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 -- Trigger para public.user_security_status
 CREATE OR REPLACE TRIGGER trg_user_security_status_set_updated_at
 BEFORE UPDATE ON public.user_security_status
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- Trigger para public.system_settings
+CREATE OR REPLACE TRIGGER trg_system_settings_set_updated_at
+BEFORE UPDATE ON public.system_settings
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- Trigger para public.email_templates
+CREATE OR REPLACE TRIGGER trg_email_templates_set_updated_at
+BEFORE UPDATE ON public.email_templates
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- Trigger para public.alert_rules
+CREATE OR REPLACE TRIGGER trg_alert_rules_set_updated_at
+BEFORE UPDATE ON public.alert_rules
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ====================================================================
@@ -603,7 +717,10 @@ $$ LANGUAGE plpgsql;
 -- ====================================================================
 
 -- Habilitar RLS en todas las tablas
-ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alert_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_notification_states ENABLE ROW LEVEL SECURITY;
@@ -714,11 +831,46 @@ CREATE POLICY "admins_can_manage_all_sessions" ON public.user_sessions
         )
     );
 
--- ====================================================================
--- 7) Datos Semilla Iniciales (Seed Data)
--- ====================================================================
+-- Políticas para System Settings
+CREATE POLICY "admins_can_manage_system_settings" ON public.system_settings
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
 
--- Agencia Default
-INSERT INTO public.agencies (code, name, main_color, text_color, is_active)
-VALUES ('default', 'Agencia Genérica', '#2c4b8b', '#ffffff', true)
-ON CONFLICT (code) DO NOTHING;
+-- Políticas para Email Templates
+CREATE POLICY "admins_can_manage_email_templates" ON public.email_templates
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- Políticas para Email Log
+CREATE POLICY "admins_and_agency_admins_can_view_email_log" ON public.email_log
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles p
+            WHERE p.id = auth.uid() AND p.role IN ('admin','agency_admin')
+        )
+    );
+
+CREATE POLICY "admins_can_delete_email_log" ON public.email_log
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles 
+            WHERE p.id = auth.uid() AND p.role = 'admin'
+        )
+    );
+
+-- Políticas para Alert Rules
+CREATE POLICY "admins_and_agency_admins_can_manage_alert_rules" ON public.alert_rules
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles p
+            WHERE p.id = auth.uid() AND p.role IN ('admin','agency_admin')
+        )
+    );

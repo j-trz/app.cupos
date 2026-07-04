@@ -8,19 +8,16 @@ import dataApiService from "./dataApiService";
  * Todas las operaciones de base de datos se delegan al backend API.
  */
 class ConnectionService {
+  // Indica que la gestión de conexiones desde el cliente fue desactivada.
+  static CLIENT_CONNECTIONS_REMOVED = true;
   /**
    * Crear una nueva conexión API
    * @param {Object} connectionData - Datos de la conexión
    * @returns {Promise<Object>} Conexión creada
    */
   static async createConnection(connectionData) {
-    try {
-      const result = await ApiClient.post("/connections", connectionData);
-      if (!result.success) throw new Error(result.error || "Error al crear conexión");
-      return { success: true, connection: result.connection };
-    } catch (error) {
-      console.error("Error creating connection:", error);
-      throw new Error(error.message || "Error al crear la conexión");
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      throw new Error('Funcionalidad removida: la creación de conexiones desde el cliente ya no está soportada. Use el panel de administración del backend.');
     }
   }
 
@@ -29,12 +26,8 @@ class ConnectionService {
    * @returns {Promise<Array>} Lista de conexiones (sin credenciales)
    */
   static async getUserConnections() {
-    try {
-      const result = await ApiClient.get("/connections");
-      return { success: true, connections: result.connections || [] };
-    } catch (error) {
-      console.error("Error fetching connections:", error);
-      throw new Error(error.message || "Error al obtener las conexiones");
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      throw new Error('Funcionalidad removida: la obtención de conexiones desde el cliente ya no está soportada.');
     }
   }
 
@@ -44,6 +37,9 @@ class ConnectionService {
    * @returns {Promise<Object>} Credenciales
    */
   static async getDecryptedCredentials(connectionId) {
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      throw new Error('Funcionalidad removida: el acceso a credenciales de conexiones desde el cliente ya no está soportado.');
+    }
     try {
       // Obtener credenciales desde la base de datos vía API
       const filters = JSON.stringify({ connection_id: connectionId });
@@ -77,6 +73,9 @@ class ConnectionService {
    * @returns {Promise<Object>} Conexión actualizada
    */
   static async updateConnection(connectionId, updateData) {
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      throw new Error('Funcionalidad removida: actualización de conexiones desde el cliente no soportada.');
+    }
     try {
       // Actualizar metadatos de la conexión vía API
       const updates = {
@@ -154,6 +153,9 @@ class ConnectionService {
    * @returns {Promise<Object>} Resultado de la eliminación
    */
   static async deleteConnection(connectionId) {
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      throw new Error('Funcionalidad removida: eliminación de conexiones desde el cliente no soportada.');
+    }
     try {
       await ApiClient.delete(`/connections/${connectionId}`);
       return { success: true, message: "Conexión eliminada correctamente" };
@@ -169,6 +171,9 @@ class ConnectionService {
    * @returns {Promise<Object>} Resultado de la activación
    */
   static async setActiveConnection(connectionId) {
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      throw new Error('Funcionalidad removida: activar conexiones desde el cliente no soportado.');
+    }
     try {
       await ApiClient.post(`/connections/${connectionId}/activate`);
       return { success: true, message: "Conexión activada correctamente" };
@@ -184,84 +189,8 @@ class ConnectionService {
    * @returns {Promise<Object>} Conexión activa o null
    */
   static async getActiveConnection(dataType = null) {
-    try {
-      const user = ApiClient.getSessionUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      // Obtener todas las conexiones accesibles vía API
-      const result = await ApiClient.get("/connections");
-      const connections = result.connections || [];
-
-      if (connections.length === 0) return null;
-
-      const profile = await AuthorizationService.getCurrentUserProfile();
-      const agency = profile?.agencia || null;
-      const normScope = (s) => (s == null ? "user" : s);
-
-      // Filtrar conexiones activas
-      const activeConns = connections.filter((c) => c.is_active);
-
-      if (activeConns.length === 0) {
-        // Si no hay is_active, usar la primera conexión como fallback
-        if (connections.length > 0) {
-          return connections[0];
-        }
-        return null;
-      }
-
-      // Preferencia por proveedor según tipo de datos
-      const typePref = (c) => {
-        if (dataType === "pedidos")
-          return c?.type === "powerautomate" ? 0 : 1;
-        if (dataType === "productos") return 0;
-        return 0;
-      };
-      const sortByType = (list) =>
-        [...list].filter(Boolean).sort((a, b) => typePref(a) - typePref(b));
-
-      const ownList = activeConns.filter(
-        (c) => normScope(c.scope) === "user" && c.user_id === user.id
-      );
-      const agencyList = activeConns.filter(
-        (c) =>
-          normScope(c.scope) === "agency" &&
-          agency &&
-          c.target_agency === agency
-      );
-      const globalList = activeConns.filter(
-        (c) => normScope(c.scope) === "all"
-      );
-      const restList = activeConns.filter(
-        (c) =>
-          !ownList.includes(c) &&
-          !agencyList.includes(c) &&
-          !globalList.includes(c)
-      );
-
-      const ordered = [
-        ...sortByType(ownList),
-        ...sortByType(agencyList),
-        ...sortByType(globalList),
-        ...sortByType(restList),
-      ];
-
-      const chosen = ordered[0] || null;
-      if (chosen) {
-        console.log(
-          "✅ Conexión activa seleccionada (alcance + tipo preferido):",
-          {
-            id: chosen.id,
-            name: chosen.name,
-            type: chosen.type,
-            scope: normScope(chosen.scope),
-            target_agency: chosen.target_agency || null,
-          }
-        );
-      }
-
-      return chosen;
-    } catch (error) {
-      console.error("Error getting active connection:", error);
+    if (this.CLIENT_CONNECTIONS_REMOVED) {
+      console.warn('Funcionalidad removida: getActiveConnection devuelve null porque la gestión cliente de conexiones fue desactivada.');
       return null;
     }
   }

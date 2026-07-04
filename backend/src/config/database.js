@@ -70,12 +70,16 @@ const initializeDatabase = async () => {
         pnr VARCHAR(255),
         ficha VARCHAR(255),
         temporada VARCHAR(255),
-        neto_1 NUMERIC(10, 2),
+        bloqueo_temporal_minutos INTEGER NULL,
+        email_warning_enabled BOOLEAN DEFAULT TRUE,
+        is_blocked_for_sale BOOLEAN DEFAULT FALSE,
         op VARCHAR(255),
         carryon BOOLEAN DEFAULT FALSE,
         handbag BOOLEAN DEFAULT FALSE,
         checkedbag BOOLEAN DEFAULT FALSE,
-        inf_fare NUMERIC(10, 2)
+        inf_fare NUMERIC(10, 2),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
@@ -83,7 +87,12 @@ const initializeDatabase = async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS reservations (
         id SERIAL PRIMARY KEY,
-        estado VARCHAR(255) NOT NULL,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+        estado VARCHAR(255) NOT NULL DEFAULT 'bloqueo_temporal', -- Estados: solicitud, bloqueo_temporal, bloqueo_permanente, expirada, cancelada
+        bloqueo_expira_at TIMESTAMPTZ NULL, -- Fecha y hora de expiración del bloqueo temporal
+        precio_venta NUMERIC(10, 2) NOT NULL, -- Precio congelado para el usuario final
+        neto_1 NUMERIC(10, 2) NOT NULL, -- Costo neto interno, visible solo para admin
         pedido_id VARCHAR(255) NOT NULL,
         agencia VARCHAR(255) NOT NULL,
         contacto_nombre VARCHAR(255) NOT NULL,
@@ -93,13 +102,15 @@ const initializeDatabase = async () => {
         vuelo_destino VARCHAR(255) NOT NULL,
         vuelo_compania VARCHAR(255) NOT NULL,
         vuelo_salida DATE NOT NULL,
-        vuelo_precio NUMERIC(10, 2),
+        vuelo_precio NUMERIC(10, 2), -- Puede corresponder al precio de venta histórico
         nombre_pasajero VARCHAR(255) NOT NULL,
         apellido_pasajero VARCHAR(255) NOT NULL,
         documento_pasajero VARCHAR(255) NOT NULL,
         nacimiento_pasajero DATE,
         nacionalidad_pasajero VARCHAR(255),
-        tipo_pasajero VARCHAR(255)
+        tipo_pasajero VARCHAR(255),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
@@ -207,7 +218,83 @@ const initializeDatabase = async () => {
       );
     `);
 
-    console.log('🔧 Tablas products, reservations, themes, agency_themes, agency_configurations, agency_theme_configs, permissions, roles, role_permissions y user_roles creadas exitosamente');
+    // Tabla para configuración global del sistema
+    await query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(255) PRIMARY KEY,
+        value JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Tabla para plantillas de email
+    await query(`
+      CREATE TABLE IF NOT EXISTS email_templates (
+        id SERIAL PRIMARY KEY,
+        event_code VARCHAR(255) UNIQUE NOT NULL,
+        subject TEXT NOT NULL,
+        body_html TEXT NOT NULL,
+        placeholders TEXT[], -- Array de strings con los nombres de los placeholders esperados
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Tabla para logs de envío de email
+    await query(`
+      CREATE TABLE IF NOT EXISTS email_log (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER REFERENCES email_templates(id) ON DELETE SET NULL,
+        recipient_email VARCHAR(255) NOT NULL,
+        subject TEXT NOT NULL,
+        body_html TEXT NOT NULL,
+        status VARCHAR(50) NOT NULL CHECK (status IN ('sent', 'failed', 'retrying')),
+        error_message TEXT,
+        sent_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Tabla para reglas de alerta de cupo
+    await query(`
+      CREATE TABLE IF NOT EXISTS alert_rules (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+        threshold_quantity INTEGER NOT NULL, -- Umbral de lugares restantes
+        actions TEXT[] NOT NULL, -- Array de acciones a tomar (ej: ['email_admin', 'in_app_alert', 'block_sale'])
+        send_email_to_admin BOOLEAN DEFAULT FALSE,
+        send_email_to_agency BOOLEAN DEFAULT FALSE,
+        metadata JSONB DEFAULT '{}'::JSONB,
+        is_active BOOLEAN DEFAULT TRUE,
+        last_triggered_at TIMESTAMPTZ NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Semillas por defecto: settings y plantillas de email (si no existen)
+    await query(`
+      INSERT INTO system_settings (key, value)
+      VALUES
+        ('default_temporary_block_minutes', '{"minutes": 60}'::jsonb),
+        ('temporary_block_expiration_email_enabled', '{"enabled": true}'::jsonb),
+        ('low_availability_email_enabled', '{"enabled": true}'::jsonb)
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    await query(`
+      INSERT INTO email_templates (event_code, subject, body_html, placeholders, is_active)
+      VALUES
+        ('reservation_temporary_blocked', 'Reserva bloqueada temporalmente - {{product_code}}', '<p>Hola {{nombre_usuario}},</p><p>Tu solicitud para el cupo <strong>{{product_code}}</strong> fue bloqueada temporalmente. Expira: {{expires_at}} ({{minutos_restantes}} minutos).</p><p>Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','product_code','expires_at','minutos_restantes','precio_venta'], TRUE),
+        ('reservation_expired', 'Reserva expirada - {{product_code}}', '<p>Hola {{nombre_usuario}},</p><p>Tu bloqueo para el cupo <strong>{{product_code}}</strong> ha expirado y el cupo fue liberado.</p>', ARRAY['nombre_usuario','product_code'], TRUE),
+        ('reservation_confirmed', 'Reserva confirmada - {{solicitud_id}}', '<p>Hola {{nombre_usuario}},</p><p>Tu reserva ({{solicitud_id}}) ha sido confirmada.</p><p>Detalles del vuelo: {{vuelo_codigo}} - {{vuelo_destino}} - {{vuelo_compania}}. Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','solicitud_id','vuelo_codigo','vuelo_destino','vuelo_compania','precio_venta'], TRUE),
+        ('low_availability_alert', 'Alerta: baja disponibilidad en {{product_code}}', '<p>Atención,</p><p>Quedan {{availability}} lugares en {{product_code}}. Umbral: {{threshold}}.</p>', ARRAY['product_code','availability','threshold'], TRUE),
+        ('reservation_details', 'Detalle de reserva {{pedido_id}}', '<p>Hola {{nombre_usuario}},</p><p>Aquí están los detalles de tu reserva: Pedido: {{pedido_id}}. Vuelo: {{vuelo_codigo}} - {{vuelo_destino}} - {{vuelo_compania}}. Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','pedido_id','vuelo_codigo','vuelo_destino','vuelo_compania','precio_venta'], TRUE)
+      ON CONFLICT (event_code) DO NOTHING;
+    `);
+
+    console.log('🔧 Tablas products, reservations, themes, agency_themes, agency_configurations, agency_theme_configs, permissions, roles, role_permissions, user_roles, system_settings, email_templates, email_log y alert_rules creadas exitosamente');
   } catch (error) {
     console.error('❌ Error al inicializar la base de datos:', error);
   }

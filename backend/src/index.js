@@ -3,15 +3,16 @@ import cors from 'cors';
 import morgan from 'morgan';
 import * as themesController from './controllers/themesController.js';
 import * as productsController from './controllers/productsController.js';
+import * as settingsController from './controllers/settingsController.js';
+import * as alertRulesController from './controllers/alertRulesController.js';
 import dotenv from 'dotenv';
 
 // Importar middlewares de autenticación
-import { requireAuth, isAdmin, isAgencyAdminOrAdmin } from './middleware/auth.js';
+import { requireAuth, isAdmin, isAgencyAdminOrAdmin, requireInternalToken } from './middleware/auth.js';
 
 // Importar controladores
 import * as authController from './controllers/authController.js';
 import * as userController from './controllers/userController.js';
-import * as connectionController from './controllers/connectionController.js';
 import * as notificationController from './controllers/notificationController.js';
 import * as dataController from './controllers/dataController.js';
 import * as ordersController from './controllers/ordersController.js';
@@ -50,15 +51,7 @@ userRouter.post('/:id/unlock', isAdmin, userController.unlockUser);
 userRouter.get('/2fa', isAdmin, userController.listUsers2FA);
 app.use('/api/users', userRouter);
 
-// Rutas de Conexiones (/api/connections)
-const connectionRouter = express.Router();
-connectionRouter.use(requireAuth);
-connectionRouter.get('/', connectionController.listConnections);
-connectionRouter.post('/', isAdmin, connectionController.createConnection);
-connectionRouter.delete('/:id', isAdmin, connectionController.deleteConnection);
-connectionRouter.post('/:id/activate', isAdmin, connectionController.activateConnection);
-connectionRouter.post('/:id/test', isAdmin, connectionController.testConnection);
-app.use('/api/connections', connectionRouter);
+
 
 // Rutas de Notificaciones (/api/notifications)
 const notificationRouter = express.Router();
@@ -93,6 +86,24 @@ productRouter.put('/:id', isAdmin, productsController.updateProduct);
 productRouter.delete('/:id', isAdmin, productsController.deleteProduct);
 app.use('/api/products', productRouter);
 
+// Rutas de Ajustes del Sistema (/api/settings)
+const settingsRouter = express.Router();
+settingsRouter.use(requireAuth);
+settingsRouter.get('/', isAdmin, settingsController.listSettings);
+settingsRouter.get('/:key', isAdmin, settingsController.getSetting);
+settingsRouter.put('/:key', isAdmin, settingsController.updateSetting);
+app.use('/api/settings', settingsRouter);
+
+// Rutas de Reglas de Alerta (/api/alert-rules)
+const alertRulesRouter = express.Router();
+alertRulesRouter.use(requireAuth);
+alertRulesRouter.get('/', isAgencyAdminOrAdmin, alertRulesController.listAlertRules);
+alertRulesRouter.post('/', isAgencyAdminOrAdmin, alertRulesController.createAlertRule);
+alertRulesRouter.get('/:id', isAgencyAdminOrAdmin, alertRulesController.getAlertRuleById);
+alertRulesRouter.put('/:id', isAgencyAdminOrAdmin, alertRulesController.updateAlertRule);
+alertRulesRouter.delete('/:id', isAdmin, alertRulesController.deleteAlertRule);
+app.use('/api/alert-rules', alertRulesRouter);
+
 // Rutas de Temas (/api/themes)
 const themeRouter = express.Router();
 themeRouter.use(requireAuth);
@@ -106,12 +117,19 @@ app.use('/api/themes', themeRouter);
 // Rutas de Ordenes (/api/orders)
 const orderRouter = express.Router();
 orderRouter.use(requireAuth);
-orderRouter.post('/', isAdmin, ordersController.createReservation);
-orderRouter.get('/', isAdmin, ordersController.getAllReservations);
-orderRouter.get('/:id', isAdmin, ordersController.getReservationById);
+orderRouter.post('/', ordersController.createReservation);
+orderRouter.get('/', ordersController.getAllReservations);
+orderRouter.get('/:id', ordersController.getReservationById);
 orderRouter.put('/:id', isAdmin, ordersController.updateReservation);
+orderRouter.post('/:id/confirm', isAdmin, ordersController.confirmReservation);
+orderRouter.post('/:id/resend-email', ordersController.resendReservationEmail);
 orderRouter.delete('/:id', isAdmin, ordersController.deleteReservation);
 app.use('/api/orders', orderRouter);
+
+// Endpoint interno para cron de expiración de bloqueos
+const internalRouter = express.Router();
+internalRouter.post('/cron/expirar-bloqueos', requireInternalToken, ordersController.expireReservationsViaCron);
+app.use('/internal', internalRouter);
 
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {

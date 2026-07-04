@@ -74,3 +74,21 @@ export const isAgencyAdminOrAdmin = (req, res, next) => {
 
   next();
 };
+
+/**
+ * Middleware para proteger endpoints internos/cron con token secreto.
+ */
+export const requireInternalToken = (req, res, next) => {
+  const token = req.headers['x-internal-token'] || req.headers['x-cron-token'] || req.headers.authorization?.split(' ')[1];
+  const expected = process.env.INTERNAL_CRON_TOKEN;
+
+  if (!expected) {
+    return res.status(500).json({ error: 'Configuración interna de cron no definida.' });
+  }
+
+  if (!token || token !== expected) {
+    return res.status(403).json({ error: 'Token interno inválido.' });
+  }
+
+  next();
+};
