@@ -3,11 +3,16 @@ import { query } from '../db.js';
 // Crear un nuevo producto
 exports.createProduct = async (req, res) => {
   try {
-    const { 
-      codigo_cupo, destino, compania, disponibilidad, salida, regreso, 
-      fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada, 
-      neto_1, op, carryon, handbag, checkedbag, inf_fare 
+    const {
+      codigo_cupo, destino, compania, disponibilidad, salida, regreso,
+      fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada,
+      neto_1, op, carryon, handbag, checkedbag, inf_fare
     } = req.body;
+    
+    // Validación de datos
+    if (!codigo_cupo || !destino || !compania || !disponibilidad) {
+      return res.status(400).json({ error: 'Campos obligatorios faltantes' });
+    }
 
     const result = await query(
       `INSERT INTO products (
@@ -36,7 +41,7 @@ exports.getAllProducts = async (req, res) => {
     res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener los productos' });
+    res.status(500).json({ error: 'Error al obtener los productos', details: err.message });
   }
 };
 
@@ -51,7 +56,7 @@ exports.getProductById = async (req, res) => {
     res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener el producto' });
+    res.status(500).json({ error: 'Error al obtener el producto', details: err.message });
   }
 };
 
@@ -59,21 +64,21 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      codigo_cupo, destino, compania, disponibilidad, salida, regreso, 
-      fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada, 
-      neto_1, op, carryon, handbag, checkedbag, inf_fare 
+    const {
+      codigo_cupo, destino, compania, disponibilidad, salida, regreso,
+      fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada,
+      neto_1, op, carryon, handbag, checkedbag, inf_fare
     } = req.body;
 
     const result = await query(
-      `UPDATE products SET 
-        codigo_cupo = $1, destino = $2, compania = $3, disponibilidad = $4, salida = $5, regreso = $6, 
-        fecha_salida = $7, fecha_regreso = $8, precio = $9, ruta = $10, pnr = $11, ficha = $12, temporada = $13, 
-        neto_1 = $14, op = $15, carryon = $16, handbag = $17, checkedbag = $18, inf_fare = $19 
+      `UPDATE products SET
+        codigo_cupo = $1, destino = $2, compania = $3, disponibilidad = $4, salida = $5, regreso = $6,
+        fecha_salida = $7, fecha_regreso = $8, precio = $9, ruta = $10, pnr = $11, ficha = $12, temporada = $13,
+        neto_1 = $14, op = $15, carryon = $16, handbag = $17, checkedbag = $18, inf_fare = $19
       WHERE id = $20 RETURNING *`,
       [
-        codigo_cupo, destino, compania, disponibilidad, salida, regreso, 
-        fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada, 
+        codigo_cupo, destino, compania, disponibilidad, salida, regreso,
+        fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada,
         neto_1, op, carryon, handbag, checkedbag, inf_fare, id
       ]
     );
@@ -84,7 +89,7 @@ exports.updateProduct = async (req, res) => {
     res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al actualizar el producto' });
+    res.status(500).json({ error: 'Error al actualizar el producto', details: err.message });
   }
 };
 
@@ -99,6 +104,6 @@ exports.deleteProduct = async (req, res) => {
     res.status(200).json({ message: 'Producto eliminado exitosamente', deleted: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al eliminar el producto' });
+    res.status(500).json({ error: 'Error al eliminar el producto', details: err.message });
   }
 };

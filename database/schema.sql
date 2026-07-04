@@ -4,6 +4,11 @@
 -- Este script crea todas las tablas, relaciones, índices, triggers y
 -- funciones necesarias para el funcionamiento del sistema form-cupos.
 -- Diseñado para ser portable: Funciona en Supabase, Neon, RDS y local.
+--
+-- NOTA: la gestión de conexiones a APIs externas y sus credenciales
+-- (data_connections, api_credentials, service_credentials,
+-- connection_data_types) se maneja en un backend separado y NO forma
+-- parte de este esquema.
 -- ====================================================================
 
 -- 0) Habilitar extensiones necesarias
@@ -67,64 +72,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 COMMENT ON TABLE public.profiles IS 'Perfiles de usuario conectados con Auth.Users';
 COMMENT ON COLUMN public.profiles.role IS 'Rol del usuario: admin, agency_admin, agency_user';
 
--- C) Tipos de Datos de Conexión
-CREATE TABLE IF NOT EXISTS public.connection_data_types (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- D) Conexiones de Datos (data_connections)
-CREATE TABLE IF NOT EXISTS public.data_connections (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('powerautomate', 'supabase', 'smartsheet', 'mongodb', 'tableau')),
-    description TEXT,
-    connection_status VARCHAR(20) DEFAULT 'unknown' CHECK (connection_status IN ('unknown', 'connected', 'failed', 'testing')),
-    scope TEXT NOT NULL DEFAULT 'user' CHECK (scope IN ('user','agency','all')),
-    target_agency TEXT,
-    last_tested_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    CONSTRAINT unique_user_connection_name UNIQUE (user_id, name)
-);
-
-COMMENT ON TABLE public.data_connections IS 'Almacena metadatos sobre las conexiones a APIs externas.';
-COMMENT ON COLUMN public.data_connections.scope IS 'Ámbito de la conexión: user (solo propietario), agency (disponible para usuarios de esa agencia), all (disponible para todas las agencias)';
-COMMENT ON COLUMN public.data_connections.target_agency IS 'Código/nombre de la agencia a la que aplica la conexión cuando scope=agency';
-
--- E) Credenciales de Conexión (api_credentials)
-CREATE TABLE IF NOT EXISTS public.api_credentials (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    connection_id UUID NOT NULL REFERENCES public.data_connections(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    credential_key TEXT NOT NULL,
-    credential_value TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    CONSTRAINT api_credentials_unique_credential_key UNIQUE (connection_id, credential_key)
-);
-
--- F) Credenciales de Servicio (service_credentials)
--- Nota: Mantenida por compatibilidad con Edge Functions más antiguas
-CREATE TABLE IF NOT EXISTS public.service_credentials (
-    connection_id UUID PRIMARY KEY,
-    connection_name TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    credentials JSONB NOT NULL,
-    column_mapping JSONB,
-    is_active BOOLEAN DEFAULT FALSE,
-    last_tested_at TIMESTAMPTZ,
-    connection_status TEXT,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- G) Notificaciones del Sistema
+-- C) Notificaciones del Sistema
 CREATE TABLE IF NOT EXISTS public.notifications (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     type VARCHAR(50) NOT NULL CHECK (type IN ('new_request', 'request_confirmed', 'new_product', 'low_availability', 'system_update')),
@@ -144,7 +92,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 COMMENT ON TABLE public.notifications IS 'Tabla para almacenar notificaciones del sistema';
 
--- H) Estados de Notificaciones del Usuario (user_notification_states)
+-- D) Estados de Notificaciones del Usuario (user_notification_states)
 CREATE TABLE IF NOT EXISTS public.user_notification_states (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -159,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.user_notification_states (
     UNIQUE(user_id, notification_id)
 );
 
--- I) Historial de Intentos de Inicio de Sesión
+-- E) Historial de Intentos de Inicio de Sesión
 CREATE TABLE IF NOT EXISTS public.user_login_attempts (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -171,7 +119,7 @@ CREATE TABLE IF NOT EXISTS public.user_login_attempts (
     attempted_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- J) Estado de Seguridad y 2FA
+-- F) Estado de Seguridad y 2FA
 CREATE TABLE IF NOT EXISTS public.user_security_status (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     is_locked BOOLEAN DEFAULT FALSE,
@@ -198,7 +146,7 @@ CREATE TABLE IF NOT EXISTS public.user_security_status (
     CONSTRAINT user_security_status_profile_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
 );
 
--- K) Sesiones de Usuario
+-- G) Sesiones de Usuario
 CREATE TABLE IF NOT EXISTS public.user_sessions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -220,14 +168,6 @@ CREATE INDEX IF NOT EXISTS idx_agencies_address ON public.agencies USING GIN (to
 
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
 CREATE INDEX IF NOT EXISTS idx_profiles_agencia_role ON public.profiles(agencia, role);
-
-CREATE INDEX IF NOT EXISTS idx_data_connections_user_id ON public.data_connections(user_id);
-CREATE INDEX IF NOT EXISTS idx_data_connections_type ON public.data_connections(type);
-CREATE INDEX IF NOT EXISTS idx_data_connections_scope ON public.data_connections(scope);
-CREATE INDEX IF NOT EXISTS idx_data_connections_scope_agency ON public.data_connections(scope, target_agency);
-
-CREATE INDEX IF NOT EXISTS idx_api_credentials_connection ON public.api_credentials(connection_id);
-CREATE INDEX IF NOT EXISTS idx_api_credentials_user ON public.api_credentials(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON public.notifications (target_user_id, read) WHERE read = FALSE;
 CREATE INDEX IF NOT EXISTS idx_notifications_role_unread ON public.notifications (target_role, read) WHERE read = FALSE;
@@ -265,16 +205,6 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 -- Trigger para public.profiles
 CREATE OR REPLACE TRIGGER trg_profiles_set_updated_at
 BEFORE UPDATE ON public.profiles
-FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
--- Trigger para public.data_connections
-CREATE OR REPLACE TRIGGER trg_data_connections_set_updated_at
-BEFORE UPDATE ON public.data_connections
-FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
--- Trigger para public.api_credentials
-CREATE OR REPLACE TRIGGER trg_api_credentials_set_updated_at
-BEFORE UPDATE ON public.api_credentials
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- Trigger para public.user_notification_states
@@ -670,21 +600,11 @@ $$ LANGUAGE plpgsql;
 
 -- ====================================================================
 -- 6) Políticas de Row Level Security (RLS)
-CREATE TABLE IF NOT EXISTS public.products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    price DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
 -- ====================================================================
 
 -- Habilitar RLS en todas las tablas
 ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.data_connections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.api_credentials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_notification_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_login_attempts ENABLE ROW LEVEL SECURITY;
@@ -737,26 +657,6 @@ CREATE POLICY "admin_can_manage_profiles" ON public.profiles
             WHERE p.id = auth.uid() AND p.role = 'admin'
         )
     );
-
--- Políticas para Data Connections
-CREATE POLICY "users_and_agencies_can_view_connections" ON public.data_connections
-    FOR SELECT USING (
-        auth.uid() = user_id
-        OR scope = 'all'
-        OR (scope = 'agency' AND target_agency = get_current_user_agency())
-    );
-
-CREATE POLICY "users_can_manage_own_connections" ON public.data_connections
-    FOR ALL USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
-
--- Políticas para API Credentials
-CREATE POLICY "users_can_view_own_credentials" ON public.api_credentials
-    FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "users_can_manage_own_credentials" ON public.api_credentials
-    FOR ALL USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
 
 -- Políticas para Notifications
 CREATE POLICY "users_can_view_notifications" ON public.notifications
@@ -821,13 +721,4 @@ CREATE POLICY "admins_can_manage_all_sessions" ON public.user_sessions
 -- Agencia Default
 INSERT INTO public.agencies (code, name, main_color, text_color, is_active)
 VALUES ('default', 'Agencia Genérica', '#2c4b8b', '#ffffff', true)
-ON CONFLICT (code) DO NOTHING;
-
--- Tipos de datos de conexión
-INSERT INTO public.connection_data_types (name, code, description) VALUES
-('Power Automate API', 'powerautomate', 'Conexión segura basada en desencadenadores HTTP de Microsoft Power Automate.'),
-('Supabase Database', 'supabase', 'Conexión directa a otra base de datos de Supabase.'),
-('Smartsheet API', 'smartsheet', 'Conexión a hojas de Smartsheet a través de API Tokens.'),
-('MongoDB Database', 'mongodb', 'Conexión a base de datos NoSQL MongoDB.'),
-('Tableau Dashboard', 'tableau', 'Conexión a reportes y fuentes de datos de Tableau.')
 ON CONFLICT (code) DO NOTHING;

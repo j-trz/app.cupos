@@ -4,16 +4,21 @@ import { query } from '../db.js';
 exports.createTheme = async (req, res) => {
   try {
     const { name, colors, fonts, logo } = req.body;
-
+    
+    // Validación de datos
+    if (!name || !colors || !fonts) {
+      return res.status(400).json({ error: 'Campos obligatorios faltantes' });
+    }
+    
     const result = await query(
       `INSERT INTO themes (name, colors, fonts, logo) VALUES ($1, $2, $3, $4) RETURNING *`,
       [name, colors, fonts, logo]
     );
-
+    
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al crear el tema' });
+    res.status(500).json({ error: 'Error al crear el tema', details: err.message });
   }
 };
 
@@ -24,7 +29,7 @@ exports.getAllThemes = async (req, res) => {
     res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener los temas' });
+    res.status(500).json({ error: 'Error al obtener los temas', details: err.message });
   }
 };
 
@@ -39,7 +44,7 @@ exports.getThemeById = async (req, res) => {
     res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener el tema' });
+    res.status(500).json({ error: 'Error al obtener el tema', details: err.message });
   }
 };
 
@@ -60,7 +65,7 @@ exports.updateTheme = async (req, res) => {
     res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al actualizar el tema' });
+    res.status(500).json({ error: 'Error al actualizar el tema', details: err.message });
   }
 };
 
@@ -75,6 +80,6 @@ exports.deleteTheme = async (req, res) => {
     res.status(200).json({ message: 'Tema eliminado exitosamente', deleted: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al eliminar el tema' });
+    res.status(500).json({ error: 'Error al eliminar el tema', details: err.message });
   }
 };

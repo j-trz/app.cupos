@@ -4,6 +4,11 @@ import { query } from '../db.js';
 exports.createUserRole = async (req, res) => {
   try {
     const { user_id, role_id } = req.body;
+    
+    // Validación de datos
+    if (!user_id || !role_id) {
+      return res.status(400).json({ error: 'Campos obligatorios faltantes' });
+    }
 
     const result = await query(
       `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) RETURNING *`,
@@ -24,7 +29,7 @@ exports.getAllUserRoles = async (req, res) => {
     res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener las asignaciones de rol a usuario' });
+    res.status(500).json({ error: 'Error al obtener las asignaciones de rol a usuario', details: err.message });
   }
 };
 
@@ -39,7 +44,7 @@ exports.getUserRoleById = async (req, res) => {
     res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener la asignación de rol a usuario' });
+    res.status(500).json({ error: 'Error al obtener la asignación de rol a usuario', details: err.message });
   }
 };
 
@@ -60,7 +65,7 @@ exports.updateUserRole = async (req, res) => {
     res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al actualizar la asignación de rol a usuario' });
+    res.status(500).json({ error: 'Error al actualizar la asignación de rol a usuario', details: err.message });
   }
 };
 
@@ -75,6 +80,6 @@ exports.deleteUserRole = async (req, res) => {
     res.status(200).json({ message: 'Asignación de rol a usuario eliminada exitosamente', deleted: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al eliminar la asignación de rol a usuario' });
+    res.status(500).json({ error: 'Error al eliminar la asignación de rol a usuario', details: err.message });
   }
 };
