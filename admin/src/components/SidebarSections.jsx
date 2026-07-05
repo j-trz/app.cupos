@@ -58,14 +58,6 @@ export const SECCIONES = [
     descripcion: 'CRUD de productos/cupos usando conexión API activa.',
     soloAdmin: true
   },
-  {
-    id: 'gestion-conexiones',
-    nombre: 'Conexiones API',
-    icono: HiOutlineShare ,
-    ruta: '/admin/gestion-conexiones',
-    descripcion: 'Gestión de conexiones a APIs externas.',
-    soloAdmin: true
-  },
 
   {
     id: 'seguridad',

@@ -22,6 +22,10 @@ export default function DataMapper() {
   ];
 
   useEffect(() => {
+    if (ConnectionService.CLIENT_CONNECTIONS_REMOVED) {
+      setConnections([]);
+      return;
+    }
     async function fetchConnections() {
       try {
         const result = await ConnectionService.getConnections();
@@ -87,6 +91,12 @@ export default function DataMapper() {
 
   return (
     <Layout seccion={seccion} setSeccion={setSeccion}>
+      {ConnectionService.CLIENT_CONNECTIONS_REMOVED ? (
+        <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
+          <h1 className="text-2xl font-bold text-[#2c4b8b] mb-4">Data Mapping (Conexiones deshabilitadas)</h1>
+          <p>La gestión de conexiones está deshabilitada en el cliente. Use el panel de administración del backend o contacte al equipo de soporte.</p>
+        </div>
+      ) : (
       <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
         <h1 className="text-2xl font-bold text-[#2c4b8b] mb-6">Data Mapping</h1>
 
@@ -166,6 +176,7 @@ export default function DataMapper() {
           </div>
         )}
       </div>
+      )}
     </Layout>
   );
 }

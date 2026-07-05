@@ -28,7 +28,6 @@ const DataMappingModal = ({ isOpen, onClose, connection, onSave }) => {
       { key: 'pnr', label: 'PNR', required: false, type: 'string' },
       { key: 'ficha', label: 'Ficha', required: false, type: 'string' },
       { key: 'temporada', label: 'Temporada', required: false, type: 'string' },
-      { key: 'neto_1', label: 'Neto 1', required: false, type: 'number' },
       { key: 'op', label: 'OP', required: false, type: 'string' },
       { key: 'carryon', label: 'Carry-on', required: false, type: 'boolean' },
       { key: 'handbag', label: 'Hand bag', required: false, type: 'boolean' },

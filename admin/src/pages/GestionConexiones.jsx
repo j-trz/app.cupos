@@ -36,6 +36,10 @@ export default function GestionConexiones() {
   });
 
   useEffect(() => {
+    if (ConnectionService.CLIENT_CONNECTIONS_REMOVED) {
+      setLoading(false);
+      return;
+    }
     fetchConexiones();
   }, []);
 
@@ -236,6 +240,17 @@ export default function GestionConexiones() {
       default: return <FaDatabase className="text-gray-500 text-2xl" />;
     }
   };
+
+  if (ConnectionService.CLIENT_CONNECTIONS_REMOVED) {
+    return (
+      <Layout seccion={seccion} setSeccion={setSeccion}>
+        <div className="w-full mx-auto bg-white rounded-lg shadow-lg p-6">
+          <h1 className="text-2xl font-bold text-[#2c4b8b]">Gestión de Conexiones API (Deshabilitada)</h1>
+          <p className="mt-4">La gestión de conexiones desde el cliente ha sido desactivada por motivos de seguridad. Use el panel de administración del backend o contacte al equipo de soporte.</p>
+        </div>
+      </Layout>
+    );
+  }
 
 
   return (

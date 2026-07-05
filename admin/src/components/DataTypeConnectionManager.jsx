@@ -33,6 +33,12 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
   const loadData = async () => {
     setLoading(true);
     try {
+      if (ConnectionService.CLIENT_CONNECTIONS_REMOVED) {
+        setConnections([]);
+        await loadDataTypeAssignments();
+        setLoading(false);
+        return;
+      }
       // Cargar conexiones disponibles
       const connectionsResult = await ConnectionService.getUserConnections();
       if (connectionsResult.success) {
@@ -229,12 +235,21 @@ const DataTypeConnectionManager = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-          {loading ? (
+          {loading && (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-600">Cargando datos...</p>
             </div>
-          ) : (
+          )}
+
+          {!loading && ConnectionService.CLIENT_CONNECTIONS_REMOVED && (
+            <div className="p-6 text-center">
+              <h3 className="text-lg font-semibold mb-2">Conexiones deshabilitadas</h3>
+              <p>La gestión de conexiones desde el cliente ha sido deshabilitada por motivos de seguridad. Las asignaciones existentes se muestran pero no se pueden crear ni modificar desde aquí.</p>
+            </div>
+          )}
+
+          {!loading && !ConnectionService.CLIENT_CONNECTIONS_REMOVED && (
             <div className="space-y-6">
               {/* Información del sistema */}
               <div className="bg-blue-50 border-l-4 border-blue-400 p-4">

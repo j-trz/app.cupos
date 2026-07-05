@@ -3,6 +3,7 @@ import { query } from '../db.js';
 // Crear un nuevo producto
 export const createProduct = async (req, res) => {
   try {
+    const isAdminUser = req.user && req.user.role === 'admin';
     const {
       codigo_cupo, destino, compania, disponibilidad, salida, regreso,
       fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada,
@@ -27,7 +28,9 @@ export const createProduct = async (req, res) => {
       ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const row = { ...result.rows[0] };
+    if (!isAdminUser && Object.prototype.hasOwnProperty.call(row, 'neto_1')) delete row.neto_1;
+    res.status(201).json(row);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al crear el producto' });
@@ -38,6 +41,15 @@ export const createProduct = async (req, res) => {
 export const getAllProducts = async (req, res) => {
   try {
     const result = await query('SELECT * FROM products');
+    const isAdminUser = req.user && req.user.role === 'admin';
+    if (!isAdminUser) {
+      const sanitized = result.rows.map(r => {
+        const copy = { ...r };
+        if (Object.prototype.hasOwnProperty.call(copy, 'neto_1')) delete copy.neto_1;
+        return copy;
+      });
+      return res.status(200).json(sanitized);
+    }
     res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
@@ -53,7 +65,10 @@ export const getProductById = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
-    res.status(200).json(result.rows[0]);
+    const isAdminUser = req.user && req.user.role === 'admin';
+    const row = { ...result.rows[0] };
+    if (!isAdminUser && Object.prototype.hasOwnProperty.call(row, 'neto_1')) delete row.neto_1;
+    res.status(200).json(row);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener el producto', details: err.message });
@@ -86,7 +101,10 @@ export const updateProduct = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
-    res.status(200).json(result.rows[0]);
+    const isAdminUser = req.user && req.user.role === 'admin';
+    const row = { ...result.rows[0] };
+    if (!isAdminUser && Object.prototype.hasOwnProperty.call(row, 'neto_1')) delete row.neto_1;
+    res.status(200).json(row);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al actualizar el producto', details: err.message });
@@ -101,7 +119,10 @@ export const deleteProduct = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
-    res.status(200).json({ message: 'Producto eliminado exitosamente', deleted: result.rows[0] });
+    const isAdminUser = req.user && req.user.role === 'admin';
+    const deleted = { ...result.rows[0] };
+    if (!isAdminUser && Object.prototype.hasOwnProperty.call(deleted, 'neto_1')) delete deleted.neto_1;
+    res.status(200).json({ message: 'Producto eliminado exitosamente', deleted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al eliminar el producto', details: err.message });

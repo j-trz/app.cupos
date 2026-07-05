@@ -205,7 +205,6 @@ export const AuthProvider = ({ children }) => {
 
     const adminOnlyRoutes = [
       '/admin/gestion-usuarios',
-      '/admin/gestion-conexiones',
       '/admin/seguridad',
       '/admin/crear-usuario'
     ];

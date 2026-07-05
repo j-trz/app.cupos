@@ -113,6 +113,20 @@ export const getData = async (req, res) => {
     }
 
     const result = await query(sql, params);
+
+    // Sanitizar campos sensibles según tabla y rol
+    const tbl = String(table).toLowerCase();
+    const isAdminUser = req.user && req.user.role === 'admin';
+
+    if (!isAdminUser && (tbl === 'reservations' || tbl === 'solicitudes' || tbl === 'products' || tbl === 'productos')) {
+      const sanitized = result.rows.map((r) => {
+        const copy = { ...r };
+        if (Object.prototype.hasOwnProperty.call(copy, 'neto_1')) delete copy.neto_1;
+        return copy;
+      });
+      return res.json(sanitized);
+    }
+
     res.json(result.rows);
   } catch (error) {
     console.error('Error en getData:', error);
@@ -126,6 +140,7 @@ export const getData = async (req, res) => {
 export const crudOperation = async (req, res) => {
   try {
     const { table, operation, data, id, idField = 'id' } = req.body;
+    const isAdminUser = req.user && req.user.role === 'admin';
 
     // Validar nombre de tabla
     if (!isValidTableName(table)) {
@@ -156,7 +171,14 @@ export const crudOperation = async (req, res) => {
         
         const insertSql = `INSERT INTO "${table}" (${insertColumns}) VALUES (${insertPlaceholders}) RETURNING *`;
         result = await query(insertSql, values);
-        res.status(201).json(result.rows[0]);
+        // Sanitizar respuesta si es tabla sensible
+        if (table && !isAdminUser && (table.toLowerCase() === 'reservations' || table.toLowerCase() === 'solicitudes' || table.toLowerCase() === 'products' || table.toLowerCase() === 'productos')) {
+          const row = { ...result.rows[0] };
+          if (Object.prototype.hasOwnProperty.call(row, 'neto_1')) delete row.neto_1;
+          res.status(201).json(row);
+        } else {
+          res.status(201).json(result.rows[0]);
+        }
         break;
 
       case 'update':
@@ -185,7 +207,13 @@ export const crudOperation = async (req, res) => {
           return res.status(404).json({ error: 'Registro no encontrado' });
         }
 
-        res.json(result.rows[0]);
+        if (table && !isAdminUser && (table.toLowerCase() === 'reservations' || table.toLowerCase() === 'solicitudes' || table.toLowerCase() === 'products' || table.toLowerCase() === 'productos')) {
+          const row = { ...result.rows[0] };
+          if (Object.prototype.hasOwnProperty.call(row, 'neto_1')) delete row.neto_1;
+          res.json(row);
+        } else {
+          res.json(result.rows[0]);
+        }
         break;
 
       case 'delete':
@@ -200,7 +228,12 @@ export const crudOperation = async (req, res) => {
           return res.status(404).json({ error: 'Registro no encontrado' });
         }
 
-        res.json({ message: 'Registro eliminado exitosamente', deleted: result.rows[0] });
+        // Sanitizar deleted
+        const deletedRow = { ...result.rows[0] };
+        if (table && !isAdminUser && (table.toLowerCase() === 'reservations' || table.toLowerCase() === 'solicitudes' || table.toLowerCase() === 'products' || table.toLowerCase() === 'productos')) {
+          if (Object.prototype.hasOwnProperty.call(deletedRow, 'neto_1')) delete deletedRow.neto_1;
+        }
+        res.json({ message: 'Registro eliminado exitosamente', deleted: deletedRow });
         break;
 
       default:
@@ -218,6 +251,7 @@ export const crudOperation = async (req, res) => {
 export const executeQuery = async (req, res) => {
   try {
     const { query: sqlQuery, params = [] } = req.body;
+    const isAdminUser = req.user && req.user.role === 'admin';
 
     // Validar que la consulta no contenga comandos peligrosos
     if (!isValidQuery(sqlQuery)) {
@@ -225,6 +259,20 @@ export const executeQuery = async (req, res) => {
     }
 
     const result = await query(sqlQuery, params);
+
+    // Intentar detección simple de tabla en la consulta para sanitizar neto_1
+    const lower = String(sqlQuery).toLowerCase();
+    const mentionsReservations = lower.includes(' from reservations') || lower.includes(' from "reservations"') || lower.includes(' from solicitudes') || lower.includes(' from "solicitudes"');
+    const mentionsProducts = lower.includes(' from products') || lower.includes(' from "products"') || lower.includes(' from productos') || lower.includes(' from "productos"');
+    if (!isAdminUser && (mentionsReservations || mentionsProducts)) {
+      const sanitized = result.rows.map((r) => {
+        const copy = { ...r };
+        if (Object.prototype.hasOwnProperty.call(copy, 'neto_1')) delete copy.neto_1;
+        return copy;
+      });
+      return res.json(sanitized);
+    }
+
     res.json(result.rows);
   } catch (error) {
     console.error('Error en executeQuery:', error);
@@ -283,9 +331,11 @@ export const getTables = async (req, res) => {
 
 // Funciones de validación para prevenir inyección SQL
 const validTableNames = [
-  'profiles', 'agencies', 'data_connections', 'api_credentials', 
+  'profiles', 'agencies', 'data_connections', 'api_credentials',
   'connection_data_types', 'solicitudes', 'productos', 'notifications',
-  'user_security_status', 'user_sessions', 'admin_actions'
+  'user_security_status', 'user_sessions', 'admin_actions',
+  // Tablas en inglés
+  'products', 'reservations', 'system_settings', 'email_templates', 'email_log', 'alert_rules'
 ]; // Lista blanca de nombres de tablas válidas
 
 function isValidTableName(name) {

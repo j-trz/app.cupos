@@ -53,6 +53,32 @@ export default pool;
 // Función para inicializar la base de datos
 const initializeDatabase = async () => {
   try {
+    // Helper: obtener tipo de columna existente para adaptarse a bases ya creadas
+    const getColumnType = async (schema, table, column) => {
+      try {
+        const q = `
+          SELECT data_type, udt_name
+          FROM information_schema.columns
+          WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+          LIMIT 1
+        `;
+        const r = await query(q, [schema, table, column]);
+        if (r.rows.length === 0) return null;
+        const dt = r.rows[0].data_type || r.rows[0].udt_name;
+        if (!dt) return null;
+        // Normalizar a un tipo SQL simple
+        if (String(dt).toLowerCase().includes('uuid')) return 'UUID';
+        if (String(dt).toLowerCase().includes('int')) return 'INT';
+        return String(dt).toUpperCase();
+      } catch (err) {
+        return null;
+      }
+    };
+
+    // Detectar tipos actuales (si ya existen tablas)
+    const agenciesIdType = (await getColumnType('public', 'agencies', 'id')) || 'UUID';
+    const themesIdType = (await getColumnType('public', 'themes', 'id')) || 'UUID';
+    const authUsersIdType = (await getColumnType('auth', 'users', 'id')) || 'UUID';
     // Crear tabla products
     await query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -114,7 +140,7 @@ const initializeDatabase = async () => {
       );
     `);
 
-    // Crear tabla themes
+    // Crear tabla themes (usar UUID por defecto)
     await query(`
       CREATE TABLE IF NOT EXISTS themes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,12 +153,12 @@ const initializeDatabase = async () => {
       );
     `);
 
-    // Crear tabla agency_themes
+    // Crear tabla agency_themes adaptando tipos según la base existente
     await query(`
       CREATE TABLE IF NOT EXISTS agency_themes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        agency_id UUID NOT NULL,
-        theme_id UUID NOT NULL,
+        agency_id ${agenciesIdType} NOT NULL,
+        theme_id ${themesIdType} NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (agency_id) REFERENCES agencies(id) ON DELETE CASCADE,
@@ -141,11 +167,11 @@ const initializeDatabase = async () => {
       );
     `);
 
-    // Crear tabla agency_configurations
+    // Crear tabla agency_configurations (agency_id usa el tipo detectado)
     await query(`
       CREATE TABLE IF NOT EXISTS agency_configurations (
         id SERIAL PRIMARY KEY,
-        agency_id INT NOT NULL,
+        agency_id ${agenciesIdType} NOT NULL,
         configuration JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -153,12 +179,12 @@ const initializeDatabase = async () => {
       );
     `);
 
-    // Crear tabla agency_theme_configs
+    // Crear tabla agency_theme_configs (adaptar types según DB existente)
     await query(`
       CREATE TABLE IF NOT EXISTS agency_theme_configs (
         id SERIAL PRIMARY KEY,
-        agency_id INT NOT NULL,
-        theme_id INT NOT NULL,
+        agency_id ${agenciesIdType} NOT NULL,
+        theme_id ${themesIdType} NOT NULL,
         configuration JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -204,15 +230,15 @@ const initializeDatabase = async () => {
       );
     `);
 
-    // Crear tabla user_roles
+    // Crear tabla user_roles (usar tipo de auth.users.id si existe)
     await query(`
       CREATE TABLE IF NOT EXISTS user_roles (
         id SERIAL PRIMARY KEY,
-        user_id INT NOT NULL,
+        user_id ${authUsersIdType} NOT NULL,
         role_id INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
         FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
         UNIQUE (user_id, role_id)
       );

@@ -7,8 +7,7 @@ import Dashboard from "./pages/Dashboard"; // eslint-disable-line no-unused-vars
 import Login from "./pages/Login"; // eslint-disable-line no-unused-vars
 import CrearUsuario from "./pages/CrearUsuario"; // eslint-disable-line no-unused-vars
 import GestionUsuarios from "./pages/GestionUsuarios"; // eslint-disable-line no-unused-vars
-import GestionConexiones from "./pages/GestionConexiones"; // eslint-disable-line no-unused-vars
-import DataMapper from "./pages/DataMapper"; // eslint-disable-line no-unused-vars
+// Removed: GestionConexiones and DataMapper pages (client-side connections UI removed)
 import GestionProductos from "./pages/GestionProductos"; // eslint-disable-line no-unused-vars
 import Disponibilidad from "./pages/Disponibilidad"; // eslint-disable-line no-unused-vars
 import Solicitudes from "./pages/Solicitudes"; // eslint-disable-line no-unused-vars
@@ -16,7 +15,7 @@ import Confirmaciones from "./pages/Confirmaciones"; // eslint-disable-line no-u
 import Seguridad from "./pages/Seguridad"; // eslint-disable-line no-unused-vars
 import Perfil from "./pages/Perfil"; // eslint-disable-line no-unused-vars
 import GestionAgencias from "./pages/GestionAgencias"; // eslint-disable-line no-unused-vars
-import { ensurePowerAutomateConnection } from "./utils/ensurePowerAutomateConnection";
+// ensurePowerAutomateConnection removed (client-side connection management disabled)
 
 // Componente para rutas privadas
 function PrivateRoute({ children }) { // eslint-disable-line no-unused-vars
@@ -62,13 +61,7 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
 
   // Ejecutar configuraciones una vez cuando la app se inicializa
   useEffect(() => {
-    if (isInitialized) {
-      const timer = setTimeout(() => {
-        ensurePowerAutomateConnection();
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
+    // No-op: client-side connection auto-creation disabled
   }, [isInitialized]);
 
   // Mostrar loader mientras se inicializa
@@ -165,14 +158,6 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
           }
         />
         <Route
-          path="/admin/gestion-conexiones"
-          element={
-            <AdminRoute>
-              <GestionConexiones />
-            </AdminRoute>
-          }
-        />
-        <Route
           path="/admin/gestion-agencias"
           element={
             <AdminRoute>
@@ -180,14 +165,7 @@ function AppRoutes() { // eslint-disable-line no-unused-vars
             </AdminRoute>
           }
         />
-        <Route
-          path="/admin/data-mapper"
-          element={
-            <AdminRoute>
-              <DataMapper />
-            </AdminRoute>
-          }
-        />
+        {/* Client-side connections UI removed: routes omitted */}
         <Route
           path="/admin/seguridad"
           element={
