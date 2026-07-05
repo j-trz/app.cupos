@@ -151,14 +151,14 @@ export default function GestionReservas() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between ">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gestión de Reservas</h1>
           <p className="text-muted-foreground">
             Administra las reservas y su estado de confirmación.
           </p>
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} className="border">
           <Plus className="mr-2 h-4 w-4" />
           Nueva Reserva
         </Button>
@@ -207,10 +207,10 @@ export default function GestionReservas() {
                     <TableCell>{reservation.vuelo_destino}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${reservation.estado === 'confirmado' ? 'bg-green-100 text-green-800' :
-                          reservation.estado === 'procesando' ? 'bg-yellow-100 text-yellow-800' :
-                            reservation.estado === 'completado' ? 'bg-blue-100 text-blue-800' :
-                              reservation.estado === 'cancelado' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
+                        reservation.estado === 'procesando' ? 'bg-yellow-100 text-yellow-800' :
+                          reservation.estado === 'completado' ? 'bg-blue-100 text-blue-800' :
+                            reservation.estado === 'cancelado' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
                         }`}>
                         {reservation.estado === 'bloqueo_temporal' ? 'Bloqueo Temporal' :
                           reservation.estado === 'confirmado' ? 'Confirmado' :
@@ -259,7 +259,7 @@ export default function GestionReservas() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editReservation ? 'Editar Reserva' : 'Nueva Reserva'}</DialogTitle>
           </DialogHeader>
@@ -311,7 +311,7 @@ export default function GestionReservas() {
               ))}
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -328,6 +328,6 @@ export default function GestionReservas() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

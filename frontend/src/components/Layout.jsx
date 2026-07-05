@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import Sidebar from './ui/Sidebar.jsx';
 
 export default function Layout() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {

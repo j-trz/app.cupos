@@ -50,7 +50,7 @@ export default function GestionUsuarios() {
 
   const openEdit = (user) => {
     setEditUser(user);
-    setFormState({ 
+    setFormState({
       email: user.email,
       nombre: user.nombre || '',
       apellido: user.apellido || '',
@@ -136,7 +136,7 @@ export default function GestionUsuarios() {
             Administra los usuarios y sus permisos en el sistema.
           </p>
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} className="border">
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Usuario
         </Button>
@@ -181,13 +181,12 @@ export default function GestionUsuarios() {
                     <TableCell>{user.nombre} {user.apellido}</TableCell>
                     <TableCell>{user.agencia || '-'}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                      <span className={`px-2 py-1 rounded-full text-xs ${user.role === 'admin' ? 'bg-red-100 text-red-800' :
                         user.role === 'agency_admin' ? 'bg-blue-100 text-blue-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {user.role === 'admin' ? 'Admin' : 
-                         user.role === 'agency_admin' ? 'Admin Agencia' : 'Usuario'}
+                          'bg-green-100 text-green-800'
+                        }`}>
+                        {user.role === 'admin' ? 'Admin' :
+                          user.role === 'agency_admin' ? 'Admin Agencia' : 'Usuario'}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -206,9 +205,9 @@ export default function GestionUsuarios() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {user.security_status?.is_locked && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleUnlock(user)}
                             title="Desbloquear usuario"
                           >
@@ -218,9 +217,9 @@ export default function GestionUsuarios() {
                         <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => handleDelete(user)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -236,20 +235,20 @@ export default function GestionUsuarios() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editUser ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {fields.map((field) => (
                 <div key={field.name}>
                   <Label htmlFor={field.name}>
                     {field.label} {field.required && '*'}
                   </Label>
                   {field.type === 'select' ? (
-                    <Select 
-                      value={formState[field.name]} 
+                    <Select
+                      value={formState[field.name]}
                       onValueChange={(value) => setFormState({ ...formState, [field.name]: value })}
                     >
                       <SelectTrigger className="mt-1">
@@ -279,8 +278,8 @@ export default function GestionUsuarios() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
               >

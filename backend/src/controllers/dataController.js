@@ -21,7 +21,6 @@ export const getData = async (req, res) => {
     sql = `SELECT * FROM "${table}"`;
     params = [];
     paramIndex = 1;
-    let paramIndex = 1;
     let hasWhere = false;
 
     // Procesar filtros

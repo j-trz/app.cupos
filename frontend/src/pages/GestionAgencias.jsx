@@ -120,7 +120,7 @@ export default function GestionAgencias() {
             Administra las agencias y sus configuraciones de marca.
           </p>
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} className="border">
           <Plus className="mr-2 h-4 w-4" />
           Nueva Agencia
         </Button>
@@ -176,9 +176,9 @@ export default function GestionAgencias() {
                         <Button variant="outline" size="sm" onClick={() => openEdit(agency)}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => handleDelete(agency)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -194,7 +194,7 @@ export default function GestionAgencias() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editAgency ? 'Editar Agencia' : 'Nueva Agencia'}</DialogTitle>
           </DialogHeader>
@@ -245,7 +245,7 @@ export default function GestionAgencias() {
               ))}
               <div className="col-span-2">
                 <div className="flex items-center space-x-2 mt-1">
-                  <ShadcnCheckbox 
+                  <ShadcnCheckbox
                     id="is_active"
                     checked={formState.is_active}
                     onCheckedChange={(checked) => setFormState({ ...formState, is_active: checked })}
@@ -256,8 +256,8 @@ export default function GestionAgencias() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
               >

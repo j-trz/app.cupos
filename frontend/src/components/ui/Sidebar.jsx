@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, User, Package, Settings, ChevronLeft, ChevronRight, LogOut, ChevronDown, Building2, Users, CreditCard, Bell } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import { useSidebar } from './SidebarProvider.jsx';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shadcn-tooltip';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './shadcn-dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
+import NotificationService from '../../services/notificationService.js';
 
 const navItems = [
   { label: 'Inicio', path: '/dashboard', icon: Home },
@@ -20,8 +21,6 @@ const adminNavItems = [
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Usuarios', path: '/usuarios', icon: Users },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
-  { label: 'Notificaciones', path: '/notificaciones', icon: Bell },
-  { label: 'Ajustes', path: '/settings', icon: Settings },
 ];
 
 export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }) {
@@ -29,8 +28,28 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const [localCollapsed, setLocalCollapsed] = useState(false);
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const isAdmin = user?.role === 'admin';
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchUnread = async () => {
+      try {
+        const count = await NotificationService.getUnreadCount();
+        setUnreadCount(count);
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
+    fetchUnread();
+    // Poll every 30 seconds
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   return (
     <TooltipProvider>
@@ -121,36 +140,53 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                           <div className="ml-auto">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button aria-label="Abrir opciones de perfil" className="inline-flex items-center rounded-full p-1 text-slate-300 hover:bg-slate-800">
+                                <button aria-label="Abrir opciones de perfil" className="inline-flex items-center rounded-full p-1 text-slate-300 hover:bg-slate-800 relative">
                                   <ChevronDown className="h-4 w-4" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem asChild>
-                                  <a href="/profile">Mi perfil</a>
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuLabel className="px-3 py-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-white">{user.nombre || user.email || 'Invitado'}</span>
+                                    <span className="text-xs text-slate-400">{user.agencia || 'Agencia no definida'}</span>
+                                  </div>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild className="gap-2">
+                                  <a href="/profile">
+                                    <User className="h-4 w-4" />
+                                    <span>Perfil</span>
+                                  </a>
                                 </DropdownMenuItem>
-                                {/* Only show settings option if user is admin */}
-                                {user?.role === 'admin' && (
-                                  <>
-                                    <DropdownMenuItem asChild>
-                                      <a href="/settings">Ajustes</a>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <a href="/agencias">Gestión de Agencias</a>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <a href="/usuarios">Gestión de Usuarios</a>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <a href="/reservas">Gestión de Reservas</a>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <a href="/notificaciones">Notificaciones</a>
-                                    </DropdownMenuItem>
-                                  </>
+                                <DropdownMenuItem asChild className="gap-2">
+                                  <a href="/settings">
+                                    <Settings className="h-4 w-4" />
+                                    <span>Ajustes</span>
+                                  </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild className="gap-2">
+                                  <a href="/notificaciones">
+                                    <Bell className="h-4 w-4" />
+                                    <span>Notificaciones</span>
+                                    {unreadCount > 0 && (
+                                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                      </span>
+                                    )}
+                                  </a>
+                                </DropdownMenuItem>
+                                {isAdmin && (
+                                  <DropdownMenuItem asChild className="gap-2">
+                                    <a href="/usuarios">
+                                      <Users className="h-4 w-4" />
+                                      <span>Usuarios</span>
+                                    </a>
+                                  </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem onClick={onLogout} className="text-red-600">
-                                  Cerrar sesión
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={onLogout} className="gap-2 text-red-400 hover:bg-red-950/50 hover:text-red-300 focus:bg-red-950/50 focus:text-red-300">
+                                  <LogOut className="h-4 w-4" />
+                                  <span>Cerrar sesión</span>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -165,9 +201,14 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                               <ChevronDown className="h-4 w-4" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={onLogout} className="text-red-600">
-                              Cerrar sesión
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel className="px-3 py-2">
+                              <span className="text-sm font-semibold text-white">Invitado</span>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={onLogout} className="gap-2 text-red-400 hover:bg-red-950/50 hover:text-red-300 focus:bg-red-950/50 focus:text-red-300">
+                              <LogOut className="h-4 w-4" />
+                              <span>Cerrar sesión</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
