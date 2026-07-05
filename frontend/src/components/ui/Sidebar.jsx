@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, User, ChevronLeft, ChevronRight, LogOut, ChevronDown } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, User, Package, Settings, ChevronLeft, ChevronRight, LogOut, ChevronDown } from 'lucide-react';
 import Card from './Card.jsx';
 import Button from './Button.jsx';
 import clsx from 'clsx';
@@ -15,11 +15,19 @@ const navItems = [
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
 ];
 
+// Admin-only items
+const adminNavItems = [
+  { label: 'Productos', path: '/products', icon: Package },
+  { label: 'Ajustes', path: '/settings', icon: Settings },
+];
+
 export default function Sidebar({ user = {}, onLogout = () => {}, dir = 'ltr' }) {
   const ctx = useSidebar();
   const [localCollapsed, setLocalCollapsed] = useState(false);
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
+
+  const isAdmin = user?.role === 'admin';
 
   return (
     <aside
@@ -67,6 +75,26 @@ export default function Sidebar({ user = {}, onLogout = () => {}, dir = 'ltr' })
                 {!collapsed && <span>{label}</span>}
               </NavLink>
             ))}
+            
+            {/* Admin-only menu items */}
+            {isAdmin && adminNavItems.map(({ label, path, icon: Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={({ isActive }) =>
+                  clsx(
+                    'group flex items-center gap-3 rounded-3xl px-3 py-2 text-sm font-medium transition-colors',
+                    isActive ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+                    collapsed ? 'justify-center px-2' : 'px-4'
+                  )
+                }
+              >
+                <Tooltip label={label}>
+                  <Icon className="h-5 w-5" />
+                </Tooltip>
+                {!collapsed && <span>{label}</span>}
+              </NavLink>
+            ))}
           </nav>
         </div>
 
@@ -91,7 +119,8 @@ export default function Sidebar({ user = {}, onLogout = () => {}, dir = 'ltr' })
                             placement="top"
                             items={[
                               { label: 'Mi perfil', to: '/profile' },
-                              { label: 'Ajustes', to: '/settings' },
+                              // Only show settings option if user is admin
+                              ...(user?.role === 'admin' ? [{ label: 'Ajustes', to: '/settings' }] : []),
                               { label: 'Cerrar sesión', onClick: onLogout, danger: true },
                             ]}
                           >

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Edit3 } from 'lucide-react';
+import { Plus, Trash2, Edit3, Package } from 'lucide-react';
 import ProductService from '../services/productService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -118,7 +118,7 @@ export default function Products() {
       <PageHeader
         title="Productos"
         description="Gestiona los cupos disponibles, precios, fechas y métricas de cada producto."
-        icon={Plus}
+        icon={Package}
         action={
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
