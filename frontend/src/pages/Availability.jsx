@@ -7,7 +7,8 @@ import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
 export default function Availability() {
   const [data, setData] = useState([]);
@@ -93,52 +94,50 @@ export default function Availability() {
           <span className="text-sm text-slate-500">Última actualización automática al ingresar</span>
         </div>
 
-        <Table className="p-6">
-          <table className="min-w-full border-separate border-spacing-0">
-            <TableHeader>
+        <TableComponent>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Cupo</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Compañía</TableHead>
+              <TableHead>Disponibilidad</TableHead>
+              <TableHead>Salida</TableHead>
+              <TableHead>Regreso</TableHead>
+              <TableHead>Precio</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>Cupo</TableHead>
-                <TableHead>Destino</TableHead>
-                <TableHead>Compañía</TableHead>
-                <TableHead>Disponibilidad</TableHead>
-                <TableHead>Salida</TableHead>
-                <TableHead>Regreso</TableHead>
-                <TableHead>Precio</TableHead>
+                <TableCell className="text-center py-10" colSpan={7}>
+                  Cargando disponibilidad...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell className="text-center py-10" colSpan={7}>
-                    Cargando disponibilidad...
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-10" colSpan={7}>
+                  No hay cupos disponibles.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{item.codigo_cupo}</TableCell>
+                  <TableCell>{item.destino}</TableCell>
+                  <TableCell>{item.compania}</TableCell>
+                  <TableCell>
+                    <Badge variant={getAvailabilityVariant(Number(item.disponibilidad))}>
+                      {item.disponibilidad}
+                    </Badge>
                   </TableCell>
+                  <TableCell>{item.fecha_salida || '—'}</TableCell>
+                  <TableCell>{item.fecha_regreso || '—'}</TableCell>
+                  <TableCell>{item.precio ? `$${item.precio}` : '—'}</TableCell>
                 </TableRow>
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell className="text-center py-10" colSpan={7}>
-                    No hay cupos disponibles.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.codigo_cupo}</TableCell>
-                    <TableCell>{item.destino}</TableCell>
-                    <TableCell>{item.compania}</TableCell>
-                    <TableCell>
-                      <Badge variant={getAvailabilityVariant(Number(item.disponibilidad))}>
-                        {item.disponibilidad}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{item.fecha_salida || '—'}</TableCell>
-                    <TableCell>{item.fecha_regreso || '—'}</TableCell>
-                    <TableCell>{item.precio ? `$${item.precio}` : '—'}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </table>
-        </Table>
+              ))
+            )}
+          </TableBody>
+        </TableComponent>
       </Card>
     </div>
   );

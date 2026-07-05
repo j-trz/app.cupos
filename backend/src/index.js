@@ -5,6 +5,7 @@ import * as themesController from './controllers/themesController.js';
 import * as productsController from './controllers/productsController.js';
 import * as settingsController from './controllers/settingsController.js';
 import * as alertRulesController from './controllers/alertRulesController.js';
+import * as agenciesController from './controllers/agenciesController.js';
 import dotenv from 'dotenv';
 
 // Importar middlewares de autenticación
@@ -18,6 +19,29 @@ import * as dataController from './controllers/dataController.js';
 import * as ordersController from './controllers/ordersController.js';
 
 dotenv.config();
+
+import pool from './config/database.js';
+
+// Manejar eventos de conexión del pool
+pool.on('connect', () => {
+  console.log('✅ Pool de base de datos listo');
+});
+
+pool.on('error', (err) => {
+  console.error('❌ Error inesperado en el pool de base de datos:', err);
+  // No salir de la aplicación, solo registrar el error
+  process.exitCode = 1;
+});
+
+// Intentar obtener una conexión inmediatamente para verificar
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('⚠️  Error inicial de conexión:', err.message);
+  } else {
+    console.log('✅ Conexión exitosa a la base de datos');
+    release();
+  }
+});
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -93,6 +117,16 @@ settingsRouter.get('/', isAdmin, settingsController.listSettings);
 settingsRouter.get('/:key', isAdmin, settingsController.getSetting);
 settingsRouter.put('/:key', isAdmin, settingsController.updateSetting);
 app.use('/api/settings', settingsRouter);
+
+// Rutas de Agencias (/api/agencies)
+const agenciesRouter = express.Router();
+agenciesRouter.use(requireAuth);
+agenciesRouter.get('/', agenciesController.listAgencies);
+agenciesRouter.get('/:id', agenciesController.getAgency);
+agenciesRouter.post('/', isAdmin, agenciesController.createAgency);
+agenciesRouter.put('/:id', isAdmin, agenciesController.updateAgency);
+agenciesRouter.delete('/:id', isAdmin, agenciesController.deleteAgency);
+app.use('/api/agencies', agenciesRouter);
 
 // Rutas de Reglas de Alerta (/api/alert-rules)
 const alertRulesRouter = express.Router();

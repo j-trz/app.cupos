@@ -4,21 +4,29 @@ import { query } from '../db.js';
  * Obtener datos de una tabla
  */
 export const getData = async (req, res) => {
+  let sql;
+  let params;
+  let paramIndex;
+  
   try {
     const { table, filters = '{}', limit, offset, order } = req.query;
+    
+    console.log(`[getData] Table: ${table}, Filters: ${filters}`);
     
     // Validar nombre de tabla para prevenir inyección SQL
     if (!isValidTableName(table)) {
       return res.status(400).json({ error: 'Nombre de tabla inválido' });
     }
 
-    let sql = `SELECT * FROM "${table}"`;
-    const params = [];
+    sql = `SELECT * FROM "${table}"`;
+    params = [];
+    paramIndex = 1;
     let paramIndex = 1;
     let hasWhere = false;
 
     // Procesar filtros
     const parsedFilters = JSON.parse(filters);
+    console.log(`[getData] Parsed Filters:`, parsedFilters);
     if (Object.keys(parsedFilters).length > 0) {
       sql += ' WHERE ';
       const conditions = [];
@@ -28,61 +36,64 @@ export const getData = async (req, res) => {
           return res.status(400).json({ error: `Campo inválido: ${field}` });
         }
 
+        // Convertir field a lowercase para coincidir con nombres de columnas en PostgreSQL
+        const dbField = field.toLowerCase();
+
         if (typeof value === 'object' && value !== null) {
           // Manejar operadores especiales como $gt, $lt, etc.
           for (const [op, opValue] of Object.entries(value)) {
             switch (op) {
               case '$eq':
-                conditions.push(`"${field}" = $${paramIndex}`);
+                conditions.push(`"${dbField}" = $${paramIndex}`);
                 params.push(opValue);
                 paramIndex++;
                 break;
               case '$ne':
               case '$neq':
-                conditions.push(`"${field}" != $${paramIndex}`);
+                conditions.push(`"${dbField}" != $${paramIndex}`);
                 params.push(opValue);
                 paramIndex++;
                 break;
               case '$gt':
-                conditions.push(`"${field}" > $${paramIndex}`);
+                conditions.push(`"${dbField}" > $${paramIndex}`);
                 params.push(opValue);
                 paramIndex++;
                 break;
               case '$gte':
-                conditions.push(`"${field}" >= $${paramIndex}`);
+                conditions.push(`"${dbField}" >= $${paramIndex}`);
                 params.push(opValue);
                 paramIndex++;
                 break;
               case '$lt':
-                conditions.push(`"${field}" < $${paramIndex}`);
+                conditions.push(`"${dbField}" < $${paramIndex}`);
                 params.push(opValue);
                 paramIndex++;
                 break;
               case '$lte':
-                conditions.push(`"${field}" <= $${paramIndex}`);
+                conditions.push(`"${dbField}" <= $${paramIndex}`);
                 params.push(opValue);
                 paramIndex++;
                 break;
               case '$in':
                 const inValues = Array.isArray(opValue) ? opValue : [opValue];
                 const placeholders = inValues.map(() => `$${paramIndex++}`).join(',');
-                conditions.push(`"${field}" IN (${placeholders})`);
+                conditions.push(`"${dbField}" IN (${placeholders})`);
                 params.push(...inValues);
                 break;
               case '$like':
-                conditions.push(`"${field}" LIKE $${paramIndex}`);
+                conditions.push(`"${dbField}" LIKE $${paramIndex}`);
                 params.push(`%${opValue}%`);
                 paramIndex++;
                 break;
               case '$ilike':
-                conditions.push(`"${field}" ILIKE $${paramIndex}`);
+                conditions.push(`"${dbField}" ILIKE $${paramIndex}`);
                 params.push(`%${opValue}%`);
                 paramIndex++;
                 break;
             }
           }
         } else {
-          conditions.push(`"${field}" = $${paramIndex}`);
+          conditions.push(`"${dbField}" = $${paramIndex}`);
           params.push(value);
           paramIndex++;
         }
@@ -130,7 +141,9 @@ export const getData = async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Error en getData:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('SQL:', sql);
+    console.error('Params:', params);
+    res.status(500).json({ error: 'Error interno del servidor', details: error.message });
   }
 };
 

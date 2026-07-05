@@ -1,9 +1,14 @@
 import clsx from 'clsx';
 import { Badge } from './shadcn-badge';
 
-export default function PageHeader({ title, description, icon: Icon, badge, className, ...props }) {
+export default function PageHeader({ title, description, icon: Icon, badge, className, action, ...props }) {
   return (
-    <header className={clsx('space-y-2', className)} {...props}>
+    <header className={clsx('space-y-4', className)} {...props}>
+      {action && (
+        <div className="flex justify-end">
+          {action}
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <div className="rounded-full bg-slate-100 p-2 text-slate-900">
           {Icon && <Icon className="h-6 w-6" />}

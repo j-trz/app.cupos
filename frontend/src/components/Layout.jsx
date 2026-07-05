@@ -1,10 +1,9 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../contexts/AuthContext.jsx';
-import { useContext } from 'react';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import Sidebar from './ui/Sidebar.jsx';
 
 export default function Layout() {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {

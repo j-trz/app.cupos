@@ -7,7 +7,8 @@ import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
 const statusVariant = (status) => {
   if (!status) return 'default';
@@ -104,48 +105,46 @@ export default function Requests() {
           <span className="text-sm text-slate-500">Actualiza con el botón cuando necesites datos frescos</span>
         </div>
 
-        <Table className="p-6">
-          <table className="min-w-full border-separate border-spacing-0">
-            <TableHeader>
+        <TableComponent>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Pedido</TableHead>
+              <TableHead>Agencia</TableHead>
+              <TableHead>Pasajero</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Salida</TableHead>
+              <TableHead>Estado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>Pedido</TableHead>
-                <TableHead>Agencia</TableHead>
-                <TableHead>Pasajero</TableHead>
-                <TableHead>Destino</TableHead>
-                <TableHead>Salida</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableCell className="text-center py-10" colSpan={6}>
+                  Cargando solicitudes...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell className="text-center py-10" colSpan={6}>
-                    Cargando solicitudes...
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-10" colSpan={6}>
+                  No hay solicitudes registradas.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{item.Pedido_ID}</TableCell>
+                  <TableCell>{item.Agencia || 'Sin agencia'}</TableCell>
+                  <TableCell>{`${item.Nombre_Pasajero || '-'} ${item.Apellido_Pasajero || ''}`.trim()}</TableCell>
+                  <TableCell>{item.Vuelo_Destino || '—'}</TableCell>
+                  <TableCell>{item.Vuelo_Salida || '—'}</TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant(item.Estado)}>{item.Estado || 'Desconocido'}</Badge>
                   </TableCell>
                 </TableRow>
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell className="text-center py-10" colSpan={6}>
-                    No hay solicitudes registradas.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.Pedido_ID}</TableCell>
-                    <TableCell>{item.Agencia || 'Sin agencia'}</TableCell>
-                    <TableCell>{`${item.Nombre_Pasajero || '-'} ${item.Apellido_Pasajero || ''}`.trim()}</TableCell>
-                    <TableCell>{item.Vuelo_Destino || '—'}</TableCell>
-                    <TableCell>{item.Vuelo_Salida || '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(item.Estado)}>{item.Estado || 'Desconocido'}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </table>
-        </Table>
+              ))
+            )}
+          </TableBody>
+        </TableComponent>
       </Card>
     </div>
   );

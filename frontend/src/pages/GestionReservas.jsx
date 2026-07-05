@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/shadcn-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/shadcn-dialog';
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
-import { ShadcnLabel as Label } from '../components/ui/shadcn-label';
+import { Label } from '../components/ui/shadcn-label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/shadcn-select';
 
 const emptyReservation = {
@@ -206,34 +206,33 @@ export default function GestionReservas() {
                     <TableCell>{reservation.vuelo_codigo}</TableCell>
                     <TableCell>{reservation.vuelo_destino}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        reservation.estado === 'confirmado' ? 'bg-green-100 text-green-800' :
-                        reservation.estado === 'procesando' ? 'bg-yellow-100 text-yellow-800' :
-                        reservation.estado === 'completado' ? 'bg-blue-100 text-blue-800' :
-                        reservation.estado === 'cancelado' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs ${reservation.estado === 'confirmado' ? 'bg-green-100 text-green-800' :
+                          reservation.estado === 'procesando' ? 'bg-yellow-100 text-yellow-800' :
+                            reservation.estado === 'completado' ? 'bg-blue-100 text-blue-800' :
+                              reservation.estado === 'cancelado' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                        }`}>
                         {reservation.estado === 'bloqueo_temporal' ? 'Bloqueo Temporal' :
-                         reservation.estado === 'confirmado' ? 'Confirmado' :
-                         reservation.estado === 'procesando' ? 'Procesando' :
-                         reservation.estado === 'completado' ? 'Completado' : 'Cancelado'}
+                          reservation.estado === 'confirmado' ? 'Confirmado' :
+                            reservation.estado === 'procesando' ? 'Procesando' :
+                              reservation.estado === 'completado' ? 'Completado' : 'Cancelado'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {reservation.estado && reservation.estado !== 'confirmado' && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleConfirm(reservation)}
                             title="Confirmar reserva"
                           >
                             <CheckCircle2 className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleResendEmail(reservation)}
                           title="Reenviar email"
                         >
@@ -242,9 +241,9 @@ export default function GestionReservas() {
                         <Button variant="outline" size="sm" onClick={() => openEdit(reservation)}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => handleDelete(reservation)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -272,8 +271,8 @@ export default function GestionReservas() {
                     {field.label} {field.required && '*'}
                   </Label>
                   {field.type === 'select' ? (
-                    <Select 
-                      value={formState[field.name] || ''} 
+                    <Select
+                      value={formState[field.name] || ''}
                       onValueChange={(value) => setFormState({ ...formState, [field.name]: value })}
                     >
                       <SelectTrigger className="mt-1">
@@ -313,8 +312,8 @@ export default function GestionReservas() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
               >
