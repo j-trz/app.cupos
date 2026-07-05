@@ -1,18 +1,19 @@
-export default function PageHeader({ title, description, action, icon: Icon }) {
+import clsx from 'clsx';
+import { Badge } from './shadcn-badge';
+
+export default function PageHeader({ title, description, icon: Icon, badge, className, ...props }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-4">
-        {Icon ? (
-          <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
-            <Icon className="h-6 w-6" />
-          </div>
-        ) : null}
+    <header className={clsx('space-y-2', className)} {...props}>
+      <div className="flex items-center gap-3">
+        <div className="rounded-full bg-slate-100 p-2 text-slate-900">
+          {Icon && <Icon className="h-6 w-6" />}
+        </div>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
+          {badge && <Badge className="ml-2 mt-1">{badge}</Badge>}
         </div>
       </div>
-      <div>{action}</div>
-    </div>
+      {description && <p className="text-sm text-slate-500">{description}</p>}
+    </header>
   );
 }

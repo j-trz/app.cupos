@@ -34,6 +34,85 @@ const adaptRequest = (item) => ({
 });
 
 class ReservationService {
+  // Get all reservations
+  static async listReservations(params = {}) {
+    try {
+      const queryParams = new URLSearchParams(params).toString();
+      const endpoint = queryParams ? `/orders?${queryParams}` : '/orders';
+      const result = await ApiClient.get(endpoint);
+      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+      throw error;
+    }
+  }
+
+  // Get reservation by ID
+  static async getReservationById(id) {
+    try {
+      const result = await ApiClient.get(`/orders/${id}`);
+      return result;
+    } catch (error) {
+      console.error(`Error fetching reservation with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Create new reservation
+  static async createReservation(payload) {
+    try {
+      const result = await ApiClient.post('/orders', payload);
+      return result;
+    } catch (error) {
+      console.error('Error creating reservation:', error);
+      throw error;
+    }
+  }
+
+  // Update reservation
+  static async updateReservation(id, payload) {
+    try {
+      const result = await ApiClient.put(`/orders/${id}`, payload);
+      return result;
+    } catch (error) {
+      console.error(`Error updating reservation with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Confirm reservation
+  static async confirmReservation(id) {
+    try {
+      const result = await ApiClient.post(`/orders/${id}/confirm`);
+      return result;
+    } catch (error) {
+      console.error(`Error confirming reservation with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Delete reservation
+  static async deleteReservation(id) {
+    try {
+      const result = await ApiClient.delete(`/orders/${id}`);
+      return result;
+    } catch (error) {
+      console.error(`Error deleting reservation with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Resend reservation email
+  static async resendReservationEmail(id) {
+    try {
+      const result = await ApiClient.post(`/orders/${id}/resend-email`);
+      return result;
+    } catch (error) {
+      console.error(`Error resending email for reservation with id ${id}:`, error);
+      throw error;
+    }
+  }
+
   static async getAvailability() {
     const result = await ApiClient.get('/products');
     const products = Array.isArray(result)

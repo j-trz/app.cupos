@@ -24,16 +24,9 @@ export default function Profile() {
     loadProfile();
   }, []);
 
-  if (loading) {
-    return <div className="text-slate-500">Cargando perfil...</div>;
-  }
-
-  if (!profile) {
-    return <div className="text-slate-500">No se encontró información de usuario.</div>;
-  }
-
+  // Define stats useMemo before any early returns to maintain hook order
   const stats = useMemo(
-    () => [
+    () => profile ? [
       {
         label: 'Acceso',
         value: profile.role || 'Usuario',
@@ -46,9 +39,17 @@ export default function Profile() {
         icon: MapPin,
         description: 'Ciudad desde donde opera el usuario.',
       },
-    ],
+    ] : [],
     [profile],
   );
+
+  if (loading) {
+    return <div className="text-slate-500">Cargando perfil...</div>;
+  }
+
+  if (!profile) {
+    return <div className="text-slate-500">No se encontró información de usuario.</div>;
+  }
 
   return (
     <div className="space-y-6">

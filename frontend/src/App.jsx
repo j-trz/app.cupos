@@ -7,6 +7,10 @@ import Profile from './pages/Profile.jsx';
 import Products from './pages/Products.jsx';
 import Settings from './pages/Settings.jsx';
 import Login from './pages/Login.jsx';
+import GestionAgencias from './pages/GestionAgencias.jsx';
+import GestionUsuarios from './pages/GestionUsuarios.jsx';
+import GestionReservas from './pages/GestionReservas.jsx';
+import Notificaciones from './pages/Notificaciones.jsx';
 import Layout from './components/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AdminRoute from './components/AdminRoute.jsx'; // New component for admin protection
@@ -40,6 +44,26 @@ function App() {
           <Route path="settings" element={
             <AdminRoute>
               <Settings />
+            </AdminRoute>
+          } />
+          <Route path="agencias" element={
+            <AdminRoute>
+              <GestionAgencias />
+            </AdminRoute>
+          } />
+          <Route path="usuarios" element={
+            <AdminRoute>
+              <GestionUsuarios />
+            </AdminRoute>
+          } />
+          <Route path="reservas" element={
+            <AdminRoute>
+              <GestionReservas />
+            </AdminRoute>
+          } />
+          <Route path="notificaciones" element={
+            <AdminRoute>
+              <Notificaciones />
             </AdminRoute>
           } />
           <Route path="*" element={<Navigate to="availability" replace />} />

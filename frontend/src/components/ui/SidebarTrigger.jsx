@@ -1,20 +1,22 @@
 import React from 'react';
-import Button from './Button.jsx';
 import { useSidebar } from './SidebarProvider.jsx';
-import { PanelLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import clsx from 'clsx';
 
-export default function SidebarTrigger({ className }) {
-  const ctx = useSidebar();
-  const toggle = ctx ? ctx.toggleSidebar : null;
+export default function SidebarTrigger({ className, ...props }) {
+  const { collapsed, setCollapsed } = useSidebar();
 
   return (
-    <Button
-      variant="ghost"
-      onClick={() => toggle && toggle()}
-      className={className}
-      aria-label="Toggle sidebar"
+    <button
+      onClick={() => setCollapsed(!collapsed)}
+      className={clsx(
+        'absolute -right-3.5 top-12 z-10 hidden h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 group-data-[collapsible=icon]:inline-flex',
+        className
+      )}
+      {...props}
     >
-      <PanelLeft className="h-4 w-4" />
-    </Button>
+      {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      <span className="sr-only">Toggle sidebar</span>
+    </button>
   );
 }

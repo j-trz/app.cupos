@@ -1,57 +1,45 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
+import clsx from 'clsx';
 
-export default function Tooltip({ children, label, placement = 'right' }) {
+export default function Tooltip({ label, children, position = 'top' }) {
   const [visible, setVisible] = useState(false);
-  const [styles, setStyles] = useState({ top: 0, left: 0, transform: '' });
-  const wrapperRef = useRef(null);
-  const idRef = useRef(`tooltip-${Math.random().toString(36).slice(2, 9)}`);
 
-  useEffect(() => {
-    if (!visible || !wrapperRef.current) return;
-    const rect = wrapperRef.current.getBoundingClientRect();
-    const gap = 8;
-    const isMobile = window.innerWidth < 768;
-
-    if (isMobile) {
-      // Center above the element on mobile
-      const top = rect.top - gap;
-      const left = rect.left + rect.width / 2;
-      setStyles({ top: Math.round(top), left: Math.round(left), transform: 'translateX(-50%) translateY(-100%)' });
-    } else {
-      const top = rect.top + rect.height / 2;
-      const left = placement === 'right' ? rect.right + gap : rect.left - gap;
-      setStyles({ top: Math.round(top), left: Math.round(left), transform: 'translateY(-50%)' });
-    }
-  }, [visible, placement]);
-
-  const handleShow = () => setVisible(true);
-  const handleHide = () => setVisible(false);
+  const positionClasses = {
+    top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2',
+    bottom: 'top-full left-1/2 transform -translate-x-1/2 mt-2',
+    left: 'right-full top-1/2 transform -translate-y-1/2 mr-2',
+    right: 'left-full top-1/2 transform -translate-y-1/2 ml-2',
+  };
 
   return (
-    <span
-      ref={wrapperRef}
-      className="relative inline-flex"
-      onMouseEnter={handleShow}
-      onMouseLeave={handleHide}
-      onFocus={handleShow}
-      onBlur={handleHide}
-      aria-describedby={visible ? idRef.current : undefined}
-    >
-      {children}
-      {visible &&
-        createPortal(
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        className="cursor-pointer"
+      >
+        {children}
+      </div>
+      {visible && (
+        <div
+          className={clsx(
+            'absolute z-10 rounded-lg bg-slate-900 px-2 py-1 text-xs text-white whitespace-nowrap',
+            positionClasses[position]
+          )}
+        >
+          {label}
           <div
-            id={idRef.current}
-            role="tooltip"
-            className="pointer-events-none z-50 transform-gpu animate-fade-in rounded-md bg-slate-900 px-3 py-1 text-xs text-white shadow-lg"
-            style={{ position: 'fixed', top: styles.top, left: styles.left, transform: styles.transform }}
-          >
-            {label}
-          </div>,
-          document.body,
-        )}
-    </span>
+            className={clsx(
+              'absolute h-2 w-2 rotate-45 bg-slate-900',
+              position === 'top' && 'bottom-[-4px] left-1/2 transform -translate-x-1/2',
+              position === 'bottom' && 'top-[-4px] left-1/2 transform -translate-x-1/2',
+              position === 'left' && 'right-[-4px] top-1/2 transform -translate-y-1/2',
+              position === 'right' && 'left-[-4px] top-1/2 transform -translate-y-1/2'
+            )}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

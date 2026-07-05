@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, User, Package, Settings, ChevronLeft, ChevronRight, LogOut, ChevronDown } from 'lucide-react';
-import Card from './Card.jsx';
-import Button from './Button.jsx';
+import { Home, Plane, ClipboardList, CheckCircle2, User, Package, Settings, ChevronLeft, ChevronRight, LogOut, ChevronDown, Building2, Users, CreditCard, Bell } from 'lucide-react';
+import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import { useSidebar } from './SidebarProvider.jsx';
-import Tooltip from './Tooltip.jsx';
-import DropdownMenu from './DropdownMenu.jsx';
+import { ShadcnTooltip as Tooltip } from './shadcn-tooltip';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './shadcn-dropdown-menu';
 
 const navItems = [
   { label: 'Inicio', path: '/dashboard', icon: Home },
@@ -18,6 +17,10 @@ const navItems = [
 // Admin-only items
 const adminNavItems = [
   { label: 'Productos', path: '/products', icon: Package },
+  { label: 'Agencias', path: '/agencias', icon: Building2 },
+  { label: 'Usuarios', path: '/usuarios', icon: Users },
+  { label: 'Reservas', path: '/reservas', icon: CreditCard },
+  { label: 'Notificaciones', path: '/notificaciones', icon: Bell },
   { label: 'Ajustes', path: '/settings', icon: Settings },
 ];
 
@@ -115,33 +118,57 @@ export default function Sidebar({ user = {}, onLogout = () => {}, dir = 'ltr' })
                           <p className="text-xs text-slate-400">{user.agencia || 'Agencia no definida'}</p>
                         </div>
                         <div className="ml-auto">
-                          <DropdownMenu
-                            placement="top"
-                            items={[
-                              { label: 'Mi perfil', to: '/profile' },
-                              // Only show settings option if user is admin
-                              ...(user?.role === 'admin' ? [{ label: 'Ajustes', to: '/settings' }] : []),
-                              { label: 'Cerrar sesión', onClick: onLogout, danger: true },
-                            ]}
-                          >
-                            {({ open }) => (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                               <button aria-label="Abrir opciones de perfil" className="inline-flex items-center rounded-full p-1 text-slate-300 hover:bg-slate-800">
                                 <ChevronDown className="h-4 w-4" />
                               </button>
-                            )}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <a href="/profile">Mi perfil</a>
+                              </DropdownMenuItem>
+                              {/* Only show settings option if user is admin */}
+                              {user?.role === 'admin' && (
+                                <>
+                                  <DropdownMenuItem asChild>
+                                    <a href="/settings">Ajustes</a>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <a href="/agencias">Gestión de Agencias</a>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <a href="/usuarios">Gestión de Usuarios</a>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <a href="/reservas">Gestión de Reservas</a>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <a href="/notificaciones">Notificaciones</a>
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              <DropdownMenuItem onClick={onLogout} className="text-red-600">
+                                Cerrar sesión
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div>
-                      <DropdownMenu
-                        placement="top"
-                        items={[{ label: 'Cerrar sesión', onClick: onLogout, danger: true }]}
-                      >
-                        <button aria-label="Abrir opciones de perfil" className="inline-flex items-center rounded-full p-1 text-slate-300 hover:bg-slate-800">
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button aria-label="Abrir opciones de perfil" className="inline-flex items-center rounded-full p-1 text-slate-300 hover:bg-slate-800">
+                            <ChevronDown className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={onLogout} className="text-red-600">
+                            Cerrar sesión
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   )}
