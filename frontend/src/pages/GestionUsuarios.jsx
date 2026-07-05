@@ -235,7 +235,7 @@ export default function GestionUsuarios() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>{editUser ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
           </DialogHeader>

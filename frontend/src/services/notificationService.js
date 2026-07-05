@@ -7,7 +7,11 @@ class NotificationService {
       const queryParams = new URLSearchParams(params).toString();
       const endpoint = queryParams ? `/notifications?${queryParams}` : '/notifications';
       const result = await ApiClient.get(endpoint);
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+      // Backend returns: { success: true, notifications: [...] }
+      if (Array.isArray(result)) return result;
+      if (result?.notifications) return result.notifications;
+      if (Array.isArray(result?.data)) return result.data;
+      return [];
     } catch (error) {
       console.error('Error fetching notifications:', error);
       throw error;
@@ -18,7 +22,8 @@ class NotificationService {
   static async getUnreadCount() {
     try {
       const result = await ApiClient.get('/notifications/unread-count');
-      return result.count || 0;
+      // Backend returns: { success: true, unreadCount: N }
+      return result.unreadCount || 0;
     } catch (error) {
       console.error('Error fetching unread count:', error);
       throw error;

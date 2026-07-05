@@ -37,23 +37,38 @@ export const createReservation = async (req, res) => {
 
 export const getAllReservations = async (req, res) => {
   try {
-    let sql = 'SELECT * FROM reservations ORDER BY created_at DESC';
+    // Primero, verificar qué columnas existen en la tabla
+    const columnsResult = await query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'reservations' AND column_name IN ('created_at', 'updated_at', 'fecha_creacion')
+    `);
+    const availableColumns = columnsResult.rows.map(r => r.column_name);
+    const orderColumn = availableColumns.find(col => ['created_at', 'updated_at', 'fecha_creacion'].includes(col)) || 'id';
+
+    console.log('📋 Columnas de tiempo disponibles:', availableColumns);
+    console.log('📋 Ordenando por:', orderColumn);
+
+    let sql = `SELECT * FROM reservations ORDER BY ${orderColumn} DESC`;
     let params = [];
 
     if (req.user.role === 'agency_admin') {
-      sql = 'SELECT * FROM reservations WHERE agencia = $1 ORDER BY created_at DESC';
+      sql = `SELECT * FROM reservations WHERE agencia = $1 ORDER BY ${orderColumn} DESC`;
       params = [req.user.agencia];
     } else if (req.user.role !== 'admin') {
-      sql = 'SELECT * FROM reservations WHERE created_by = $1 ORDER BY created_at DESC';
+      sql = `SELECT * FROM reservations WHERE created_by = $1 ORDER BY ${orderColumn} DESC`;
       params = [req.user.id];
     }
 
+    console.log('📋 Ejecutando consulta:', sql, 'params:', params);
     const result = await query(sql, params);
-    const sanitized = result.rows.map((reservation) => sanitizeReservation(reservation, req.user));
+    console.log('📋 Resultado:', result?.rows?.length || 0, 'filas');
+    const rows = result?.rows || [];
+    const sanitized = rows.map((reservation) => sanitizeReservation(reservation, req.user));
     res.status(200).json(sanitized);
   } catch (error) {
-    console.error('❌ Error al obtener reservas:', error.message);
-    res.status(500).json({ error: 'Error al obtener las reservas.' });
+    console.error('❌ Error detallado al obtener reservas:', error);
+    console.error('❌ SQL State:', error.code);
+    res.status(500).json({ error: 'Error al obtener las reservas.', details: error.message });
   }
 };
 

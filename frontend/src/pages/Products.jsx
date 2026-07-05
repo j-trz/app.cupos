@@ -202,7 +202,7 @@ export default function Products() {
         </CardContent>
       </Card>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>{editProduct ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
           </DialogHeader>

@@ -58,32 +58,8 @@ class AgencyService {
     }
   }
 
-  // Upload agency logo
-  static async uploadLogo(agencyId, file) {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch(`${ApiClient.getBaseUrl()}/agencies/${agencyId}/logo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${ApiClient.getToken()}`
-        },
-        body: formData
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to upload logo');
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Error uploading logo:', error);
-      throw error;
-    }
-  }
 }
+
+// Note: uploadLogo removed - no corresponding endpoint in backend (/api/agencies/:id/logo does not exist)
 
 export default AgencyService;

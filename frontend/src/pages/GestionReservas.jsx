@@ -259,7 +259,7 @@ export default function GestionReservas() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>{editReservation ? 'Editar Reserva' : 'Nueva Reserva'}</DialogTitle>
           </DialogHeader>

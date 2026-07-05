@@ -121,14 +121,24 @@ export const login = async (req, res) => {
       });
     }
 
-    // 4. Login exitoso - Obtener perfil
-    const profileResult = await query('SELECT nombre, agencia, role, admin FROM public.profiles WHERE id = $1', [userId]);
-    const profile = profileResult.rows[0] || {
-      nombre: email.split('@')[0],
-      agencia: 'default',
-      role: 'agency_user',
-      admin: false
-    };
+    // 4. Login exitoso - Obtener perfil (crear si no existe)
+    let profileResult = await query('SELECT nombre, agencia, role, admin FROM public.profiles WHERE id = $1', [userId]);
+    let profile = profileResult.rows[0];
+    
+    // Si no existe el perfil, crearlo automáticamente
+    if (!profile) {
+      const defaultNombre = email.split('@')[0];
+      await query(
+        'INSERT INTO public.profiles (id, email, nombre, agencia, admin, role) VALUES ($1, $2, $3, $4, $5, $6)',
+        [userId, email, defaultNombre, 'default', false, 'agency_user']
+      );
+      profile = {
+        nombre: defaultNombre,
+        agencia: 'default',
+        role: 'agency_user',
+        admin: false
+      };
+    }
 
     // Registrar intento exitoso
     await query('SELECT public.log_login_attempt($1, $2, $3, $4, TRUE)', [userId, email, ipAddress, userAgent]);

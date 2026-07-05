@@ -17,6 +17,7 @@ import * as userController from './controllers/userController.js';
 import * as notificationController from './controllers/notificationController.js';
 import * as dataController from './controllers/dataController.js';
 import * as ordersController from './controllers/ordersController.js';
+import * as whiteLabelController from './controllers/whiteLabelController.js';
 
 dotenv.config();
 
@@ -159,6 +160,20 @@ orderRouter.post('/:id/confirm', isAdmin, ordersController.confirmReservation);
 orderRouter.post('/:id/resend-email', ordersController.resendReservationEmail);
 orderRouter.delete('/:id', isAdmin, ordersController.deleteReservation);
 app.use('/api/orders', orderRouter);
+
+// Rutas de White Label (/api/white-label)
+const whiteLabelRouter = express.Router();
+whiteLabelRouter.use(requireAuth);
+whiteLabelRouter.get('/config', whiteLabelController.getConfig);
+whiteLabelRouter.post('/config', isAdmin, whiteLabelController.createConfig);
+whiteLabelRouter.put('/config/:id', isAgencyAdminOrAdmin, whiteLabelController.updateConfig);
+whiteLabelRouter.delete('/config/:id', isAdmin, whiteLabelController.deleteConfig);
+whiteLabelRouter.get('/presets', whiteLabelController.getPresets);
+whiteLabelRouter.get('/fonts', whiteLabelController.getFonts);
+whiteLabelRouter.get('/buttons', whiteLabelController.getButtons);
+whiteLabelRouter.get('/export/:id', isAdmin, whiteLabelController.exportConfig);
+whiteLabelRouter.post('/import', isAdmin, whiteLabelController.importConfig);
+app.use('/api/white-label', whiteLabelRouter);
 
 // Endpoint interno para cron de expiración de bloqueos
 const internalRouter = express.Router();

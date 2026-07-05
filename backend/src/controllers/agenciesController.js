@@ -30,9 +30,13 @@ export const createAgency = async (req, res) => {
     if (!code || !name) {
       return res.status(400).json({ error: 'Código y nombre son obligatorios' });
     }
+    // Convert undefined to null for optional fields to avoid SQL errors
+    const safeEmail = email ?? null;
+    const safeAddress = address ?? null;
+    const safeColor = color ?? '#3b82f6';
     const result = await query(
       'INSERT INTO agencies (code, name, email, address, color) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [code, name, email, address, color]
+      [code, name, safeEmail, safeAddress, safeColor]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -45,9 +49,20 @@ export const updateAgency = async (req, res) => {
   try {
     const { id } = req.params;
     const { code, name, email, address, color } = req.body;
+    // Use existing values if not provided - first fetch the agency
+    const existingResult = await query('SELECT * FROM agencies WHERE id = $1', [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Agencia no encontrada' });
+    }
+    const existing = existingResult.rows[0];
+    const safeCode = code ?? existing.code;
+    const safeName = name ?? existing.name;
+    const safeEmail = email ?? existing.email ?? null;
+    const safeAddress = address ?? existing.address ?? null;
+    const safeColor = color ?? existing.color ?? '#3b82f6';
     const result = await query(
       'UPDATE agencies SET code = $1, name = $2, email = $3, address = $4, color = $5 WHERE id = $6 RETURNING *',
-      [code, name, email, address, color, id]
+      [safeCode, safeName, safeEmail, safeAddress, safeColor, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Agencia no encontrada' });

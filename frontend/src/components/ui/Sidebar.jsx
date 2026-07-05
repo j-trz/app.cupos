@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import { useSidebar } from './SidebarProvider.jsx';
@@ -21,6 +21,7 @@ const adminNavItems = [
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Usuarios', path: '/usuarios', icon: Users },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
+  { label: 'Marca Blanca', path: '/marca-blanca', icon: Palette },
 ];
 
 export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }) {

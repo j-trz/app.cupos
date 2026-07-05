@@ -11,6 +11,7 @@ import GestionAgencias from './pages/GestionAgencias.jsx';
 import GestionUsuarios from './pages/GestionUsuarios.jsx';
 import GestionReservas from './pages/GestionReservas.jsx';
 import Notificaciones from './pages/Notificaciones.jsx';
+import WhiteLabelConfig from './pages/WhiteLabelConfig.jsx';
 import Layout from './components/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AdminRoute from './components/AdminRoute.jsx'; // New component for admin protection
@@ -64,6 +65,11 @@ function App() {
           <Route path="notificaciones" element={
             <AdminRoute>
               <Notificaciones />
+            </AdminRoute>
+          } />
+          <Route path="marca-blanca" element={
+            <AdminRoute>
+              <WhiteLabelConfig />
             </AdminRoute>
           } />
           <Route path="*" element={<Navigate to="availability" replace />} />

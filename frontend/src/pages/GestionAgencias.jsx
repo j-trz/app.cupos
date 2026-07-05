@@ -8,19 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/shadcn-dialog';
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import { Label } from '../components/ui/shadcn-label';
-import { ShadcnCheckbox } from '../components/ui/shadcn-checkbox';
 
+// Backend expects: code, name, email, address, color
 const emptyAgency = {
   code: '',
   name: '',
   email: '',
-  phone: '',
   address: '',
-  website: '',
-  logo_url: '',
-  main_color: '',
-  text_color: '',
-  is_active: true,
+  color: '#3b82f6',
 };
 
 export default function GestionAgencias() {
@@ -96,17 +91,14 @@ export default function GestionAgencias() {
     }
   };
 
+  // Backend expects: code, name, email, address, color
   const fields = useMemo(
     () => [
       { name: 'code', label: 'Código', required: true },
       { name: 'name', label: 'Nombre', required: true },
       { name: 'email', label: 'Email', type: 'email' },
-      { name: 'phone', label: 'Teléfono', type: 'tel' },
       { name: 'address', label: 'Dirección', type: 'textarea' },
-      { name: 'website', label: 'Sitio Web', type: 'url' },
-      { name: 'logo_url', label: 'URL del Logo', type: 'url' },
-      { name: 'main_color', label: 'Color Principal', type: 'color' },
-      { name: 'text_color', label: 'Color de Texto', type: 'color' },
+      { name: 'color', label: 'Color (hex e.g. #3b82f6)', type: 'color' },
     ],
     []
   );
@@ -140,21 +132,19 @@ export default function GestionAgencias() {
                 <TableHead>Código</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10">
+                  <TableCell colSpan={4} className="text-center py-10">
                     Cargando agencias...
                   </TableCell>
                 </TableRow>
               ) : agencies.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10">
+                  <TableCell colSpan={4} className="text-center py-10">
                     No se encontraron agencias.
                   </TableCell>
                 </TableRow>
@@ -164,13 +154,6 @@ export default function GestionAgencias() {
                     <TableCell className="font-medium">{agency.code}</TableCell>
                     <TableCell>{agency.name}</TableCell>
                     <TableCell>{agency.email || '-'}</TableCell>
-                    <TableCell>{agency.phone || '-'}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div className={`h-2 w-2 rounded-full mr-2 ${agency.is_active ? 'bg-green-500' : 'bg-red-500'}`} />
-                        {agency.is_active ? 'Activa' : 'Inactiva'}
-                      </div>
-                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => openEdit(agency)}>
@@ -194,7 +177,7 @@ export default function GestionAgencias() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>{editAgency ? 'Editar Agencia' : 'Nueva Agencia'}</DialogTitle>
           </DialogHeader>
@@ -243,16 +226,6 @@ export default function GestionAgencias() {
                   )}
                 </div>
               ))}
-              <div className="col-span-2">
-                <div className="flex items-center space-x-2 mt-1">
-                  <ShadcnCheckbox
-                    id="is_active"
-                    checked={formState.is_active}
-                    onCheckedChange={(checked) => setFormState({ ...formState, is_active: checked })}
-                  />
-                  <Label htmlFor="is_active">Agencia Activa</Label>
-                </div>
-              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4">

@@ -7,7 +7,11 @@ class UserService {
       const queryParams = new URLSearchParams(params).toString();
       const endpoint = queryParams ? `/users?${queryParams}` : '/users';
       const result = await ApiClient.get(endpoint);
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+      // Backend returns: { success: true, users: [...], pagination: {...} }
+      if (result?.users) return result.users;
+      if (Array.isArray(result)) return result;
+      if (Array.isArray(result?.data)) return result.data;
+      return [];
     } catch (error) {
       console.error('Error fetching users:', error);
       throw error;
@@ -69,16 +73,7 @@ class UserService {
     }
   }
 
-  // Toggle 2FA for user
-  static async toggleTwoFactor(id, enabled) {
-    try {
-      const result = await ApiClient.put(`/users/${id}/2fa`, { enabled });
-      return result;
-    } catch (error) {
-      console.error(`Error toggling 2FA for user with id ${id}:`, error);
-      throw error;
-    }
-  }
+  // Note: toggleTwoFactor removed - no corresponding PUT /api/users/:id/2fa endpoint in backend
 }
 
 export default UserService;

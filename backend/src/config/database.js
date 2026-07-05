@@ -301,6 +301,254 @@ const initializeDatabase = async () => {
       );
     `);
 
+    // ============================================
+    // Tablas de White Label (Marca Blanca)
+    // ============================================
+
+    // Tabla de presets de temas
+    await query(`
+      CREATE TABLE IF NOT EXISTS theme_presets (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        label VARCHAR(100) NOT NULL,
+        colors JSONB NOT NULL,
+        preview_image TEXT,
+        is_dark BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Seed de presets de temas
+    await query(`
+      INSERT INTO theme_presets (name, label, colors, is_dark) VALUES
+        ('corporate-blue', 'Corporativo Azul', '{"primary":"#2563eb","primary_hover":"#1d4ed8","secondary":"#64748b","secondary_hover":"#475569","accent":"#3b82f6","background":"#f8fafc","surface":"#ffffff","text_primary":"#0f172a","text_secondary":"#64748b","border":"#e2e8f0","success":"#22c55e","warning":"#f59e0b","error":"#ef4444","info":"#3b82f6"}', FALSE),
+        ('forest-green', 'Bosque Verde', '{"primary":"#16a34a","primary_hover":"#15803d","secondary":"#6b7280","secondary_hover":"#4b5563","accent":"#84cc16","background":"#f0fdf4","surface":"#ffffff","text_primary":"#14532d","text_secondary":"#6b7280","border":"#bbf7d0","success":"#22c55e","warning":"#f59e0b","error":"#ef4444","info":"#3b82f6"}', FALSE),
+        ('royal-purple', 'Púrpura Real', '{"primary":"#7c3aed","primary_hover":"#6d28d9","secondary":"#6b7280","secondary_hover":"#4b5563","accent":"#a78bfa","background":"#faf5ff","surface":"#ffffff","text_primary":"#1e1b4b","text_secondary":"#6b7280","border":"#e9d5ff","success":"#22c55e","warning":"#f59e0b","error":"#ef4444","info":"#3b82f6"}', FALSE),
+        ('sunset-orange', 'Naranja Atardecer', '{"primary":"#ea580c","primary_hover":"#c2410c","secondary":"#6b7280","secondary_hover":"#4b5563","accent":"#fb923c","background":"#fff7ed","surface":"#ffffff","text_primary":"#431407","text_secondary":"#6b7280","border":"#fed7aa","success":"#22c55e","warning":"#f59e0b","error":"#ef4444","info":"#3b82f6"}', FALSE),
+        ('dark-classic', 'Oscuro Clásico', '{"primary":"#3b82f6","primary_hover":"#60a5fa","secondary":"#6b7280","secondary_hover":"#9ca3af","accent":"#8b5cf6","background":"#0f172a","surface":"#1e293b","text_primary":"#f1f5f9","text_secondary":"#94a3b8","border":"#334155","success":"#22c55e","warning":"#f59e0b","error":"#ef4444","info":"#3b82f6"}', TRUE),
+        ('dark-midnight', 'Medianoche', '{"primary":"#6366f1","primary_hover":"#818cf8","secondary":"#64748b","secondary_hover":"#94a3b8","accent":"#a78bfa","background":"#020617","surface":"#0f172a","text_primary":"#e2e8f0","text_secondary":"#94a3b8","border":"#1e293b","success":"#22c55e","warning":"#f59e0b","error":"#ef4444","info":"#3b82f6"}', TRUE)
+      ON CONFLICT DO NOTHING;
+    `);
+
+    // Tabla de presets de fuentes
+    await query(`
+      CREATE TABLE IF NOT EXISTS font_presets (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        heading_font VARCHAR(100) NOT NULL,
+        body_font VARCHAR(100) NOT NULL,
+        mono_font VARCHAR(100) DEFAULT 'JetBrains Mono',
+        preview_url TEXT,
+        is_google_font BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Seed de presets de fuentes
+    await query(`
+      INSERT INTO font_presets (name, heading_font, body_font, mono_font) VALUES
+        ('Moderno', 'Inter', 'Inter', 'JetBrains Mono'),
+        ('Elegante', 'Playfair Display', 'Source Sans Pro', 'JetBrains Mono'),
+        ('Corporativo', 'Roboto', 'Roboto', 'JetBrains Mono'),
+        ('Creativo', 'Poppins', 'Open Sans', 'JetBrains Mono'),
+        ('Minimalista', 'DM Sans', 'DM Sans', 'JetBrains Mono'),
+        ('Tecnológico', 'Space Grotesk', 'Inter', 'Fira Code'),
+        ('Editorial', 'Merriweather', 'Lato', 'JetBrains Mono'),
+        ('Geométrico', 'Outfit', 'Outfit', 'JetBrains Mono')
+      ON CONFLICT DO NOTHING;
+    `);
+
+    // Tabla de presets de botones
+    await query(`
+      CREATE TABLE IF NOT EXISTS button_presets (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        border_radius VARCHAR(10) NOT NULL,
+        shadow VARCHAR(100),
+        hover_effect VARCHAR(50),
+        hover_scale VARCHAR(10) DEFAULT '1.02',
+        transition VARCHAR(50) DEFAULT 'all 0.2s ease',
+        preview_css TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Seed de presets de botones
+    await query(`
+      INSERT INTO button_presets (name, border_radius, shadow, hover_effect, hover_scale, transition) VALUES
+        ('Flat', '0.375rem', 'none', 'opacity', '1', 'all 0.15s ease'),
+        ('Rounded', '9999px', '0 1px 2px rgb(0 0 0 / 0.05)', 'scale', '1.05', 'all 0.2s ease'),
+        ('Shadowed', '0.5rem', '0 4px 6px -1px rgb(0 0 0 / 0.1)', 'lift', '1.02', 'all 0.2s ease'),
+        ('Outlined', '0.375rem', 'none', 'border-color', '1', 'all 0.15s ease'),
+        ('Gradient', '0.5rem', '0 2px 4px rgb(0 0 0 / 0.1)', 'gradient-shift', '1.02', 'all 0.3s ease'),
+        ('Glass', '0.75rem', '0 8px 32px rgb(0 0 0 / 0.1)', 'blur', '1.02', 'all 0.3s ease')
+      ON CONFLICT DO NOTHING;
+    `);
+
+    // Tabla de configuraciones de marca blanca por agencia
+    await query(`
+      CREATE TABLE IF NOT EXISTS white_label_configs (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        agency_id VARCHAR(255) NOT NULL,
+        company_name VARCHAR(255),
+        company_tagline TEXT,
+        logo_url TEXT,
+        logo_dark_url TEXT,
+        favicon_url TEXT,
+        og_image_url TEXT,
+        primary_color VARCHAR(7) DEFAULT '#3b82f6',
+        primary_hover_color VARCHAR(7) DEFAULT '#2563eb',
+        secondary_color VARCHAR(7) DEFAULT '#64748b',
+        secondary_hover_color VARCHAR(7) DEFAULT '#475569',
+        accent_color VARCHAR(7) DEFAULT '#f59e0b',
+        background_color VARCHAR(7) DEFAULT '#f8fafc',
+        surface_color VARCHAR(7) DEFAULT '#ffffff',
+        text_primary_color VARCHAR(7) DEFAULT '#0f172a',
+        text_secondary_color VARCHAR(7) DEFAULT '#64748b',
+        border_color VARCHAR(7) DEFAULT '#e2e8f0',
+        success_color VARCHAR(7) DEFAULT '#22c55e',
+        warning_color VARCHAR(7) DEFAULT '#f59e0b',
+        error_color VARCHAR(7) DEFAULT '#ef4444',
+        info_color VARCHAR(7) DEFAULT '#3b82f6',
+        font_heading VARCHAR(100) DEFAULT 'Inter',
+        font_body VARCHAR(100) DEFAULT 'Inter',
+        font_mono VARCHAR(100) DEFAULT 'JetBrains Mono',
+        font_size_base VARCHAR(10) DEFAULT '16px',
+        font_weight_normal INTEGER DEFAULT 400,
+        font_weight_medium INTEGER DEFAULT 500,
+        font_weight_bold INTEGER DEFAULT 700,
+        button_radius VARCHAR(10) DEFAULT '0.5rem',
+        button_shadow VARCHAR(100) DEFAULT '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        button_hover_scale VARCHAR(10) DEFAULT '1.02',
+        button_transition VARCHAR(50) DEFAULT 'all 0.2s ease',
+        sidebar_bg_color VARCHAR(7) DEFAULT '#0f172a',
+        sidebar_text_color VARCHAR(7) DEFAULT '#e2e8f0',
+        sidebar_active_bg VARCHAR(7) DEFAULT '#ffffff',
+        sidebar_active_text VARCHAR(7) DEFAULT '#0f172a',
+        sidebar_width VARCHAR(10) DEFAULT '320px',
+        sidebar_collapsed_width VARCHAR(10) DEFAULT '80px',
+        border_radius_sm VARCHAR(10) DEFAULT '0.25rem',
+        border_radius_md VARCHAR(10) DEFAULT '0.5rem',
+        border_radius_lg VARCHAR(10) DEFAULT '0.75rem',
+        border_radius_xl VARCHAR(10) DEFAULT '1rem',
+        shadow_sm VARCHAR(100) DEFAULT '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        shadow_md VARCHAR(100) DEFAULT '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+        shadow_lg VARCHAR(100) DEFAULT '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+        email_header_logo_url TEXT,
+        email_footer_text TEXT,
+        email_support_url TEXT,
+        legal_company_name VARCHAR(255),
+        legal_address TEXT,
+        legal_phone VARCHAR(50),
+        legal_email VARCHAR(255),
+        terms_url TEXT,
+        privacy_url TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Índice único por agencia
+    await query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_white_label_configs_agency_id
+      ON white_label_configs (agency_id) WHERE is_active = TRUE;
+    `);
+
+    // ============================================
+    // Tablas de IA (Chat)
+    // ============================================
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS ai_providers (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        display_name VARCHAR(100) NOT NULL,
+        api_key_encrypted TEXT,
+        base_url TEXT,
+        default_model VARCHAR(100),
+        max_tokens INTEGER DEFAULT 4096,
+        temperature DECIMAL(3,2) DEFAULT 0.7,
+        top_p DECIMAL(3,2) DEFAULT 1.0,
+        is_active BOOLEAN DEFAULT FALSE,
+        is_default BOOLEAN DEFAULT FALSE,
+        rate_limit_per_minute INTEGER DEFAULT 60,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+        provider_id UUID REFERENCES ai_providers(id) ON DELETE SET NULL,
+        title VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS ai_chat_messages (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        session_id UUID REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+        role VARCHAR(20) CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+        content TEXT,
+        tool_calls JSONB,
+        tool_result JSONB,
+        tokens_used INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS ai_actions (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        description TEXT,
+        category VARCHAR(50),
+        endpoint VARCHAR(255),
+        method VARCHAR(10),
+        parameters_schema JSONB,
+        requires_confirmation BOOLEAN DEFAULT TRUE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Seed de proveedores de IA
+    await query(`
+      INSERT INTO ai_providers (name, display_name, base_url, default_model, max_tokens, temperature)
+      VALUES
+        ('openai', 'OpenAI', 'https://api.openai.com/v1', 'gpt-4o', 4096, 0.7),
+        ('anthropic', 'Anthropic', 'https://api.anthropic.com/v1', 'claude-3-5-sonnet-20241022', 4096, 0.7),
+        ('google', 'Google AI', 'https://generativelanguage.googleapis.com/v1beta', 'gemini-1.5-pro', 4096, 0.7),
+        ('azure', 'Azure OpenAI', NULL, 'gpt-4', 4096, 0.7),
+        ('local', 'Modelo Local', NULL, 'llama-3.1-8b', 2048, 0.7)
+      ON CONFLICT (name) DO NOTHING;
+    `);
+
+    // Seed de acciones de IA
+    await query(`
+      INSERT INTO ai_actions (name, description, category, endpoint, method, parameters_schema, requires_confirmation)
+      VALUES
+        ('create_reservation', 'Crear una nueva reserva temporal', 'reservations', '/api/orders', 'POST', '{"type":"object","properties":{"productId":{"type":"string"},"body":{"type":"object"}},"required":["productId","body"]}'::jsonb, TRUE),
+        ('list_reservations', 'Listar todas las reservas con filtros opcionales', 'reservations', '/api/orders', 'GET', '{"type":"object","properties":{"agencia":{"type":"string"},"estado":{"type":"string"},"fecha_desde":{"type":"string"},"fecha_hasta":{"type":"string"}}}'::jsonb, FALSE),
+        ('get_reservation', 'Obtener detalles de una reserva específica', 'reservations', '/api/orders/:id', 'GET', '{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}'::jsonb, FALSE),
+        ('confirm_reservation', 'Confirmar una reserva temporal', 'reservations', '/api/orders/:id/confirm', 'POST', '{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}'::jsonb, TRUE),
+        ('cancel_reservation', 'Cancelar/eliminar una reserva', 'reservations', '/api/orders/:id', 'DELETE', '{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}'::jsonb, TRUE),
+        ('create_user', 'Crear un nuevo usuario del sistema', 'users', '/api/users', 'POST', '{"type":"object","properties":{"email":{"type":"string"},"nombre":{"type":"string"},"agencia":{"type":"string"},"role":{"type":"string"}},"required":["email","nombre","agencia"]}'::jsonb, TRUE),
+        ('list_users', 'Listar todos los usuarios del sistema', 'users', '/api/users', 'GET', '{"type":"object","properties":{"agencia":{"type":"string"},"role":{"type":"string"}}}'::jsonb, FALSE),
+        ('list_products', 'Listar todos los productos disponibles', 'products', '/api/products', 'GET', '{"type":"object","properties":{"activo":{"type":"boolean"}}}'::jsonb, FALSE),
+        ('list_agencies', 'Listar todas las agencias', 'agencies', '/api/agencies', 'GET', '{"type":"object","properties":{"activa":{"type":"boolean"}}}'::jsonb, FALSE),
+        ('get_availability', 'Consultar disponibilidad de cupos', 'reservations', '/api/availability', 'GET', '{"type":"object","properties":{"productId":{"type":"string"},"fecha":{"type":"string"}}}'::jsonb, FALSE),
+        ('send_notification', 'Enviar notificación a usuarios', 'notifications', '/api/notifications', 'POST', '{"type":"object","properties":{"title":{"type":"string"},"message":{"type":"string"},"targetRole":{"type":"string"}},"required":["title","message"]}'::jsonb, TRUE),
+        ('generate_report', 'Generar reporte de datos', 'reports', '/api/reports/generate', 'POST', '{"type":"object","properties":{"type":{"type":"string"},"dateFrom":{"type":"string"},"dateTo":{"type":"string"}},"required":["type"]}'::jsonb, FALSE)
+      ON CONFLICT (name) DO NOTHING;
+    `);
+
     // Semillas por defecto: settings y plantillas de email (si no existen)
     await query(`
       INSERT INTO system_settings (key, value)
@@ -322,7 +570,7 @@ const initializeDatabase = async () => {
       ON CONFLICT (event_code) DO NOTHING;
     `);
 
-    console.log('🔧 Tablas products, reservations, themes, agency_themes, agency_configurations, agency_theme_configs, permissions, roles, role_permissions, user_roles, system_settings, email_templates, email_log y alert_rules creadas exitosamente');
+    console.log('🔧 Tablas creadas exitosamente: products, reservations, themes, agency_themes, agency_configurations, agency_theme_configs, permissions, roles, role_permissions, user_roles, system_settings, email_templates, email_log, alert_rules, theme_presets, font_presets, button_presets, white_label_configs, ai_providers, ai_chat_sessions, ai_chat_messages, ai_actions');
   } catch (error) {
     console.error('❌ Error al inicializar la base de datos:', error);
   }

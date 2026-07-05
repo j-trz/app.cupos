@@ -17,8 +17,17 @@ export default function Settings() {
 
   const loadSettings = async () => {
     try {
-      const result = await ApiClient.get('/api/settings');
-      setSettings(result.settings || {});
+      const result = await ApiClient.get('/settings');
+      // Backend returns array or object with key-value pairs
+      if (Array.isArray(result)) {
+        const obj = {};
+        result.forEach(s => { obj[s.key] = s.value; });
+        setSettings(obj);
+      } else if (result?.settings) {
+        setSettings(result.settings);
+      } else if (result && typeof result === 'object') {
+        setSettings(result);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
       Swal.fire('Error', 'No se pudieron cargar las configuraciones', 'error');
@@ -29,7 +38,11 @@ export default function Settings() {
 
   const handleSave = async () => {
     try {
-      await ApiClient.post('/api/settings', { settings });
+      // Save each setting individually via PUT /settings/:key
+      const entries = Object.entries(settings);
+      for (const [key, value] of entries) {
+        await ApiClient.put(`/settings/${key}`, { key, value });
+      }
       Swal.fire('Guardado', 'Configuraciones guardadas correctamente', 'success');
     } catch (error) {
       console.error('Error saving settings:', error);
