@@ -307,7 +307,7 @@ const initializeDatabase = async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER,
+        user_id VARCHAR(255), -- Cambiado de INTEGER a VARCHAR para aceptar UUIDs
         action VARCHAR(255) NOT NULL,
         user_agent TEXT,
         ip VARCHAR(45),
@@ -318,6 +318,13 @@ const initializeDatabase = async () => {
         response_body JSONB
       );
     `);
+
+    // Asegurarse de que el tipo de columna user_id sea VARCHAR(255) si la tabla ya existía con tipo INTEGER
+    await query(`
+      ALTER TABLE audit_logs 
+      ALTER COLUMN user_id TYPE VARCHAR(255) 
+      USING CASE WHEN user_id IS NOT NULL THEN user_id::TEXT ELSE NULL END;
+    `).catch(() => {}); // Ignorar error si la columna ya es del tipo correcto
 
     // ============================================
     // Tablas de White Label (Marca Blanca)

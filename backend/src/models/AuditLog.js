@@ -8,7 +8,7 @@ const AuditLog = sequelize.define('AuditLog', {
     autoIncrement: true
   },
   userId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING, // Cambiado de INTEGER a STRING para aceptar UUIDs
     allowNull: true,
     field: 'user_id'
   },
@@ -49,7 +49,9 @@ const AuditLog = sequelize.define('AuditLog', {
   }
 }, {
   tableName: 'audit_logs',
-  timestamps: false
+  timestamps: false,
+  // Asegurar que no haya sincronización automática que sobrescriba nuestra definición
+  // Esto evita que Sequelize intente modificar la tabla según la definición del modelo
 });
 
 export default AuditLog;
