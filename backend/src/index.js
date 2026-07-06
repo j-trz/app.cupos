@@ -23,6 +23,9 @@ import * as aiController from './controllers/aiController.js';
 import * as sseController from './controllers/sseController.js';
 import * as exportController from './controllers/exportController.js';
 
+// Importar middleware de auditoría
+import auditLogger from './middleware/auditLogger.js';
+
 dotenv.config();
 
 import pool from './config/database.js';
@@ -55,6 +58,8 @@ const PORT = process.env.PORT || 5001;
 app.use(cors({ origin: '*' })); // Permitir acceso del frontend desde cualquier origen
 app.use(express.json());
 app.use(morgan('dev'));
+// Middleware de auditoría debe estar después de morgan pero antes de las rutas
+app.use(auditLogger);
 
 // Ruta de salud de la API
 app.get('/health', (req, res) => {
@@ -80,7 +85,17 @@ userRouter.post('/:id/unlock', isAdmin, userController.unlockUser);
 userRouter.get('/2fa', isAdmin, userController.listUsers2FA);
 app.use('/api/users', userRouter);
 
+// Importar rutas de auditoría
+import auditRoutes from './routes/auditRoutes.js';
 
+// Rutas de Auditoría (/api/audit) - debe ir antes de otras rutas para evitar ser interceptada por el middleware de auditoría
+app.use('/api/audit', auditRoutes);
+
+// Importar rutas de backup
+import backupRoutes from './routes/backupRoutes.js';
+
+// Rutas de Backup (/api/backup)
+app.use('/api/backup', backupRoutes);
 
 // Rutas de Notificaciones (/api/notifications)
 const notificationRouter = express.Router();
