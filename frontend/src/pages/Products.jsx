@@ -35,7 +35,7 @@ export default function Products() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const items = await ProductService.getProducts();
+      const items = await ProductService.listProducts();
       setProducts(items);
     } catch (error) {
       Swal.fire('Error', error.message || 'No se pudieron cargar los productos', 'error');

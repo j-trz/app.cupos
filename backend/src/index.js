@@ -177,11 +177,14 @@ const orderRouter = express.Router();
 orderRouter.use(requireAuth);
 orderRouter.post('/', ordersController.createReservation);
 orderRouter.get('/', ordersController.getAllReservations);
+orderRouter.get('/my-blocked', ordersController.getMyBlockedReservations); // Reservas bloqueadas pendientes de doc_contable
 orderRouter.get('/:id', ordersController.getReservationById);
 orderRouter.put('/:id', isAdmin, ordersController.updateReservation);
 orderRouter.post('/:id/confirm', isAdmin, ordersController.confirmReservation);
 orderRouter.post('/:id/resend-email', ordersController.resendReservationEmail);
 orderRouter.delete('/:id', isAdmin, ordersController.deleteReservation);
+// Endpoint para agregar documento contable (usuarios pueden actualizar sus reservas bloqueadas)
+orderRouter.put('/:id/doc-contable', ordersController.addDocContable);
 app.use('/api/orders', orderRouter);
 
 // Rutas de White Label (/api/white-label)

@@ -10,7 +10,7 @@ import {
     Zap, Clock, AlertCircle, CheckCircle
 } from 'lucide-react';
 import AIService from '../services/aiService';
-import Card from '../components/ui/Card';
+import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Swal from 'sweetalert2';
@@ -240,8 +240,8 @@ export default function AIConfig() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors border-b-2 ${activeTab === tab.id
-                                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
                             <Icon className="w-4 h-4" />
@@ -307,7 +307,7 @@ export default function AIConfig() {
                                                     {/* Resultado de test */}
                                                     {testResult?.id === provider.id && (
                                                         <span className={`text-sm ${testResult.status === 'testing' ? 'text-yellow-500' :
-                                                                testResult.status === 'success' ? 'text-green-500' : 'text-red-500'
+                                                            testResult.status === 'success' ? 'text-green-500' : 'text-red-500'
                                                             }`}>
                                                             {testResult.status === 'testing' ? 'Probando...' :
                                                                 testResult.status === 'success' ? '✓ Conexión OK' : '✗ Error'}

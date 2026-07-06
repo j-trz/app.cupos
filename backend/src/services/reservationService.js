@@ -229,13 +229,17 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
         precio_venta, neto_1, pedido_id, agencia, contacto_nombre, contacto_email,
         contacto_telefono, vuelo_codigo, vuelo_destino, vuelo_compania, vuelo_salida,
         vuelo_precio, nombre_pasajero, apellido_pasajero, documento_pasajero,
-        nacimiento_pasajero, nacionalidad_pasajero, tipo_pasajero, created_at, updated_at
+        nacimiento_pasajero, nacionalidad_pasajero, tipo_pasajero,
+        ficha_venta, doc_contable, doc_contable_expires_at,
+        created_at, updated_at
       ) VALUES (
         $1, $2, 'bloqueo_temporal', $3,
         $4, $5, $6, $7, $8, $9,
         $10, $11, $12, $13, $14,
         $15, $16, $17, $18,
-        $19, $20, $21, NOW(), NOW()
+        $19, $20, $21,
+        $22, $23, $24,
+        NOW(), NOW()
       ) RETURNING *`,
       [
         productId,
@@ -257,7 +261,10 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
         reservationData.documento_pasajero,
         reservationData.nacimiento_pasajero,
         reservationData.nacionalidad_pasajero,
-        reservationData.tipo_pasajero
+        reservationData.tipo_pasajero,
+        body.ficha_venta || null,
+        body.doc_contable || null,
+        new Date(expiresAt.getTime() + (24 * 60 * 60 * 1000))
       ]
     );
 
@@ -360,6 +367,80 @@ export const expireTemporaryReservations = async () => {
     } catch (err) {
       await query('ROLLBACK');
       console.error('Error expirando reserva temporal:', err.message);
+    }
+  }
+
+  return processedReservations;
+};
+
+/**
+ * Expirar reservas bloqueadas que no tienen doc_contable después del tiempo límite
+ * Se llama desde un cron job separado
+ */
+export const expireReservationsWithoutDocContable = async () => {
+  const expiredReservations = await query(
+    `SELECT * FROM reservations
+     WHERE estado = 'bloqueo_temporal'
+       AND (doc_contable IS NULL OR doc_contable = '')
+       AND doc_contable_expires_at IS NOT NULL
+       AND doc_contable_expires_at <= NOW()`
+  );
+
+  const processedReservations = [];
+
+  for (const reservation of expiredReservations.rows) {
+    try {
+      await query('BEGIN');
+
+      const alreadyExpired = await query(
+        `SELECT 1 FROM reservations WHERE id = $1 AND estado = 'expirada_sin_doc'`,
+        [reservation.id]
+      );
+
+      if (alreadyExpired.rows.length > 0) {
+        await query('COMMIT');
+        continue;
+      }
+
+      // Actualizar estado a expirada_sin_doc (nuevo estado para reservas sin documento)
+      await query(
+        `UPDATE reservations SET estado = 'expirada_sin_doc', updated_at = NOW() WHERE id = $1`,
+        [reservation.id]
+      );
+
+      // Liberar el cupo
+      if (reservation.product_id) {
+        await query(
+          `UPDATE products SET disponibilidad = disponibilidad + 1, updated_at = NOW() WHERE id = $1`,
+          [reservation.product_id]
+        );
+      }
+
+      await createNotification({
+        type: 'reservation_expired',
+        title: 'Reserva expirada - Sin documento',
+        message: 'Tu reserva venció porque no se agregó el documento contable a tiempo.',
+        data: { reservation_id: reservation.id },
+        targetUserId: reservation.created_by
+      });
+
+      try {
+        await sendTemplateEmail('reservation_expired_no_doc', reservation.contacto_email, {
+          nombre_usuario: reservation.contacto_nombre,
+          product_code: reservation.product_id,
+          product_destino: reservation.vuelo_destino,
+          vuelo_codigo: reservation.vuelo_codigo,
+          doc_contable_deadline: reservation.doc_contable_expires_at
+        });
+      } catch (error) {
+        console.error('Error enviando email de expiración por documento:', error.message);
+      }
+
+      processedReservations.push(reservation.id);
+      await query('COMMIT');
+    } catch (err) {
+      await query('ROLLBACK');
+      console.error('Error expirando reserva sin documento:', err.message);
     }
   }
 

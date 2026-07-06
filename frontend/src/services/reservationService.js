@@ -10,6 +10,12 @@ const adaptProduct = (producto) => ({
   fecha_regreso: producto.fecha_regreso || producto.regreso || '',
   precio: producto.precio || '',
   ruta: producto.ruta || '',
+  temporada: producto.temporada || '',
+  pnr: producto.pnr || '',
+  ficha: producto.ficha || '',
+  salida: producto.salida || '',
+  regreso: producto.regreso || '',
+  neto_1: producto.neto_1 || '',
 });
 
 const adaptRequest = (item) => ({
@@ -143,7 +149,7 @@ class ReservationService {
     const result = await ApiClient.get('/orders');
     return {
       success: true,
-      data: Array.isArray(result.data) ? result.data.map(adaptRequest) : [],
+      data: Array.isArray(result) ? result.map(adaptRequest) : Array.isArray(result.data) ? result.data.map(adaptRequest) : [],
     };
   }
 
@@ -163,6 +169,28 @@ class ReservationService {
       reservation: result,
       referenceId: result.pedido_id || result.pedidoId || payload.pedidoId,
     };
+  }
+
+  // Get user blocked reservations pending doc_contable
+  static async getMyBlockedReservations() {
+    try {
+      const result = await ApiClient.get('/orders/my-blocked');
+      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+    } catch (error) {
+      console.error('Error fetching blocked reservations:', error);
+      throw error;
+    }
+  }
+
+  // Add document to blocked reservation
+  static async addDocContable(id, docData) {
+    try {
+      const result = await ApiClient.put(`/orders/${id}/doc-contable`, docData);
+      return result;
+    } catch (error) {
+      console.error(`Error adding doc_contable to reservation ${id}:`, error);
+      throw error;
+    }
   }
 
   static generatePedidoId() {

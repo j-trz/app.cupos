@@ -22,8 +22,7 @@ export const listUsers = async (req, res) => {
                 INNER JOIN public.user_roles ur ON ur.role_id = r.id
                 WHERE ur.user_id = p.id),
                '[]'
-             ) as roles,
-             (SELECT row_to_json(s) FROM public.user_security_status s WHERE s.user_id = p.id) as security_status
+             ) as roles
       FROM public.profiles p`;
     let countQuery = 'SELECT COUNT(*) FROM public.profiles p';
     const queryParams = [];

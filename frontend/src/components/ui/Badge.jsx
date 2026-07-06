@@ -6,6 +6,9 @@ const Badge = ({ className, variant = 'default', ...props }) => {
     secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
     destructive: 'bg-red-500 text-white hover:bg-red-600',
     outline: 'border border-slate-300 text-slate-700 hover:bg-slate-100',
+    success: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    warning: 'bg-amber-100 text-amber-800 border border-amber-200',
+    danger: 'bg-red-100 text-red-800 border border-red-200',
   };
 
   return (

@@ -97,7 +97,7 @@ export const getReservationById = async (req, res) => {
 export const updateReservation = async (req, res) => {
   try {
     const { id } = req.params;
-    const { estado, pedido_id, contacto_nombre, contacto_email, contacto_telefono } = req.body;
+    const { estado, pedido_id, contacto_nombre, contacto_email, contacto_telefono, ficha_venta, doc_contable } = req.body;
 
     const allowedFields = [];
     const params = [];
@@ -124,6 +124,19 @@ export const updateReservation = async (req, res) => {
       allowedFields.push(`contacto_telefono = $${index++}`);
       params.push(contacto_telefono);
     }
+    if (ficha_venta !== undefined) {
+      allowedFields.push(`ficha_venta = $${index++}`);
+      params.push(ficha_venta);
+    }
+    if (doc_contable !== undefined) {
+      allowedFields.push(`doc_contable = $${index++}`);
+      params.push(doc_contable);
+      // Al agregar doc_contable, marcamos como confirmado por usuario y setteamos la fecha
+      allowedFields.push(`doc_contable_added_at = $${index++}`);
+      params.push(new Date());
+      allowedFields.push(`confirmada_por_usuario = $${index++}`);
+      params.push(true);
+    }
 
     if (allowedFields.length === 0) {
       return res.status(400).json({ error: 'No se proporcionaron campos válidos para actualizar.' });
@@ -142,6 +155,82 @@ export const updateReservation = async (req, res) => {
   } catch (error) {
     console.error('❌ Error al actualizar reserva:', error.message);
     res.status(500).json({ error: 'Error al actualizar la reserva.' });
+  }
+};
+
+/**
+ * Agregar documento contable a una reserva bloqueada
+ */
+export const addDocContable = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { doc_contable, ficha_venta } = req.body;
+
+    if (!doc_contable) {
+      return res.status(400).json({ error: 'El documento contable es requerido.' });
+    }
+
+    // Verificar que la reserva existe y pertenece al usuario
+    const result = await query('SELECT * FROM reservations WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Reserva no encontrada.' });
+    }
+
+    const reservation = result.rows[0];
+    
+    // Verificar permisos
+    if (req.user.role !== 'admin' && req.user.role !== 'agency_admin' && reservation.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permisos para modificar esta reserva.' });
+    }
+
+    // Verificar que la reserva esté en estado de bloqueo temporal
+    if (reservation.estado !== 'bloqueo_temporal') {
+      return res.status(400).json({ error: 'La reserva no está en estado de bloqueo temporal.' });
+    }
+
+    // Actualizar con el documento contable
+    const updateResult = await query(
+      `UPDATE reservations
+       SET doc_contable = $1,
+           doc_contable_added_at = NOW(),
+           confirmada_por_usuario = TRUE,
+           ficha_venta = COALESCE($2, ficha_venta),
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [doc_contable, ficha_venta || null, id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Documento contable agregado correctamente.',
+      reservation: sanitizeReservation(updateResult.rows[0], req.user)
+    });
+  } catch (error) {
+    console.error('❌ Error al agregar documento contable:', error.message);
+    res.status(500).json({ error: 'Error al agregar el documento contable.' });
+  }
+};
+
+/**
+ * Obtener reservas bloqueadas pendientes de documento contable del usuario
+ */
+export const getMyBlockedReservations = async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT * FROM reservations
+       WHERE created_by = $1
+         AND estado = 'bloqueo_temporal'
+         AND (doc_contable IS NULL OR doc_contable = '')
+       ORDER BY bloqueo_expira_at ASC`,
+      [req.user.id]
+    );
+
+    const reservations = result.rows.map(r => sanitizeReservation(r, req.user));
+    res.status(200).json(reservations);
+  } catch (error) {
+    console.error('❌ Error al obtener reservas bloqueadas:', error.message);
+    res.status(500).json({ error: 'Error al obtener las reservas bloqueadas.' });
   }
 };
 

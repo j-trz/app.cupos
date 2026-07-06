@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Mail, MapPin, UserCircle2 } from 'lucide-react';
 import ApiClient from '../services/apiClient';
-import Card from '../components/ui/Card.jsx';
+import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
