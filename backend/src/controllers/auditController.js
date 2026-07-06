@@ -1,4 +1,4 @@
-const AuditService = require('../services/auditService');
+import AuditService from '../services/auditService.js';
 
 const auditController = {
   // Obtener logs de auditoría
@@ -50,4 +50,4 @@ const auditController = {
   }
 };
 
-module.exports = auditController;
+export default auditController;

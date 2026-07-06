@@ -237,10 +237,10 @@ app.use('/api/ai', aiRouter);
 // Rutas de Exportación de Datos (/api/export)
 const exportRouter = express.Router();
 exportRouter.use(requireAuth);
-exportRouter.get('/csv/:entityType', exportController.exportCSV);
-exportRouter.get('/excel/:entityType', exportController.exportExcel);
-exportRouter.get('/pdf/:entityType', exportController.exportPDF);
-exportRouter.get('/stats', exportController.getExportStats);
+exportRouter.get('/csv/:entityType', (req, res, next) => exportController.exportCSV(req, res).catch(next));
+exportRouter.get('/excel/:entityType', (req, res, next) => exportController.exportExcel(req, res).catch(next));
+exportRouter.get('/pdf/:entityType', (req, res, next) => exportController.exportPDF(req, res).catch(next));
+exportRouter.get('/stats', (req, res, next) => exportController.getExportStats(req, res).catch(next));
 app.use('/api/export', exportRouter);
 
 // Rutas de Notificaciones en Tiempo Real (SSE) (/api/sse)

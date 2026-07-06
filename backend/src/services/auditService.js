@@ -1,5 +1,5 @@
-const AuditLog = require('../models/AuditLog');
-const { Op } = require('sequelize');
+import AuditLog from '../models/AuditLog.js';
+import { Op } from 'sequelize';
 
 class AuditService {
   // Obtener logs de auditoría con filtros
@@ -75,4 +75,4 @@ class AuditService {
   }
 }
 
-module.exports = AuditService;
+export default AuditService;

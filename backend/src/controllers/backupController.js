@@ -1,4 +1,4 @@
-const BackupService = require('../services/backupService');
+import BackupService from '../services/backupService.js';
 
 const backupController = {
   // Crear backup
@@ -74,10 +74,10 @@ const backupController = {
   downloadBackup: async (req, res) => {
     try {
       const { filename } = req.params;
-      const filepath = require('path').join(BackupService.backupDir, filename);
+      const filepath = (await import('path')).join(BackupService.backupDir, filename);
       
       // Verificar que el archivo existe
-      const fs = require('fs');
+      const fs = (await import('fs')).default;
       if (!fs.existsSync(filepath)) {
         return res.status(404).json({
           success: false,
@@ -103,4 +103,4 @@ const backupController = {
   }
 };
 
-module.exports = backupController;
+export default backupController;

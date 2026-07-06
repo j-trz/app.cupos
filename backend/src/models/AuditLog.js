@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../config/sequelize.js';
 
 const AuditLog = sequelize.define('AuditLog', {
   id: {
@@ -49,4 +49,4 @@ const AuditLog = sequelize.define('AuditLog', {
   timestamps: false
 });
 
-module.exports = AuditLog;
+export default AuditLog;

@@ -1,12 +1,12 @@
-const fs = require('fs');
-const path = require('path');
-const { exec } = require('child_process');
-const { promisify } = require('util');
+import fs from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
 class BackupService {
-  static backupDir = path.join(__dirname, '..', 'backups');
+  static backupDir = path.join(import.meta.dirname, '..', 'backups');
   
   // Asegurar que el directorio de backups exista
   static ensureBackupDir() {
@@ -85,9 +85,7 @@ class BackupService {
     // Por ahora retornamos un objeto vacío o simulamos la obtención
     try {
       // Simular obtención de configuraciones del sistema
-      const settingsController = require('../controllers/settingsController');
-      // Esto dependerá de cómo esté implementado tu controlador
-      // Por ahora devolveremos un valor simulado
+      // Esto dependerá de cómo esté implementado tu modelo
       return {}; // Debe ser implementado según tu modelo
     } catch (error) {
       console.error('Error obteniendo configuraciones del sistema:', error);
@@ -99,8 +97,7 @@ class BackupService {
   static async getThemes() {
     try {
       // Simular obtención de temas
-      const themesController = require('../controllers/themesController');
-      // Esto dependerá de cómo esté implementado tu controlador
+      // Esto dependerá de cómo esté implementado tu modelo
       return {}; // Debe ser implementado según tu modelo
     } catch (error) {
       console.error('Error obteniendo temas:', error);
@@ -252,4 +249,4 @@ class BackupService {
   }
 }
 
-module.exports = BackupService;
+export default BackupService;

@@ -1,24 +1,57 @@
-const fs = require('fs');
-const path = require('path');
-const xlsx = require('xlsx');
-const PDFDocument = require('pdfkit');
+import fs from 'fs';
+import path from 'path';
+import xlsx from 'xlsx';
+import PDFDocument from 'pdfkit';
 
-// Suponiendo que ya tienes modelos definidos
-const models = {
-  User: require('../models/User'),
-  Agency: require('../models/Agency'),
-  Reservation: require('../models/Reservation'),
-  Product: require('../models/Product'),
-  AuditLog: require('../models/AuditLog')
-};
 
 class ExportService {
   // Función para obtener los datos según el tipo de entidad
   static async getDataByEntityType(entityType, filters = {}) {
-    const model = models[entityType];
-    
-    if (!model) {
-      throw new Error(`Modelo no encontrado para la entidad: ${entityType}`);
+    // Importar modelos dinámicamente
+    let model;
+    switch(entityType) {
+      case 'User':
+        try {
+          const UserModel = await import('../models/User.js').then(m => m.default);
+          model = UserModel;
+        } catch (e) {
+          throw new Error(`Modelo User no encontrado: ${e.message}`);
+        }
+        break;
+      case 'Agency':
+        try {
+          const AgencyModel = await import('../models/Agency.js').then(m => m.default);
+          model = AgencyModel;
+        } catch (e) {
+          throw new Error(`Modelo Agency no encontrado: ${e.message}`);
+        }
+        break;
+      case 'Reservation':
+        try {
+          const ReservationModel = await import('../models/Reservation.js').then(m => m.default);
+          model = ReservationModel;
+        } catch (e) {
+          throw new Error(`Modelo Reservation no encontrado: ${e.message}`);
+        }
+        break;
+      case 'Product':
+        try {
+          const ProductModel = await import('../models/Product.js').then(m => m.default);
+          model = ProductModel;
+        } catch (e) {
+          throw new Error(`Modelo Product no encontrado: ${e.message}`);
+        }
+        break;
+      case 'AuditLog':
+        try {
+          const AuditLogModel = await import('../models/AuditLog.js').then(m => m.default);
+          model = AuditLogModel;
+        } catch (e) {
+          throw new Error(`Modelo AuditLog no encontrado: ${e.message}`);
+        }
+        break;
+      default:
+        throw new Error(`Modelo no encontrado para la entidad: ${entityType}`);
     }
 
     try {
@@ -63,7 +96,7 @@ class ExportService {
     }
     
     const csvString = csvRows.join('\n');
-    const filePath = path.join(__dirname, '..', 'exports', `${filename}.csv`);
+    const filePath = path.join(import.meta.dirname, '..', 'exports', `${filename}.csv`);
     
     // Asegurar que el directorio existe
     const dir = path.dirname(filePath);
@@ -97,7 +130,7 @@ class ExportService {
     xlsx.utils.book_append_sheet(workbook, worksheet, 'Datos');
     
     // Escribir archivo
-    const filePath = path.join(__dirname, '..', 'exports', `${filename}.xlsx`);
+    const filePath = path.join(import.meta.dirname, '..', 'exports', `${filename}.xlsx`);
     
     // Asegurar que el directorio existe
     const dir = path.dirname(filePath);
@@ -119,9 +152,9 @@ class ExportService {
     return new Promise((resolve, reject) => {
       try {
         // Crear documento PDF
-        const doc = new createPdf();
+        const doc = new PDFDocument();
         
-        const filePath = path.join(__dirname, '..', 'exports', `${filename}.pdf`);
+        const filePath = path.join(import.meta.dirname, '..', 'exports', `${filename}.pdf`);
         
         // Asegurar que el directorio existe
         const dir = path.dirname(filePath);
@@ -204,4 +237,4 @@ class ExportService {
   }
 }
 
-module.exports = ExportService;
+export default ExportService;

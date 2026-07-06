@@ -1,4 +1,4 @@
-const AuditLog = require('../models/AuditLog');
+import AuditLog from '../models/AuditLog.js';
 
 const auditLogger = async (req, res, next) => {
   const startTime = Date.now();
@@ -32,4 +32,4 @@ const auditLogger = async (req, res, next) => {
   next();
 };
 
-module.exports = auditLogger;
+export default auditLogger;

@@ -302,6 +302,24 @@ const initializeDatabase = async () => {
     `);
 
     // ============================================
+    // Tabla de logs de auditoría
+    // ============================================
+    await query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        action VARCHAR(255) NOT NULL,
+        user_agent TEXT,
+        ip VARCHAR(45),
+        timestamp TIMESTAMPTZ DEFAULT NOW(),
+        duration INTEGER, -- Duración en milisegundos
+        status_code INTEGER,
+        request_body JSONB,
+        response_body JSONB
+      );
+    `);
+
+    // ============================================
     // Tablas de White Label (Marca Blanca)
     // ============================================
 
@@ -591,12 +609,12 @@ const initializeDatabase = async () => {
         ('reservation_temporary_blocked', 'Reserva bloqueada temporalmente - {{product_code}}', '<p>Hola {{nombre_usuario}},</p><p>Tu solicitud para el cupo <strong>{{product_code}}</strong> fue bloqueada temporalmente. Expira: {{expires_at}} ({{minutos_restantes}} minutos).</p><p>Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','product_code','expires_at','minutos_restantes','precio_venta'], TRUE),
         ('reservation_expired', 'Reserva expirada - {{product_code}}', '<p>Hola {{nombre_usuario}},</p><p>Tu bloqueo para el cupo <strong>{{product_code}}</strong> ha expirado y el cupo fue liberado.</p>', ARRAY['nombre_usuario','product_code'], TRUE),
         ('reservation_confirmed', 'Reserva confirmada - {{solicitud_id}}', '<p>Hola {{nombre_usuario}},</p><p>Tu reserva ({{solicitud_id}}) ha sido confirmada.</p><p>Detalles del vuelo: {{vuelo_codigo}} - {{vuelo_destino}} - {{vuelo_compania}}. Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','solicitud_id','vuelo_codigo','vuelo_destino','vuelo_compania','precio_venta'], TRUE),
-        ('low_availability_alert', 'Alerta: baja disponibilidad en {{product_code}}', '<p>Atención,</p><p>Quedan {{availability}} lugares en {{product_code}}. Umbral: {{threshold}}.</p>', ARRAY['product_code','availability','threshold'], TRUE),
-        ('reservation_details', 'Detalle de reserva {{pedido_id}}', '<p>Hola {{nombre_usuario}},</p><p>Aquí están los detalles de tu reserva: Pedido: {{pedido_id}}. Vuelo: {{vuelo_codigo}} - {{vuelo_destino}} - {{vuelo_compania}}. Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','pedido_id','vuelo_codigo','vuelo_destino','vuelo_compania','precio_venta'], TRUE)
+        ('reservation_details', 'Detalle de reserva {{pedido_id}}', '<p>Hola {{nombre_usuario}},</p><p>Aquí están los detalles de tu reserva: Pedido: {{pedido_id}}. Vuelo: {{vuelo_codigo}} - {{vuelo_destino}} - {{vuelo_compania}}. Precio: {{precio_venta}}</p>', ARRAY['nombre_usuario','pedido_id','vuelo_codigo','vuelo_destino','vuelo_compania','precio_venta'], TRUE),
+        ('low_availability_alert', 'Alerta: baja disponibilidad en {{product_code}}', '<p>Atención,</p><p>Quedan {{availability}} lugares en {{product_code}}. Umbral: {{threshold}}.</p>', ARRAY['product_code','availability','threshold'], TRUE)
       ON CONFLICT (event_code) DO NOTHING;
     `);
 
-    console.log('🔧 Tablas creadas exitosamente: products, reservations, themes, agency_themes, agency_configurations, agency_theme_configs, permissions, roles, role_permissions, user_roles, system_settings, email_templates, email_log, alert_rules, theme_presets, font_presets, button_presets, white_label_configs, ai_providers, ai_chat_sessions, ai_chat_messages, ai_actions');
+    console.log('🔧 Tablas creadas exitosamente: products, reservations, themes, agency_themes, agency_configurations, agency_theme_configs, permissions, roles, role_permissions, user_roles, system_settings, email_templates, email_log, alert_rules, audit_logs, theme_presets, font_presets, button_presets, white_label_configs, ai_providers, ai_chat_sessions, ai_chat_messages, ai_actions');
   } catch (error) {
     console.error('❌ Error al inicializar la base de datos:', error);
   }

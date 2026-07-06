@@ -1,10 +1,11 @@
-const express = require('express');
+import express from 'express';
+import backupController from '../controllers/backupController.js';
+import { requireAuth, isAdmin } from '../middleware/auth.js';
+
 const router = express.Router();
-const backupController = require('../controllers/backupController');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
 
 // Todas las rutas requieren autenticación y permisos de administrador
-router.use(authenticateToken);
+router.use(requireAuth);
 
 // Ruta para crear backup
 router.post('/', isAdmin, (req, res, next) => {
@@ -31,4 +32,4 @@ router.get('/download/:filename', isAdmin, (req, res, next) => {
   backupController.downloadBackup(req, res).catch(next);
 });
 
-module.exports = router;
+export default router;

@@ -4,9 +4,10 @@
  */
 
 import { query } from '../db.js';
-import AIService from '../services/aiService.js';
+import aiService from '../services/aiService.js';
 
-const aiService = new AIService();
+// Usar directamente la instancia importada
+const aiServiceInstance = aiService;
 
 /**
  * Enviar mensaje al asistente IA
@@ -24,28 +25,28 @@ export const chat = async (req, res) => {
     // Crear o recuperar sesión
     let currentSessionId = sessionId;
     if (!currentSessionId) {
-      const session = await aiService.createSession(userId, message.substring(0, 50));
+      const session = await aiServiceInstance.createSession(userId, message.substring(0, 50));
       currentSessionId = session.id;
     }
 
     // Guardar mensaje del usuario
-    await aiService.saveMessage(currentSessionId, userId, 'user', message);
+    await aiServiceInstance.saveMessage(currentSessionId, userId, 'user', message);
 
     // Obtener historial de la sesión para contexto
-    const history = await aiService.getSessionHistory(currentSessionId);
-    const messages = history.rows.map(row => ({
+    const history = await aiServiceInstance.getSessionHistory(currentSessionId);
+    const messages = history.map(row => ({
       role: row.role,
       content: row.content
     }));
 
     // Enviar al proveedor de IA
-    const response = await aiService.sendMessage(messages, {
+    const response = await aiServiceInstance.sendMessage(messages, {
       providerId,
       tools: tools || []
     });
 
     // Guardar respuesta del asistente
-    await aiService.saveMessage(
+    await aiServiceInstance.saveMessage(
       currentSessionId,
       null,
       'assistant',
@@ -72,10 +73,10 @@ export const chat = async (req, res) => {
 export const getSessions = async (req, res) => {
   try {
     const userId = req.user.id;
-    const sessions = await aiService.getUserSessions(userId);
+    const sessions = await aiServiceInstance.getUserSessions(userId);
 
     res.status(200).json({
-      sessions: sessions.rows
+      sessions
     });
   } catch (error) {
     console.error('Error al obtener sesiones:', error);
@@ -102,10 +103,10 @@ export const getSessionMessages = async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    const history = await aiService.getSessionHistory(id);
+    const history = await aiServiceInstance.getSessionHistory(id);
 
     res.status(200).json({
-      messages: history.rows
+      messages: history
     });
   } catch (error) {
     console.error('Error al obtener mensajes:', error);
@@ -122,7 +123,7 @@ export const deleteSession = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    await aiService.deleteSession(id, userId);
+    await aiServiceInstance.deleteSession(id, userId);
 
     res.status(200).json({
       message: 'Sesión eliminada correctamente'
@@ -425,13 +426,13 @@ export const testProvider = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const provider = await aiService.getProviderById(id);
+    const provider = await aiServiceInstance.getProviderById(id);
 
     const testMessages = [
       { role: 'user', content: 'Responde brevemente: "Conexión exitosa"' }
     ];
 
-    const response = await aiService.sendMessage(testMessages, {
+    const response = await aiServiceInstance.sendMessage(testMessages, {
       providerId: provider.id
     });
 

@@ -1,10 +1,11 @@
-const express = require('express');
+import express from 'express';
+import auditController from '../controllers/auditController.js';
+import { requireAuth } from '../middleware/auth.js';
+
 const router = express.Router();
-const auditController = require('../controllers/auditController');
-const { authenticateToken } = require('../middleware/auth');
 
 // Ruta para obtener logs de auditoría (solo administradores)
-router.get('/', authenticateToken, (req, res, next) => {
+router.get('/', requireAuth, (req, res, next) => {
   // Verificar si el usuario es administrador
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({
@@ -16,7 +17,7 @@ router.get('/', authenticateToken, (req, res, next) => {
 });
 
 // Ruta para limpiar logs antiguos (solo administradores)
-router.delete('/cleanup', authenticateToken, (req, res, next) => {
+router.delete('/cleanup', requireAuth, (req, res, next) => {
   // Verificar si el usuario es administrador
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({
@@ -27,4 +28,4 @@ router.delete('/cleanup', authenticateToken, (req, res, next) => {
   auditController.cleanupLogs(req, res).catch(next);
 });
 
-module.exports = router;
+export default router;
