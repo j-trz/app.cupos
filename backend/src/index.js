@@ -24,6 +24,7 @@ import * as sseController from './controllers/sseController.js';
 import * as exportController from './controllers/exportController.js';
 import * as rolesController from './controllers/rolesController.js';
 import * as permissionsController from './controllers/permissionsController.js';
+import * as reportController from './controllers/reportController.js';
 
 // Importar middleware de auditoría
 import auditLogger from './middleware/auditLogger.js';
@@ -126,6 +127,7 @@ app.use('/api/data', dataRouter);
 const productRouter = express.Router();
 productRouter.use(requireAuth);
 productRouter.post('/', isAdmin, productsController.createProduct);
+productRouter.post('/bulk', isAdmin, productsController.bulkCreateProducts);
 productRouter.get('/', isAdmin, productsController.getAllProducts);
 productRouter.get('/:id', isAdmin, productsController.getProductById);
 productRouter.put('/:id', isAdmin, productsController.updateProduct);
@@ -272,6 +274,15 @@ exportRouter.get('/excel/:entityType', (req, res, next) => exportController.expo
 exportRouter.get('/pdf/:entityType', (req, res, next) => exportController.exportPDF(req, res).catch(next));
 exportRouter.get('/stats', (req, res, next) => exportController.getExportStats(req, res).catch(next));
 app.use('/api/export', exportRouter);
+
+// Rutas de Reportes (/api/reports)
+const reportRouter = express.Router();
+reportRouter.use(requireAuth);
+reportRouter.get('/stats', reportController.getGeneralStats);
+reportRouter.get('/agencies', isAdmin, reportController.getAgencyReport);
+reportRouter.get('/inventory', reportController.getInventoryReport);
+reportRouter.get('/historical', reportController.getHistoricalSalesReport);
+app.use('/api/reports', reportRouter);
 
 // Endpoint interno para cron de expiración de bloqueos
 const internalRouter = express.Router();
