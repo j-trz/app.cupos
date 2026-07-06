@@ -46,3 +46,5 @@ export class ProductService {
     });
   }
 }
+
+export default ProductService;

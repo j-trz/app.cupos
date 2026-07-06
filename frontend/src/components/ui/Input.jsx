@@ -1,6 +1,7 @@
 import clsx from 'clsx';
+import { Input } from './Input';
 
-export default function Input({ className, type, ...props }) {
+function Input({ className, type, ...props }) {
   return (
     <input
       type={type}
@@ -12,3 +13,6 @@ export default function Input({ className, type, ...props }) {
     />
   );
 }
+
+export { Input };
+export default Input;

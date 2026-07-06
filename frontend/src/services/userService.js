@@ -43,3 +43,5 @@ export class UserService {
     return await ApiClient.delete(`/users/${userId}/roles/${roleId}`);
   }
 }
+
+export default UserService;

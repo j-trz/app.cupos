@@ -1,6 +1,7 @@
 import clsx from 'clsx';
+import { Textarea } from './Textarea';
 
-export default function Textarea({ className, ...props }) {
+function Textarea({ className, ...props }) {
   return (
     <textarea
       className={clsx(
@@ -11,3 +12,6 @@ export default function Textarea({ className, ...props }) {
     />
   );
 }
+
+export { Textarea };
+export default Textarea;

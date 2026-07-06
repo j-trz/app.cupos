@@ -1,4 +1,7 @@
 import clsx from 'clsx';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './Table';
+
+export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow };
 
 export default function Table({ className, ...props }) {
   return (

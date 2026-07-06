@@ -60,3 +60,5 @@ export const RoleService = {
     return await ApiClient.get(`/roles/${roleId}/permissions`);
   }
 };
+
+export default RoleService;

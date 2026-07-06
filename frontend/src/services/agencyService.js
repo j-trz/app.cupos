@@ -39,3 +39,5 @@ export class AgencyService {
     return await ApiClient.get(`/agencies/${agencyId}/config`);
   }
 }
+
+export default AgencyService;

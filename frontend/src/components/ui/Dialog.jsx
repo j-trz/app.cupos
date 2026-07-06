@@ -1,3 +1,6 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './Dialog';
+
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger };
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';

@@ -1,6 +1,7 @@
 import clsx from 'clsx';
+import { Button } from './Button';
 
-export default function Button({
+function Button({
   children,
   variant = 'primary',
   size = 'md',
@@ -39,3 +40,6 @@ export default function Button({
     </button>
   );
 }
+
+export { Button };
+export default Button;

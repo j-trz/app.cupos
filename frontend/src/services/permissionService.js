@@ -39,3 +39,5 @@ export class PermissionService {
     return await ApiClient.delete(`/roles/${roleId}/permissions/${permissionId}`);
   }
 }
+
+export default PermissionService;

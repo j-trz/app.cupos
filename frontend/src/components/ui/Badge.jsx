@@ -1,6 +1,7 @@
 import clsx from 'clsx';
+import { Badge } from './Badge';
 
-export default function Badge({ className, variant = 'default', ...props }) {
+function Badge({ className, variant = 'default', ...props }) {
   const variants = {
     default: 'bg-slate-900 text-white hover:bg-slate-800',
     secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
@@ -19,3 +20,6 @@ export default function Badge({ className, variant = 'default', ...props }) {
     />
   );
 }
+
+export { Badge };
+export default Badge;

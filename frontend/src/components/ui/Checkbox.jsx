@@ -1,3 +1,6 @@
+import { Checkbox } from './Checkbox';
+
+export { Checkbox };
 import React from 'react';
 import clsx from 'clsx';
 
@@ -25,4 +28,5 @@ const Checkbox = React.forwardRef(({ className, checked, onCheckedChange, ...pro
 
 Checkbox.displayName = 'Checkbox';
 
+export { Checkbox };
 export default Checkbox;
