@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Shield, Plus, Edit, Trash2, Search, Filter, Key, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Search, Filter, Key, CheckCircle, XCircle, RefreshCw, BarChart3 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PermissionService from '../services/permissionService';
-import PageHeader from '../components/ui/PageHeader';
-import Table from '../components/ui/Table';
-import { ShadcnButton as Button } from '../components/ui/shadcn-button';
-import { ShadcnInput as Input } from '../components/ui/shadcn-input';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from '../components/ui/shadcn-dialog';
+import Button from '../components/ui/Button.jsx';
+import Badge from '../components/ui/Badge.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import StatCard from '../components/ui/StatCard.jsx';
+import Modal from '../components/Modal.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
 const emptyPermission = {
     name: '',
@@ -118,7 +114,8 @@ export default function GestionPermisos() {
                     icon: 'success',
                     title: 'Eliminado',
                     text: 'El permiso fue eliminado correctamente',
-                    timer: 1500
+                    timer: 1500,
+                    showConfirmButton: false
                 });
                 fetchPermissions();
             } catch (error) {
@@ -151,7 +148,8 @@ export default function GestionPermisos() {
                     icon: 'success',
                     title: 'Actualizado',
                     text: 'El permiso fue actualizado correctamente',
-                    timer: 1500
+                    timer: 1500,
+                    showConfirmButton: false
                 });
             } else {
                 await PermissionService.createPermission(formState);
@@ -159,7 +157,8 @@ export default function GestionPermisos() {
                     icon: 'success',
                     title: 'Creado',
                     text: 'El permiso fue creado correctamente',
-                    timer: 1500
+                    timer: 1500,
+                    showConfirmButton: false
                 });
             }
             setShowModal(false);
@@ -194,138 +193,164 @@ export default function GestionPermisos() {
                 description="Administra los permisos del sistema por módulo"
                 icon={Shield}
                 action={
-                    <Button onClick={openCreate} className="border">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Nuevo Permiso
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={fetchPermissions}
+                            disabled={loading}
+                            title="Refrescar datos"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        </Button>
+                        <Button size="sm" onClick={openCreate} title="Nuevo permiso">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Nuevo Permiso
+                        </Button>
+                    </div>
                 }
             />
 
-            {/* Filtros */}
-            <div className="bg-white rounded-lg border p-4 space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                            placeholder="Buscar permisos..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-slate-400" />
-                        <select
-                            value={moduleFilter}
-                            onChange={(e) => {
-                                setModuleFilter(e.target.value);
-                                setPagination(prev => ({ ...prev, page: 1 }));
-                            }}
-                            className="border rounded-md px-3 py-2 text-sm"
-                        >
-                            <option value="">Todos los módulos</option>
-                            {MODULES.map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+                <StatCard
+                    icon={BarChart3}
+                    label="Total permisos"
+                    value={pagination.total}
+                    description="Cantidad total de permisos."
+                />
+                <StatCard
+                    icon={CheckCircle}
+                    label="Activos"
+                    value={permissions.filter(p => p.is_active).length}
+                    description="Permisos activos en el sistema."
+                />
+                <StatCard
+                    icon={XCircle}
+                    label="Inactivos"
+                    value={permissions.filter(p => !p.is_active).length}
+                    description="Permisos inactivos."
+                />
             </div>
 
-            {/* Tabla de permisos */}
-            <div className="bg-white rounded-lg border overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200">
+                {/* Filtros */}
+                <div className="border-b border-slate-200 p-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar permisos..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full rounded-xl border border-slate-300 py-2 pl-10 pr-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-slate-400" />
+                            <select
+                                value={moduleFilter}
+                                onChange={(e) => {
+                                    setModuleFilter(e.target.value);
+                                    setPagination(prev => ({ ...prev, page: 1 }));
+                                }}
+                                className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            >
+                                <option value="">Todos los módulos</option>
+                                {MODULES.map(m => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
                     </div>
                 ) : (
-                    <Table>
-                        <thead className="bg-slate-50 border-b">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Código</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Módulo</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Descripción</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Estado</th>
-                                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
+                    <TableComponent>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">Nombre</TableHead>
+                                <TableHead className="text-center">Código</TableHead>
+                                <TableHead className="text-center">Módulo</TableHead>
+                                <TableHead className="text-center">Descripción</TableHead>
+                                <TableHead className="text-center">Estado</TableHead>
+                                <TableHead className="text-center">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {filteredPermissions.length === 0 ? (
-                                <tr>
-                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
+                                <TableRow>
+                                    <TableCell className="text-center py-10" colSpan={6}>
                                         {searchTerm || moduleFilter ? 'No se encontraron permisos con los filtros aplicados' : 'No hay permisos registrados'}
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             ) : (
                                 filteredPermissions.map((permission) => (
-                                    <tr key={permission.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <Key className="w-4 h-4 text-slate-400" />
+                                    <TableRow key={permission.id}>
+                                        <TableCell className="text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <Key className="h-4 w-4 text-slate-400" />
                                                 <span className="font-medium text-slate-900">{permission.name}</span>
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-3">
+                                        </TableCell>
+                                        <TableCell className="text-center">
                                             <code className="px-2 py-1 bg-slate-100 rounded text-xs font-mono text-slate-700">
                                                 {permission.code}
                                             </code>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant="default">
                                                 {getModuleLabel(permission.module)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
-                                            {permission.description || '-'}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {permission.is_active ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
-                                                    <CheckCircle className="w-3 h-3" />
-                                                    Activo
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded text-xs font-medium">
-                                                    <XCircle className="w-3 h-3" />
-                                                    Inactivo
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center text-sm text-slate-600 max-w-xs truncate">
+                                            {permission.description || '—'}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={permission.is_active ? 'success' : 'danger'}>
+                                                {permission.is_active ? 'Activo' : 'Inactivo'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <div className="flex items-center justify-center gap-1">
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => openEdit(permission)}
+                                                    title="Editar"
                                                 >
-                                                    <Edit className="w-4 h-4 text-blue-600" />
+                                                    <Edit className="h-4 w-4 text-slate-600" />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleDelete(permission)}
+                                                    title="Eliminar"
+                                                    className="text-red-600 hover:text-red-700"
                                                 >
-                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                    </TableRow>
                                 ))
                             )}
-                        </tbody>
-                    </Table>
+                        </TableBody>
+                    </TableComponent>
                 )}
 
                 {/* Paginación */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t bg-slate-50">
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
                         <span className="text-sm text-slate-600">
                             Página {pagination.page} de {totalPages} ({pagination.total} permisos)
                         </span>
                         <div className="flex gap-2">
                             <Button
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
                                 disabled={pagination.page === 1}
                                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
@@ -333,7 +358,7 @@ export default function GestionPermisos() {
                                 Anterior
                             </Button>
                             <Button
-                                variant="outline"
+                                variant="secondary"
                                 size="sm"
                                 disabled={pagination.page === totalPages}
                                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
@@ -346,100 +371,92 @@ export default function GestionPermisos() {
             </div>
 
             {/* Modal de crear/editar */}
-            <Dialog open={showModal} onOpenChange={setShowModal}>
-                <DialogContent className="max-w-md bg-white">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {editingId ? 'Editar Permiso' : 'Nuevo Permiso'}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Nombre *
-                            </label>
-                            <Input
-                                value={formState.name}
-                                onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
-                                placeholder="Ej: Ver usuarios"
-                                required
-                            />
-                        </div>
+            <Modal title={editingId ? 'Editar Permiso' : 'Nuevo Permiso'} open={showModal} onClose={() => setShowModal(false)}>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                            Nombre *
+                        </label>
+                        <input
+                            type="text"
+                            value={formState.name}
+                            onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="Ej: Ver usuarios"
+                            required
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        />
+                    </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Código *
-                            </label>
-                            <Input
-                                value={formState.code}
-                                onChange={(e) => setFormState(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                                placeholder="Ej: USERS_VIEW"
-                                className="font-mono"
-                                required
-                            />
-                            <p className="text-xs text-slate-500 mt-1">
-                                Código único en formato MAYÚSCULAS (ej: USERS_CREATE, RESERVATIONS_DELETE)
-                            </p>
-                        </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                            Código *
+                        </label>
+                        <input
+                            type="text"
+                            value={formState.code}
+                            onChange={(e) => setFormState(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                            placeholder="Ej: USERS_VIEW"
+                            required
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                            Código único en formato MAYÚSCULAS (ej: USERS_CREATE, RESERVATIONS_DELETE)
+                        </p>
+                    </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Módulo *
-                            </label>
-                            <select
-                                value={formState.module}
-                                onChange={(e) => setFormState(prev => ({ ...prev, module: e.target.value }))}
-                                className="w-full border rounded-md px-3 py-2 text-sm"
-                                required
-                            >
-                                <option value="">Seleccionar módulo</option>
-                                {MODULES.map(m => (
-                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                ))}
-                            </select>
-                        </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                            Módulo *
+                        </label>
+                        <select
+                            value={formState.module}
+                            onChange={(e) => setFormState(prev => ({ ...prev, module: e.target.value }))}
+                            required
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        >
+                            <option value="">Seleccionar módulo</option>
+                            {MODULES.map(m => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                    </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                Descripción
-                            </label>
-                            <textarea
-                                value={formState.description}
-                                onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))}
-                                placeholder="Descripción opcional del permiso"
-                                className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px]"
-                                rows="3"
-                            />
-                        </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                            Descripción
+                        </label>
+                        <textarea
+                            value={formState.description}
+                            onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Descripción opcional del permiso"
+                            rows="3"
+                            className="w-full min-h-[80px] rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        />
+                    </div>
 
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="is_active"
-                                checked={formState.is_active}
-                                onChange={(e) => setFormState(prev => ({ ...prev, is_active: e.target.checked }))}
-                                className="rounded"
-                            />
-                            <label htmlFor="is_active" className="text-sm text-slate-700">
-                                Permiso activo
-                            </label>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="is_active"
+                            checked={formState.is_active}
+                            onChange={(e) => setFormState(prev => ({ ...prev, is_active: e.target.checked }))}
+                            className="rounded"
+                        />
+                        <label htmlFor="is_active" className="text-sm text-slate-700">
+                            Permiso activo
+                        </label>
+                    </div>
 
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowModal(false)}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button type="submit">
-                                {editingId ? 'Actualizar' : 'Crear'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                    <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                        <Button variant="secondary" type="button" onClick={() => setShowModal(false)}>
+                            <XCircle className="h-4 w-4 mr-1" />Cancelar
+                        </Button>
+                        <Button type="submit">
+                            {editingId ? 'Actualizar' : 'Crear'}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }

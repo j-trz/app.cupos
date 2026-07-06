@@ -5,14 +5,19 @@
 
 import { useState, useEffect } from 'react';
 import {
-    Bot, Plus, Edit2, Trash2, TestTube, Key, Settings,
+    Bot, Plus, Edit2, Trash2, TestTube, Key,
     Activity, MessageSquare, Save, X, Eye, EyeOff, RefreshCw,
-    Zap, Clock, AlertCircle, CheckCircle
+    Zap, CheckCircle
 } from 'lucide-react';
 import AIService from '../services/aiService';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import Badge from '../components/ui/Badge.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import StatCard from '../components/ui/StatCard.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import Swal from 'sweetalert2';
 
 const PROVIDER_TYPES = [
@@ -217,22 +222,46 @@ export default function AIConfig() {
     };
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
-                    <Bot className="w-8 h-8 text-blue-500" />
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                        Configuración de Inteligencia Artificial
-                    </h1>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400">
-                    Configura los proveedores de IA, acciones disponibles y monitorea el uso
-                </p>
+        <div className="space-y-6">
+            <PageHeader
+                title="Configuración de IA"
+                description="Configura los proveedores de IA, acciones disponibles y monitorea el uso."
+                icon={Bot}
+                action={
+                    <Button
+                        size="sm"
+                        onClick={loadData}
+                        disabled={isLoading}
+                        title="Refrescar datos"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                }
+            />
+
+            <div className="grid gap-4 sm:grid-cols-3">
+                <StatCard
+                    icon={Bot}
+                    label="Proveedores"
+                    value={providers.length}
+                    description="Proveedores de IA configurados."
+                />
+                <StatCard
+                    icon={Zap}
+                    label="Acciones"
+                    value={actions.length}
+                    description="Acciones del agente IA."
+                />
+                <StatCard
+                    icon={MessageSquare}
+                    label="Sesiones"
+                    value={stats?.total_sessions || 0}
+                    description="Total de sesiones de chat."
+                />
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex flex-wrap gap-2 border-b border-slate-200">
                 {TABS.map(tab => {
                     const Icon = tab.icon;
                     return (
@@ -240,11 +269,11 @@ export default function AIConfig() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors border-b-2 ${activeTab === tab.id
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                ? 'border-slate-900 text-slate-900'
+                                : 'border-transparent text-slate-500 hover:text-slate-700'
                                 }`}
                         >
-                            <Icon className="w-4 h-4" />
+                            <Icon className="h-4 w-4" />
                             {tab.label}
                         </button>
                     );
@@ -711,53 +740,51 @@ export default function AIConfig() {
                     {activeTab === 'logs' && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-lg font-semibold">Logs de Chat</h2>
-                                <Button variant="outline" onClick={loadData}>
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    Actualizar
+                                <h2 className="text-lg font-semibold text-slate-900">Logs de Chat</h2>
+                                <Button variant="secondary" size="sm" onClick={loadData} title="Refrescar logs">
+                                    <RefreshCw className="h-4 w-4" />
                                 </Button>
                             </div>
 
-                            <Card className="overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 dark:bg-gray-900">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contenido</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tokens</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
+                            <Card>
+                                <TableComponent>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="text-center">Fecha</TableHead>
+                                            <TableHead className="text-center">Usuario</TableHead>
+                                            <TableHead className="text-center">Rol</TableHead>
+                                            <TableHead className="text-center">Contenido</TableHead>
+                                            <TableHead className="text-center">Tokens</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
                                         {logs.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                            <TableRow>
+                                                <TableCell className="text-center py-10" colSpan={5}>
                                                     No hay logs disponibles
-                                                </td>
-                                            </tr>
+                                                </TableCell>
+                                            </TableRow>
                                         ) : (
                                             logs.map((log) => (
-                                                <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                                                <TableRow key={log.id}>
+                                                    <TableCell className="text-center text-sm whitespace-nowrap">
                                                         {new Date(log.created_at).toLocaleString('es-AR')}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">{log.user_email || 'Sistema'}</td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        <span className={`px-2 py-0.5 rounded text-xs ${log.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                                                            }`}>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-sm">{log.user_email || 'Sistema'}</TableCell>
+                                                    <TableCell className="text-center text-sm">
+                                                        <Badge variant={log.role === 'user' ? 'default' : 'success'}>
                                                             {log.role}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm max-w-md truncate">{log.content}</td>
-                                                    <td className="px-4 py-3 text-sm text-gray-500">
-                                                        {log.token_usage?.total_tokens || '-'}
-                                                    </td>
-                                                </tr>
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-sm max-w-md truncate">{log.content}</TableCell>
+                                                    <TableCell className="text-center text-sm text-slate-500">
+                                                        {log.token_usage?.total_tokens || '—'}
+                                                    </TableCell>
+                                                </TableRow>
                                             ))
                                         )}
-                                    </tbody>
-                                </table>
+                                    </TableBody>
+                                </TableComponent>
                             </Card>
                         </div>
                     )}

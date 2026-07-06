@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Trophy, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Trophy, TrendingUp, RefreshCw } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -57,12 +57,22 @@ export default function Confirmations() {
     try {
       ReservationService.refreshCache?.();
       await fetchConfirmations();
-      Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Confirmaciones actualizadas correctamente' });
+      Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Confirmaciones actualizadas correctamente', timer: 1500, showConfirmButton: false });
     } catch (error) {
       console.error(error);
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   return (
@@ -72,8 +82,13 @@ export default function Confirmations() {
         description="Consulta todas las reservas ya confirmadas."
         icon={Trophy}
         action={
-          <Button onClick={refresh} disabled={refreshing}>
-            {refreshing ? 'Actualizando...' : 'Refrescar'}
+          <Button
+            size="sm"
+            onClick={refresh}
+            disabled={refreshing}
+            title="Refrescar datos"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         }
       />
@@ -102,12 +117,12 @@ export default function Confirmations() {
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead>Pedido</TableHead>
-              <TableHead>Agencia</TableHead>
-              <TableHead>Pasajero</TableHead>
-              <TableHead>Destino</TableHead>
-              <TableHead>Salida</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead className="text-center">Pedido</TableHead>
+              <TableHead className="text-center">Agencia</TableHead>
+              <TableHead className="text-center">Pasajero</TableHead>
+              <TableHead className="text-center">Destino</TableHead>
+              <TableHead className="text-center">Salida</TableHead>
+              <TableHead className="text-center">Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -126,12 +141,12 @@ export default function Confirmations() {
             ) : (
               data.map((item, index) => (
                 <TableRow key={index}>
-                  <TableCell>{item.Pedido_ID}</TableCell>
-                  <TableCell>{item.Agencia || '—'}</TableCell>
-                  <TableCell>{`${item.Nombre_Pasajero || '-'} ${item.Apellido_Pasajero || ''}`.trim()}</TableCell>
-                  <TableCell>{item.Vuelo_Destino || '—'}</TableCell>
-                  <TableCell>{item.Vuelo_Salida || '—'}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-center font-medium">{item.Pedido_ID}</TableCell>
+                  <TableCell className="text-center">{item.Agencia || '—'}</TableCell>
+                  <TableCell className="text-center">{`${item.Nombre_Pasajero || '-'} ${item.Apellido_Pasajero || ''}`.trim()}</TableCell>
+                  <TableCell className="text-center">{item.Vuelo_Destino || '—'}</TableCell>
+                  <TableCell className="text-center">{formatDate(item.Vuelo_Salida)}</TableCell>
+                  <TableCell className="text-center">
                     <Badge variant="success">{statusLabel(item.Estado)}</Badge>
                   </TableCell>
                 </TableRow>

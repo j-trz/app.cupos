@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Upload, Download, Tag, Filter } from 'lucide-react';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter } from 'lucide-react';
 import ReservationService from '../services/reservationService';
-import ProductService from '../services/productService';
 import Swal from 'sweetalert2';
-import * as XLSX from 'xlsx';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
@@ -30,24 +28,15 @@ const EMPTY_FORM = {
 
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
 
-const PLANTILLA_HEADERS = [
-  'codigo_cupo', 'destino', 'compania', 'disponibilidad',
-  'fecha_salida', 'fecha_regreso', 'precio', 'ruta', 'pnr', 'ficha',
-  'temporada', 'neto_1', 'op', 'carryon', 'handbag', 'checkedbag', 'inf_fare',
-];
-
 export default function Availability() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [temporadaFilter, setTemporadaFilter] = useState('Todas');
-  const [bulkFile, setBulkFile] = useState(null);
-  const [bulkUploading, setBulkUploading] = useState(false);
 
   useEffect(() => {
     fetchAvailability();
@@ -168,38 +157,6 @@ export default function Availability() {
     }
   };
 
-  // ---- Carga masiva ----
-  const descargarPlantilla = () => {
-    const ws = XLSX.utils.aoa_to_sheet([PLANTILLA_HEADERS]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Productos');
-    XLSX.writeFile(wb, 'plantilla_productos.xlsx');
-  };
-
-  const handleBulkFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) setBulkFile(file);
-  };
-
-  const handleBulkUpload = async () => {
-    if (!bulkFile) {
-      Swal.fire({ icon: 'warning', title: 'Sin archivo', text: 'Seleccioná un archivo Excel (.xlsx o .xls) para subir.' });
-      return;
-    }
-    setBulkUploading(true);
-    try {
-      await ProductService.bulkUploadProducts(bulkFile);
-      Swal.fire({ icon: 'success', title: '¡Carga exitosa!', text: 'Los productos se cargaron correctamente.', timer: 2000, showConfirmButton: false });
-      setBulkFile(null);
-      setBulkModalOpen(false);
-      await fetchAvailability();
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo procesar el archivo.' });
-    } finally {
-      setBulkUploading(false);
-    }
-  };
-
   const formatDate = (value) => {
     if (!value) return '—';
     const date = new Date(value);
@@ -218,14 +175,6 @@ export default function Availability() {
         icon={Plane}
         action={
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setBulkModalOpen(true)}
-              title="Carga masiva de productos"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
             <Button
               size="sm"
               onClick={refresh}
@@ -278,8 +227,8 @@ export default function Availability() {
                 type="button"
                 onClick={() => setTemporadaFilter(temp)}
                 className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all ${temporadaFilter === temp
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
                   }`}
               >
                 {temp !== 'Todas' && <Tag className="h-3 w-3" />}
@@ -293,15 +242,15 @@ export default function Availability() {
           <TableHeader>
             <TableRow>
               <TableHead className="text-center">Cupo</TableHead>
-              <TableHead className="text-center">Destino</TableHead>
-              <TableHead className="text-center">Compañía</TableHead>
-              <TableHead className="text-center">Disponibilidad</TableHead>
-              <TableHead className="text-center">Salida</TableHead>
-              <TableHead className="text-center">Regreso</TableHead>
-              <TableHead className="text-center">Temporada</TableHead>
-              <TableHead className="text-center">Ruta</TableHead>
-              <TableHead className="text-center">Precio</TableHead>
-              <TableHead className="text-center">Reservar</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Compañía</TableHead>
+              <TableHead>Disponibilidad</TableHead>
+              <TableHead>Salida</TableHead>
+              <TableHead>Regreso</TableHead>
+              <TableHead>Temporada</TableHead>
+              <TableHead>Ruta</TableHead>
+              <TableHead>Precio</TableHead>
+              <TableHead>Reservar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -450,57 +399,6 @@ export default function Availability() {
         </form>
       </Modal>
 
-      {/* Modal de Carga Masiva */}
-      <Modal title="Carga masiva de productos" open={bulkModalOpen} onClose={() => { setBulkModalOpen(false); setBulkFile(null); }}>
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm text-slate-600 mb-3">
-              Subí un archivo Excel (.xlsx o .xls) con los productos. Descargá la plantilla para asegurar el formato correcto.
-            </p>
-            <Button variant="secondary" size="sm" onClick={descargarPlantilla}>
-              <Download className="h-4 w-4 mr-2" />
-              Descargar plantilla Excel
-            </Button>
-          </div>
-
-          <div className="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center">
-            <Upload className="mx-auto h-10 w-10 text-slate-400 mb-3" />
-            <p className="text-sm font-medium text-slate-700 mb-1">
-              {bulkFile ? bulkFile.name : 'Arrastrá un archivo Excel o hacé clic para seleccionar'}
-            </p>
-            <p className="text-xs text-slate-400 mb-4">Formatos aceptados: .xlsx, .xls</p>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleBulkFileChange}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-            />
-          </div>
-
-          {bulkFile && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between">
-              <span className="text-sm text-slate-700 truncate max-w-xs">{bulkFile.name}</span>
-              <button
-                type="button"
-                onClick={() => setBulkFile(null)}
-                className="text-xs text-red-500 hover:text-red-700 font-medium"
-              >
-                Quitar
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="secondary" type="button" onClick={() => { setBulkModalOpen(false); setBulkFile(null); }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleBulkUpload} disabled={!bulkFile || bulkUploading}>
-              <Upload className="h-4 w-4 mr-1" />
-              {bulkUploading ? 'Subiendo...' : 'Subir archivo'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

@@ -40,8 +40,10 @@ class ApiClient {
   static async request(endpoint, options = {}) {
     const url = `${this.getBaseUrl()}${endpoint}`;
 
+    const isFormData = options.body instanceof FormData;
+
     const headers = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(options.headers || {}),
     };
 
@@ -65,16 +67,18 @@ class ApiClient {
   }
 
   static post(endpoint, body) {
+    const isFormData = body instanceof FormData;
     return this.request(endpoint, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: isFormData ? body : JSON.stringify(body),
     });
   }
 
   static put(endpoint, body) {
+    const isFormData = body instanceof FormData;
     return this.request(endpoint, {
       method: 'PUT',
-      body: JSON.stringify(body),
+      body: isFormData ? body : JSON.stringify(body),
     });
   }
 

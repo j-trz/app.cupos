@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Edit3, Building2, Check, X } from 'lucide-react';
+import { Building2, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, X } from 'lucide-react';
 import AgencyService from '../services/agencyService';
 import Swal from 'sweetalert2';
-import { ShadcnButton as Button } from '../components/ui/shadcn-button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/shadcn-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/shadcn-dialog';
-import { ShadcnInput as Input } from '../components/ui/shadcn-input';
-import { Label } from '../components/ui/shadcn-label';
+import Button from '../components/ui/Button.jsx';
+import { Card } from '../components/ui/Card.jsx';
+import Badge from '../components/ui/Badge.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import StatCard from '../components/ui/StatCard.jsx';
+import Modal from '../components/Modal.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
-// Backend expects: code, name, email, address, color
 const emptyAgency = {
   code: '',
   name: '',
@@ -21,9 +22,11 @@ const emptyAgency = {
 export default function GestionAgencias() {
   const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editAgency, setEditAgency] = useState(null);
   const [formState, setFormState] = useState(emptyAgency);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAgencies = async () => {
     setLoading(true);
@@ -31,7 +34,8 @@ export default function GestionAgencias() {
       const items = await AgencyService.listAgencies();
       setAgencies(items);
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudieron cargar las agencias', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudieron cargar las agencias' });
+      setAgencies([]);
     } finally {
       setLoading(false);
     }
@@ -40,6 +44,27 @@ export default function GestionAgencias() {
   useEffect(() => {
     fetchAgencies();
   }, []);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchAgencies();
+      Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Agencias actualizadas correctamente', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const filteredAgencies = useMemo(() => {
+    if (!searchTerm) return agencies;
+    return agencies.filter((a) =>
+      a.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [agencies, searchTerm]);
 
   const openCreate = () => {
     setEditAgency(null);
@@ -53,24 +78,34 @@ export default function GestionAgencias() {
     setDialogOpen(true);
   };
 
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditAgency(null);
+    setFormState(emptyAgency);
+  };
+
+  const handleFormChange = (field, value) => {
+    setFormState((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleDelete = async (agency) => {
     const result = await Swal.fire({
-      title: 'Eliminar agencia',
+      title: '¿Eliminar agencia?',
       text: `¿Eliminar agencia ${agency.name}?`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
     });
-
     if (!result.isConfirmed) return;
-
     try {
       await AgencyService.deleteAgency(agency.id);
-      Swal.fire('Eliminado', 'Agencia eliminada correctamente', 'success');
+      Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Agencia eliminada correctamente', timer: 1500, showConfirmButton: false });
       fetchAgencies();
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo eliminar la agencia', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo eliminar la agencia' });
     }
   };
 
@@ -79,19 +114,18 @@ export default function GestionAgencias() {
     try {
       if (editAgency) {
         await AgencyService.updateAgency(editAgency.id, formState);
-        Swal.fire('Actualizado', 'Agencia actualizada correctamente', 'success');
+        Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Agencia actualizada correctamente', timer: 1500, showConfirmButton: false });
       } else {
         await AgencyService.createAgency(formState);
-        Swal.fire('Creado', 'Agencia creada correctamente', 'success');
+        Swal.fire({ icon: 'success', title: 'Creado', text: 'Agencia creada correctamente', timer: 1500, showConfirmButton: false });
       }
-      setDialogOpen(false);
+      closeDialog();
       fetchAgencies();
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo guardar la agencia', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo guardar la agencia' });
     }
   };
 
-  // Backend expects: code, name, email, address, color
   const fields = useMemo(
     () => [
       { name: 'code', label: 'Código', required: true },
@@ -105,146 +139,180 @@ export default function GestionAgencias() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestión de Agencias</h1>
-          <p className="text-muted-foreground">
-            Administra las agencias y sus configuraciones de marca.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="border">
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Agencia
-        </Button>
+      <PageHeader
+        title="Gestión de Agencias"
+        description="Administra las agencias y sus configuraciones de marca."
+        icon={Building2}
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={refresh}
+              disabled={refreshing}
+              title="Refrescar datos"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button size="sm" onClick={openCreate} title="Nueva agencia">
+              <Plus className="h-4 w-4 mr-1" />
+              Nueva Agencia
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          icon={BarChart3}
+          label="Total agencias"
+          value={filteredAgencies.length}
+          description="Cantidad total de agencias registradas."
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Con email"
+          value={filteredAgencies.filter((a) => a.email).length}
+          description="Agencias con email configurado."
+        />
+        <StatCard
+          icon={Building2}
+          label="Sin email"
+          value={filteredAgencies.filter((a) => !a.email).length}
+          description="Agencias sin email configurado."
+        />
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Agencias</CardTitle>
-          <CardDescription>
-            {agencies.length} {agencies.length === 1 ? 'agencia' : 'agencias'} registradas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
+        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Lista de Agencias</h2>
+              <p className="text-sm text-slate-500">Gestioná las agencias y sus configuraciones.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Buscar por código, nombre o email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+        </div>
+
+        <TableComponent>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-center">Código</TableHead>
+              <TableHead className="text-center">Nombre</TableHead>
+              <TableHead className="text-center">Email</TableHead>
+              <TableHead className="text-center">Color</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableCell className="text-center py-10" colSpan={5}>
+                  Cargando agencias...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
-                    Cargando agencias...
+            ) : filteredAgencies.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-10" colSpan={5}>
+                  {searchTerm ? 'No se encontraron agencias con la búsqueda.' : 'No hay agencias registradas.'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredAgencies.map((agency) => (
+                <TableRow key={agency.id}>
+                  <TableCell className="text-center font-medium">{agency.code}</TableCell>
+                  <TableCell className="text-center">{agency.name}</TableCell>
+                  <TableCell className="text-center">{agency.email || '—'}</TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div
+                        className="h-5 w-5 rounded-full border border-slate-300"
+                        style={{ backgroundColor: agency.color || '#3b82f6' }}
+                      />
+                      <span className="text-xs text-slate-500">{agency.color || '—'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(agency)} title="Editar agencia">
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(agency)} title="Eliminar agencia" className="text-red-600 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ) : agencies.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
-                    No se encontraron agencias.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                agencies.map((agency) => (
-                  <TableRow key={agency.id}>
-                    <TableCell className="font-medium">{agency.code}</TableCell>
-                    <TableCell>{agency.name}</TableCell>
-                    <TableCell>{agency.email || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEdit(agency)}>
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(agency)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
+              ))
+            )}
+          </TableBody>
+        </TableComponent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto bg-white">
-          <DialogHeader>
-            <DialogTitle>{editAgency ? 'Editar Agencia' : 'Nueva Agencia'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              {fields.map((field) => (
-                <div key={field.name}>
-                  <Label htmlFor={field.name}>
-                    {field.label} {field.required && '*'}
-                  </Label>
-                  {field.type === 'textarea' ? (
-                    <textarea
-                      id={field.name}
-                      name={field.name}
+      {/* Modal de Crear/Editar Agencia */}
+      <Modal title={editAgency ? 'Editar Agencia' : 'Nueva Agencia'} open={dialogOpen} onClose={closeDialog}>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-2 gap-4">
+            {fields.map((field) => (
+              <div key={field.name} className={field.type === 'textarea' ? 'col-span-2' : ''}>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  {field.label} {field.required && '*'}
+                </label>
+                {field.type === 'textarea' ? (
+                  <textarea
+                    value={formState[field.name] ?? ''}
+                    onChange={(e) => handleFormChange(field.name, e.target.value)}
+                    className="w-full min-h-[80px] rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    placeholder={field.label}
+                  />
+                ) : field.type === 'color' ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
                       value={formState[field.name] ?? ''}
-                      onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1 w-full"
+                      onChange={(e) => handleFormChange(field.name, e.target.value)}
+                      className="h-10 w-10 rounded border border-slate-300 cursor-pointer"
                     />
-                  ) : field.type === 'color' ? (
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        id={field.name}
-                        name={field.name}
-                        value={formState[field.name] ?? ''}
-                        onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                        className="h-10 w-10 border border-input rounded cursor-pointer"
-                      />
-                      <Input
-                        type="text"
-                        value={formState[field.name] ?? ''}
-                        onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                        placeholder={field.label}
-                      />
-                    </div>
-                  ) : (
-                    <Input
-                      id={field.name}
-                      type={field.type || 'text'}
-                      name={field.name}
+                    <input
+                      type="text"
                       value={formState[field.name] ?? ''}
-                      onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                      className="mt-1"
-                      required={field.required}
+                      onChange={(e) => handleFormChange(field.name, e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                      placeholder={field.label}
                     />
-                  )}
-                </div>
-              ))}
-            </div>
+                  </div>
+                ) : (
+                  <input
+                    type={field.type || 'text'}
+                    value={formState[field.name] ?? ''}
+                    onChange={(e) => handleFormChange(field.name, e.target.value)}
+                    required={field.required}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    placeholder={field.label}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
 
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-              <Button type="submit">
-                <Check className="h-4 w-4 mr-2" />
-                Guardar
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+            <Button variant="secondary" type="button" onClick={closeDialog}>
+              <X className="h-4 w-4 mr-1" />Cancelar
+            </Button>
+            <Button type="submit">
+              Guardar
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

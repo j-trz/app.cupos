@@ -39,11 +39,7 @@ export class ProductService {
     const formData = new FormData();
     formData.append('file', file);
     
-    return await ApiClient.post('/products/bulk', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return await ApiClient.post('/products/bulk', formData);
   }
 }
 

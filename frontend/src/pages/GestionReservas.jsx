@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Edit3, CheckCircle2, Send, Package, Check, X } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2 } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
-import { ShadcnButton as Button } from '../components/ui/shadcn-button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/shadcn-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/shadcn-dialog';
-import { ShadcnInput as Input } from '../components/ui/shadcn-input';
-import { Label } from '../components/ui/shadcn-label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/shadcn-select';
-import ExportButton from '../components/ExportButton';
+import Button from '../components/ui/Button.jsx';
+import { Card } from '../components/ui/Card.jsx';
+import Badge from '../components/ui/Badge.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import StatCard from '../components/ui/StatCard.jsx';
+import Modal from '../components/Modal.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
 const emptyReservation = {
   pedido_id: '',
@@ -29,12 +29,44 @@ const emptyReservation = {
   neto_1: '',
 };
 
+const formatDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const getEstadoVariant = (estado) => {
+  if (estado === 'confirmado') return 'success';
+  if (estado === 'procesando') return 'warning';
+  if (estado === 'completado') return 'default';
+  if (estado === 'cancelado') return 'danger';
+  return 'default';
+};
+
+const getEstadoLabel = (estado) => {
+  const map = {
+    bloqueo_temporal: 'Bloqueo Temporal',
+    confirmado: 'Confirmado',
+    procesando: 'Procesando',
+    completado: 'Completado',
+    cancelado: 'Cancelado',
+  };
+  return map[estado] || estado;
+};
+
 export default function GestionReservas() {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editReservation, setEditReservation] = useState(null);
   const [formState, setFormState] = useState(emptyReservation);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('Todas');
 
   const fetchReservations = async () => {
     setLoading(true);
@@ -42,7 +74,8 @@ export default function GestionReservas() {
       const items = await ReservationService.listReservations();
       setReservations(items);
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudieron cargar las reservas', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudieron cargar las reservas' });
+      setReservations([]);
     } finally {
       setLoading(false);
     }
@@ -51,6 +84,42 @@ export default function GestionReservas() {
   useEffect(() => {
     fetchReservations();
   }, []);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchReservations();
+      Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Reservas actualizadas correctamente', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const estados = useMemo(() => {
+    const set = new Set();
+    reservations.forEach((r) => {
+      if (r.estado) set.add(r.estado);
+    });
+    return ['Todas', ...Array.from(set).sort()];
+  }, [reservations]);
+
+  const filteredReservations = useMemo(() => {
+    let result = reservations;
+    if (estadoFilter !== 'Todas') {
+      result = result.filter((r) => r.estado === estadoFilter);
+    }
+    if (searchTerm) {
+      result = result.filter((r) =>
+        r.pedido_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.contacto_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.vuelo_destino?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.agencia?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return result;
+  }, [reservations, estadoFilter, searchTerm]);
 
   const openCreate = () => {
     setEditReservation(null);
@@ -64,43 +133,53 @@ export default function GestionReservas() {
     setDialogOpen(true);
   };
 
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditReservation(null);
+    setFormState(emptyReservation);
+  };
+
+  const handleFormChange = (field, value) => {
+    setFormState((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleDelete = async (reservation) => {
     const result = await Swal.fire({
-      title: 'Eliminar reserva',
+      title: '¿Eliminar reserva?',
       text: `¿Eliminar reserva ${reservation.pedido_id}?`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
     });
-
     if (!result.isConfirmed) return;
-
     try {
       await ReservationService.deleteReservation(reservation.id);
-      Swal.fire('Eliminado', 'Reserva eliminada correctamente', 'success');
+      Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Reserva eliminada correctamente', timer: 1500, showConfirmButton: false });
       fetchReservations();
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo eliminar la reserva', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo eliminar la reserva' });
     }
   };
 
   const handleConfirm = async (reservation) => {
     try {
       await ReservationService.confirmReservation(reservation.id);
-      Swal.fire('Éxito', 'Reserva confirmada', 'success');
+      Swal.fire({ icon: 'success', title: 'Éxito', text: 'Reserva confirmada', timer: 1500, showConfirmButton: false });
       fetchReservations();
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo confirmar la reserva', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo confirmar la reserva' });
     }
   };
 
   const handleResendEmail = async (reservation) => {
     try {
       await ReservationService.resendReservationEmail(reservation.id);
-      Swal.fire('Éxito', 'Email reenviado correctamente', 'success');
+      Swal.fire({ icon: 'success', title: 'Éxito', text: 'Email reenviado correctamente', timer: 1500, showConfirmButton: false });
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo reenviar el email', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo reenviar el email' });
     }
   };
 
@@ -109,15 +188,15 @@ export default function GestionReservas() {
     try {
       if (editReservation) {
         await ReservationService.updateReservation(editReservation.id, formState);
-        Swal.fire('Actualizado', 'Reserva actualizada correctamente', 'success');
+        Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Reserva actualizada correctamente', timer: 1500, showConfirmButton: false });
       } else {
         await ReservationService.createReservation(formState);
-        Swal.fire('Creado', 'Reserva creada correctamente', 'success');
+        Swal.fire({ icon: 'success', title: 'Creado', text: 'Reserva creada correctamente', timer: 1500, showConfirmButton: false });
       }
-      setDialogOpen(false);
+      closeDialog();
       fetchReservations();
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo guardar la reserva', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo guardar la reserva' });
     }
   };
 
@@ -142,7 +221,7 @@ export default function GestionReservas() {
     []
   );
 
-  const estados = [
+  const estadoOptions = [
     { value: 'bloqueo_temporal', label: 'Bloqueo Temporal' },
     { value: 'confirmado', label: 'Confirmado' },
     { value: 'procesando', label: 'Procesando' },
@@ -152,186 +231,201 @@ export default function GestionReservas() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between ">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestión de Reservas</h1>
-          <p className="text-muted-foreground">
-            Administra las reservas y su estado de confirmación.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ExportButton entityType="reservations" entityLabel="Reservas" />
-          <Button onClick={openCreate} className="border">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Reserva
-          </Button>
-        </div>
+      <PageHeader
+        title="Gestión de Reservas"
+        description="Administra las reservas y su estado de confirmación."
+        icon={Calendar}
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={refresh}
+              disabled={refreshing}
+              title="Refrescar datos"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button size="sm" onClick={openCreate} title="Nueva reserva">
+              <Plus className="h-4 w-4 mr-1" />
+              Nueva Reserva
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          icon={BarChart3}
+          label="Total reservas"
+          value={filteredReservations.length}
+          description={estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total de reservas.'}
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Confirmadas"
+          value={filteredReservations.filter((r) => r.estado === 'confirmado').length}
+          description="Reservas confirmadas."
+        />
+        <StatCard
+          icon={Calendar}
+          label="Pendientes"
+          value={filteredReservations.filter((r) => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length}
+          description="Reservas en proceso."
+        />
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Reservas</CardTitle>
-          <CardDescription>
-            {reservations.length} {reservations.length === 1 ? 'reserva' : 'reservas'} registradas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID Pedido</TableHead>
-                <TableHead>Agencia</TableHead>
-                <TableHead>Contacto</TableHead>
-                <TableHead>Vuelo</TableHead>
-                <TableHead>Destino</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    Cargando reservas...
-                  </TableCell>
-                </TableRow>
-              ) : reservations.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    No se encontraron reservas.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                reservations.map((reservation) => (
-                  <TableRow key={reservation.id}>
-                    <TableCell className="font-medium">{reservation.pedido_id}</TableCell>
-                    <TableCell>{reservation.agencia}</TableCell>
-                    <TableCell>{reservation.contacto_nombre}</TableCell>
-                    <TableCell>{reservation.vuelo_codigo}</TableCell>
-                    <TableCell>{reservation.vuelo_destino}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${reservation.estado === 'confirmado' ? 'bg-green-100 text-green-800' :
-                        reservation.estado === 'procesando' ? 'bg-yellow-100 text-yellow-800' :
-                          reservation.estado === 'completado' ? 'bg-blue-100 text-blue-800' :
-                            reservation.estado === 'cancelado' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                        }`}>
-                        {reservation.estado === 'bloqueo_temporal' ? 'Bloqueo Temporal' :
-                          reservation.estado === 'confirmado' ? 'Confirmado' :
-                            reservation.estado === 'procesando' ? 'Procesando' :
-                              reservation.estado === 'completado' ? 'Completado' : 'Cancelado'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {reservation.estado && reservation.estado !== 'confirmado' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleConfirm(reservation)}
-                            title="Confirmar reserva"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleResendEmail(reservation)}
-                          title="Reenviar email"
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => openEdit(reservation)}>
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(reservation)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Lista de Reservas</h2>
+              <p className="text-sm text-slate-500">Gestioná las reservas y sus estados.</p>
+            </div>
+          </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
-          <DialogHeader>
-            <DialogTitle>{editReservation ? 'Editar Reserva' : 'Nueva Reserva'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              {fields.map((field) => (
-                <div key={field.name} className={field.name === 'vuelo_salida' || field.name === 'precio_venta' || field.name === 'neto_1' ? 'col-span-1' : 'col-span-2'}>
-                  <Label htmlFor={field.name}>
-                    {field.label} {field.required && '*'}
-                  </Label>
-                  {field.type === 'select' ? (
-                    <Select
-                      value={formState[field.name] || ''}
-                      onValueChange={(value) => setFormState({ ...formState, [field.name]: value })}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder={`Selecciona un ${field.label.toLowerCase()}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {estados.map((estado) => (
-                          <SelectItem key={estado.value} value={estado.value}>
-                            {estado.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : field.type === 'date' ? (
-                    <Input
-                      id={field.name}
-                      type="date"
-                      name={field.name}
-                      value={formState[field.name] ? formState[field.name].split('T')[0] : ''}
-                      onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                      className="mt-1"
-                      required={field.required}
-                    />
-                  ) : (
-                    <Input
-                      id={field.name}
-                      type={field.type || 'text'}
-                      name={field.name}
-                      value={formState[field.name] ?? ''}
-                      onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                      className="mt-1"
-                      required={field.required}
-                    />
-                  )}
-                </div>
+          {/* Buscador */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Buscar por pedido, contacto, destino o agencia..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+
+          {/* Filtros de estado */}
+          {estados.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Estado:</span>
+              {estados.map((est) => (
+                <button
+                  key={est}
+                  type="button"
+                  onClick={() => setEstadoFilter(est)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                    }`}
+                >
+                  {est !== 'Todas' && getEstadoLabel(est)}
+                  {est === 'Todas' && 'Todas'}
+                </button>
               ))}
             </div>
+          )}
+        </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-              <Button type="submit">
-                <Check className="h-4 w-4 mr-2" />
-                Guardar
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div >
+        <TableComponent>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-center">ID Pedido</TableHead>
+              <TableHead className="text-center">Agencia</TableHead>
+              <TableHead className="text-center">Contacto</TableHead>
+              <TableHead className="text-center">Vuelo</TableHead>
+              <TableHead className="text-center">Destino</TableHead>
+              <TableHead className="text-center">Salida</TableHead>
+              <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell className="text-center py-10" colSpan={8}>
+                  Cargando reservas...
+                </TableCell>
+              </TableRow>
+            ) : filteredReservations.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-10" colSpan={8}>
+                  {searchTerm || estadoFilter !== 'Todas'
+                    ? 'No se encontraron reservas con los filtros aplicados.'
+                    : 'No hay reservas registradas.'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredReservations.map((reservation) => (
+                <TableRow key={reservation.id}>
+                  <TableCell className="text-center font-medium">{reservation.pedido_id}</TableCell>
+                  <TableCell className="text-center">{reservation.agencia || '—'}</TableCell>
+                  <TableCell className="text-center">{reservation.contacto_nombre || '—'}</TableCell>
+                  <TableCell className="text-center">{reservation.vuelo_codigo || '—'}</TableCell>
+                  <TableCell className="text-center">{reservation.vuelo_destino || '—'}</TableCell>
+                  <TableCell className="text-center">{formatDate(reservation.vuelo_salida)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant={getEstadoVariant(reservation.estado)}>
+                      {getEstadoLabel(reservation.estado)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {reservation.estado && reservation.estado !== 'confirmado' && (
+                        <Button variant="ghost" size="sm" onClick={() => handleConfirm(reservation)} title="Confirmar reserva">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => handleResendEmail(reservation)} title="Reenviar email">
+                        <Send className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(reservation)} title="Editar reserva">
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(reservation)} title="Eliminar reserva" className="text-red-600 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </TableComponent>
+      </Card>
+
+      {/* Modal de Crear/Editar Reserva */}
+      <Modal title={editReservation ? 'Editar Reserva' : 'Nueva Reserva'} open={dialogOpen} onClose={closeDialog}>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-2 gap-4">
+            {fields.map((field) => (
+              <div key={field.name} className={field.type === 'textarea' ? 'col-span-2' : 'col-span-1'}>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  {field.label} {field.required && '*'}
+                </label>
+                {field.type === 'select' ? (
+                  <select
+                    value={formState[field.name] || ''}
+                    onChange={(e) => handleFormChange(field.name, e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 bg-white"
+                  >
+                    {estadoOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type || 'text'}
+                    value={formState[field.name] ? (field.type === 'date' ? String(formState[field.name]).split('T')[0] : formState[field.name]) : ''}
+                    onChange={(e) => handleFormChange(field.name, e.target.value)}
+                    required={field.required}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    placeholder={field.label}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+            <Button variant="secondary" type="button" onClick={closeDialog}>
+              <X className="h-4 w-4 mr-1" />Cancelar
+            </Button>
+            <Button type="submit">
+              Guardar
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
   );
 }
