@@ -128,3 +128,70 @@ export const deleteProduct = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar el producto', details: err.message });
   }
 };
+
+// Carga masiva de productos
+export const bulkCreateProducts = async (req, res) => {
+  const { products } = req.body;
+
+  if (!Array.isArray(products) || products.length === 0) {
+    return res.status(400).json({ error: 'Se requiere un array de productos no vacío.' });
+  }
+
+  // Importar pool para obtener un cliente para la transacción
+  const { default: pool } = await import('../db.js');
+  const client = await pool.connect();
+
+  try {
+    const insertedProducts = [];
+    const errors = [];
+
+    // Usar una transacción para asegurar que todos se inserten o ninguno
+    await client.query('BEGIN');
+
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      try {
+        if (!p.codigo_cupo || !p.destino || !p.compania || !p.disponibilidad) {
+          throw new Error(`Faltan campos obligatorios en el producto en la posición ${i}`);
+        }
+
+        const result = await client.query(
+          `INSERT INTO products (
+            codigo_cupo, destino, compania, disponibilidad, salida, regreso,
+            fecha_salida, fecha_regreso, precio, ruta, pnr, ficha, temporada,
+            neto_1, op, carryon, handbag, checkedbag, inf_fare
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
+          [
+            p.codigo_cupo, p.destino, p.compania, p.disponibilidad, p.salida, p.regreso,
+            p.fecha_salida, p.fecha_regreso, p.precio, p.ruta, p.pnr, p.ficha, p.temporada,
+            p.neto_1, p.op, p.carryon, p.handbag, p.checkedbag, p.inf_fare
+          ]
+        );
+        insertedProducts.push(result.rows[0]);
+      } catch (err) {
+        errors.push({ index: i, error: err.message });
+      }
+    }
+
+    if (errors.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Error en la carga masiva. Se realizó un rollback.',
+        details: errors
+      });
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({
+      success: true,
+      message: `${insertedProducts.length} productos insertados correctamente.`,
+      count: insertedProducts.length
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('💥 Error en bulkCreateProducts:', err);
+    res.status(500).json({ error: 'Error al procesar la carga masiva.' });
+  } finally {
+    client.release();
+  }
+};
