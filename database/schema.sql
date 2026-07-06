@@ -215,6 +215,21 @@ CREATE TABLE IF NOT EXISTS public.reservations (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Tabla de pasajeros asociados a una reserva/pedido
+CREATE TABLE IF NOT EXISTS public.passengers (
+    id SERIAL PRIMARY KEY,
+    reservation_id INTEGER REFERENCES public.reservations(id) ON DELETE CASCADE,
+    pedido_id VARCHAR(255) NOT NULL,
+    nombre VARCHAR(255) NOT NULL,
+    apellido VARCHAR(255) NOT NULL,
+    documento VARCHAR(255),
+    nacimiento DATE,
+    nacionalidad VARCHAR(255),
+    tipo_pasajero VARCHAR(255) DEFAULT 'Adulto',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.system_settings (
     key VARCHAR(255) PRIMARY KEY,
     value JSONB NOT NULL,

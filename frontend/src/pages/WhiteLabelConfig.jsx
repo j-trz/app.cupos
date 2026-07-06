@@ -10,7 +10,7 @@ import {
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 
-const TABS = [
+const tabs = [
     { id: 'identity', label: 'Identidad', icon: Building2 },
     { id: 'colors', label: 'Colores', icon: Palette },
     { id: 'fonts', label: 'Tipografías', icon: Type },
@@ -261,20 +261,19 @@ export default function WhiteLabelConfig() {
                 }
             />
 
+            {/* Tabs */}
             <div className="flex flex-col lg:flex-row gap-6">
-                {/* Tabs */}
                 <div className="w-full lg:w-64 shrink-0">
-                    <div className="bg-white rounded-2xl border border-slate-200 p-2 space-y-1">
-                        {TABS.map(tab => {
+                    <div className="bg-white rounded-2xl border border-slate-200 p-2 space-y-1 flex">
+                        {tabs.map(tab => {
                             const Icon = tab.icon;
-                            const active = activeTab === tab.id;
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${active
-                                            ? 'bg-slate-900 text-white'
-                                            : 'text-slate-600 hover:bg-slate-100'
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${activeTab === tab.id
+                                        ? 'bg-slate-900 text-white'
+                                        : 'text-slate-600 hover:bg-slate-100'
                                         }`}
                                 >
                                     <Icon className="h-4 w-4" />
@@ -284,253 +283,425 @@ export default function WhiteLabelConfig() {
                         })}
                     </div>
                 </div>
+            </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    {activeTab === 'identity' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Identidad de la marca</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Nombre de la agencia</label>
-                                    <input
-                                        type="text"
-                                        value={config?.identity?.agency_name || ''}
-                                        onChange={(e) => handleIdentityChange('agency_name', e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Email de contacto</label>
-                                    <input
-                                        type="email"
-                                        value={config?.identity?.contact_email || ''}
-                                        onChange={(e) => handleIdentityChange('contact_email', e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Eslogan</label>
-                                    <input
-                                        type="text"
-                                        value={config?.identity?.slogan || ''}
-                                        onChange={(e) => handleIdentityChange('slogan', e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'colors' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Colores</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {['primary', 'secondary', 'background', 'text', 'accent', 'border'].map(colorKey => (
-                                    <div key={colorKey}>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{colorKey}</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                value={config?.colors?.[colorKey] || '#000000'}
-                                                onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                                                className="h-10 w-14 rounded border border-slate-300"
-                                            />
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+                {activeTab === 'identity' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        {activeTab === 'fonts' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">Tipografías</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {['heading', 'body'].map(fontKey => (
+                                        <div key={fontKey}>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{fontKey === 'heading' ? 'Títulos' : 'Cuerpo'}</label>
                                             <input
                                                 type="text"
-                                                value={config?.colors?.[colorKey] || ''}
-                                                onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                                                className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                                value={config?.fonts?.[fontKey] || ''}
+                                                onChange={(e) => handleFontChange(fontKey, e.target.value)}
+                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                                             />
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                            {themePresets.length > 0 && (
-                                <div className="pt-4 border-t border-slate-200">
-                                    <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de temas</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {themePresets.map(preset => (
-                                            <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyThemePreset(preset)}>
-                                                {preset.name}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'fonts' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Tipografías</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {['heading', 'body'].map(fontKey => (
-                                    <div key={fontKey}>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{fontKey === 'heading' ? 'Títulos' : 'Cuerpo'}</label>
-                                        <input
-                                            type="text"
-                                            value={config?.fonts?.[fontKey] || ''}
-                                            onChange={(e) => handleFontChange(fontKey, e.target.value)}
-                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            {fontPresets.length > 0 && (
-                                <div className="pt-4 border-t border-slate-200">
-                                    <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de fuentes</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {fontPresets.map(preset => (
-                                            <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyFontPreset(preset)}>
-                                                {preset.name}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'buttons' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Botones</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {['borderRadius', 'paddingX', 'paddingY'].map(key => (
-                                    <div key={key}>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600">{key}</label>
-                                        <input
-                                            type="text"
-                                            value={config?.buttons?.[key] || ''}
-                                            onChange={(e) => handleButtonChange(key, e.target.value)}
-                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            {buttonPresets.length > 0 && (
-                                <div className="pt-4 border-t border-slate-200">
-                                    <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de botones</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {buttonPresets.map(preset => (
-                                            <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyButtonPreset(preset)}>
-                                                {preset.name}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'sidebar' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Sidebar</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Ancho</label>
-                                    <input
-                                        type="text"
-                                        value={config?.sidebar?.width || ''}
-                                        onChange={(e) => handleSidebarChange('width', e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Color de fondo</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="color"
-                                            value={config?.sidebar?.backgroundColor || '#000000'}
-                                            onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
-                                            className="h-10 w-14 rounded border border-slate-300"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={config?.sidebar?.backgroundColor || ''}
-                                            onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
-                                            className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
-                                    </div>
+                                    ))}
+                                    {fontPresets.length > 0 && (
+                                        <div className="pt-4 border-t border-slate-200">
+                                            <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de fuentes</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                                {fontPresets.map(preset => (
+                                                    <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyFontPreset(preset)}>
+                                                        {preset.name}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'layout' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Layout</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {['maxWidth', 'padding'].map(key => (
-                                    <div key={key}>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
-                                        <input
-                                            type="text"
-                                            value={config?.layout?.[key] || ''}
-                                            onChange={(e) => handleLayoutChange(key, e.target.value)}
-                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'emails' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Emails</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {['headerColor', 'footerText', 'logoUrl'].map(key => (
-                                    <div key={key} className={key === 'footerText' ? 'md:col-span-2' : ''}>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
-                                        {key === 'headerColor' ? (
+                        )}
+                        {activeTab === 'colors' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'colors' && 'Colores'}</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {['primary', 'secondary', 'background', 'text', 'accent', 'border'].map(colorKey => (
+                                        <div key={colorKey}>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{colorKey}</label>
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="color"
-                                                    value={config?.emails?.[key] || '#000000'}
-                                                    onChange={(e) => handleEmailsChange(key, e.target.value)}
+                                                    value={config?.colors?.[colorKey] || '#000000'}
+                                                    onChange={(e) => handleColorChange(colorKey, e.target.value)}
                                                     className="h-10 w-14 rounded border border-slate-300"
                                                 />
                                                 <input
                                                     type="text"
-                                                    value={config?.emails?.[key] || ''}
-                                                    onChange={(e) => handleEmailsChange(key, e.target.value)}
+                                                    value={config?.colors?.[colorKey] || ''}
+                                                    onChange={(e) => handleColorChange(colorKey, e.target.value)}
                                                     className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                                                 />
                                             </div>
-                                        ) : (
+                                        </div>
+                                    ))}
+                                    {themePresets.length > 0 && (
+                                        <div className="pt-4 border-t border-slate-200">
+                                            <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de temas</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                                {themePresets.map(preset => (
+                                                    <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyThemePreset(preset)}>
+                                                        {preset.name}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        <h3 className="text-lg font-semibold text-slate-900">Identidad de la marca</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Nombre de la agencia</label>
+                                <input
+                                    type="text"
+                                    value={config?.identity?.agency_name || ''}
+                                    onChange={(e) => handleIdentityChange('agency_name', e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Email de contacto</label>
+                                <input
+                                    type="email"
+                                    value={config?.identity?.contact_email || ''}
+                                    onChange={(e) => handleIdentityChange('contact_email', e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Eslogan</label>
+                                <input
+                                    type="text"
+                                    value={config?.identity?.slogan || ''}
+                                    onChange={(e) => handleIdentityChange('slogan', e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'colors' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        {activeTab === 'layout' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">Layout</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {['maxWidth', 'padding'].map(key => (
+                                        <div key={key}>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
+                                            <input
+                                                type="text"
+                                                value={config?.layout?.[key] || ''}
+                                                onChange={(e) => handleLayoutChange(key, e.target.value)}
+                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'sidebar' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'sidebar' && 'Sidebar'}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="mb-1 block text-xs font-medium text-slate-600">Ancho</label>
+                                        <input
+                                            type="text"
+                                            value={config?.sidebar?.width || ''}
+                                            onChange={(e) => handleSidebarChange('width', e.target.value)}
+                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs font-medium text-slate-600">Color de fondo</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={config?.sidebar?.backgroundColor || '#000000'}
+                                                onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
+                                                className="h-10 w-14 rounded border border-slate-300"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={config?.sidebar?.backgroundColor || ''}
+                                                onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
+                                                className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'colors' && 'Colores'}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {['primary', 'secondary', 'background', 'text', 'accent', 'border'].map(colorKey => (
+                                <div key={colorKey}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{colorKey}</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="color"
+                                            value={config?.colors?.[colorKey] || '#000000'}
+                                            onChange={(e) => handleColorChange(colorKey, e.target.value)}
+                                            className="h-10 w-14 rounded border border-slate-300"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={config?.colors?.[colorKey] || ''}
+                                            onChange={(e) => handleColorChange(colorKey, e.target.value)}
+                                            className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {themePresets.length > 0 && (
+                            <div className="pt-4 border-t border-slate-200">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de temas</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {themePresets.map(preset => (
+                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyThemePreset(preset)}>
+                                            {preset.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'fonts' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        {activeTab === 'legal' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'legal' && 'Legal'}</h3>
+                                <div className="space-y-4">
+                                    {['termsUrl', 'privacyUrl'].map(key => (
+                                        <div key={key}>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key === 'termsUrl' ? 'URL Términos' : 'URL Privacidad'}</label>
+                                            <input
+                                                type="text"
+                                                value={config?.legal?.[key] || ''}
+                                                onChange={(e) => handleLegalChange(key, e.target.value)}
+                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'emails' && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">Emails</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {['headerColor', 'footerText', 'logoUrl'].map(key => (
+                                        <div key={key} className={key === 'footerText' ? 'md:col-span-2' : ''}>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
+                                            {key === 'headerColor' ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="color"
+                                                        value={config?.emails?.[key] || '#000000'}
+                                                        onChange={(e) => handleEmailsChange(key, e.target.value)}
+                                                        className="h-10 w-14 rounded border border-slate-300"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={config?.emails?.[key] || ''}
+                                                        onChange={(e) => handleEmailsChange(key, e.target.value)}
+                                                        className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    type="text"
+                                                    value={config?.emails?.[key] || ''}
+                                                    onChange={(e) => handleEmailsChange(key, e.target.value)}
+                                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'fonts' && 'Tipografías'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['heading', 'body'].map(fontKey => (
+                                <div key={fontKey}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{fontKey === 'heading' ? 'Títulos' : 'Cuerpo'}</label>
+                                    <input
+                                        type="text"
+                                        value={config?.fonts?.[fontKey] || ''}
+                                        onChange={(e) => handleFontChange(fontKey, e.target.value)}
+                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        {fontPresets.length > 0 && (
+                            <div className="pt-4 border-t border-slate-200">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de fuentes</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {fontPresets.map(preset => (
+                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyFontPreset(preset)}>
+                                            {preset.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'buttons' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'buttons' && 'Botones'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['borderRadius', 'paddingX', 'paddingY'].map(key => (
+                                <div key={key}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600">{key}</label>
+                                    <input
+                                        type="text"
+                                        value={config?.buttons?.[key] || ''}
+                                        onChange={(e) => handleButtonChange(key, e.target.value)}
+                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        {buttonPresets.length > 0 && (
+                            <div className="pt-4 border-t border-slate-200">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de botones</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {buttonPresets.map(preset => (
+                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyButtonPreset(preset)}>
+                                            {preset.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'sidebar' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'sidebar' && 'Sidebar'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Ancho</label>
+                                <input
+                                    type="text"
+                                    value={config?.sidebar?.width || ''}
+                                    onChange={(e) => handleSidebarChange('width', e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Color de fondo</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={config?.sidebar?.backgroundColor || '#000000'}
+                                        onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
+                                        className="h-10 w-14 rounded border border-slate-300"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={config?.sidebar?.backgroundColor || ''}
+                                        onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
+                                        className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'layout' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'layout' && 'Layout'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['maxWidth', 'padding'].map(key => (
+                                <div key={key}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
+                                    <input
+                                        type="text"
+                                        value={config?.layout?.[key] || ''}
+                                        onChange={(e) => handleLayoutChange(key, e.target.value)}
+                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'emails' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'emails' && 'Emails'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['headerColor', 'footerText', 'logoUrl'].map(key => (
+                                <div key={key} className={key === 'footerText' ? 'md:col-span-2' : ''}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
+                                    {key === 'headerColor' ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={config?.emails?.[key] || '#000000'}
+                                                onChange={(e) => handleEmailsChange(key, e.target.value)}
+                                                className="h-10 w-14 rounded border border-slate-300"
+                                            />
                                             <input
                                                 type="text"
                                                 value={config?.emails?.[key] || ''}
                                                 onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                                className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                                             />
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'legal' && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Legal</h3>
-                            <div className="space-y-4">
-                                {['termsUrl', 'privacyUrl'].map(key => (
-                                    <div key={key}>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key === 'termsUrl' ? 'URL Términos' : 'URL Privacidad'}</label>
+                                        </div>
+                                    ) : (
                                         <input
                                             type="text"
-                                            value={config?.legal?.[key] || ''}
-                                            onChange={(e) => handleLegalChange(key, e.target.value)}
+                                            value={config?.emails?.[key] || ''}
+                                            onChange={(e) => handleEmailsChange(key, e.target.value)}
                                             className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                                         />
-                                    </div>
-                                ))}
-                            </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
+
+                {activeTab === 'legal' && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'legal' && 'Legal'}</h3>
+                        <div className="space-y-4">
+                            {['termsUrl', 'privacyUrl'].map(key => (
+                                <div key={key}>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key === 'termsUrl' ? 'URL Términos' : 'URL Privacidad'}</label>
+                                    <input
+                                        type="text"
+                                        value={config?.legal?.[key] || ''}
+                                        onChange={(e) => handleLegalChange(key, e.target.value)}
+                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Preview */}
@@ -564,6 +735,6 @@ export default function WhiteLabelConfig() {
                     Guardar configuración
                 </Button>
             </div>
-        </div>
+        </div >
     );
 }

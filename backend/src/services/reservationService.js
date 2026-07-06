@@ -74,13 +74,7 @@ const getLatestReservationData = (product, body) => {
     vuelo_codigo: body.vuelo_codigo || product.codigo_cupo || '',
     vuelo_destino: body.vuelo_destino || product.destino || '',
     vuelo_compania: body.vuelo_compania || product.compania || '',
-    vuelo_salida: body.vuelo_salida || product.fecha_salida || null,
-    nombre_pasajero: body.nombre_pasajero || '',
-    apellido_pasajero: body.apellido_pasajero || '',
-    documento_pasajero: body.documento_pasajero || '',
-    nacimiento_pasajero: body.nacimiento_pasajero || null,
-    nacionalidad_pasajero: body.nacionalidad_pasajero || null,
-    tipo_pasajero: body.tipo_pasajero || null
+    vuelo_salida: body.vuelo_salida || product.fecha_salida || null
   };
 };
 
@@ -199,7 +193,18 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
     throw new Error('Este cupo está bloqueado para venta.');
   }
 
-  if (product.disponibilidad <= 0) {
+  const passengers = Array.isArray(body.passengers) && body.passengers.length > 0
+    ? body.passengers
+    : [{
+        nombre: body.nombre_pasajero,
+        apellido: body.apellido_pasajero,
+        documento: body.documento_pasajero,
+        nacimiento: body.nacimiento_pasajero,
+        nacionalidad: body.nacionalidad_pasajero,
+        tipo_pasajero: body.tipo_pasajero
+      }];
+
+  if (product.disponibilidad < passengers.length) {
     throw new Error('No hay disponibilidad suficiente para este paquete.');
   }
 
@@ -207,14 +212,15 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
   const bloque_at = new Date();
   const expiresAt = new Date(bloque_at.getTime() + blockMinutes * 60 * 1000);
   const reservationData = getLatestReservationData(product, body);
-  const agencia = body.agencia || body.agencia || (body.agencia === undefined ? null : body.agencia);
+  const reservationAgency = normalizeReservationAgency(body);
+  const mainPassenger = passengers[0];
 
   try {
     await query('BEGIN');
 
     const productUpdate = await query(
-      'UPDATE products SET disponibilidad = disponibilidad - 1, updated_at = NOW() WHERE id = $1 AND disponibilidad > 0 RETURNING disponibilidad, is_blocked_for_sale',
-      [productId]
+      'UPDATE products SET disponibilidad = disponibilidad - $2, updated_at = NOW() WHERE id = $1 AND disponibilidad >= $2 RETURNING disponibilidad, is_blocked_for_sale',
+      [productId, passengers.length]
     );
 
     if (productUpdate.rows.length === 0) {
@@ -222,8 +228,8 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
     }
 
     const updatedProduct = { ...product, disponibilidad: productUpdate.rows[0].disponibilidad };
-  const reservationAgency = normalizeReservationAgency(body);
-  const inserted = await query(
+
+    const inserted = await query(
       `INSERT INTO reservations (
         product_id, created_by, estado, bloqueo_expira_at,
         precio_venta, neto_1, pedido_id, agencia, contacto_nombre, contacto_email,
@@ -249,6 +255,7 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
         reservationData.neto_1,
         body.pedido_id,
         reservationAgency,
+        body.contacto_nombre,
         body.contacto_email,
         body.contacto_telefono || null,
         reservationData.vuelo_codigo,
@@ -256,12 +263,12 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
         reservationData.vuelo_compania,
         reservationData.vuelo_salida,
         reservationData.vuelo_precio,
-        reservationData.nombre_pasajero,
-        reservationData.apellido_pasajero,
-        reservationData.documento_pasajero,
-        reservationData.nacimiento_pasajero,
-        reservationData.nacionalidad_pasajero,
-        reservationData.tipo_pasajero,
+        mainPassenger.nombre,
+        mainPassenger.apellido,
+        mainPassenger.documento || null,
+        mainPassenger.nacimiento || null,
+        mainPassenger.nacionalidad || null,
+        mainPassenger.tipo_pasajero || null,
         body.ficha_venta || null,
         body.doc_contable || null,
         new Date(expiresAt.getTime() + (24 * 60 * 60 * 1000))
@@ -269,6 +276,15 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
     );
 
     const reservation = inserted.rows[0];
+
+    // Insertar pasajeros adicionales
+    for (const passenger of passengers.slice(1)) {
+      await query(
+        `INSERT INTO passengers (reservation_id, pedido_id, nombre, apellido, documento, nacimiento, nacionalidad, tipo_pasajero, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+        [reservation.id, body.pedido_id, passenger.nombre, passenger.apellido, passenger.documento || null, passenger.nacimiento || null, passenger.nacionalidad || null, passenger.tipo_pasajero || 'Adulto']
+      );
+    }
 
     await createNotification({
       type: 'reservation_blocked',
@@ -287,7 +303,8 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
           product_destino: product.destino,
           expires_at: expiresAt.toISOString(),
           minutos_restantes: blockMinutes,
-          precio_venta: reservation.precio_venta
+          precio_venta: reservation.precio_venta,
+          cantidad_pasajeros: passengers.length
         });
       } catch (error) {
         console.error('Error enviando email de bloqueo temporal:', error.message);
@@ -300,7 +317,7 @@ export const createTemporaryReservation = async ({ productId, createdBy, body })
     });
 
     await query('COMMIT');
-    return reservation;
+    return { ...reservation, passengers };
   } catch (error) {
     await query('ROLLBACK');
     throw error;

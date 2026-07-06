@@ -16,12 +16,7 @@ const EMPTY_FORM = {
   contacto_nombre: '',
   contacto_email: '',
   contacto_telefono: '',
-  nombre_pasajero: '',
-  apellido_pasajero: '',
-  documento_pasajero: '',
-  nacimiento_pasajero: '',
-  nacionalidad_pasajero: '',
-  tipo_pasajero: 'Adulto',
+  passengers: [],
   ficha_venta: '',
   doc_contable: '',
 };
@@ -92,7 +87,7 @@ export default function Availability() {
   // ---- Reserva individual ----
   const openReservationModal = (product) => {
     setSelectedProduct(product);
-    setForm({ ...EMPTY_FORM, pedido_id: ReservationService.generatePedidoId() });
+    setForm({ ...EMPTY_FORM, pedido_id: ReservationService.generatePedidoId(), passengers: [] });
     setModalOpen(true);
   };
 
@@ -104,6 +99,29 @@ export default function Availability() {
 
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddPassenger = () => {
+    setForm((prev) => ({
+      ...prev,
+      passengers: [...prev.passengers, { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', tipo_pasajero: 'Adulto' }],
+    }));
+  };
+
+  const handleRemovePassenger = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      passengers: prev.passengers.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handlePassengerChange = (index, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      passengers: prev.passengers.map((passenger, i) =>
+        i === index ? { ...passenger, [field]: value } : passenger
+      ),
+    }));
   };
 
   const handleSubmitReservation = async (e) => {
@@ -126,12 +144,6 @@ export default function Availability() {
         contacto_nombre: form.contacto_nombre,
         contacto_email: form.contacto_email,
         contacto_telefono: form.contacto_telefono,
-        nombre_pasajero: form.nombre_pasajero,
-        apellido_pasajero: form.apellido_pasajero,
-        documento_pasajero: form.documento_pasajero,
-        nacimiento_pasajero: form.nacimiento_pasajero,
-        nacionalidad_pasajero: form.nacionalidad_pasajero,
-        tipo_pasajero: form.tipo_pasajero,
         ficha_venta: form.ficha_venta || null,
         doc_contable: form.doc_contable || null,
         vuelo_destino: selectedProduct.destino,
@@ -140,8 +152,13 @@ export default function Availability() {
         vuelo_precio: selectedProduct.precio,
         precio_venta: selectedProduct.precio,
         vuelo_codigo: selectedProduct.codigo_cupo,
+        passengers: form.passengers,
       };
       const result = await ReservationService.submitReservation(payload);
+      setForm((prev) => ({
+        ...prev,
+        passengers: [EMPTY_FORM],
+      }));
       Swal.fire({
         icon: 'success',
         title: '¡Reserva creada!',
@@ -310,6 +327,7 @@ export default function Availability() {
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-slate-500">Compañía:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.compania}</span></div>
+              <div><span className="text-slate-500">Cantidad de Pasajeros:</span><span className="ml-2 font-medium text-slate-900">{form.passengers.length}</span></div>
               <div><span className="text-slate-500">Salida:</span><span className="ml-2 font-medium text-slate-900">{formatDate(selectedProduct?.fecha_salida)}</span></div>
               <div><span className="text-slate-500">Regreso:</span><span className="ml-2 font-medium text-slate-900">{formatDate(selectedProduct?.fecha_regreso)}</span></div>
               <div><span className="text-slate-500">Temporada:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.temporada || '—'}</span></div>
@@ -344,9 +362,48 @@ export default function Availability() {
           <fieldset className="rounded-2xl border border-slate-200 p-4">
             <legend className="px-2 text-sm font-semibold text-slate-700">Datos del pasajero</legend>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Nombre *</label>
-                <input type="text" value={form.nombre_pasajero} onChange={(e) => handleFormChange('nombre_pasajero', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: María" />
+              <div className="grid gap-3">
+                {form.passengers.map((passenger, index) => (
+                  <fieldset key={index} className="rounded-2xl border border-slate-200 p-4">
+                    <legend className="px-2 text-sm font-semibold text-slate-700">Pasajero {index + 1}</legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Nombre *</label>
+                        <input type="text" value={passenger.nombre} onChange={(e) => handlePassengerChange(index, 'nombre', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: María" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Apellido *</label>
+                        <input type="text" value={passenger.apellido} onChange={(e) => handlePassengerChange(index, 'apellido', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: González" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Documento</label>
+                        <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad</label>
+                        <input type="text" value={passenger.nacionalidad} onChange={(e) => handlePassengerChange(index, 'nacionalidad', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Argentina" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600"><Calendar className="inline h-3 w-3 mr-1" />Fecha de nacimiento</label>
+                        <input type="date" value={passenger.nacimiento} onChange={(e) => handlePassengerChange(index, 'nacimiento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Tipo de pasajero</label>
+                        <select value={passenger.tipo_pasajero} onChange={(e) => handlePassengerChange(index, 'tipo_pasajero', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 bg-white">
+                          {TIPO_PASAJERO_OPTIONS.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end">
+                      <Button variant="secondary" size="sm" onClick={() => handleRemovePassenger(index)} disabled={form.passengers.length === 1}>
+                        <X className="h-4 w-4 mr-1" />Remover
+                      </Button>
+                    </div>
+                  </fieldset>
+                ))}
+                <Button variant="secondary" size="sm" onClick={() => handleAddPassenger()}>
+                  <Plus className="h-4 w-4 mr-1" />Agregar Pasajero
+                </Button>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">Apellido *</label>
@@ -388,7 +445,7 @@ export default function Availability() {
           </fieldset>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="secondary" type="button" onClick={closeReservationModal} disabled={submitting}>
+            <Button variant="secondary" type="button" onClick={closeReservationModal} disabled={submitting} className="mr-2">
               <X className="h-4 w-4 mr-1" />Cancelar
             </Button>
             <Button type="submit" disabled={submitting}>

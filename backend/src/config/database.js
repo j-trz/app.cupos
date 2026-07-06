@@ -131,12 +131,29 @@ const initializeDatabase = async () => {
         vuelo_compania VARCHAR(255) NOT NULL,
         vuelo_salida DATE NOT NULL,
         vuelo_precio NUMERIC(10, 2), -- Puede corresponder al precio de venta histórico
-        nombre_pasajero VARCHAR(255) NOT NULL,
-        apellido_pasajero VARCHAR(255) NOT NULL,
-        documento_pasajero VARCHAR(255) NOT NULL,
+        nombre_pasajero VARCHAR(255),
+        apellido_pasajero VARCHAR(255),
+        documento_pasajero VARCHAR(255),
         nacimiento_pasajero DATE,
         nacionalidad_pasajero VARCHAR(255),
         tipo_pasajero VARCHAR(255),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // Crear tabla passengers para soporte multi-pasajero por pedido
+    await query(`
+      CREATE TABLE IF NOT EXISTS passengers (
+        id SERIAL PRIMARY KEY,
+        reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
+        pedido_id VARCHAR(255) NOT NULL,
+        nombre VARCHAR(255) NOT NULL,
+        apellido VARCHAR(255) NOT NULL,
+        documento VARCHAR(255),
+        nacimiento DATE,
+        nacionalidad VARCHAR(255),
+        tipo_pasajero VARCHAR(255) DEFAULT 'Adulto',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
