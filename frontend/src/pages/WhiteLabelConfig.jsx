@@ -238,7 +238,7 @@ export default function WhiteLabelConfig() {
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Restablecer
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={saving}>
+                        <Button size="sm" onClick={handleSave} disabled={saving} className='border'>
                             {saving ? (
                                 <>
                                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />

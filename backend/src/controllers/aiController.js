@@ -176,7 +176,7 @@ export const updateSessionTitle = async (req, res) => {
 export const getProviders = async (req, res) => {
   try {
     const result = await query(
-      `SELECT id, name, provider_type, default_model, is_active, is_default, 
+      `SELECT id, name, display_name, default_model, is_active, is_default, 
               temperature, max_tokens, created_at, updated_at
        FROM ai_providers 
        ORDER BY is_default DESC, name ASC`
@@ -206,7 +206,7 @@ export const getProviderById = async (req, res) => {
     const { id } = req.params;
 
     const result = await query(
-      `SELECT id, name, provider_type, default_model, api_endpoint, 
+      `SELECT id, name, display_name, default_model, base_url, 
               is_active, is_default, temperature, max_tokens, created_at, updated_at
        FROM ai_providers 
        WHERE id = $1`,
@@ -237,9 +237,9 @@ export const createProvider = async (req, res) => {
   try {
     const {
       name,
-      provider_type,
+      display_name,
       api_key,
-      api_endpoint,
+      base_url,
       default_model,
       temperature,
       max_tokens,
@@ -247,8 +247,8 @@ export const createProvider = async (req, res) => {
       is_default
     } = req.body;
 
-    if (!name || !provider_type) {
-      return res.status(400).json({ error: 'Nombre y tipo de proveedor son requeridos' });
+    if (!name || !display_name) {
+      return res.status(400).json({ error: 'Nombre y nombre para mostrar son requeridos' });
     }
 
     // Si es el proveedor por defecto, desactivar otros
@@ -258,16 +258,16 @@ export const createProvider = async (req, res) => {
 
     const result = await query(
       `INSERT INTO ai_providers (
-        name, provider_type, api_key_encrypted, api_endpoint, 
+        name, display_name, api_key_encrypted, base_url, 
         default_model, temperature, max_tokens, is_active, is_default
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, name, provider_type, default_model, api_endpoint, 
+      RETURNING id, name, display_name, default_model, base_url, 
                 is_active, is_default, temperature, max_tokens, created_at`,
       [
         name,
-        provider_type,
+        display_name,
         api_key,
-        api_endpoint,
+        base_url,
         default_model || 'gpt-4o',
         temperature || 0.7,
         max_tokens || 4096,
@@ -298,9 +298,9 @@ export const updateProvider = async (req, res) => {
     const { id } = req.params;
     const {
       name,
-      provider_type,
+      display_name,
       api_key,
-      api_endpoint,
+      base_url,
       default_model,
       temperature,
       max_tokens,
@@ -322,17 +322,17 @@ export const updateProvider = async (req, res) => {
       updates.push(`name = $${paramIndex++}`);
       values.push(name);
     }
-    if (provider_type !== undefined) {
-      updates.push(`provider_type = $${paramIndex++}`);
-      values.push(provider_type);
+    if (display_name !== undefined) {
+      updates.push(`display_name = $${paramIndex++}`);
+      values.push(display_name);
     }
     if (api_key !== undefined) {
       updates.push(`api_key_encrypted = $${paramIndex++}`);
       values.push(api_key);
     }
-    if (api_endpoint !== undefined) {
-      updates.push(`api_endpoint = $${paramIndex++}`);
-      values.push(api_endpoint);
+    if (base_url !== undefined) {
+      updates.push(`base_url = $${paramIndex++}`);
+      values.push(base_url);
     }
     if (default_model !== undefined) {
       updates.push(`default_model = $${paramIndex++}`);
@@ -366,7 +366,7 @@ export const updateProvider = async (req, res) => {
       `UPDATE ai_providers 
        SET ${updates.join(', ')} 
        WHERE id = $${paramIndex}
-       RETURNING id, name, provider_type, default_model, api_endpoint, 
+       RETURNING id, name, display_name, default_model, base_url, 
                  is_active, is_default, temperature, max_tokens, created_at, updated_at`,
       values
     );
@@ -458,8 +458,8 @@ export const testProvider = async (req, res) => {
 export const getActions = async (req, res) => {
   try {
     const result = await query(
-      `SELECT id, name, description, action_type, endpoint, 
-              method, parameters, is_active, created_at
+      `SELECT id, name, description, category, endpoint, 
+              method, parameters_schema, is_active, created_at
        FROM ai_actions 
        WHERE is_active = true
        ORDER BY name ASC`
@@ -483,30 +483,30 @@ export const createAction = async (req, res) => {
     const {
       name,
       description,
-      action_type,
+      category,
       endpoint,
       method,
-      parameters,
+      parameters_schema,
       is_active
     } = req.body;
 
-    if (!name || !action_type) {
-      return res.status(400).json({ error: 'Nombre y tipo de acción son requeridos' });
+    if (!name || !category) {
+      return res.status(400).json({ error: 'Nombre y categoría son requeridos' });
     }
 
     const result = await query(
       `INSERT INTO ai_actions (
-        name, description, action_type, endpoint, method, parameters, is_active
+        name, description, category, endpoint, method, parameters_schema, is_active
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, name, description, action_type, endpoint, method, 
-                parameters, is_active, created_at`,
+      RETURNING id, name, description, category, endpoint, method, 
+                parameters_schema, is_active, created_at`,
       [
         name,
         description,
-        action_type,
+        category,
         endpoint,
         method || 'GET',
-        parameters || {},
+        parameters_schema || {},
         is_active !== false
       ]
     );
@@ -531,10 +531,10 @@ export const updateAction = async (req, res) => {
     const {
       name,
       description,
-      action_type,
+      category,
       endpoint,
       method,
-      parameters,
+      parameters_schema,
       is_active
     } = req.body;
 
@@ -542,16 +542,16 @@ export const updateAction = async (req, res) => {
       `UPDATE ai_actions 
        SET name = COALESCE($1, name),
            description = COALESCE($2, description),
-           action_type = COALESCE($3, action_type),
+           category = COALESCE($3, category),
            endpoint = COALESCE($4, endpoint),
            method = COALESCE($5, method),
-           parameters = COALESCE($6, parameters),
+           parameters_schema = COALESCE($6, parameters_schema),
            is_active = COALESCE($7, is_active),
            updated_at = NOW()
        WHERE id = $8
-       RETURNING id, name, description, action_type, endpoint, method, 
-                 parameters, is_active, created_at, updated_at`,
-      [name, description, action_type, endpoint, method, parameters, is_active, id]
+       RETURNING id, name, description, category, endpoint, method, 
+                 parameters_schema, is_active, created_at, updated_at`,
+      [name, description, category, endpoint, method, parameters_schema, is_active, id]
     );
 
     if (result.rows.length === 0) {
@@ -627,14 +627,14 @@ export const getStats = async (req, res) => {
     // Uso por proveedor
     const providerUsageResult = await query(
       `SELECT 
-         p.name as provider_name,
+         p.display_name as provider_name,
          COUNT(m.id) as message_count,
          SUM((m.token_usage->>'total_tokens')::int) as total_tokens
        FROM ai_chat_messages m
        JOIN ai_chat_sessions s ON m.session_id = s.id
        JOIN ai_providers p ON s.provider_id = p.id
        WHERE m.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
-       GROUP BY p.name
+       GROUP BY p.display_name
        ORDER BY message_count DESC`
     );
 
@@ -675,7 +675,7 @@ export const getLogs = async (req, res) => {
         u.email as user_email
       FROM ai_chat_messages m
       JOIN ai_chat_sessions s ON m.session_id = s.id
-      LEFT JOIN users u ON s.user_id = u.id
+      LEFT JOIN auth.users u ON s.user_id = u.id
       WHERE 1=1
     `;
 

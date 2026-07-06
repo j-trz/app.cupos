@@ -289,13 +289,13 @@ export default function GestionRoles() {
     const totalPages = Math.ceil(pagination.total / pagination.limit);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 ">
             <PageHeader
                 title="Gestión de Roles"
                 description="Administra los roles y sus permisos en el sistema"
                 icon={Users}
                 action={
-                    <Button onClick={openCreate}>
+                    <Button onClick={openCreate} className="border">
                         <Plus className="w-4 h-4 mr-2" />
                         Nuevo Rol
                     </Button>
@@ -456,7 +456,7 @@ export default function GestionRoles() {
 
             {/* Modal de crear/editar rol */}
             <Dialog open={showModal} onOpenChange={setShowModal}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md bg-white">
                     <DialogHeader>
                         <DialogTitle>
                             {editingId ? 'Editar Rol' : 'Nuevo Rol'}

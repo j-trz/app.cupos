@@ -194,7 +194,7 @@ export default function GestionPermisos() {
                 description="Administra los permisos del sistema por módulo"
                 icon={Shield}
                 action={
-                    <Button onClick={openCreate}>
+                    <Button onClick={openCreate} className="border">
                         <Plus className="w-4 h-4 mr-2" />
                         Nuevo Permiso
                     </Button>
@@ -347,7 +347,7 @@ export default function GestionPermisos() {
 
             {/* Modal de crear/editar */}
             <Dialog open={showModal} onOpenChange={setShowModal}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md bg-white">
                     <DialogHeader>
                         <DialogTitle>
                             {editingId ? 'Editar Permiso' : 'Nuevo Permiso'}

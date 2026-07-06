@@ -34,15 +34,18 @@ const AuditLog = sequelize.define('AuditLog', {
   },
   statusCode: {
     type: DataTypes.INTEGER,
-    allowNull: true
+    allowNull: true,
+    field: 'status_code'
   },
   requestBody: {
     type: DataTypes.JSON,
-    allowNull: true
+    allowNull: true,
+    field: 'request_body'
   },
   responseBody: {
     type: DataTypes.JSON,
-    allowNull: true
+    allowNull: true,
+    field: 'response_body'
   }
 }, {
   tableName: 'audit_logs',
