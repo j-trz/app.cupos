@@ -8,9 +8,30 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const sessionUser = ApiClient.getSessionUser();
-    setUser(sessionUser);
-    setIsLoading(false);
+    const initAuth = async () => {
+      let sessionUser = ApiClient.getSessionUser();
+      
+      // En modo desarrollo, si no hay usuario de sesión, crear uno de prueba
+      if (!sessionUser && process.env.NODE_ENV === 'development') {
+        const testUser = {
+          id: 1,
+          email: 'admin@example.com',
+          nombre: 'Admin',
+          apellido: 'User',
+          rol: 'Administrador',
+          activo: true,
+          permissions: ['read', 'write', 'delete', 'manage_users', 'manage_products', 'manage_reservations']
+        };
+        ApiClient.setSessionUser(testUser);
+        sessionUser = testUser;
+        console.log("Created test user for development");
+      }
+      
+      setUser(sessionUser);
+      setIsLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const signIn = (userData) => {

@@ -62,6 +62,8 @@ export default function Layout() {
         return t('emailConfig');
       case '/config-ia':
         return t('aiConfig');
+      case '/test':
+        return 'Página de Prueba';
       default:
         return t('dashboard'); // Valor por defecto
     }
@@ -149,11 +151,11 @@ export default function Layout() {
   });
 
   return (
-    <div className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'bg-gray-900' : 'bg-slate-50'}`}>
+    <div className="flex h-screen overflow-hidden bg-white">
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="flex justify-between items-center p-6 border-b">
-          <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
+        <header className="flex justify-between items-center p-6 border-b border-gray-200 bg-white z-10">
+          <h1 className="text-2xl font-bold text-gray-800">
             {getTitleByPath()}
           </h1>
           <div className="flex space-x-4">
@@ -161,8 +163,13 @@ export default function Layout() {
             <ThemeToggle />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 bg-inherit">
-          <Outlet context={{ user }} />
+        <main 
+          className="flex-1 overflow-y-auto bg-gray-50 p-6"
+          style={{ minHeight: 'calc(100vh - 100px)' }}
+        >
+          <div className="text-gray-900 min-h-full">
+            <Outlet context={{ user }} />
+          </div>
         </main>
       </div>
 

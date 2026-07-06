@@ -26,6 +26,7 @@ import Products from './pages/Products';
 import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import AIConfig from './pages/AIConfig';
+import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import './styles/globals.css';
@@ -248,6 +249,25 @@ function App() {
                         <AIConfig />
                       </Layout>
                     </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/test" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <TestPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                {/* Ruta para pruebas sin protección */}
+                <Route 
+                  path="/test-public" 
+                  element={
+                    <Layout>
+                      <TestPage />
+                    </Layout>
                   } 
                 />
               </Routes>
