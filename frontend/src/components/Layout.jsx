@@ -9,7 +9,7 @@ import LanguageSelector from './LanguageSelector.jsx';
 import { useSSE } from '../hooks/useSSE';
 import Swal from 'sweetalert2';
 
-export default function Layout() {
+export default function Layout({ children }) {
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
   const { t } = useI18n();
@@ -19,8 +19,8 @@ export default function Layout() {
   // Determinar el título basado en la ruta actual
   const getTitleByPath = () => {
     const path = location.pathname;
-    
-    switch(path) {
+
+    switch (path) {
       case '/':
       case '/dashboard':
         return t('dashboard');
@@ -164,12 +164,12 @@ export default function Layout() {
             <ThemeToggle />
           </div>
         </header>
-        <main 
+        <main
           className="flex-1 overflow-y-auto bg-gray-50 p-6"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
           <div className="text-gray-900 min-h-full">
-            <Outlet context={{ user }} />
+            {children || <Outlet context={{ user }} />}
           </div>
         </main>
       </div>

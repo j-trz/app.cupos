@@ -6,7 +6,6 @@ import { query } from '../db.js';
 export const getGeneralStats = async (req, res) => {
   try {
     const isAdmin = req.user.role === 'admin';
-    const isAgencyAdmin = req.user.role === 'agency_admin';
     const agencia = req.user.agencia;
 
     // Filtro por agencia si no es admin
@@ -17,19 +16,42 @@ export const getGeneralStats = async (req, res) => {
       params = [agencia];
     }
 
-    // 1. Total de reservas por estado
+    // 1. Total de reservas
+    const totalReservationsResult = await query(
+      `SELECT COUNT(*) as total FROM reservations ${agencyFilter}`,
+      params
+    );
+    const totalReservations = parseInt(totalReservationsResult.rows[0]?.total || 0);
+
+    // 2. Ventas totales (solo confirmadas)
+    // Usamos COALESCE para manejar casos donde precio_venta sea NULL
+    const salesStats = await query(
+      `SELECT COALESCE(SUM(precio_venta), 0) as total_ventas FROM reservations WHERE estado = 'confirmada' ${isAdmin ? '' : ' AND agencia = $1'}`,
+      params
+    );
+    const totalSales = parseFloat(salesStats.rows[0]?.total_ventas || 0);
+
+    // 3. Usuarios activos (últimos 30 días)
+    const activeUsersResult = await query(
+      `SELECT COUNT(DISTINCT created_by) as total FROM reservations
+       WHERE created_at > NOW() - INTERVAL '30 days' ${isAdmin ? '' : ' AND agencia = $1'}`,
+      params
+    );
+    const activeUsers = parseInt(activeUsersResult.rows[0]?.total || 0);
+
+    // 4. Disponibilidad promedio
+    const avgAvailabilityResult = await query(
+      `SELECT AVG(disponibilidad) as avg FROM products ${isAdmin ? '' : ' WHERE 1=1'}`
+    );
+    const avgAvailability = Math.round(parseFloat(avgAvailabilityResult.rows[0]?.avg || 0));
+
+    // 5. Total de reservas por estado
     const statusStats = await query(
       `SELECT estado, count(*) as total FROM reservations ${agencyFilter} GROUP BY estado`,
       params
     );
 
-    // 2. Ventas totales (solo confirmadas)
-    const salesStats = await query(
-      `SELECT SUM(precio_venta) as total_ventas FROM reservations WHERE estado = 'confirmada' ${isAdmin ? '' : ' AND agencia = $1'}`,
-      params
-    );
-
-    // 3. Productos más vendidos
+    // 6. Productos más vendidos
     const topProducts = await query(
       `SELECT vuelo_destino, count(*) as total
        FROM reservations
@@ -40,7 +62,7 @@ export const getGeneralStats = async (req, res) => {
       params
     );
 
-    // 4. Reservas recientes
+    // 7. Reservas recientes
     const recentReservations = await query(
       `SELECT * FROM reservations ${agencyFilter} ORDER BY created_at DESC LIMIT 10`,
       params
@@ -48,9 +70,13 @@ export const getGeneralStats = async (req, res) => {
 
     res.json({
       success: true,
+      totalReservations,
+      totalSales,
+      activeUsers,
+      avgAvailability,
       stats: {
         status_distribution: statusStats.rows,
-        total_sales: salesStats.rows[0]?.total_ventas || 0,
+        total_sales: totalSales,
         top_destinations: topProducts.rows,
         recent_activity: recentReservations.rows
       }
@@ -71,7 +97,7 @@ export const getAgencyReport = async (req, res) => {
     }
 
     const result = await query(`
-      SELECT agencia, count(*) as total_reservas, SUM(precio_venta) as total_venta
+      SELECT agencia, count(*) as total_reservas, COALESCE(SUM(precio_venta), 0) as total_venta
       FROM reservations
       WHERE estado = 'confirmada'
       GROUP BY agencia
@@ -127,7 +153,7 @@ export const getHistoricalSalesReport = async (req, res) => {
     }
 
     let sql = `
-      SELECT ${dateTrunc} as period, count(*) as total_reservas, SUM(precio_venta) as total_venta
+      SELECT ${dateTrunc} as period, count(*) as total_reservas, COALESCE(SUM(precio_venta), 0) as total_venta
       FROM reservations
       WHERE estado = 'confirmada'
     `;

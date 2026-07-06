@@ -279,6 +279,7 @@ app.use('/api/export', exportRouter);
 const reportRouter = express.Router();
 reportRouter.use(requireAuth);
 reportRouter.get('/stats', reportController.getGeneralStats);
+reportRouter.get('/general', reportController.getGeneralStats); // Alias para compatibilidad con frontend
 reportRouter.get('/agencies', isAdmin, reportController.getAgencyReport);
 reportRouter.get('/inventory', reportController.getInventoryReport);
 reportRouter.get('/historical', reportController.getHistoricalSalesReport);

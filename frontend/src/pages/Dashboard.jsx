@@ -6,7 +6,7 @@ import AgencyService from '../services/agencyService';
 import UserService from '../services/userService';
 import { useGeneralReport } from '../hooks/useReports';
 import DashboardCharts from '../components/DashboardCharts';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import { Skeleton } from '../components/ui/Skeleton';
 
 const Dashboard = () => {
@@ -57,9 +57,7 @@ const Dashboard = () => {
                 <div className="text-2xl font-bold">
                   <Skeleton className="h-6 w-16" />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  <Skeleton className="h-3 w-20" />
-                </p>
+                <Skeleton className="h-3 w-20" />
               </CardContent>
             </Card>
           ))}
