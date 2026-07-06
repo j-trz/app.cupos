@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/shadcn-dialog';
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import { Label } from '../components/ui/shadcn-label';
+import ExportButton from '../components/ExportButton';
 
 const emptyProduct = {
   codigo_cupo: '',
@@ -116,10 +117,13 @@ export default function Products() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Productos</h1>
           <p className="text-sm text-slate-500">Gestiona los productos y cupos disponibles.</p>
         </div>
-        <Button onClick={openCreate} className="border">
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Producto
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton entityType="products" entityLabel="Productos" />
+          <Button onClick={openCreate} className="border">
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-4">

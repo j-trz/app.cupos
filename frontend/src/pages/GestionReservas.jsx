@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import { Label } from '../components/ui/shadcn-label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/shadcn-select';
+import ExportButton from '../components/ExportButton';
 
 const emptyReservation = {
   pedido_id: '',
@@ -158,10 +159,13 @@ export default function GestionReservas() {
             Administra las reservas y su estado de confirmación.
           </p>
         </div>
-        <Button onClick={openCreate} className="border">
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Reserva
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton entityType="reservations" entityLabel="Reservas" />
+          <Button onClick={openCreate} className="border">
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Reserva
+          </Button>
+        </div>
       </div>
 
       <Card>

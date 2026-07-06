@@ -20,6 +20,8 @@ import * as ordersController from './controllers/ordersController.js';
 import * as whiteLabelController from './controllers/whiteLabelController.js';
 import * as emailConfigController from './controllers/emailConfigController.js';
 import * as aiController from './controllers/aiController.js';
+import * as sseController from './controllers/sseController.js';
+import * as exportController from './controllers/exportController.js';
 
 dotenv.config();
 
@@ -216,6 +218,26 @@ aiRouter.delete('/actions/:id', isAdmin, aiController.deleteAction);
 aiRouter.get('/stats', isAdmin, aiController.getStats);
 aiRouter.get('/logs', isAdmin, aiController.getLogs);
 app.use('/api/ai', aiRouter);
+
+// Rutas de Exportación de Datos (/api/export)
+const exportRouter = express.Router();
+exportRouter.use(requireAuth);
+exportRouter.get('/csv/:entityType', exportController.exportCSV);
+exportRouter.get('/excel/:entityType', exportController.exportExcel);
+exportRouter.get('/pdf/:entityType', exportController.exportPDF);
+exportRouter.get('/stats', exportController.getExportStats);
+app.use('/api/export', exportRouter);
+
+// Rutas de Notificaciones en Tiempo Real (SSE) (/api/sse)
+const sseRouter = express.Router();
+sseRouter.get('/connect', requireAuth, sseController.connect);
+sseRouter.post('/notify-user', isAdmin, sseController.notifyUser);
+sseRouter.post('/notify-admins', isAdmin, sseController.notifyAdmins);
+sseRouter.post('/notify-agency', isAgencyAdminOrAdmin, sseController.notifyAgency);
+sseRouter.get('/stats', isAdmin, sseController.getStats);
+sseRouter.post('/notify-reservation', requireAuth, sseController.notifyReservation);
+sseRouter.post('/notify-product', requireAuth, sseController.notifyProduct);
+app.use('/api/sse', sseRouter);
 
 // Endpoint interno para cron de expiración de bloqueos
 const internalRouter = express.Router();
