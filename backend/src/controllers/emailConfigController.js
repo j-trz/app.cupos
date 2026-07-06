@@ -8,14 +8,35 @@ export const getConfig = async (req, res) => {
   try {
     const agencyId = req.user?.agencia || 'default';
 
-    const result = await query(
-      `SELECT * FROM email_smtp_configs
-       WHERE agency_id = $1 AND is_active = TRUE
-       LIMIT 1`,
+    // Buscar la configuración SMTP asociada a esta agencia
+    // Primero buscamos en la tabla de agencias para obtener el UUID
+    const agencyResult = await query(
+      `SELECT id FROM agencies WHERE name = $1 OR id = $1 LIMIT 1`,
       [agencyId]
     );
 
-    if (result.rows.length === 0) {
+    let configResult;
+    if (agencyResult.rows.length > 0) {
+      // Si encontramos la agencia, buscamos su configuración SMTP por UUID
+      const agencyUuid = agencyResult.rows[0].id;
+      configResult = await query(
+        `SELECT * FROM email_smtp_configs
+         WHERE agency_id = $1 AND is_active = TRUE
+         LIMIT 1`,
+        [agencyUuid]
+      );
+    } else {
+      // Si no encontramos la agencia por nombre o UUID, buscamos directamente por el valor
+      // como cadena (caso para valores que no son UUID válidos)
+      configResult = await query(
+        `SELECT * FROM email_smtp_configs
+         WHERE CAST(agency_id AS TEXT) = $1 AND is_active = TRUE
+         LIMIT 1`,
+        [agencyId]
+      );
+    }
+
+    if (configResult.rows.length === 0) {
       return res.status(200).json({
         config: null,
         isDefault: true,
@@ -24,7 +45,7 @@ export const getConfig = async (req, res) => {
     }
 
     // No retornar la contraseña en texto plano por seguridad
-    const config = result.rows[0];
+    const config = configResult.rows[0];
     const safeConfig = {
       ...config,
       smtp_pass: config.smtp_pass ? '••••••••' : null,
@@ -51,10 +72,21 @@ export const createConfig = async (req, res) => {
       return res.status(400).json({ error: 'Host SMTP y usuario son requeridos' });
     }
 
-    // Verificar si ya existe una configuración activa
+    // Buscar el UUID de la agencia en la tabla agencies
+    const agencyResult = await query(
+      `SELECT id FROM agencies WHERE name = $1 OR id = $1 LIMIT 1`,
+      [agencyId]
+    );
+
+    let targetAgencyId = agencyId; // Valor por defecto
+    if (agencyResult.rows.length > 0) {
+      targetAgencyId = agencyResult.rows[0].id;
+    }
+
+    // Verificar si ya existe una configuración activa para esta agencia
     const existing = await query(
       `SELECT id FROM email_smtp_configs WHERE agency_id = $1 AND is_active = TRUE`,
-      [agencyId]
+      [targetAgencyId]
     );
 
     if (existing.rows.length > 0) {
@@ -69,7 +101,7 @@ export const createConfig = async (req, res) => {
         agency_id, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, email_from
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id, agency_id, smtp_host, smtp_port, smtp_user, smtp_secure, email_from, created_at`,
-      [agencyId, smtp_host, smtp_port || 587, smtp_user, smtp_pass, smtp_secure || false, email_from]
+      [targetAgencyId, smtp_host, smtp_port || 587, smtp_user, smtp_pass, smtp_secure || false, email_from]
     );
 
     res.status(201).json({
@@ -156,7 +188,7 @@ export const testConnection = async (req, res) => {
       return res.status(400).json({ error: 'Host, usuario y contraseña son requeridos' });
     }
 
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       host: smtp_host,
       port: smtp_port || 587,
       secure: smtp_secure || false,
@@ -197,10 +229,21 @@ export const sendTestEmail = async (req, res) => {
       return res.status(400).json({ error: 'Email destinatario es requerido' });
     }
 
+    // Buscar el UUID de la agencia en la tabla agencies
+    const agencyResult = await query(
+      `SELECT id FROM agencies WHERE name = $1 OR id = $1 LIMIT 1`,
+      [agencyId]
+    );
+
+    let targetAgencyId = agencyId; // Valor por defecto
+    if (agencyResult.rows.length > 0) {
+      targetAgencyId = agencyResult.rows[0].id;
+    }
+
     // Obtener configuración SMTP de la agencia
     const configResult = await query(
       `SELECT * FROM email_smtp_configs WHERE agency_id = $1 AND is_active = TRUE LIMIT 1`,
-      [agencyId]
+      [targetAgencyId]
     );
 
     if (configResult.rows.length === 0) {
@@ -209,7 +252,7 @@ export const sendTestEmail = async (req, res) => {
 
     const config = configResult.rows[0];
 
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       host: config.smtp_host,
       port: config.smtp_port,
       secure: config.smtp_secure,

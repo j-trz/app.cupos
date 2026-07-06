@@ -22,6 +22,8 @@ import * as emailConfigController from './controllers/emailConfigController.js';
 import * as aiController from './controllers/aiController.js';
 import * as sseController from './controllers/sseController.js';
 import * as exportController from './controllers/exportController.js';
+import * as rolesController from './controllers/rolesController.js';
+import * as permissionsController from './controllers/permissionsController.js';
 
 // Importar middleware de auditoría
 import auditLogger from './middleware/auditLogger.js';
@@ -234,6 +236,34 @@ aiRouter.get('/stats', isAdmin, aiController.getStats);
 aiRouter.get('/logs', isAdmin, aiController.getLogs);
 app.use('/api/ai', aiRouter);
 
+// Rutas de Notificaciones en Tiempo Real (SSE) (/api/sse)
+const sseRouter = express.Router();
+sseRouter.get('/connect', requireAuth, sseController.connect);
+sseRouter.post('/notify-user', isAdmin, sseController.notifyUser);
+sseRouter.post('/notify-admins', isAdmin, sseController.notifyAdmins);
+sseRouter.post('/notify-agency', isAgencyAdminOrAdmin, sseController.notifyAgency);
+app.use('/api/sse', sseRouter);
+
+// Rutas de Roles (/api/roles)
+const rolesRouter = express.Router();
+rolesRouter.use(requireAuth);
+rolesRouter.get('/', isAdmin, (req, res, next) => rolesController.getAllRoles(req, res).catch(next));
+rolesRouter.get('/:id', isAdmin, (req, res, next) => rolesController.getRoleById(req, res).catch(next));
+rolesRouter.post('/', isAdmin, (req, res, next) => rolesController.createRole(req, res).catch(next));
+rolesRouter.put('/:id', isAdmin, (req, res, next) => rolesController.updateRole(req, res).catch(next));
+rolesRouter.delete('/:id', isAdmin, (req, res, next) => rolesController.deleteRole(req, res).catch(next));
+app.use('/api/roles', rolesRouter);
+
+// Rutas de Permisos (/api/permissions)
+const permissionsRouter = express.Router();
+permissionsRouter.use(requireAuth);
+permissionsRouter.get('/', isAdmin, (req, res, next) => permissionsController.getAllPermissions(req, res).catch(next));
+permissionsRouter.get('/:id', isAdmin, (req, res, next) => permissionsController.getPermissionById(req, res).catch(next));
+permissionsRouter.post('/', isAdmin, (req, res, next) => permissionsController.createPermission(req, res).catch(next));
+permissionsRouter.put('/:id', isAdmin, (req, res, next) => permissionsController.updatePermission(req, res).catch(next));
+permissionsRouter.delete('/:id', isAdmin, (req, res, next) => permissionsController.deletePermission(req, res).catch(next));
+app.use('/api/permissions', permissionsRouter);
+
 // Rutas de Exportación de Datos (/api/export)
 const exportRouter = express.Router();
 exportRouter.use(requireAuth);
@@ -242,17 +272,6 @@ exportRouter.get('/excel/:entityType', (req, res, next) => exportController.expo
 exportRouter.get('/pdf/:entityType', (req, res, next) => exportController.exportPDF(req, res).catch(next));
 exportRouter.get('/stats', (req, res, next) => exportController.getExportStats(req, res).catch(next));
 app.use('/api/export', exportRouter);
-
-// Rutas de Notificaciones en Tiempo Real (SSE) (/api/sse)
-const sseRouter = express.Router();
-sseRouter.get('/connect', requireAuth, sseController.connect);
-sseRouter.post('/notify-user', isAdmin, sseController.notifyUser);
-sseRouter.post('/notify-admins', isAdmin, sseController.notifyAdmins);
-sseRouter.post('/notify-agency', isAgencyAdminOrAdmin, sseController.notifyAgency);
-sseRouter.get('/stats', isAdmin, sseController.getStats);
-sseRouter.post('/notify-reservation', requireAuth, sseController.notifyReservation);
-sseRouter.post('/notify-product', requireAuth, sseController.notifyProduct);
-app.use('/api/sse', sseRouter);
 
 // Endpoint interno para cron de expiración de bloqueos
 const internalRouter = express.Router();

@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 
 // Crear un nuevo rol
-exports.createRole = async (req, res) => {
+export const createRole = async (req, res) => {
   try {
     const { name, description } = req.body;
 
@@ -18,7 +18,7 @@ exports.createRole = async (req, res) => {
 };
 
 // Obtener todos los roles
-exports.getAllRoles = async (req, res) => {
+export const getAllRoles = async (req, res) => {
   try {
     const result = await query('SELECT * FROM roles');
     res.status(200).json(result.rows);
@@ -29,7 +29,7 @@ exports.getAllRoles = async (req, res) => {
 };
 
 // Obtener un rol por ID
-exports.getRoleById = async (req, res) => {
+export const getRoleById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('SELECT * FROM roles WHERE id = $1', [id]);
@@ -44,7 +44,7 @@ exports.getRoleById = async (req, res) => {
 };
 
 // Actualizar un rol por ID
-exports.updateRole = async (req, res) => {
+export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -65,7 +65,7 @@ exports.updateRole = async (req, res) => {
 };
 
 // Eliminar un rol por ID
-exports.deleteRole = async (req, res) => {
+export const deleteRole = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('DELETE FROM roles WHERE id = $1 RETURNING *', [id]);
@@ -77,4 +77,13 @@ exports.deleteRole = async (req, res) => {
     console.error('💥 Error al eliminar el rol:', err.stack);
     res.status(500).json({ error: 'Error al eliminar el rol', details: err.message || 'Detalles no disponibles' });
   }
+};
+
+// Exportar todas las funciones como objeto por si se importan así
+export default {
+  createRole,
+  getAllRoles,
+  getRoleById,
+  updateRole,
+  deleteRole
 };

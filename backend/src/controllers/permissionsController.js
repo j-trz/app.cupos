@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 
 // Crear un nuevo permiso
-exports.createPermission = async (req, res) => {
+export const createPermission = async (req, res) => {
   try {
     const { name, description } = req.body;
     
@@ -23,7 +23,7 @@ exports.createPermission = async (req, res) => {
 };
 
 // Obtener todos los permisos
-exports.getAllPermissions = async (req, res) => {
+export const getAllPermissions = async (req, res) => {
   try {
     const result = await query('SELECT * FROM permissions');
     res.status(200).json(result.rows);
@@ -34,7 +34,7 @@ exports.getAllPermissions = async (req, res) => {
 };
 
 // Obtener un permiso por ID
-exports.getPermissionById = async (req, res) => {
+export const getPermissionById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('SELECT * FROM permissions WHERE id = $1', [id]);
@@ -49,7 +49,7 @@ exports.getPermissionById = async (req, res) => {
 };
 
 // Actualizar un permiso por ID
-exports.updatePermission = async (req, res) => {
+export const updatePermission = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -70,7 +70,7 @@ exports.updatePermission = async (req, res) => {
 };
 
 // Eliminar un permiso por ID
-exports.deletePermission = async (req, res) => {
+export const deletePermission = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('DELETE FROM permissions WHERE id = $1 RETURNING *', [id]);
@@ -82,4 +82,13 @@ exports.deletePermission = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Error al eliminar el permiso', details: err.message });
   }
+};
+
+// Exportar todas las funciones como objeto por si se importan así
+export default {
+  createPermission,
+  getAllPermissions,
+  getPermissionById,
+  updatePermission,
+  deletePermission
 };
