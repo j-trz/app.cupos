@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useI18n } from '../contexts/I18nContext.jsx';
@@ -13,7 +13,59 @@ export default function Layout() {
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
   const { t } = useI18n();
+  const location = useLocation();
   const navigate = useNavigate();
+
+  // Determinar el título basado en la ruta actual
+  const getTitleByPath = () => {
+    const path = location.pathname;
+    
+    switch(path) {
+      case '/':
+      case '/dashboard':
+        return t('dashboard');
+      case '/usuarios':
+        return t('users');
+      case '/productos':
+        return t('products');
+      case '/reservas':
+        return t('reservations');
+      case '/agencias':
+        return t('agencies');
+      case '/temas':
+        return t('whiteLabel');
+      case '/roles':
+        return t('roles');
+      case '/permisos':
+        return t('permissions');
+      case '/correo':
+        return t('emailConfig');
+      case '/panel-control':
+        return t('settings');
+      case '/availability':
+        return t('availability');
+      case '/profile':
+        return t('profile');
+      case '/settings':
+        return t('settings');
+      case '/notificaciones':
+        return t('notifications');
+      case '/requests':
+        return t('requests');
+      case '/confirmations':
+        return t('confirmations');
+      case '/products':
+        return t('products');
+      case '/marca-blanca':
+        return t('whiteLabel');
+      case '/email-config':
+        return t('emailConfig');
+      case '/config-ia':
+        return t('aiConfig');
+      default:
+        return t('dashboard'); // Valor por defecto
+    }
+  };
 
   const handleLogout = () => {
     signOut();
@@ -99,18 +151,20 @@ export default function Layout() {
   return (
     <div className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'bg-gray-900' : 'bg-slate-50'}`}>
       <Sidebar user={user} onLogout={handleLogout} />
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <header className="flex justify-between items-center p-6 border-b">
           <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
-            {t('dashboard')}
+            {getTitleByPath()}
           </h1>
           <div className="flex space-x-4">
             <LanguageSelector />
             <ThemeToggle />
           </div>
-        </div>
-        <Outlet context={{ user }} />
-      </main>
+        </header>
+        <main className="flex-1 overflow-y-auto p-6 bg-inherit">
+          <Outlet context={{ user }} />
+        </main>
+      </div>
 
       {/* Widget de Chat IA flotante */}
       <AIChatWidget />

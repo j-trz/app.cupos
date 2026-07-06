@@ -1,10 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BarChart3, Plane, Users, CreditCard, Calendar, TrendingUp, AlertTriangle, CheckCircle, Package, Building2, Clock, DollarSign, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import ProductService from '../services/productService';
 import ReservationService from '../services/reservationService';
 import AgencyService from '../services/agencyService';
 import UserService from '../services/userService';
-import { useState } from 'react';
 import { useGeneralReport } from '../hooks/useReports';
 import DashboardCharts from '../components/DashboardCharts';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
