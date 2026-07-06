@@ -1,380 +1,254 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Edit3, User, Check, X, Lock, Unlock, Shield } from 'lucide-react';
-import UserService from '../services/userService';
-import RoleService from '../services/roleService';
-import Swal from 'sweetalert2';
-import { ShadcnButton as Button } from '../components/ui/shadcn-button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/shadcn-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/shadcn-dialog';
-import { ShadcnInput as Input } from '../components/ui/shadcn-input';
-import { Label } from '../components/ui/shadcn-label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/shadcn-select';
+import React, { useState } from 'react';
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../hooks/useUsers';
+import { useRoles } from '../hooks/useRoles';
+import { usePermissions } from '../hooks/usePermissions';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/Dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { SkeletonTable } from '../components/SkeletonTable';
+import { EmptyState } from '../components/EmptyState';
+import UserForm from '../components/UserForm';
+import { Search, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { useToast } from '../hooks/use-toast';
 
-const emptyUser = {
-  email: '',
-  nombre: '',
-  apellido: '',
-  agencia: '',
-  role: 'agency_user',
-  telefono: '',
-  role_ids: [],
-};
+const GestionUsuarios = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [selectedPermissions, setSelectedPermissions] = useState([]);
+  const [selectedRole, setSelectedRole] = useState(null);
 
-export default function GestionUsuarios() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editUser, setEditUser] = useState(null);
-  const [formState, setFormState] = useState(emptyUser);
-  const [roles, setRoles] = useState([]);
-  const [loadingRoles, setLoadingRoles] = useState(false);
+  const { toast } = useToast();
+  const { data: users, isLoading, isError } = useUsers({ search: searchTerm });
+  const { data: roles } = useRoles();
+  const { data: permissions } = usePermissions();
+  const createUserMutation = useCreateUser();
+  const updateUserMutation = useUpdateUser();
+  const deleteUserMutation = useDeleteUser();
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const handleCreateUser = async (userData) => {
     try {
-      const items = await UserService.listUsers();
-      setUsers(items);
+      await createUserMutation.mutateAsync(userData);
+      toast({
+        title: 'Éxito',
+        description: 'Usuario creado correctamente',
+      });
+      setIsModalOpen(false);
+      resetForm();
     } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudieron cargar los usuarios', 'error');
-    } finally {
-      setLoading(false);
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al crear el usuario',
+        variant: 'destructive',
+      });
     }
   };
 
-  const fetchRoles = async () => {
-    setLoadingRoles(true);
+  const handleUpdateUser = async (userData) => {
     try {
-      const response = await RoleService.listRoles({ limit: 100 });
-      setRoles(response.data || []);
+      await updateUserMutation.mutateAsync({ id: editingUser.id, userData });
+      toast({
+        title: 'Éxito',
+        description: 'Usuario actualizado correctamente',
+      });
+      setIsModalOpen(false);
+      resetForm();
     } catch (error) {
-      console.error('Error al cargar roles:', error);
-    } finally {
-      setLoadingRoles(false);
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al actualizar el usuario',
+        variant: 'destructive',
+      });
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-    fetchRoles();
-  }, []);
-
-  const openCreate = () => {
-    setEditUser(null);
-    setFormState(emptyUser);
-    setDialogOpen(true);
-  };
-
-  const openEdit = (user) => {
-    setEditUser(user);
-    setFormState({
-      email: user.email,
-      nombre: user.nombre || '',
-      apellido: user.apellido || '',
-      agencia: user.agencia || '',
-      role: user.role || 'agency_user',
-      telefono: user.telefono || '',
-      role_ids: user.roles?.map(r => r.id) || []
-    });
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (user) => {
-    const result = await Swal.fire({
-      title: 'Eliminar usuario',
-      text: `¿Eliminar usuario ${user.email}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-      await UserService.deleteUser(user.id);
-      Swal.fire('Eliminado', 'Usuario eliminado correctamente', 'success');
-      fetchUsers();
-    } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo eliminar el usuario', 'error');
-    }
-  };
-
-  const handleUnlock = async (user) => {
-    try {
-      await UserService.unlockUser(user.id);
-      Swal.fire('Éxito', 'Cuenta de usuario desbloqueada', 'success');
-      fetchUsers();
-    } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo desbloquear el usuario', 'error');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editUser) {
-        await UserService.updateUser(editUser.id, formState);
-        Swal.fire('Actualizado', 'Usuario actualizado correctamente', 'success');
-      } else {
-        await UserService.createUser(formState);
-        Swal.fire('Creado', 'Usuario creado correctamente', 'success');
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
+      try {
+        await deleteUserMutation.mutateAsync(userId);
+        toast({
+          title: 'Éxito',
+          description: 'Usuario eliminado correctamente',
+        });
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Error al eliminar el usuario',
+          variant: 'destructive',
+        });
       }
-      setDialogOpen(false);
-      fetchUsers();
-    } catch (error) {
-      Swal.fire('Error', error.message || 'No se pudo guardar el usuario', 'error');
     }
   };
 
-  const fields = useMemo(
-    () => [
-      { name: 'email', label: 'Email', required: true, type: 'email' },
-      { name: 'nombre', label: 'Nombre', required: true },
-      { name: 'apellido', label: 'Apellido' },
-      { name: 'telefono', label: 'Teléfono', type: 'tel' },
-      { name: 'agencia', label: 'Agencia' },
-      { name: 'role', label: 'Rol', type: 'select' },
-    ],
-    []
-  );
-
-  const legacyRoles = [
-    { value: 'admin', label: 'Administrador' },
-    { value: 'agency_admin', label: 'Admin de Agencia' },
-    { value: 'agency_user', label: 'Usuario de Agencia' },
-  ];
-
-  const toggleRole = (roleId) => {
-    setFormState(prev => ({
-      ...prev,
-      role_ids: prev.role_ids.includes(roleId)
-        ? prev.role_ids.filter(id => id !== roleId)
-        : [...prev.role_ids, roleId]
-    }));
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setSelectedPermissions(user.permissions || []);
+    setSelectedRole(user.roleId || user.rol);
+    setIsModalOpen(true);
   };
+
+  const resetForm = () => {
+    setEditingUser(null);
+    setSelectedPermissions([]);
+    setSelectedRole(null);
+  };
+
+  const togglePermission = (permissionId) => {
+    setSelectedPermissions(prev =>
+      prev.includes(permissionId)
+        ? prev.filter(id => id !== permissionId)
+        : [...prev, permissionId]
+    );
+  };
+
+  const handleRoleSelect = (roleId) => {
+    setSelectedRole(roleId);
+    // Aquí podrías cargar automáticamente los permisos del rol predefinido
+  };
+
+  if (isError) {
+    return (
+      <div className="container mx-auto py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-destructive">Error al cargar los usuarios</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto py-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
           <p className="text-muted-foreground">
-            Administra los usuarios y sus permisos en el sistema.
+            Administra los usuarios del sistema
           </p>
         </div>
-        <Button onClick={openCreate} className="border">
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Usuario
-        </Button>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => resetForm()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Usuario
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingUser ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
+              </DialogTitle>
+            </DialogHeader>
+            <UserForm
+              onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
+              onCancel={() => {
+                setIsModalOpen(false);
+                resetForm();
+              }}
+              defaultValues={editingUser || {}}
+              isEditing={!!editingUser}
+              permissions={permissions?.data || []}
+              selectedPermissions={selectedPermissions}
+              onPermissionToggle={togglePermission}
+              roles={roles?.data || []}
+              selectedRole={selectedRole}
+              onRoleSelect={handleRoleSelect}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Usuarios</CardTitle>
-          <CardDescription>
-            {users.length} {users.length === 1 ? 'usuario' : 'usuarios'} registrados
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Agencia</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10">
-                    Cargando usuarios...
-                  </TableCell>
-                </TableRow>
-              ) : users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10">
-                    No se encontraron usuarios.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.email}</TableCell>
-                    <TableCell>{user.nombre} {user.apellido}</TableCell>
-                    <TableCell>{user.agencia || '-'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <span className={`px-2 py-1 rounded-full text-xs ${user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                          user.role === 'agency_admin' ? 'bg-blue-100 text-blue-800' :
-                            'bg-green-100 text-green-800'
+      {/* Barra de búsqueda */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar usuarios..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+      </div>
+
+      {/* Tabla de usuarios */}
+      {isLoading ? (
+        <SkeletonTable columns={6} rows={5} />
+      ) : users?.data && users.data.length > 0 ? (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rol</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Agencia</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Estado</th>
+                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.data.map((user) => (
+                    <tr key={user.id} className="border-b hover:bg-muted/10">
+                      <td className="p-4 align-middle">
+                        {user.nombre} {user.apellido}
+                      </td>
+                      <td className="p-4 align-middle">{user.email}</td>
+                      <td className="p-4 align-middle">{user.rol}</td>
+                      <td className="p-4 align-middle">{user.agencia || '-'}</td>
+                      <td className="p-4 align-middle">
+                        <span className={`px-2 py-1 rounded-full text-xs ${user.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
-                          {user.role === 'admin' ? 'Admin' :
-                            user.role === 'agency_admin' ? 'Admin Agencia' : 'Usuario'}
+                          {user.activo ? 'Activo' : 'Inactivo'}
                         </span>
-                        {user.roles && user.roles.length > 0 && (
-                          <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 flex items-center gap-1">
-                            <Shield className="w-3 h-3" />
-                            {user.roles.length} rol{user.roles.length !== 1 ? 'es' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.security_status?.is_locked ? (
-                        <div className="flex items-center text-red-600">
-                          <Lock className="h-4 w-4 mr-1" />
-                          Bloqueado
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-green-600">
-                          <Unlock className="h-4 w-4 mr-1" />
-                          Activo
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {user.security_status?.is_locked && (
+                      </td>
+                      <td className="p-4 align-middle text-right">
+                        <div className="flex justify-end space-x-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleUnlock(user)}
-                            title="Desbloquear usuario"
+                            onClick={() => handleEditUser(user)}
                           >
-                            <Unlock className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(user)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto bg-white">
-          <DialogHeader>
-            <DialogTitle>{editUser ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              {fields.map((field) => (
-                <div key={field.name}>
-                  <Label htmlFor={field.name}>
-                    {field.label} {field.required && '*'}
-                  </Label>
-                  {field.type === 'select' ? (
-                    <Select
-                      value={formState[field.name]}
-                      onValueChange={(value) => setFormState({ ...formState, [field.name]: value })}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder={`Selecciona un ${field.label.toLowerCase()}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {legacyRoles.map((role) => (
-                          <SelectItem key={role.value} value={role.value}>
-                            {role.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id={field.name}
-                      type={field.type || 'text'}
-                      name={field.name}
-                      value={formState[field.name] ?? ''}
-                      onChange={(e) => setFormState({ ...formState, [field.name]: e.target.value })}
-                      className="mt-1"
-                      required={field.required}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Roles Granulares */}
-            <div className="border-t pt-4 mt-4">
-              <Label className="flex items-center gap-2 mb-2">
-                <Shield className="w-4 h-4 text-indigo-600" />
-                Roles Granulares
-              </Label>
-              <p className="text-xs text-slate-500 mb-3">
-                Selecciona los roles adicionales que tendrá este usuario. Los roles definen permisos específicos en el sistema.
-              </p>
-
-              {loadingRoles ? (
-                <div className="text-center py-4 text-slate-500">Cargando roles...</div>
-              ) : roles.length === 0 ? (
-                <div className="text-center py-4 text-slate-500">
-                  No hay roles disponibles. Crea roles en la sección de Roles.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                  {roles.map((role) => (
-                    <label
-                      key={role.id}
-                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${formState.role_ids.includes(role.id)
-                          ? 'bg-indigo-50 border border-indigo-200'
-                          : 'hover:bg-slate-50 border border-transparent'
-                        }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formState.role_ids.includes(role.id)}
-                        onChange={() => toggleRole(role.id)}
-                        className="rounded text-indigo-600"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-900 truncate">
-                          {role.name}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <div className="text-xs text-slate-500 font-mono truncate">
-                          {role.code}
-                        </div>
-                      </div>
-                    </label>
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              )}
+                </tbody>
+              </table>
             </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-              <Button type="submit">
-                <Check className="h-4 w-4 mr-2" />
-                Guardar
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      ) : (
+        <EmptyState
+          title="No hay usuarios"
+          description="No se encontraron usuarios en el sistema"
+          icon="👥"
+          action={
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Crear primer usuario
+            </Button>
+          }
+        />
+      )}
     </div>
   );
-}
+};
+
+export default GestionUsuarios;

@@ -1,0 +1,169 @@
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { userSchema, updateUserSchema } from '../schemas';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Label } from './ui/Label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select';
+import { Checkbox } from './ui/Checkbox';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/Card';
+import PermissionSelector from './PermissionSelector';
+
+const UserForm = ({
+  onSubmit,
+  onCancel,
+  isLoading = false,
+  defaultValues = {},
+  isEditing = false,
+  permissions = [],
+  selectedPermissions = [],
+  onPermissionToggle = () => { },
+  roles = [],
+  selectedRole = null,
+  onRoleSelect = () => { }
+}) => {
+  const schema = isEditing ? updateUserSchema : userSchema;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      email: defaultValues.email || '',
+      nombre: defaultValues.nombre || '',
+      apellido: defaultValues.apellido || '',
+      rol: defaultValues.rol || '',
+      agencia: defaultValues.agencia || '',
+      activo: defaultValues.activo ?? true,
+      password: ''
+    }
+  });
+
+  const watchedActive = watch('activo');
+  const watchedRole = watch('rol');
+
+  const handleFormSubmit = (data) => {
+    onSubmit({
+      ...data,
+      permissions: selectedPermissions,
+      role: selectedRole || data.rol
+    });
+  };
+
+  return (
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>{isEditing ? 'Editar Usuario' : 'Crear Usuario'}</CardTitle>
+        <CardDescription>
+          {isEditing
+            ? 'Actualizar la información del usuario'
+            : 'Crear un nuevo usuario para el sistema'}
+        </CardDescription>
+      </CardHeader>
+      <form onSubmit={handleSubmit(handleFormSubmit)}>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              {...register('email')}
+              disabled={isEditing}
+            />
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email.message}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nombre">Nombre *</Label>
+              <Input id="nombre" {...register('nombre')} />
+              {errors.nombre && (
+                <p className="text-sm text-red-500">{errors.nombre.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="apellido">Apellido *</Label>
+              <Input id="apellido" {...register('apellido')} />
+              {errors.apellido && (
+                <p className="text-sm text-red-500">{errors.apellido.message}</p>
+              )}
+            </div>
+          </div>
+
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña *</Label>
+              <Input id="password" type="password" {...register('password')} />
+              {errors.password && (
+                <p className="text-sm text-red-500">{errors.password.message}</p>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="rol">Rol *</Label>
+            <Select
+              value={watchedRole}
+              onValueChange={(value) => setValue('rol', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="agency_admin">Admin de Agencia</SelectItem>
+                <SelectItem value="user">Usuario</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.rol && (
+              <p className="text-sm text-red-500">{errors.rol.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="agencia">Agencia</Label>
+            <Input id="agencia" {...register('agencia')} />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="activo"
+              checked={watchedActive}
+              onCheckedChange={(checked) => setValue('activo', checked)}
+            />
+            <Label htmlFor="activo">Usuario Activo</Label>
+          </div>
+
+          {/* Selector de permisos */}
+          <div className="mt-6 pt-6 border-t">
+            <PermissionSelector
+              permissions={permissions}
+              selectedPermissions={selectedPermissions}
+              onPermissionToggle={onPermissionToggle}
+              roles={roles}
+              selectedRole={selectedRole}
+              onRoleSelect={onRoleSelect}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear')}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+};
+
+export default UserForm;

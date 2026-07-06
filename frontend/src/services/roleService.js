@@ -1,87 +1,62 @@
 import ApiClient from './apiClient';
 
-class RoleService {
+export const RoleService = {
   /**
-   * Lista todos los roles con paginación y filtros
+   * Lista todos los roles con filtros
    */
-  static async listRoles(params = {}) {
-    const queryParams = new URLSearchParams();
-    if (params.page) queryParams.append('page', params.page);
-    if (params.limit) queryParams.append('limit', params.limit);
-    if (params.search) queryParams.append('search', params.search);
+  listRoles: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
     
-    const query = queryParams.toString();
-    const response = await ApiClient.get(`/roles${query ? `?${query}` : ''}`);
-    return response;
-  }
+    const queryString = params.toString();
+    const endpoint = queryString ? `/roles?${queryString}` : '/roles';
+    
+    return await ApiClient.get(endpoint);
+  },
 
   /**
    * Obtiene un rol por ID
    */
-  static async getRoleById(id) {
-    const response = await ApiClient.get(`/roles/${id}`);
-    return response;
-  }
+  getRoleById: async (id) => {
+    return await ApiClient.get(`/roles/${id}`);
+  },
 
   /**
    * Crea un nuevo rol
    */
-  static async createRole(payload) {
-    const response = await ApiClient.post('/roles', payload);
-    return response;
-  }
+  createRole: async (roleData) => {
+    return await ApiClient.post('/roles', roleData);
+  },
 
   /**
    * Actualiza un rol existente
    */
-  static async updateRole(id, payload) {
-    const response = await ApiClient.put(`/roles/${id}`, payload);
-    return response;
-  }
+  updateRole: async (id, roleData) => {
+    return await ApiClient.put(`/roles/${id}`, roleData);
+  },
 
   /**
    * Elimina un rol
    */
-  static async deleteRole(id) {
-    const response = await ApiClient.delete(`/roles/${id}`);
-    return response;
-  }
+  deleteRole: async (id) => {
+    return await ApiClient.delete(`/roles/${id}`);
+  },
 
   /**
-   * Obtiene usuarios asignados a un rol
+   * Asigna permisos a un rol
    */
-  static async getRoleUsers(roleId) {
-    const response = await ApiClient.get(`/roles/${roleId}/users`);
-    return response;
-  }
+  assignPermissionsToRole: async (roleId, permissions) => {
+    return await ApiClient.post(`/roles/${roleId}/permissions`, { permissions });
+  },
 
   /**
-   * Asigna un rol a un usuario
+   * Obtiene los permisos de un rol
    */
-  static async assignRoleToUser(userId, roleId) {
-    const response = await ApiClient.post(`/roles/${roleId}/users`, {
-      user_id: userId
-    });
-    return response;
+  getRolePermissions: async (roleId) => {
+    return await ApiClient.get(`/roles/${roleId}/permissions`);
   }
-
-  /**
-   * Remueve un rol de un usuario
-   */
-  static async removeRoleFromUser(userId, roleId) {
-    const response = await ApiClient.delete(`/roles/${roleId}/users`, {
-      user_id: userId
-    });
-    return response;
-  }
-
-  /**
-   * Obtiene los roles de un usuario
-   */
-  static async getUserRoles(userId) {
-    const response = await ApiClient.get(`/users/${userId}/roles`);
-    return response;
-  }
-}
-
-export default RoleService;
+};

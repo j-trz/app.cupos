@@ -1,65 +1,41 @@
 import ApiClient from './apiClient';
 
-class AgencyService {
-  // Get all agencies
-  static async listAgencies(params = {}) {
-    try {
-      const queryParams = new URLSearchParams(params).toString();
-      const endpoint = queryParams ? `/agencies?${queryParams}` : '/agencies';
-      const result = await ApiClient.get(endpoint);
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
-    } catch (error) {
-      console.error('Error fetching agencies:', error);
-      throw error;
-    }
+export class AgencyService {
+  static async listAgencies(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const queryString = params.toString();
+    const endpoint = queryString ? `/agencies?${queryString}` : '/agencies';
+    
+    return await ApiClient.get(endpoint);
   }
 
-  // Get agency by ID
   static async getAgencyById(id) {
-    try {
-      const result = await ApiClient.get(`/agencies/${id}`);
-      return result;
-    } catch (error) {
-      console.error(`Error fetching agency with id ${id}:`, error);
-      throw error;
-    }
+    return await ApiClient.get(`/agencies/${id}`);
   }
 
-  // Create new agency
-  static async createAgency(payload) {
-    try {
-      const result = await ApiClient.post('/agencies', payload);
-      return result;
-    } catch (error) {
-      console.error('Error creating agency:', error);
-      throw error;
-    }
+  static async createAgency(agencyData) {
+    return await ApiClient.post('/agencies', agencyData);
   }
 
-  // Update agency
-  static async updateAgency(id, payload) {
-    try {
-      const result = await ApiClient.put(`/agencies/${id}`, payload);
-      return result;
-    } catch (error) {
-      console.error(`Error updating agency with id ${id}:`, error);
-      throw error;
-    }
+  static async updateAgency(id, agencyData) {
+    return await ApiClient.put(`/agencies/${id}`, agencyData);
   }
 
-  // Delete agency
   static async deleteAgency(id) {
-    try {
-      const result = await ApiClient.delete(`/agencies/${id}`);
-      return result;
-    } catch (error) {
-      console.error(`Error deleting agency with id ${id}:`, error);
-      throw error;
-    }
+    return await ApiClient.delete(`/agencies/${id}`);
   }
 
+  static async updateAgencyConfig(agencyId, configData) {
+    return await ApiClient.put(`/agencies/${agencyId}/config`, configData);
+  }
+
+  static async getAgencyConfig(agencyId) {
+    return await ApiClient.get(`/agencies/${agencyId}/config`);
+  }
 }
-
-// Note: uploadLogo removed - no corresponding endpoint in backend (/api/agencies/:id/logo does not exist)
-
-export default AgencyService;

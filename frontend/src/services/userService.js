@@ -1,79 +1,45 @@
 import ApiClient from './apiClient';
 
-class UserService {
-  // Get all users
-  static async listUsers(params = {}) {
-    try {
-      const queryParams = new URLSearchParams(params).toString();
-      const endpoint = queryParams ? `/users?${queryParams}` : '/users';
-      const result = await ApiClient.get(endpoint);
-      // Backend returns: { success: true, users: [...], pagination: {...} }
-      if (result?.users) return result.users;
-      if (Array.isArray(result)) return result;
-      if (Array.isArray(result?.data)) return result.data;
-      return [];
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw error;
-    }
+export class UserService {
+  static async listUsers(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const queryString = params.toString();
+    const endpoint = queryString ? `/users?${queryString}` : '/users';
+    
+    return await ApiClient.get(endpoint);
   }
 
-  // Get user by ID
   static async getUserById(id) {
-    try {
-      const result = await ApiClient.get(`/users/${id}`);
-      return result;
-    } catch (error) {
-      console.error(`Error fetching user with id ${id}:`, error);
-      throw error;
-    }
+    return await ApiClient.get(`/users/${id}`);
   }
 
-  // Create new user
-  static async createUser(payload) {
-    try {
-      const result = await ApiClient.post('/users', payload);
-      return result;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
+  static async createUser(userData) {
+    return await ApiClient.post('/users', userData);
   }
 
-  // Update user
-  static async updateUser(id, payload) {
-    try {
-      const result = await ApiClient.put(`/users/${id}`, payload);
-      return result;
-    } catch (error) {
-      console.error(`Error updating user with id ${id}:`, error);
-      throw error;
-    }
+  static async updateUser(id, userData) {
+    return await ApiClient.put(`/users/${id}`, userData);
   }
 
-  // Delete user
   static async deleteUser(id) {
-    try {
-      const result = await ApiClient.delete(`/users/${id}`);
-      return result;
-    } catch (error) {
-      console.error(`Error deleting user with id ${id}:`, error);
-      throw error;
-    }
+    return await ApiClient.delete(`/users/${id}`);
   }
 
-  // Unlock user account
-  static async unlockUser(id) {
-    try {
-      const result = await ApiClient.post(`/users/${id}/unlock`);
-      return result;
-    } catch (error) {
-      console.error(`Error unlocking user with id ${id}:`, error);
-      throw error;
-    }
+  static async toggleUserStatus(id, isActive) {
+    return await ApiClient.put(`/users/${id}/status`, { active: isActive });
   }
 
-  // Note: toggleTwoFactor removed - no corresponding PUT /api/users/:id/2fa endpoint in backend
+  static async assignRole(userId, roleId) {
+    return await ApiClient.post(`/users/${userId}/roles/${roleId}`);
+  }
+
+  static async removeRole(userId, roleId) {
+    return await ApiClient.delete(`/users/${userId}/roles/${roleId}`);
+  }
 }
-
-export default UserService;
