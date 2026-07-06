@@ -20,6 +20,12 @@ import Availability from './pages/Availability';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Notificaciones from './pages/Notificaciones';
+import Requests from './pages/Requests';
+import Confirmations from './pages/Confirmations';
+import Products from './pages/Products';
+import WhiteLabelConfig from './pages/WhiteLabelConfig';
+import EmailConfig from './pages/EmailConfig';
+import AIConfig from './pages/AIConfig';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import './styles/globals.css';
@@ -180,6 +186,66 @@ function App() {
                     <ProtectedRoute>
                       <Layout>
                         <Notificaciones />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/requests" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Requests />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/confirmations" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Confirmations />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/products" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Products />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/marca-blanca" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <WhiteLabelConfig />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/email-config" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <EmailConfig />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/config-ia" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <AIConfig />
                       </Layout>
                     </ProtectedRoute>
                   } 
