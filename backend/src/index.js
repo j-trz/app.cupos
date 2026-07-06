@@ -18,6 +18,8 @@ import * as notificationController from './controllers/notificationController.js
 import * as dataController from './controllers/dataController.js';
 import * as ordersController from './controllers/ordersController.js';
 import * as whiteLabelController from './controllers/whiteLabelController.js';
+import * as emailConfigController from './controllers/emailConfigController.js';
+import * as aiController from './controllers/aiController.js';
 
 dotenv.config();
 
@@ -174,6 +176,46 @@ whiteLabelRouter.get('/buttons', whiteLabelController.getButtons);
 whiteLabelRouter.get('/export/:id', isAdmin, whiteLabelController.exportConfig);
 whiteLabelRouter.post('/import', isAdmin, whiteLabelController.importConfig);
 app.use('/api/white-label', whiteLabelRouter);
+
+// Rutas de Configuración de Email (/api/email-config)
+const emailConfigRouter = express.Router();
+emailConfigRouter.use(requireAuth);
+emailConfigRouter.get('/config', isAgencyAdminOrAdmin, emailConfigController.getConfig);
+emailConfigRouter.post('/config', isAgencyAdminOrAdmin, emailConfigController.createConfig);
+emailConfigRouter.put('/config/:id', isAgencyAdminOrAdmin, emailConfigController.updateConfig);
+emailConfigRouter.delete('/config/:id', isAgencyAdminOrAdmin, emailConfigController.deleteConfig);
+emailConfigRouter.post('/test', isAgencyAdminOrAdmin, emailConfigController.testConnection);
+emailConfigRouter.post('/send-test', isAgencyAdminOrAdmin, emailConfigController.sendTestEmail);
+emailConfigRouter.get('/templates', isAgencyAdminOrAdmin, emailConfigController.getTemplates);
+emailConfigRouter.put('/templates/:id', isAgencyAdminOrAdmin, emailConfigController.updateTemplate);
+app.use('/api/email-config', emailConfigRouter);
+
+// Rutas de Inteligencia Artificial (/api/ai)
+const aiRouter = express.Router();
+aiRouter.use(requireAuth);
+// Chat y sesiones
+aiRouter.post('/chat', aiController.chat);
+aiRouter.get('/sessions', aiController.getSessions);
+aiRouter.get('/sessions/:id/messages', aiController.getSessionMessages);
+aiRouter.delete('/sessions/:id', aiController.deleteSession);
+aiRouter.put('/sessions/:id/title', aiController.updateSessionTitle);
+// Acciones disponibles
+aiRouter.get('/actions', aiController.getActions);
+// Rutas admin - proveedores
+aiRouter.get('/providers', isAdmin, aiController.getProviders);
+aiRouter.get('/providers/:id', isAdmin, aiController.getProviderById);
+aiRouter.post('/providers', isAdmin, aiController.createProvider);
+aiRouter.put('/providers/:id', isAdmin, aiController.updateProvider);
+aiRouter.delete('/providers/:id', isAdmin, aiController.deleteProvider);
+aiRouter.post('/providers/:id/test', isAdmin, aiController.testProvider);
+// Rutas admin - acciones
+aiRouter.post('/actions', isAdmin, aiController.createAction);
+aiRouter.put('/actions/:id', isAdmin, aiController.updateAction);
+aiRouter.delete('/actions/:id', isAdmin, aiController.deleteAction);
+// Rutas admin - estadísticas y logs
+aiRouter.get('/stats', isAdmin, aiController.getStats);
+aiRouter.get('/logs', isAdmin, aiController.getLogs);
+app.use('/api/ai', aiRouter);
 
 // Endpoint interno para cron de expiración de bloqueos
 const internalRouter = express.Router();

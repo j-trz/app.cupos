@@ -76,6 +76,94 @@ export const isAgencyAdminOrAdmin = (req, res, next) => {
 };
 
 /**
+ * Middleware para verificar permisos granulares
+ * @param {string|string[]} permissionCodes - Código(s) de permiso requerido(s)
+ * @param {Object} options - Opciones adicionales
+ * @param {boolean} options.requireAll - Si es true, requiere todos los permisos (default: false - requiere al menos uno)
+ * @param {boolean} options.allowAdmin - Si los admins siempre tienen acceso (default: true)
+ */
+export const requirePermission = (permissionCodes, options = {}) => {
+  const { requireAll = false, allowAdmin = true } = options;
+  
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'No autorizado. Se requiere autenticación.' });
+    }
+
+    // Los administradores siempre tienen acceso si allowAdmin está habilitado
+    if (allowAdmin && req.user.role === 'admin') {
+      return next();
+    }
+
+    // Convertir a array si es un solo código
+    const requiredCodes = Array.isArray(permissionCodes) ? permissionCodes : [permissionCodes];
+
+    if (requiredCodes.length === 0) {
+      return next();
+    }
+
+    try {
+      // Obtener permisos del usuario desde la base de datos
+      const { query } = await import('../db.js');
+      
+      const result = await query(`
+        SELECT DISTINCT p.code
+        FROM permissions p
+        INNER JOIN role_permissions rp ON rp.permission_id = p.id
+        INNER JOIN user_roles ur ON ur.role_id = rp.role_id
+        WHERE ur.user_id = $1 AND p.is_active = true
+      `, [req.user.id]);
+
+      const userPermissions = result.rows.map(row => row.code);
+
+      // Verificar si tiene los permisos requeridos
+      const hasPermission = requireAll
+        ? requiredCodes.every(code => userPermissions.includes(code))
+        : requiredCodes.some(code => userPermissions.includes(code));
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          error: 'Acceso prohibido. Permisos insuficientes.',
+          required: requiredCodes,
+          message: `Se requiere ${requireAll ? 'todos los permisos' : 'al menos uno de los permisos'}: ${requiredCodes.join(', ')}`
+        });
+      }
+
+      // Adjuntar permisos al request para uso posterior
+      req.userPermissions = userPermissions;
+      next();
+    } catch (error) {
+      console.error('Error verificando permisos:', error);
+      return res.status(500).json({ error: 'Error al verificar permisos.' });
+    }
+  };
+};
+
+/**
+ * Middleware para verificar si el usuario tiene algún rol de una lista
+ * @param {string[]} allowedRoles - Array de roles permitidos
+ */
+export const requireRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'No autorizado. Se requiere autenticación.' });
+    }
+
+    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+    
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: 'Acceso prohibido. Rol insuficiente.',
+        required: roles,
+        current: req.user.role
+      });
+    }
+
+    next();
+  };
+};
+
+/**
  * Middleware para proteger endpoints internos/cron con token secreto.
  */
 export const requireInternalToken = (req, res, next) => {

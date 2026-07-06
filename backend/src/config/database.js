@@ -549,6 +549,32 @@ const initializeDatabase = async () => {
       ON CONFLICT (name) DO NOTHING;
     `);
 
+    // ============================================
+    // Tabla de Configuración SMTP por Agencia
+    // ============================================
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS email_smtp_configs (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        agency_id UUID REFERENCES public.agencies(id) ON DELETE CASCADE,
+        smtp_host VARCHAR(255),
+        smtp_port INTEGER DEFAULT 587,
+        smtp_user VARCHAR(255),
+        smtp_pass TEXT,
+        smtp_secure BOOLEAN DEFAULT FALSE,
+        email_from VARCHAR(255),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Índice único por agencia
+    await query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_smtp_configs_agency_id
+      ON email_smtp_configs (agency_id) WHERE is_active = TRUE;
+    `);
+
     // Semillas por defecto: settings y plantillas de email (si no existen)
     await query(`
       INSERT INTO system_settings (key, value)

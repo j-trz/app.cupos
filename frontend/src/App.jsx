@@ -12,6 +12,10 @@ import GestionUsuarios from './pages/GestionUsuarios.jsx';
 import GestionReservas from './pages/GestionReservas.jsx';
 import Notificaciones from './pages/Notificaciones.jsx';
 import WhiteLabelConfig from './pages/WhiteLabelConfig.jsx';
+import EmailConfig from './pages/EmailConfig.jsx';
+import AIConfig from './pages/AIConfig.jsx';
+import GestionPermisos from './pages/GestionPermisos.jsx';
+import GestionRoles from './pages/GestionRoles.jsx';
 import Layout from './components/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AdminRoute from './components/AdminRoute.jsx'; // New component for admin protection
@@ -70,6 +74,26 @@ function App() {
           <Route path="marca-blanca" element={
             <AdminRoute>
               <WhiteLabelConfig />
+            </AdminRoute>
+          } />
+          <Route path="email-config" element={
+            <AdminRoute>
+              <EmailConfig />
+            </AdminRoute>
+          } />
+          <Route path="config-ia" element={
+            <AdminRoute>
+              <AIConfig />
+            </AdminRoute>
+          } />
+          <Route path="permisos" element={
+            <AdminRoute>
+              <GestionPermisos />
+            </AdminRoute>
+          } />
+          <Route path="roles" element={
+            <AdminRoute>
+              <GestionRoles />
             </AdminRoute>
           } />
           <Route path="*" element={<Navigate to="availability" replace />} />

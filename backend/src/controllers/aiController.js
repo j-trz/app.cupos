@@ -1,0 +1,754 @@
+/**
+ * Controlador de Inteligencia Artificial
+ * Maneja chat, sesiones, proveedores y acciones del agente IA
+ */
+
+import { query } from '../db.js';
+import AIService from '../services/aiService.js';
+
+const aiService = new AIService();
+
+/**
+ * Enviar mensaje al asistente IA
+ * POST /api/ai/chat
+ */
+export const chat = async (req, res) => {
+  try {
+    const { message, sessionId, providerId, tools } = req.body;
+    const userId = req.user.id;
+
+    if (!message) {
+      return res.status(400).json({ error: 'El mensaje es requerido' });
+    }
+
+    // Crear o recuperar sesión
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      const session = await aiService.createSession(userId, message.substring(0, 50));
+      currentSessionId = session.id;
+    }
+
+    // Guardar mensaje del usuario
+    await aiService.saveMessage(currentSessionId, userId, 'user', message);
+
+    // Obtener historial de la sesión para contexto
+    const history = await aiService.getSessionHistory(currentSessionId);
+    const messages = history.rows.map(row => ({
+      role: row.role,
+      content: row.content
+    }));
+
+    // Enviar al proveedor de IA
+    const response = await aiService.sendMessage(messages, {
+      providerId,
+      tools: tools || []
+    });
+
+    // Guardar respuesta del asistente
+    await aiService.saveMessage(
+      currentSessionId,
+      null,
+      'assistant',
+      response.content,
+      response.toolCalls
+    );
+
+    res.status(200).json({
+      sessionId: currentSessionId,
+      message: response.content,
+      toolCalls: response.toolCalls,
+      usage: response.usage
+    });
+  } catch (error) {
+    console.error('Error en chat IA:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener sesiones de chat del usuario
+ * GET /api/ai/sessions
+ */
+export const getSessions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const sessions = await aiService.getUserSessions(userId);
+
+    res.status(200).json({
+      sessions: sessions.rows
+    });
+  } catch (error) {
+    console.error('Error al obtener sesiones:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener historial de mensajes de una sesión
+ * GET /api/ai/sessions/:id/messages
+ */
+export const getSessionMessages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Verificar que la sesión pertenece al usuario
+    const sessionCheck = await query(
+      `SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2`,
+      [id, userId]
+    );
+
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    const history = await aiService.getSessionHistory(id);
+
+    res.status(200).json({
+      messages: history.rows
+    });
+  } catch (error) {
+    console.error('Error al obtener mensajes:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Eliminar una sesión de chat
+ * DELETE /api/ai/sessions/:id
+ */
+export const deleteSession = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    await aiService.deleteSession(id, userId);
+
+    res.status(200).json({
+      message: 'Sesión eliminada correctamente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar sesión:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Actualizar título de sesión
+ * PUT /api/ai/sessions/:id/title
+ */
+export const updateSessionTitle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    const userId = req.user.id;
+
+    if (!title) {
+      return res.status(400).json({ error: 'El título es requerido' });
+    }
+
+    const result = await query(
+      `UPDATE ai_chat_sessions 
+       SET title = $1, updated_at = NOW() 
+       WHERE id = $2 AND user_id = $3 
+       RETURNING id, title`,
+      [title, id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    res.status(200).json({
+      session: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error al actualizar título:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener lista de proveedores IA (solo admin)
+ * GET /api/ai/providers
+ */
+export const getProviders = async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, name, provider_type, default_model, is_active, is_default, 
+              temperature, max_tokens, created_at, updated_at
+       FROM ai_providers 
+       ORDER BY is_default DESC, name ASC`
+    );
+
+    // No devolver API keys en la respuesta
+    const providers = result.rows.map(p => ({
+      ...p,
+      has_api_key: !!p.api_key_encrypted
+    }));
+
+    res.status(200).json({
+      providers
+    });
+  } catch (error) {
+    console.error('Error al obtener proveedores:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener un proveedor específico (solo admin)
+ * GET /api/ai/providers/:id
+ */
+export const getProviderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      `SELECT id, name, provider_type, default_model, api_endpoint, 
+              is_active, is_default, temperature, max_tokens, created_at, updated_at
+       FROM ai_providers 
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Proveedor no encontrado' });
+    }
+
+    const provider = result.rows[0];
+    provider.has_api_key = !!provider.api_key_encrypted;
+
+    res.status(200).json({
+      provider
+    });
+  } catch (error) {
+    console.error('Error al obtener proveedor:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Crear nuevo proveedor IA (solo admin)
+ * POST /api/ai/providers
+ */
+export const createProvider = async (req, res) => {
+  try {
+    const {
+      name,
+      provider_type,
+      api_key,
+      api_endpoint,
+      default_model,
+      temperature,
+      max_tokens,
+      is_active,
+      is_default
+    } = req.body;
+
+    if (!name || !provider_type) {
+      return res.status(400).json({ error: 'Nombre y tipo de proveedor son requeridos' });
+    }
+
+    // Si es el proveedor por defecto, desactivar otros
+    if (is_default) {
+      await query(`UPDATE ai_providers SET is_default = false WHERE is_default = true`);
+    }
+
+    const result = await query(
+      `INSERT INTO ai_providers (
+        name, provider_type, api_key_encrypted, api_endpoint, 
+        default_model, temperature, max_tokens, is_active, is_default
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, name, provider_type, default_model, api_endpoint, 
+                is_active, is_default, temperature, max_tokens, created_at`,
+      [
+        name,
+        provider_type,
+        api_key,
+        api_endpoint,
+        default_model || 'gpt-4o',
+        temperature || 0.7,
+        max_tokens || 4096,
+        is_active !== false,
+        is_default || false
+      ]
+    );
+
+    const provider = result.rows[0];
+    provider.has_api_key = !!api_key;
+
+    res.status(201).json({
+      message: 'Proveedor creado correctamente',
+      provider
+    });
+  } catch (error) {
+    console.error('Error al crear proveedor:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Actualizar proveedor IA (solo admin)
+ * PUT /api/ai/providers/:id
+ */
+export const updateProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      provider_type,
+      api_key,
+      api_endpoint,
+      default_model,
+      temperature,
+      max_tokens,
+      is_active,
+      is_default
+    } = req.body;
+
+    // Si se establece como default, desactivar otros
+    if (is_default) {
+      await query(`UPDATE ai_providers SET is_default = false WHERE is_default = true AND id != $1`, [id]);
+    }
+
+    // Construir query dinámicamente para no sobrescribir API key si no se envía
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (provider_type !== undefined) {
+      updates.push(`provider_type = $${paramIndex++}`);
+      values.push(provider_type);
+    }
+    if (api_key !== undefined) {
+      updates.push(`api_key_encrypted = $${paramIndex++}`);
+      values.push(api_key);
+    }
+    if (api_endpoint !== undefined) {
+      updates.push(`api_endpoint = $${paramIndex++}`);
+      values.push(api_endpoint);
+    }
+    if (default_model !== undefined) {
+      updates.push(`default_model = $${paramIndex++}`);
+      values.push(default_model);
+    }
+    if (temperature !== undefined) {
+      updates.push(`temperature = $${paramIndex++}`);
+      values.push(temperature);
+    }
+    if (max_tokens !== undefined) {
+      updates.push(`max_tokens = $${paramIndex++}`);
+      values.push(max_tokens);
+    }
+    if (is_active !== undefined) {
+      updates.push(`is_active = $${paramIndex++}`);
+      values.push(is_active);
+    }
+    if (is_default !== undefined) {
+      updates.push(`is_default = $${paramIndex++}`);
+      values.push(is_default);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No hay campos para actualizar' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await query(
+      `UPDATE ai_providers 
+       SET ${updates.join(', ')} 
+       WHERE id = $${paramIndex}
+       RETURNING id, name, provider_type, default_model, api_endpoint, 
+                 is_active, is_default, temperature, max_tokens, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Proveedor no encontrado' });
+    }
+
+    const provider = result.rows[0];
+    provider.has_api_key = !!provider.api_key_encrypted;
+
+    res.status(200).json({
+      message: 'Proveedor actualizado correctamente',
+      provider
+    });
+  } catch (error) {
+    console.error('Error al actualizar proveedor:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Eliminar proveedor IA (solo admin)
+ * DELETE /api/ai/providers/:id
+ */
+export const deleteProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar si es el proveedor por defecto
+    const provider = await query(`SELECT is_default FROM ai_providers WHERE id = $1`, [id]);
+    
+    if (provider.rows.length === 0) {
+      return res.status(404).json({ error: 'Proveedor no encontrado' });
+    }
+
+    if (provider.rows[0].is_default) {
+      return res.status(400).json({ error: 'No se puede eliminar el proveedor por defecto' });
+    }
+
+    await query(`DELETE FROM ai_providers WHERE id = $1`, [id]);
+
+    res.status(200).json({
+      message: 'Proveedor eliminado correctamente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar proveedor:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Probar conexión con proveedor IA
+ * POST /api/ai/providers/:id/test
+ */
+export const testProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const provider = await aiService.getProviderById(id);
+
+    const testMessages = [
+      { role: 'user', content: 'Responde brevemente: "Conexión exitosa"' }
+    ];
+
+    const response = await aiService.sendMessage(testMessages, {
+      providerId: provider.id
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Conexión exitosa',
+      response: response.content,
+      usage: response.usage
+    });
+  } catch (error) {
+    console.error('Error al probar proveedor:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Obtener acciones disponibles del agente IA
+ * GET /api/ai/actions
+ */
+export const getActions = async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, name, description, action_type, endpoint, 
+              method, parameters, is_active, created_at
+       FROM ai_actions 
+       WHERE is_active = true
+       ORDER BY name ASC`
+    );
+
+    res.status(200).json({
+      actions: result.rows
+    });
+  } catch (error) {
+    console.error('Error al obtener acciones:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Crear nueva acción para el agente IA (solo admin)
+ * POST /api/ai/actions
+ */
+export const createAction = async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      action_type,
+      endpoint,
+      method,
+      parameters,
+      is_active
+    } = req.body;
+
+    if (!name || !action_type) {
+      return res.status(400).json({ error: 'Nombre y tipo de acción son requeridos' });
+    }
+
+    const result = await query(
+      `INSERT INTO ai_actions (
+        name, description, action_type, endpoint, method, parameters, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, name, description, action_type, endpoint, method, 
+                parameters, is_active, created_at`,
+      [
+        name,
+        description,
+        action_type,
+        endpoint,
+        method || 'GET',
+        parameters || {},
+        is_active !== false
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Acción creada correctamente',
+      action: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error al crear acción:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Actualizar acción del agente IA (solo admin)
+ * PUT /api/ai/actions/:id
+ */
+export const updateAction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      description,
+      action_type,
+      endpoint,
+      method,
+      parameters,
+      is_active
+    } = req.body;
+
+    const result = await query(
+      `UPDATE ai_actions 
+       SET name = COALESCE($1, name),
+           description = COALESCE($2, description),
+           action_type = COALESCE($3, action_type),
+           endpoint = COALESCE($4, endpoint),
+           method = COALESCE($5, method),
+           parameters = COALESCE($6, parameters),
+           is_active = COALESCE($7, is_active),
+           updated_at = NOW()
+       WHERE id = $8
+       RETURNING id, name, description, action_type, endpoint, method, 
+                 parameters, is_active, created_at, updated_at`,
+      [name, description, action_type, endpoint, method, parameters, is_active, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Acción no encontrada' });
+    }
+
+    res.status(200).json({
+      message: 'Acción actualizada correctamente',
+      action: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error al actualizar acción:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Eliminar acción del agente IA (solo admin)
+ * DELETE /api/ai/actions/:id
+ */
+export const deleteAction = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(`DELETE FROM ai_actions WHERE id = $1 RETURNING id`, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Acción no encontrada' });
+    }
+
+    res.status(200).json({
+      message: 'Acción eliminada correctamente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar acción:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener estadísticas de uso del agente IA (solo admin)
+ * GET /api/ai/stats
+ */
+export const getStats = async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+
+    // Total de sesiones
+    const sessionsResult = await query(
+      `SELECT COUNT(*) as total 
+       FROM ai_chat_sessions 
+       WHERE created_at >= NOW() - INTERVAL '${parseInt(days)} days'`
+    );
+
+    // Total de mensajes
+    const messagesResult = await query(
+      `SELECT COUNT(*) as total 
+       FROM ai_chat_messages 
+       WHERE created_at >= NOW() - INTERVAL '${parseInt(days)} days'`
+    );
+
+    // Total de tokens usados
+    const tokensResult = await query(
+      `SELECT 
+         SUM((token_usage->>'prompt_tokens')::int) as prompt_tokens,
+         SUM((token_usage->>'completion_tokens')::int) as completion_tokens,
+         SUM((token_usage->>'total_tokens')::int) as total_tokens
+       FROM ai_chat_messages 
+       WHERE token_usage IS NOT NULL 
+       AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'`
+    );
+
+    // Uso por proveedor
+    const providerUsageResult = await query(
+      `SELECT 
+         p.name as provider_name,
+         COUNT(m.id) as message_count,
+         SUM((m.token_usage->>'total_tokens')::int) as total_tokens
+       FROM ai_chat_messages m
+       JOIN ai_chat_sessions s ON m.session_id = s.id
+       JOIN ai_providers p ON s.provider_id = p.id
+       WHERE m.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
+       GROUP BY p.name
+       ORDER BY message_count DESC`
+    );
+
+    res.status(200).json({
+      stats: {
+        total_sessions: parseInt(sessionsResult.rows[0].total),
+        total_messages: parseInt(messagesResult.rows[0].total),
+        tokens: tokensResult.rows[0],
+        provider_usage: providerUsageResult.rows,
+        period_days: parseInt(days)
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener estadísticas:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener logs de chat (solo admin)
+ * GET /api/ai/logs
+ */
+export const getLogs = async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, userId, sessionId } = req.query;
+
+    let queryText = `
+      SELECT 
+        m.id,
+        m.session_id,
+        m.role,
+        m.content,
+        m.tool_calls,
+        m.tool_result,
+        m.token_usage,
+        m.created_at,
+        s.title as session_title,
+        u.email as user_email
+      FROM ai_chat_messages m
+      JOIN ai_chat_sessions s ON m.session_id = s.id
+      LEFT JOIN users u ON s.user_id = u.id
+      WHERE 1=1
+    `;
+
+    const values = [];
+    let paramIndex = 1;
+
+    if (userId) {
+      queryText += ` AND s.user_id = $${paramIndex++}`;
+      values.push(userId);
+    }
+
+    if (sessionId) {
+      queryText += ` AND m.session_id = $${paramIndex++}`;
+      values.push(sessionId);
+    }
+
+    queryText += ` ORDER BY m.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    values.push(parseInt(limit), parseInt(offset));
+
+    const result = await query(queryText, values);
+
+    // Count total
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM ai_chat_messages m
+      JOIN ai_chat_sessions s ON m.session_id = s.id
+      WHERE 1=1
+    `;
+
+    const countValues = [];
+    let countParamIndex = 1;
+
+    if (userId) {
+      countQuery += ` AND s.user_id = $${countParamIndex++}`;
+      countValues.push(userId);
+    }
+
+    if (sessionId) {
+      countQuery += ` AND m.session_id = $${countParamIndex++}`;
+      countValues.push(sessionId);
+    }
+
+    const countResult = await query(countQuery, countValues);
+
+    res.status(200).json({
+      logs: result.rows,
+      pagination: {
+        total: parseInt(countResult.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener logs:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export default {
+  chat,
+  getSessions,
+  getSessionMessages,
+  deleteSession,
+  updateSessionTitle,
+  getProviders,
+  getProviderById,
+  createProvider,
+  updateProvider,
+  deleteProvider,
+  testProvider,
+  getActions,
+  createAction,
+  updateAction,
+  deleteAction,
+  getStats,
+  getLogs
+};

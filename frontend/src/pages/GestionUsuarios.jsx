@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Edit3, User, Check, X, Lock, Unlock } from 'lucide-react';
+import { Plus, Trash2, Edit3, User, Check, X, Lock, Unlock, Shield } from 'lucide-react';
 import UserService from '../services/userService';
+import RoleService from '../services/roleService';
 import Swal from 'sweetalert2';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
@@ -17,6 +18,7 @@ const emptyUser = {
   agencia: '',
   role: 'agency_user',
   telefono: '',
+  role_ids: [],
 };
 
 export default function GestionUsuarios() {
@@ -25,6 +27,8 @@ export default function GestionUsuarios() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [formState, setFormState] = useState(emptyUser);
+  const [roles, setRoles] = useState([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -38,8 +42,21 @@ export default function GestionUsuarios() {
     }
   };
 
+  const fetchRoles = async () => {
+    setLoadingRoles(true);
+    try {
+      const response = await RoleService.listRoles({ limit: 100 });
+      setRoles(response.data || []);
+    } catch (error) {
+      console.error('Error al cargar roles:', error);
+    } finally {
+      setLoadingRoles(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   const openCreate = () => {
@@ -56,7 +73,8 @@ export default function GestionUsuarios() {
       apellido: user.apellido || '',
       agencia: user.agencia || '',
       role: user.role || 'agency_user',
-      telefono: user.telefono || ''
+      telefono: user.telefono || '',
+      role_ids: user.roles?.map(r => r.id) || []
     });
     setDialogOpen(true);
   };
@@ -121,11 +139,20 @@ export default function GestionUsuarios() {
     []
   );
 
-  const roles = [
+  const legacyRoles = [
     { value: 'admin', label: 'Administrador' },
     { value: 'agency_admin', label: 'Admin de Agencia' },
     { value: 'agency_user', label: 'Usuario de Agencia' },
   ];
+
+  const toggleRole = (roleId) => {
+    setFormState(prev => ({
+      ...prev,
+      role_ids: prev.role_ids.includes(roleId)
+        ? prev.role_ids.filter(id => id !== roleId)
+        : [...prev.role_ids, roleId]
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -181,13 +208,21 @@ export default function GestionUsuarios() {
                     <TableCell>{user.nombre} {user.apellido}</TableCell>
                     <TableCell>{user.agencia || '-'}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                        user.role === 'agency_admin' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                        {user.role === 'admin' ? 'Admin' :
-                          user.role === 'agency_admin' ? 'Admin Agencia' : 'Usuario'}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        <span className={`px-2 py-1 rounded-full text-xs ${user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                          user.role === 'agency_admin' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                          {user.role === 'admin' ? 'Admin' :
+                            user.role === 'agency_admin' ? 'Admin Agencia' : 'Usuario'}
+                        </span>
+                        {user.roles && user.roles.length > 0 && (
+                          <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 flex items-center gap-1">
+                            <Shield className="w-3 h-3" />
+                            {user.roles.length} rol{user.roles.length !== 1 ? 'es' : ''}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {user.security_status?.is_locked ? (
@@ -255,7 +290,7 @@ export default function GestionUsuarios() {
                         <SelectValue placeholder={`Selecciona un ${field.label.toLowerCase()}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {roles.map((role) => (
+                        {legacyRoles.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
                             {role.label}
                           </SelectItem>
@@ -275,6 +310,52 @@ export default function GestionUsuarios() {
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Roles Granulares */}
+            <div className="border-t pt-4 mt-4">
+              <Label className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-indigo-600" />
+                Roles Granulares
+              </Label>
+              <p className="text-xs text-slate-500 mb-3">
+                Selecciona los roles adicionales que tendrá este usuario. Los roles definen permisos específicos en el sistema.
+              </p>
+
+              {loadingRoles ? (
+                <div className="text-center py-4 text-slate-500">Cargando roles...</div>
+              ) : roles.length === 0 ? (
+                <div className="text-center py-4 text-slate-500">
+                  No hay roles disponibles. Crea roles en la sección de Roles.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                  {roles.map((role) => (
+                    <label
+                      key={role.id}
+                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${formState.role_ids.includes(role.id)
+                          ? 'bg-indigo-50 border border-indigo-200'
+                          : 'hover:bg-slate-50 border border-transparent'
+                        }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formState.role_ids.includes(role.id)}
+                        onChange={() => toggleRole(role.id)}
+                        className="rounded text-indigo-600"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-slate-900 truncate">
+                          {role.name}
+                        </div>
+                        <div className="text-xs text-slate-500 font-mono truncate">
+                          {role.code}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4">

@@ -1,0 +1,291 @@
+<summary>
+1. Primary Request and Intent:
+   - **Main request**: Implementar un sistema completo de Agente IA con chat integrado, configuración multi-proveedor y function calling para interactuar con el sistema de reservas
+   - **Expanded scope**: Agregar herramientas de IA para gestionar reservas, usuarios y productos mediante function calling
+   - **Critical requirement**: El agente IA debe poder ejecutar acciones reales en el sistema (crear reservas, consultar disponibilidad, etc.)
+   - **Current execution**: Completar la Fase 3 del plan de implementación
+
+2. Key Technical Concepts:
+   - React 18 + Vite frontend con Tailwind CSS
+   - Express.js + PostgreSQL backend
+   - Multi-provider AI integration (OpenAI, Anthropic, Google AI, Azure OpenAI, Local models)
+   - Function calling / tool use para acciones del agente
+   - Widget de chat flotante con animaciones
+   - Auto-resize textarea para input de chat
+   - Session management para conversaciones
+   - Agency-level configuration (configuración por agencia)
+   - JWT authentication con role-based middleware
+
+3. Files and Code Sections:
+
+   - **backend/src/controllers/aiController.js** (CREADO - 680 líneas)
+     - Controlador completo para gestión de IA
+     - Endpoints para chat, sesiones, proveedores, acciones, estadísticas y logs
+     - Key methods:
+     ```javascript
+     export const chat = async (req, res) => {
+       // Maneja mensajes del usuario, crea/recupera sesiones
+       // Guarda mensajes y obtiene respuesta del proveedor IA
+     }
+     
+     export const getSessions = async (req, res) => {
+       // Lista sesiones del usuario autenticado
+     }
+     
+     export const createProvider = async (req, res) => {
+       // Crea nuevo proveedor IA (admin only)
+     }
+     
+     export const testProvider = async (req, res) => {
+       // Prueba conexión con proveedor específico
+     }
+     ```
+
+   - **backend/src/index.js** (MODIFICADO)
+     - Agregadas rutas para /api/ai con todos los endpoints
+     - Rutas de chat y sesiones accesibles para usuarios autenticados
+     - Rutas de administración (proveedores, acciones, stats, logs) protegidas con isAdmin
+     ```javascript
+     // Rutas de Inteligencia Artificial (/api/ai)
+     const aiRouter = express.Router();
+     aiRouter.use(requireAuth);
+     aiRouter.post('/chat', aiController.chat);
+     aiRouter.get('/sessions', aiController.getSessions);
+     aiRouter.get('/sessions/:id/messages', aiController.getSessionMessages);
+     aiRouter.delete('/sessions/:id', aiController.deleteSession);
+     aiRouter.put('/sessions/:id/title', aiController.updateSessionTitle);
+     aiRouter.get('/actions', aiController.getActions);
+     // Admin routes
+     aiRouter.get('/providers', isAdmin, aiController.getProviders);
+     aiRouter.post('/providers', isAdmin, aiController.createProvider);
+     aiRouter.put('/providers/:id', isAdmin, aiController.updateProvider);
+     aiRouter.delete('/providers/:id', isAdmin, aiController.deleteProvider);
+     aiRouter.post('/providers/:id/test', isAdmin, aiController.testProvider);
+     app.use('/api/ai', aiRouter);
+     ```
+
+   - **backend/src/tools/reservationTools.js** (CREADO - 450 líneas)
+     - Herramientas de function calling para gestión de reservas
+     - 8 herramientas definidas: search_reservations, get_reservation_details, create_reservation, update_reservation, confirm_reservation, cancel_reservation, check_availability, get_reservation_stats
+     - Key structure:
+     ```javascript
+     export const reservationToolDefinitions = [
+       {
+         type: 'function',
+         function: {
+           name: 'search_reservations',
+           description: 'Buscar reservas por diferentes criterios',
+           parameters: {
+             type: 'object',
+             properties: {
+               date_from: { type: 'string' },
+               date_to: { type: 'string' },
+               status: { type: 'string', enum: ['pending', 'confirmed', 'cancelled', 'expired'] },
+               // ... más parámetros
+             }
+           }
+         }
+       }
+     ];
+     
+     export async function executeReservationTool(toolName, parameters, userContext) {
+       // Ejecuta la herramienta correspondiente con validación de permisos
+     }
+     ```
+
+   - **backend/src/tools/userTools.js** (CREADO - 380 líneas)
+     - Herramientas para gestión de usuarios (solo admin)
+     - 8 herramientas: search_users, get_user_details, create_user, update_user, unlock_user, reset_user_password, get_user_stats, get_login_history
+     - Incluye validación de permisos (solo admin puede gestionar usuarios)
+
+   - **backend/src/tools/productTools.js** (CREADO - 420 líneas)
+     - Herramientas para gestión de productos
+     - 7 herramientas: search_products, get_product_details, create_product, update_product, update_product_inventory, get_product_availability, search_availability_by_route
+     - Calcula disponibilidad en tiempo real
+
+   - **frontend/src/services/aiService.js** (CREADO)
+     - Cliente API para comunicación con backend de IA
+     - Métodos estáticos para todas las operaciones
+     ```javascript
+     class AIService {
+       static async sendMessage(message, sessionId = null, providerId = null)
+       static async getSessions()
+       static async getSessionMessages(sessionId)
+       static async deleteSession(sessionId)
+       static async getProviders()
+       static async createProvider(provider)
+       static async testProvider(providerId)
+       // ... más métodos
+     }
+     ```
+
+   - **frontend/src/components/AIChat/AIChatWidget.jsx** (CREADO)
+     - Widget flotante con botón para abrir/cerrar chat
+     - Indicador de mensajes no leídos con badge
+     - Preview del último mensaje al hover
+     - Animaciones de entrada/salida
+     ```javascript
+     export default function AIChatWidget() {
+       const [isOpen, setIsOpen] = useState(false);
+       const [unreadCount, setUnreadCount] = useState(0);
+       
+       return (
+         <>
+           {isLoaded && <AIChatWindow isOpen={isOpen} onClose={() => setIsOpen(false)} />}
+           <button onClick={handleToggle} className="fixed bottom-6 right-6 z-50">
+             {/* Botón con animación pulse */}
+           </button>
+         </>
+       );
+     }
+     ```
+
+   - **frontend/src/components/AIChat/AIChatMessage.jsx** (CREADO)
+     - Renderizado de mensajes de usuario y asistente
+     - Soporte para tool calls indicator
+     - Botón de copiar mensaje
+     - Diferenciación visual entre mensajes de usuario, asistente y error
+
+   - **frontend/src/components/AIChat/AIChatInput.jsx** (CREADO)
+     - Textarea con auto-resize (min 40px, max 120px)
+     - Envío con Enter, nueva línea con Shift+Enter
+     - Sugerencias rápidas predefinidas
+     - Indicador de carga durante respuesta
+
+   - **frontend/src/components/AIChat/AIChatWindow.jsx** (CREADO - 280 líneas)
+     - Ventana principal del chat (400x600px)
+     - Header con gradiente y controles
+     - Panel de sesiones colapsable
+     - Auto-scroll a nuevos mensajes
+     - Indicador de "escribiendo" con animación
+     - Manejo de errores y estados de carga
+     ```javascript
+     export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
+       const [messages, setMessages] = useState([]);
+       const [sessions, setSessions] = useState([]);
+       const [isTyping, setIsTyping] = useState(false);
+       
+       const handleSendMessage = async (content) => {
+         // Envía mensaje, actualiza sesión, maneja respuesta
+       }
+     }
+     ```
+
+   - **frontend/src/pages/AIConfig.jsx** (CREADO - 750 líneas)
+     - Página de configuración para administradores
+     - 4 tabs: Proveedores, Acciones, Estadísticas, Logs
+     - Formularios para crear/editar proveedores y acciones
+     - Test de conexión con proveedores
+     - Visualización de estadísticas de uso
+     - Tabla de logs de chat
+     ```javascript
+     const TABS = [
+       { id: 'providers', label: 'Proveedores', icon: Key },
+       { id: 'actions', label: 'Acciones', icon: Zap },
+       { id: 'stats', label: 'Estadísticas', icon: Activity },
+       { id: 'logs', label: 'Logs', icon: MessageSquare }
+     ];
+     
+     export default function AIConfig() {
+       // Manejo de CRUD para proveedores y acciones
+       // Visualización de estadísticas y logs
+     }
+     ```
+
+   - **frontend/src/App.jsx** (MODIFICADO)
+     - Agregado import de AIConfig
+     - Agregada ruta `/config-ia` protegida con AdminRoute
+     ```javascript
+     import AIConfig from './pages/AIConfig.jsx';
+     
+     <Route path="config-ia" element={
+       <AdminRoute>
+         <AIConfig />
+       </AdminRoute>
+     } />
+     ```
+
+   - **frontend/src/components/Layout.jsx** (MODIFICADO)
+     - Agregado import de AIChatWidget
+     - Agregado widget flotante al layout principal
+     ```javascript
+     import AIChatWidget from './AIChat/AIChatWidget.jsx';
+     
+     return (
+       <div className="flex h-screen overflow-hidden bg-slate-50">
+         <Sidebar user={user} onLogout={handleLogout} />
+         <main className="flex-1 overflow-y-auto p-6">
+           <Outlet context={{ user }} />
+         </main>
+         <AIChatWidget />
+       </div>
+     );
+     ```
+
+   - **frontend/src/components/ui/Sidebar.jsx** (MODIFICADO)
+     - Agregado icono Bot a imports de lucide-react
+     - Agregado item "Config IA" en adminNavItems
+     ```javascript
+     import { ..., Bot } from 'lucide-react';
+     
+     const adminNavItems = [
+       // ... otros items
+       { label: 'Config IA', path: '/config-ia', icon: Bot },
+     ];
+     ```
+
+4. Errors and fixes:
+   - **No errors encountered in this session**. Todas las operaciones de archivos fueron exitosas.
+
+5. Problem Solving:
+   - **Multi-provider AI abstraction**: Implementada interfaz unificada que maneja diferentes formatos de API para OpenAI, Anthropic, Google, Azure y modelos locales
+   - **Function calling architecture**: Diseñado sistema de herramientas que permite al agente IA ejecutar acciones reales con validación de permisos por rol
+   - **Session management**: Implementado sistema de sesiones persistente para mantener contexto de conversaciones
+   - **Widget flotante**: Creado componente reutilizable con animaciones, indicadores de no leídos y preview de mensajes
+   - **Auto-resize input**: Implementado textarea que crece automáticamente con el contenido manteniendo límites razonables
+
+6. All user messages:
+   - "mejora el diseño de marca blanca, que puedan tener una previsualización del site, etc." - Request to improve white-label design with site preview
+   - "Agrega a la lista de tareas, agregar la configuracion de email smtp y HTML para que puedan diseñarlo con previsualización. Adicional a esto sumemos el Agente IA interno, luego los permisos granulares en la seccion de usuarios. Y revisa si existe alguna función que aun no este agregada." - Add SMTP config, AI agent, granular permissions, review missing features
+   - "Algo fundamental que la configuración de marca blanca tiene que aplicar a una agencia, de ese modo todos los usuarios de la agencia tendran el setting, se entiende?" - Clarify agency-level configuration requirement
+   - "comienza con el plan" - Start implementing the comprehensive plan
+
+7. Pending Tasks:
+   **Phase 4: Granular Permissions**
+   - [ ] Crear frontend/src/pages/GestionPermisos.jsx (CRUD de permisos)
+   - [ ] Crear frontend/src/pages/GestionRoles.jsx (CRUD de roles con asignación de permisos)
+   - [ ] Agregar rutas en App.jsx para /permisos y /roles
+   - [ ] Agregar items en Sidebar.jsx para "Permisos" y "Roles"
+   - [ ] Crear frontend/src/services/permissionService.js
+   - [ ] Crear frontend/src/services/roleService.js
+   - [ ] Actualizar GestionUsuarios.jsx para asignar roles granulares
+   - [ ] Implementar middleware de permisos por ruta (requirePermission)
+   - [ ] Agregar tabla de permisos por módulo (dashboard, usuarios, productos, reservas, etc.)
+
+   **Phase 5: Additional Features**
+   - [ ] Dashboard mejorado con gráficos y métricas (Chart.js o Recharts)
+   - [ ] Sistema de notificaciones en tiempo real (WebSocket o SSE)
+   - [ ] Exportación masiva de datos (CSV, Excel, PDF)
+   - [ ] Auditoría y logs de acciones de usuarios
+   - [ ] Backup y restauración de configuración
+   - [ ] Modo oscuro/claro toggle global
+   - [ ] Internacionalización (i18n) - Español/Inglés
+   - [ ] Búsqueda global y filtros avanzados
+   - [ ] Atajos de teclado (keyboard shortcuts)
+   - [ ] Onboarding guiado para nuevos usuarios
+
+8. Current Work:
+   Se completó exitosamente la **Fase 3: Agente IA** del plan de implementación. El trabajo más reciente incluyó:
+   
+   - Creación del sistema completo de function calling con 3 módulos de herramientas (reservas, usuarios, productos)
+   - Implementación del widget de chat flotante con todos sus componentes (widget, window, input, message)
+   - Creación de la página de configuración de IA para administradores
+   - Integración completa en el frontend (rutas, layout, sidebar)
+   
+   El último archivo modificado fue `frontend/src/components/ui/Sidebar.jsx` donde se agregó el item "Config IA" con el icono Bot de lucide-react en la posición final de adminNavItems.
+
+9. Optional Next Step:
+   Continuar con la **Fase 4: Permisos Granulares** comenzando con la creación de `frontend/src/services/permissionService.js` y `frontend/src/services/roleService.js`, seguido de las páginas de gestión.
+   
+   Esto sigue directamente del plan establecido cuando el usuario dijo "comienza con el plan" y la lista de tareas muestra "Crear frontend/src/pages/GestionPermisos.jsx (CRUD de permisos)" como el siguiente item pendiente después de completar toda la Fase 3.
+</summary>
