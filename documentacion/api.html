@@ -330,6 +330,13 @@
                                     style="background-color: #3b82f6;">DATA</span>
                                 <span class="text-sm" style="color: #1e355e;">Datos</span>
                             </a>
+                            <a href="#endpoint-reports"
+                                class="flex items-center gap-2 p-3 rounded-lg transition-colors hover:bg-blue-50"
+                                style="background-color: #fefce8;">
+                                <span class="text-xs font-mono font-bold text-white px-2 py-1 rounded"
+                                    style="background-color: #eab308;">REPT</span>
+                                <span class="text-sm" style="color: #1e355e;">Reportes</span>
+                            </a>
                         </div>
                     </div>
                 </section>
@@ -337,6 +344,87 @@
                 <!-- Endpoints -->
                 <section class="mb-12">
                     <div class="w-full">
+
+                        <!-- ============================================================ -->
+                        <!-- Reports Endpoints -->
+                        <!-- ============================================================ -->
+                        <div id="endpoint-reports" class="my-[70px]">
+                            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3" style="color: #1e355e;">
+                                <div class="w-0.5 h-7 rounded-full" style="background-color: #eab308;"></div>
+                                Endpoints de Reportes
+                            </h2>
+
+                            <!-- GET /api/reports/stats -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #22c55e;">GET</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/reports/stats</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Estadísticas generales del dashboard</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #22c55e;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Ejemplo de Respuesta</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-3"
+                                        style="background-color: #1e355e;"><code>{
+  "success": true,
+  "stats": {
+    "status_distribution": [{ "estado": "confirmada", "total": 150 }],
+    "total_sales": 125000.50,
+    "top_destinations": [{ "vuelo_destino": "Madrid", "total": 45 }],
+    "recent_activity": [...]
+  }
+}</code></pre>
+                                </div>
+                            </details>
+
+                            <!-- POST /api/products/bulk -->
+                            <details class="mb-4 group">
+                                <summary class="flex items-stretch rounded-xl overflow-hidden w-full cursor-pointer"
+                                    style="background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                    <span
+                                        class="px-3 py-3 w-20 text-center content-center font-mono text-sm font-bold text-white flex-shrink-0"
+                                        style="background-color: #3b82f6;">POST</span>
+                                    <div class="p-4 flex-1 flex items-center justify-between">
+                                        <div>
+                                            <code class="font-mono text-sm font-semibold"
+                                                style="color: #1e355e;">/api/products/bulk</code>
+                                            <p class="text-sm mt-1" style="color: #6b7280;">Carga masiva de productos (solo admin)</p>
+                                        </div>
+                                        <svg class="w-4 h-4 transform transition-transform group-open:rotate-180"
+                                            style="color: #9ca3af;" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </summary>
+                                <div class="p-5 rounded-b-xl border-t-0"
+                                    style="background-color: #ffffff; border-left: 2px solid #3b82f6;">
+                                    <h4 class="font-semibold text-sm mb-2" style="color: #1e355e;">Body (JSON)</h4>
+                                    <pre class="text-sm p-4 rounded-xl text-white mb-4"
+                                        style="background-color: #1e355e;"><code>{
+  "products": [
+    { "codigo_cupo": "MAD-001", "destino": "Madrid", "compania": "Iberia", "disponibilidad": 20, ... },
+    { "codigo_cupo": "PAR-002", "destino": "Paris", "compania": "Air France", "disponibilidad": 15, ... }
+  ]
+}</code></pre>
+                                </div>
+                            </details>
+                        </div>
 
                         <!-- ============================================================ -->
                         <!-- Data Endpoints -->
