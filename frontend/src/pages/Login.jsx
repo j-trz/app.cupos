@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import AuthService from '../services/authService';
-import Card from '../components/ui/Card.jsx';
-import Input from '../components/ui/Input.jsx';
-import Button from '../components/ui/Button.jsx';
+import { Card } from '../components/ui/Card.jsx';
+import { Input } from '../components/ui/Input.jsx';
+import { Button } from '../components/ui/Button.jsx';
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
