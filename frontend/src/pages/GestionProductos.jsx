@@ -5,8 +5,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/Dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { SkeletonTable } from '../components/SkeletonTable';
-import { EmptyState } from '../components/EmptyState';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
 import { Search, Plus, Edit, Trash2, Upload, Download } from 'lucide-react';
@@ -229,7 +229,7 @@ const GestionProductos = () => {
                             size="sm"
                             onClick={() => handleEditProduct(product)}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h4 w-4" />
                           </Button>
                           <Button
                             variant="outline"

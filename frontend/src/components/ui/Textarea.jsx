@@ -1,7 +1,6 @@
 import clsx from 'clsx';
-import { Textarea } from './Textarea';
 
-function Textarea({ className, ...props }) {
+const Textarea = ({ className, ...props }) => {
   return (
     <textarea
       className={clsx(
@@ -11,7 +10,7 @@ function Textarea({ className, ...props }) {
       {...props}
     />
   );
-}
+};
 
 export { Textarea };
 export default Textarea;

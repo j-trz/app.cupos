@@ -1,7 +1,6 @@
 import clsx from 'clsx';
-import { Skeleton } from './Skeleton';
 
-function Skeleton({ className, ...props }) {
+const Skeleton = ({ className, ...props }) => {
   return (
     <div
       className={clsx(
@@ -11,7 +10,7 @@ function Skeleton({ className, ...props }) {
       {...props}
     />
   );
-}
+};
 
 export { Skeleton };
 export default Skeleton;

@@ -1,7 +1,6 @@
 import clsx from 'clsx';
-import { Label } from './Label';
 
-function Label({ className, htmlFor, ...props }) {
+const Label = ({ className, htmlFor, ...props }) => {
   return (
     <label
       htmlFor={htmlFor}
@@ -12,7 +11,7 @@ function Label({ className, htmlFor, ...props }) {
       {...props}
     />
   );
-}
+};
 
 export { Label };
 export default Label;

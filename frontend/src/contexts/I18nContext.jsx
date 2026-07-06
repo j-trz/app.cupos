@@ -63,12 +63,12 @@ const translations = {
     active: 'Activo',
     inactive: 'Inactivo',
     pending: 'Pendiente',
+    confirmed_status: 'Confirmado',
     cancelled: 'Cancelado',
+    expired_status: 'Expirado',
     
     // Mensajes
     welcome: 'Bienvenido',
-    confirmed_status: 'Confirmado',
-    expired: 'Expirado',
     success: 'Éxito',
     error: 'Error',
     warning: 'Advertencia',
@@ -151,8 +151,8 @@ const translations = {
     confirm: 'Confirm',
     resend: 'Resend',
     created: 'created',
-    confirmed: 'confirmed',
-    expired: 'expired',
+    confirmed_action: 'confirmed',
+    expired_action: 'expired',
     select_option: 'Select option',
     previous: 'Previous',
     next: 'Next',
@@ -177,9 +177,9 @@ const translations = {
     active: 'Active',
     inactive: 'Inactive',
     pending: 'Pending',
-    confirmed: 'Confirmed',
+    confirmed_status: 'Confirmed',
     cancelled: 'Cancelled',
-    expired: 'Expired',
+    expired_status: 'Expired',
     
     // Messages
     welcome: 'Welcome',

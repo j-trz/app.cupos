@@ -16,6 +16,10 @@ import GestionRoles from './pages/GestionRoles';
 import GestionPermisos from './pages/GestionPermisos';
 import ConfiguracionCorreo from './pages/ConfiguracionCorreo';
 import PanelControl from './pages/PanelControl';
+import Availability from './pages/Availability';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
+import Notificaciones from './pages/Notificaciones';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import './styles/globals.css';
@@ -136,6 +140,46 @@ function App() {
                     <ProtectedRoute>
                       <Layout>
                         <PanelControl />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/availability" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Availability />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Profile />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/settings" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Settings />
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/notificaciones" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Notificaciones />
                       </Layout>
                     </ProtectedRoute>
                   } 

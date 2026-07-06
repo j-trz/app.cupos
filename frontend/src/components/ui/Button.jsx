@@ -1,14 +1,13 @@
 import clsx from 'clsx';
-import { Button } from './Button';
 
-function Button({
+const Button = ({
   children,
   variant = 'primary',
   size = 'md',
   disabled = false,
   className,
   ...props
-}) {
+}) => {
   const baseClasses = 'inline-flex items-center justify-center rounded-2xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
   
   const variants = {
@@ -39,7 +38,7 @@ function Button({
       {children}
     </button>
   );
-}
+};
 
 export { Button };
 export default Button;

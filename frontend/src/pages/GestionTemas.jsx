@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { SkeletonTable } from '../components/SkeletonTable';
-import { EmptyState } from '../components/EmptyState';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 

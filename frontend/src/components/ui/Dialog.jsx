@@ -1,16 +1,12 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './Dialog';
-
-export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger };
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
-// Contexto para compartir el estado del diálogo
-const DialogContext = React.createContext({ open: false, setOpen: () => {} });
+const DialogContext = createContext();
 
 // Componente principal del diálogo
-const Dialog = ({ children, open = false, onOpenChange }) => {
+export const Dialog = ({ children, open = false, onOpenChange }) => {
   return (
     <DialogContext.Provider value={{ open, setOpen: onOpenChange }}>
       {children}
@@ -18,13 +14,12 @@ const Dialog = ({ children, open = false, onOpenChange }) => {
   );
 };
 
-// Trigger para abrir/cerrar el diálogo
-const DialogTrigger = ({ children, onClick, ...props }) => {
-  const { setOpen } = React.useContext(DialogContext);
+// Componente del trigger del diálogo
+export const DialogTrigger = ({ children, ...props }) => {
+  const { setOpen } = useContext(DialogContext);
 
-  const handleClick = (e) => {
-    setOpen(prev => !prev);
-    if (onClick) onClick(e);
+  const handleClick = () => {
+    setOpen(true);
   };
 
   return React.cloneElement(children, {
@@ -33,13 +28,17 @@ const DialogTrigger = ({ children, onClick, ...props }) => {
   });
 };
 
-// Contenido del diálogo
-const DialogContent = ({ children, className, ...props }) => {
-  const { open, setOpen } = React.useContext(DialogContext);
+// Componente del contenido del diálogo
+export const DialogContent = ({ children, ...props }) => {
+  const { open, setOpen } = useContext(DialogContext);
 
-  const handleClickOutside = (e) => {
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
-      setOpen(false);
+      handleClose();
     }
   };
 
@@ -50,25 +49,25 @@ const DialogContent = ({ children, className, ...props }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={handleClickOutside}
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
+          onClick={handleBackdropClick}
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
+            exit={{ scale: 0.95, opacity: 0 }}
             className={clsx(
-              'relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto',
-              className
+              'relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl',
+              props.className
             )}
-            {...props}
+            onClick={(e) => e.stopPropagation()}
           >
             {children}
             <button
-              onClick={() => setOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+              onClick={handleClose}
+              className="absolute right-4 top-4 rounded-full p-1 hover:bg-slate-100"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </motion.div>
         </motion.div>
@@ -77,22 +76,20 @@ const DialogContent = ({ children, className, ...props }) => {
   );
 };
 
-// Header del diálogo
-const DialogHeader = ({ children, className, ...props }) => {
+// Componente del encabezado del diálogo
+export const DialogHeader = ({ children, className, ...props }) => {
   return (
-    <div className={clsx('p-6 pb-4', className)} {...props}>
+    <div className={clsx("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props}>
       {children}
     </div>
   );
 };
 
-// Título del diálogo
-const DialogTitle = ({ children, className, ...props }) => {
+// Componente del título del diálogo
+export const DialogTitle = ({ children, className, ...props }) => {
   return (
-    <h3 className={clsx('text-xl font-semibold text-gray-900', className)} {...props}>
+    <h3 className={clsx("text-lg font-semibold leading-none tracking-tight", className)} {...props}>
       {children}
     </h3>
   );
 };
-
-export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle };
