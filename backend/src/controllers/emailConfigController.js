@@ -2,38 +2,56 @@ import { query } from '../db.js';
 import nodemailer from 'nodemailer';
 
 /**
+ * Validar si un string es un UUID válido
+ */
+const isValidUUID = (str) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
+/**
  * Obtener configuración SMTP de la agencia del usuario autenticado
  */
 export const getConfig = async (req, res) => {
   try {
     const agencyId = req.user?.agencia || 'default';
 
-    // Buscar la configuración SMTP asociada a esta agencia
-    // Primero buscamos en la tabla de agencias para obtener el UUID
-    const agencyResult = await query(
-      `SELECT id FROM agencies WHERE name = $1 OR id = $1 LIMIT 1`,
-      [agencyId]
-    );
-
     let configResult;
-    if (agencyResult.rows.length > 0) {
-      // Si encontramos la agencia, buscamos su configuración SMTP por UUID
-      const agencyUuid = agencyResult.rows[0].id;
+
+    // Determinar si agencyId es un UUID o un nombre de agencia
+    if (isValidUUID(agencyId)) {
+      // Si es un UUID, buscar directamente en la tabla de configuración
       configResult = await query(
         `SELECT * FROM email_smtp_configs
          WHERE agency_id = $1 AND is_active = TRUE
          LIMIT 1`,
-        [agencyUuid]
-      );
-    } else {
-      // Si no encontramos la agencia por nombre o UUID, buscamos directamente por el valor
-      // como cadena (caso para valores que no son UUID válidos)
-      configResult = await query(
-        `SELECT * FROM email_smtp_configs
-         WHERE CAST(agency_id AS TEXT) = $1 AND is_active = TRUE
-         LIMIT 1`,
         [agencyId]
       );
+    } else {
+      // Si es un nombre de agencia, buscar primero el UUID en la tabla de agencias
+      const agencyResult = await query(
+        `SELECT id FROM agencies WHERE name = $1 LIMIT 1`,
+        [agencyId]
+      );
+
+      if (agencyResult.rows.length > 0) {
+        // Si encontramos la agencia, buscar su configuración SMTP por UUID
+        const agencyUuid = agencyResult.rows[0].id;
+        configResult = await query(
+          `SELECT * FROM email_smtp_configs
+           WHERE agency_id = $1 AND is_active = TRUE
+           LIMIT 1`,
+          [agencyUuid]
+        );
+      } else {
+        // Si no encontramos la agencia por nombre, buscar por texto
+        configResult = await query(
+          `SELECT * FROM email_smtp_configs
+           WHERE CAST(agency_id AS TEXT) = $1 AND is_active = TRUE
+           LIMIT 1`,
+          [agencyId]
+        );
+      }
     }
 
     if (configResult.rows.length === 0) {
@@ -72,15 +90,19 @@ export const createConfig = async (req, res) => {
       return res.status(400).json({ error: 'Host SMTP y usuario son requeridos' });
     }
 
-    // Buscar el UUID de la agencia en la tabla agencies
-    const agencyResult = await query(
-      `SELECT id FROM agencies WHERE name = $1 OR id = $1 LIMIT 1`,
-      [agencyId]
-    );
-
     let targetAgencyId = agencyId; // Valor por defecto
-    if (agencyResult.rows.length > 0) {
-      targetAgencyId = agencyResult.rows[0].id;
+
+    // Determinar si agencyId es un UUID o un nombre de agencia
+    if (!isValidUUID(agencyId)) {
+      // Si no es UUID, buscar el UUID real en la tabla de agencias
+      const agencyResult = await query(
+        `SELECT id FROM agencies WHERE name = $1 LIMIT 1`,
+        [agencyId]
+      );
+
+      if (agencyResult.rows.length > 0) {
+        targetAgencyId = agencyResult.rows[0].id;
+      }
     }
 
     // Verificar si ya existe una configuración activa para esta agencia
@@ -229,15 +251,19 @@ export const sendTestEmail = async (req, res) => {
       return res.status(400).json({ error: 'Email destinatario es requerido' });
     }
 
-    // Buscar el UUID de la agencia en la tabla agencies
-    const agencyResult = await query(
-      `SELECT id FROM agencies WHERE name = $1 OR id = $1 LIMIT 1`,
-      [agencyId]
-    );
-
     let targetAgencyId = agencyId; // Valor por defecto
-    if (agencyResult.rows.length > 0) {
-      targetAgencyId = agencyResult.rows[0].id;
+
+    // Determinar si agencyId es un UUID o un nombre de agencia
+    if (!isValidUUID(agencyId)) {
+      // Si no es UUID, buscar el UUID real en la tabla de agencias
+      const agencyResult = await query(
+        `SELECT id FROM agencies WHERE name = $1 LIMIT 1`,
+        [agencyId]
+      );
+
+      if (agencyResult.rows.length > 0) {
+        targetAgencyId = agencyResult.rows[0].id;
+      }
     }
 
     // Obtener configuración SMTP de la agencia
