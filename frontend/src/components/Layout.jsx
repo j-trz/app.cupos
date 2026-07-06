@@ -150,6 +150,7 @@ export default function Layout() {
     }
   });
 
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
       <Sidebar user={user} onLogout={handleLogout} />
