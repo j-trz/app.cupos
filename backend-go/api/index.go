@@ -225,6 +225,15 @@ func init() {
 				notifications.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteNotification)
 			}
 
+			// Cesión de disponibilidad (Transfers)
+			transfers := protected.Group("/transfers")
+			{
+				transfers.GET("", handlers.GetUserTransfers)
+				transfers.POST("", handlers.CreateTransfer)
+			}
+			// Lista completa solo para admin
+			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
+
 			// SSE
 			protected.GET("/sse", handlers.SSEHandler)
 		}

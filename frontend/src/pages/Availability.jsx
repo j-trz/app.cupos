@@ -323,7 +323,7 @@ export default function Availability() {
 
       {/* Modal de Reserva individual */}
       <Modal title={`Reservar: ${selectedProduct?.codigo_cupo || ''} - ${selectedProduct?.destino || ''}`} open={modalOpen} onClose={closeReservationModal}>
-        <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+        <div className="max-h-[calc(100vh-500px)] overflow-y-auto">
           <form onSubmit={handleSubmitReservation} className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="grid grid-cols-2 gap-3 text-sm">

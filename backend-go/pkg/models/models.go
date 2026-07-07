@@ -61,6 +61,8 @@ type Reservation struct {
 	Neto1                float64    `json:"neto_1"`
 	PedidoID             string     `gorm:"not null" json:"pedido_id"`
 	Agencia              string     `json:"agencia"`
+	TransferID           *uuid.UUID `gorm:"type:uuid;column:transfer_id" json:"transfer_id,omitempty"`
+	OriginalAgency       string     `gorm:"column:original_agency" json:"original_agency,omitempty"`
 	ContactoNombre       string     `gorm:"not null" json:"contacto_nombre"`
 	ContactoEmail        string     `json:"contacto_email"`
 	ContactoTelefono     string     `json:"contacto_telefono"`
@@ -239,3 +241,20 @@ type AIMessage struct {
 	TokenUsage datatypes.JSON `gorm:"column:token_usage" json:"token_usage"`
 	CreatedAt  time.Time      `json:"created_at"`
 }
+
+// AvailabilityTransfer representa una cesión de disponibilidad entre agencias
+type AvailabilityTransfer struct {
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ProductID     uint       `gorm:"not null" json:"product_id"`
+	SourceAgency  string     `gorm:"not null;column:source_agency" json:"source_agency"`
+	TargetAgency  string     `gorm:"not null;column:target_agency" json:"target_agency"`
+	Quantity      int        `gorm:"not null" json:"quantity"`
+	CreatedBy     uuid.UUID  `gorm:"type:uuid;not null" json:"created_by"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	// Relaciones
+	Product       Product    `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+}
+
+// Agregar campos de cesión a Reservation
+// (Ya existen en el model, pero aseguramos compatibilidad)
