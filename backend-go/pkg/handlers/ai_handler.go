@@ -623,6 +623,102 @@ func callAnthropicFull(p models.AIProvider, systemPrompt string, messages []map[
 }
 
 // ─────────────────────────────────────────────
+// GOOGLE GEMINI FULL (con tool calling)
+// ─────────────────────────────────────────────
+
+func callGoogleFull(p models.AIProvider, systemPrompt string, contents []map[string]interface{}, tools []ToolDef) (*providerResponse, error) {
+	model := p.DefaultModel
+	if model == "" {
+		model = "gemini-1.5-flash"
+	}
+
+	// Convertir tools al formato de Gemini
+	var functionDeclarations []map[string]interface{}
+	for _, t := range tools {
+		functionDeclarations = append(functionDeclarations, map[string]interface{}{
+			"name":        t.Name,
+			"description": t.Description,
+			"parameters":  t.Parameters,
+		})
+	}
+
+	payload := map[string]interface{}{
+		"contents": contents,
+		"systemInstruction": map[string]interface{}{
+			"parts": []map[string]string{{"text": systemPrompt}},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature": p.Temperature,
+			"maxOutputTokens": func() int {
+				if p.MaxTokens > 0 {
+					return p.MaxTokens
+				}
+				return 4096
+			}(),
+		},
+	}
+	if len(functionDeclarations) > 0 {
+		payload["tools"] = []map[string]interface{}{
+			{"functionDeclarations": functionDeclarations},
+		}
+		payload["toolConfig"] = map[string]interface{}{
+			"functionCallingConfig": map[string]string{"mode": "AUTO"},
+		}
+	}
+
+	body, _ := json.Marshal(payload)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, p.APIKey)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error conectando con Google AI: %v", err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Google AI error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text         string `json:"text"`
+					FunctionCall *struct {
+						Name string                 `json:"name"`
+						Args map[string]interface{} `json:"args"`
+					} `json:"functionCall"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil || len(result.Candidates) == 0 {
+		return nil, fmt.Errorf("respuesta inválida de Google AI: %s", string(respBody))
+	}
+
+	pr := &providerResponse{}
+	for i, part := range result.Candidates[0].Content.Parts {
+		if part.FunctionCall != nil {
+			pr.ToolCalls = append(pr.ToolCalls, struct {
+				ID    string
+				Name  string
+				Input map[string]interface{}
+			}{
+				ID:    fmt.Sprintf("gemini-tc-%d", i),
+				Name:  part.FunctionCall.Name,
+				Input: part.FunctionCall.Args,
+			})
+		} else if part.Text != "" {
+			pr.Content += part.Text
+		}
+	}
+	return pr, nil
+}
+
+// ─────────────────────────────────────────────
 // MAIN CHAT HANDLER
 // ─────────────────────────────────────────────
 
@@ -714,19 +810,48 @@ func Chat(c *gin.Context) {
 		userContent = req.Message
 	}
 
-	// Historia de mensajes (empezamos con el mensaje del usuario)
-	// Para OpenAI el system va en messages, para Anthropic va separado
+	isGoogle := provider.ProviderType == "google"
+
+	// Historia de mensajes — formato varía por proveedor
 	var messages []map[string]interface{}
-	if provider.ProviderType != "anthropic" {
+
+	if isGoogle {
+		// Google Gemini: contents con role "user"/"model", sin system en messages
+		var parts []interface{}
+		if req.ImageBase64 != "" {
+			parts = []interface{}{
+				map[string]interface{}{
+					"inlineData": map[string]string{
+						"mimeType": func() string {
+							if req.ImageMime != "" {
+								return req.ImageMime
+							}
+							return "image/jpeg"
+						}(),
+						"data": req.ImageBase64,
+					},
+				},
+				map[string]string{"text": req.Message},
+			}
+		} else {
+			parts = []interface{}{map[string]string{"text": req.Message}}
+		}
 		messages = append(messages, map[string]interface{}{
-			"role":    "system",
-			"content": systemPrompt,
+			"role":  "user",
+			"parts": parts,
+		})
+	} else {
+		if provider.ProviderType != "anthropic" {
+			messages = append(messages, map[string]interface{}{
+				"role":    "system",
+				"content": systemPrompt,
+			})
+		}
+		messages = append(messages, map[string]interface{}{
+			"role":    "user",
+			"content": userContent,
 		})
 	}
-	messages = append(messages, map[string]interface{}{
-		"role":    "user",
-		"content": userContent,
-	})
 
 	// Bucle de tool calling (máx 5 iteraciones)
 	var finalContent string
@@ -739,6 +864,8 @@ func Chat(c *gin.Context) {
 		switch provider.ProviderType {
 		case "anthropic":
 			pr, err = callAnthropicFull(provider, systemPrompt, messages, tools)
+		case "google":
+			pr, err = callGoogleFull(provider, systemPrompt, messages, tools)
 		default:
 			pr, err = callOpenAIFull(provider, messages, tools, req.ImageBase64 != "")
 		}
@@ -764,6 +891,25 @@ func Chat(c *gin.Context) {
 
 			// Añadir a messages según el formato del proveedor
 			switch provider.ProviderType {
+			case "google":
+				// En Gemini: model devuelve functionCall, user responde con functionResponse
+				messages = append(messages, map[string]interface{}{
+					"role": "model",
+					"parts": []map[string]interface{}{
+						{"functionCall": map[string]interface{}{"name": tc.Name, "args": tc.Input}},
+					},
+				})
+				var resultData interface{}
+				json.Unmarshal([]byte(result), &resultData)
+				messages = append(messages, map[string]interface{}{
+					"role": "user",
+					"parts": []map[string]interface{}{
+						{"functionResponse": map[string]interface{}{
+							"name":     tc.Name,
+							"response": map[string]interface{}{"output": resultData},
+						}},
+					},
+				})
 			case "anthropic":
 				// En Anthropic, el assistant puede devolver tool_use blocks
 				// Necesitamos el mensaje del assistant con los tool_use blocks
