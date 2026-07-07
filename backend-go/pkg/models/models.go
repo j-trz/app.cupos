@@ -190,9 +190,46 @@ type AIProvider struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name         string    `gorm:"unique;not null" json:"name"`
 	DisplayName  string    `json:"display_name"`
+	ProviderType string    `gorm:"column:provider_type;default:'openai'" json:"provider_type"`
+	APIKey       string    `gorm:"column:api_key" json:"api_key,omitempty"`
+	APIEndpoint  string    `gorm:"column:api_endpoint" json:"api_endpoint"`
 	BaseURL      string    `json:"base_url"`
 	DefaultModel string    `json:"default_model"`
-	IsActive     bool      `gorm:"default:false" json:"is_active"`
+	Temperature  float64   `gorm:"default:0.7" json:"temperature"`
+	MaxTokens    int       `gorm:"default:4096" json:"max_tokens"`
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
+	IsDefault    bool      `gorm:"default:false" json:"is_default"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type AIAction struct {
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Name        string         `gorm:"unique;not null" json:"name"`
+	Description string         `json:"description"`
+	ActionType  string         `gorm:"column:action_type;default:'api_call'" json:"action_type"`
+	Endpoint    string         `json:"endpoint"`
+	Method      string         `gorm:"default:'GET'" json:"method"`
+	Parameters  datatypes.JSON `json:"parameters"`
+	IsActive    bool           `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type AISession struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid" json:"user_id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type AIMessage struct {
+	ID         uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	SessionID  uuid.UUID      `gorm:"type:uuid" json:"session_id"`
+	UserID     uuid.UUID      `gorm:"type:uuid" json:"user_id"`
+	Role       string         `json:"role"`
+	Content    string         `json:"content"`
+	TokenUsage datatypes.JSON `gorm:"column:token_usage" json:"token_usage"`
+	CreatedAt  time.Time      `json:"created_at"`
 }

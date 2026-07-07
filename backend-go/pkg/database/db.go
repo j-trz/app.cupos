@@ -43,6 +43,9 @@ func InitDB() {
 		&models.RolePermission{},
 		&models.EmailSMTPConfig{},
 		&models.AIProvider{},
+		&models.AIAction{},
+		&models.AISession{},
+		&models.AIMessage{},
 	)
 
 	DB = db

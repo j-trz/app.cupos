@@ -46,6 +46,12 @@ const UserForm = ({
   const watchedActive = watch('activo');
   const watchedRole = watch('rol');
 
+  const roleLabels = {
+    admin: 'Administrador',
+    agency_admin: 'Admin de Agencia',
+    user: 'Usuario',
+  };
+
   const handleFormSubmit = (data) => {
     onSubmit({
       ...data,
@@ -93,7 +99,9 @@ const UserForm = ({
           <Label htmlFor="rol">Rol *</Label>
           <Select value={watchedRole} onValueChange={(value) => setValue('rol', value)}>
             <SelectTrigger>
-              <SelectValue placeholder="Seleccionar rol" />
+              <SelectValue placeholder="Seleccionar rol">
+                {watchedRole ? roleLabels[watchedRole] || watchedRole : null}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="admin">Administrador</SelectItem>
