@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"os"
 	"time"
+
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 
 	"backend-go/internal/database"
 	"backend-go/internal/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -94,7 +96,7 @@ func CreateUser(c *gin.Context) {
 	}
 
 	profile.ID = uuid.New()
-	
+
 	// Encriptar la contraseña si se proporciona
 	if profile.EncryptedPassword != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(profile.EncryptedPassword), bcrypt.DefaultCost)
@@ -124,24 +126,23 @@ func Register(c *gin.Context) {
 	var existingProfile models.Profile
 	err := database.DB.Where("email = ?", profile.Email).First(&existingProfile).Error
 	if err == nil {
-	    // Email already exists
-	    c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
-	    return
+		// Email already exists
+		c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
+		return
 	}
 	// Check if there was an error other than record not found
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-	    c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al verificar el email."})
-	    return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al verificar el email."})
+		return
 	}
-	
 
 	// Encriptar la contraseña
-	if profile.EncryptedPassword == "" {
+	if profile.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "La contraseña es requerida."})
 		return
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(profile.EncryptedPassword), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al encriptar la contraseña."})
 		return
@@ -150,7 +151,7 @@ func Register(c *gin.Context) {
 
 	// Set default role and ensure no admin privileges
 	profile.Role = "agency_user"
-	profile.Admin = false  // Explicitly set admin to false
+	profile.Admin = false // Explicitly set admin to false
 	profile.ID = uuid.New()
 
 	if err := database.DB.Create(&profile).Error; err != nil {
@@ -170,7 +171,7 @@ func Register(c *gin.Context) {
 		"nombre":  profile.Nombre,
 		"agencia": profile.Agencia,
 		"role":    profile.Role,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),  // Remove admin claim from token
+		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Remove admin claim from token
 	})
 
 	tokenString, err := token.SignedString([]byte(secret))
@@ -212,10 +213,10 @@ func UpdateUser(c *gin.Context) {
 
 	// Actualizar campos
 	database.DB.Model(&profile).Updates(map[string]interface{}{
-		"nombre":   input.Nombre,
-		"agencia":  input.Agencia,
-		"role":     input.Role,
-		"admin":    input.Admin,
+		"nombre":  input.Nombre,
+		"agencia": input.Agencia,
+		"role":    input.Role,
+		"admin":   input.Admin,
 	})
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile})
