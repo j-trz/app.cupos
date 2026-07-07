@@ -45,10 +45,11 @@ func buildSystemPrompt(u userCtx) string {
 	roleDesc := map[string]string{
 		"admin":        "Administrador con acceso total al sistema",
 		"agency_admin": "Administrador de agencia",
+		"agency_user":  "Agente de viajes",
 		"user":         "Agente de viajes",
 	}[u.Role]
 	if roleDesc == "" {
-		roleDesc = "Usuario"
+		roleDesc = "Agente de viajes"
 	}
 
 	permisos := `Puedes ayudar con:
@@ -223,6 +224,11 @@ func getTools(role string) []ToolDef {
 	return tools
 }
 
+// isRegularUser returns true for non-admin roles (agency_user, user, etc.)
+func isRegularUser(role string) bool {
+	return role != "admin" && role != "agency_admin"
+}
+
 // ─────────────────────────────────────────────
 // TOOL EXECUTOR (DB directo, no HTTP interno)
 // ─────────────────────────────────────────────
@@ -250,7 +256,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		}
 		// Ocultar neto para no-admin
 		for i := range products {
-			if u.Role == "user" {
+			if isRegularUser(u.Role) {
 				products[i].Neto1 = 0
 			}
 		}
@@ -260,7 +266,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 	case "mis_reservas":
 		var reservas []models.Reservation
 		q := database.DB.Model(&models.Reservation{})
-		if u.Role == "user" {
+		if isRegularUser(u.Role) {
 			q = q.Where("created_by = ?", u.ID)
 		}
 		if estado, ok := args["estado"].(string); ok && estado != "" {
@@ -273,9 +279,9 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 			}
 		}
 		q.Order("created_at desc").Limit(limit).Find(&reservas)
-		// Ocultar neto para users
+		// Ocultar neto para usuarios regulares
 		for i := range reservas {
-			if u.Role == "user" {
+			if isRegularUser(u.Role) {
 				reservas[i].Neto1 = 0
 			}
 		}
@@ -311,19 +317,16 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		if q.Error != nil {
 			return `{"error": "Reserva no encontrada"}`
 		}
-		if u.Role == "user" && reserva.CreatedBy != u.ID {
+		if isRegularUser(u.Role) && reserva.CreatedBy != u.ID {
 			return `{"error": "No tienes permiso para ver esta reserva"}`
 		}
-		if u.Role == "user" {
+		if isRegularUser(u.Role) {
 			reserva.Neto1 = 0
 		}
 		b, _ := json.Marshal(reserva)
 		return string(b)
 
 	case "crear_reserva":
-		if u.Role == "user" {
-			// verificar que haya disponibilidad
-		}
 		productIDStr, _ := args["product_id"].(string)
 		productID, err := strconv.ParseUint(productIDStr, 10, 64)
 		if err != nil {
@@ -633,8 +636,16 @@ func Chat(c *gin.Context) {
 	// Obtener usuario del contexto JWT
 	userIDVal, _ := c.Get("userID")
 	roleVal, _ := c.Get("role")
-	userID, _ := userIDVal.(uuid.UUID)
 	role, _ := roleVal.(string)
+
+	// userID puede venir como string desde el JWT
+	var userID uuid.UUID
+	switch v := userIDVal.(type) {
+	case string:
+		userID, _ = uuid.Parse(v)
+	case uuid.UUID:
+		userID = v
+	}
 
 	// Cargar perfil completo del usuario
 	var profile models.Profile
