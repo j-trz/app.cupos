@@ -144,6 +144,14 @@ func init() {
 			{
 				ai.POST("/chat", handlers.Chat)
 				ai.GET("/providers", handlers.ListAIProviders)
+				ai.POST("/providers", middleware.AdminOnly(), handlers.CreateAIProvider)
+				ai.PUT("/providers/:id", middleware.AdminOnly(), handlers.UpdateAIProvider)
+				ai.DELETE("/providers/:id", middleware.AdminOnly(), handlers.DeleteAIProvider)
+				ai.POST("/providers/:id/test", middleware.AdminOnly(), handlers.TestAIProvider)
+				ai.GET("/actions", handlers.ListAIActions)
+				ai.GET("/sessions", handlers.ListAISessions)
+				ai.GET("/stats", handlers.GetAIStats)
+				ai.GET("/logs", handlers.GetAILogs)
 			}
 
 			// CRUD Dinámico (Data)
@@ -166,7 +174,8 @@ func init() {
 			whiteLabel := protected.Group("/white-label")
 			{
 				whiteLabel.GET("/config", handlers.GetWhiteLabelConfig)
-				whiteLabel.PUT("/config/:id", handlers.UpdateWhiteLabelConfig)
+				whiteLabel.POST("/config", middleware.AdminOnly(), handlers.CreateWhiteLabelConfig)
+				whiteLabel.PUT("/config/:id", middleware.AdminOnly(), handlers.UpdateWhiteLabelConfig)
 			}
 
 			// RBAC - Roles

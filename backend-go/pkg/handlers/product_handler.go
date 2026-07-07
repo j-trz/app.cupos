@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -8,6 +9,18 @@ import (
 	"backend-go/pkg/models"
 	"github.com/gin-gonic/gin"
 )
+
+// fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
+func fixDates(data map[string]interface{}) {
+	dateFields := []string{"salida", "regreso", "fecha_salida", "fecha_regreso"}
+	for _, field := range dateFields {
+		if v, ok := data[field]; ok && v != nil {
+			if s, ok := v.(string); ok && len(s) == 10 {
+				data[field] = s + "T00:00:00Z"
+			}
+		}
+	}
+}
 
 func GetProducts(c *gin.Context) {
 	var products []models.Product
@@ -25,13 +38,20 @@ func GetProducts(c *gin.Context) {
 }
 
 func CreateProduct(c *gin.Context) {
+	var rawData map[string]interface{}
+	if err := c.ShouldBindJSON(&rawData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	fixDates(rawData)
+
+	jsonBytes, _ := json.Marshal(rawData)
 	var product models.Product
-	if err := c.ShouldBindJSON(&product); err != nil {
+	if err := json.Unmarshal(jsonBytes, &product); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Lógica de categorización automática si no viene especificada
 	if product.TipoProducto == "" {
 		product.TipoProducto = categorizeProduct(product.CodigoCupo)
 	}
@@ -41,11 +61,21 @@ func CreateProduct(c *gin.Context) {
 }
 
 func BulkCreateProducts(c *gin.Context) {
+	var rawInput struct {
+		Products []map[string]interface{} `json:"products"`
+	}
+	if err := c.ShouldBindJSON(&rawInput); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	for i := range rawInput.Products {
+		fixDates(rawInput.Products[i])
+	}
+	jsonBytes, _ := json.Marshal(rawInput)
 	var input struct {
 		Products []models.Product `json:"products"`
 	}
-
-	if err := c.ShouldBindJSON(&input); err != nil {
+	if err := json.Unmarshal(jsonBytes, &input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

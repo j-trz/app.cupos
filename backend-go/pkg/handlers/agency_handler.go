@@ -29,11 +29,26 @@ func CreateAgency(c *gin.Context) {
 func GetWhiteLabelConfig(c *gin.Context) {
 	agencyID := c.Query("agency_id")
 	var config models.WhiteLabelConfig
-	if err := database.DB.Where("agency_id = ?", agencyID).First(&config).Error; err != nil {
+	query := database.DB
+	if agencyID != "" {
+		query = query.Where("agency_id = ?", agencyID)
+	}
+	if err := query.First(&config).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Configuración no encontrada"})
 		return
 	}
 	c.JSON(http.StatusOK, config)
+}
+
+func CreateWhiteLabelConfig(c *gin.Context) {
+	var config models.WhiteLabelConfig
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	config.ID = uuid.New()
+	database.DB.Create(&config)
+	c.JSON(http.StatusCreated, config)
 }
 
 func UpdateWhiteLabelConfig(c *gin.Context) {
