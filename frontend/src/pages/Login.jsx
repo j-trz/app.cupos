@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import AuthService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { Button } from '../components/ui/Button.jsx';
@@ -12,6 +13,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,6 +26,7 @@ export default function Login() {
         setError(result.error || 'Credenciales inválidas');
         return;
       }
+      signIn(result.user);
       navigate('/availability');
     } catch (err) {
       setError(err.message || 'Credenciales inválidas');
