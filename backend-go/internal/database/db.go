@@ -36,6 +36,7 @@ func InitDB() {
 		&models.Profile{},
 		&models.Product{},
 		&models.Reservation{},
+		&models.Passenger{},
 		&models.Agency{},
 		&models.WhiteLabelConfig{},
 		&models.SystemSetting{},

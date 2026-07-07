@@ -58,6 +58,9 @@ func main() {
 			reports := protected.Group("/reports")
 			{
 				reports.GET("/stats", handlers.GetStats)
+				reports.GET("/evolution", handlers.GetEvolutionPassengers)
+				reports.GET("/agency-share", handlers.GetAgencyShare)
+				reports.GET("/destinations-detail", handlers.GetDestinationsDetail)
 			}
 
 			// Ajustes

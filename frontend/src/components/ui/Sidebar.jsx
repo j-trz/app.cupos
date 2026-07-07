@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import { useSidebar } from './SidebarProvider.jsx';
@@ -13,6 +13,7 @@ const navItems = [
   { label: 'Disponibilidad', path: '/availability', icon: Plane },
   { label: 'Solicitudes', path: '/requests', icon: ClipboardList },
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
+  { label: 'Reportes', path: '/reportes', icon: BarChart3 },
 ];
 
 // Admin-only items

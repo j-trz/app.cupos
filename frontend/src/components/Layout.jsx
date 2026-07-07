@@ -54,6 +54,8 @@ export default function Layout({ children }) {
         return t('requests');
       case '/confirmations':
         return t('confirmations');
+      case '/reportes':
+        return 'Reportes Avanzados';
       case '/products':
         return t('products');
       case '/marca-blanca':

@@ -10,12 +10,12 @@ export class ReportService {
     });
     
     const queryString = params.toString();
-    const endpoint = queryString ? `/reports/sales-by-agency?${queryString}` : '/reports/sales-by-agency';
+    const endpoint = queryString ? `/reports/agency-share?${queryString}` : '/reports/agency-share';
     
     return await ApiClient.get(endpoint);
   }
 
-  static async getReservationStatus(filters = {}) {
+  static async getEvolutionPassengers(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -24,12 +24,12 @@ export class ReportService {
     });
     
     const queryString = params.toString();
-    const endpoint = queryString ? `/reports/reservation-status?${queryString}` : '/reports/reservation-status';
+    const endpoint = queryString ? `/reports/evolution?${queryString}` : '/reports/evolution';
     
     return await ApiClient.get(endpoint);
   }
 
-  static async getHistoricalSales(filters = {}) {
+  static async getDestinationsDetail(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -38,7 +38,7 @@ export class ReportService {
     });
     
     const queryString = params.toString();
-    const endpoint = queryString ? `/reports/historical-sales?${queryString}` : '/reports/historical-sales';
+    const endpoint = queryString ? `/reports/destinations-detail?${queryString}` : '/reports/destinations-detail';
     
     return await ApiClient.get(endpoint);
   }
@@ -52,8 +52,10 @@ export class ReportService {
     });
     
     const queryString = params.toString();
-    const endpoint = queryString ? `/reports/general?${queryString}` : '/reports/general';
+    const endpoint = queryString ? `/reports/stats?${queryString}` : '/reports/stats';
     
     return await ApiClient.get(endpoint);
   }
 }
+
+export default ReportService;

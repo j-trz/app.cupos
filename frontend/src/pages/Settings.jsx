@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, X, Palette, Globe } from 'lucide-react';
-import ApiClient from '../services/ApiClient';
+import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
