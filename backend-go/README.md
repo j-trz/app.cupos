@@ -90,3 +90,9 @@ docker build -t cupos-backend-go .
 
 ### Reportes
 - `GET /api/reports/stats` - Estadísticas generales del dashboard
+
+### Ajustes y Sistema
+- `GET /api/settings` - Listar ajustes globales (Admin)
+- `PUT /api/settings/:key` - Actualizar ajuste (Admin)
+- `GET /api/backup` - Obtener respaldo de base de datos (Admin)
+- `GET /api/sse` - Canal de notificaciones en tiempo real
