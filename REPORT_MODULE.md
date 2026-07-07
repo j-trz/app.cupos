@@ -1,150 +1,153 @@
-# Documentación Técnica de Lógica de Negocio y Reportes
+# Documentación Técnica Integral: LocalApp (Versión Offline/Electron)
 
-Este documento detalla de manera quirúrgica la lógica, modelos de datos, reglas de negocio y fórmulas financieras de la aplicación. El objetivo es facilitar la migración exacta de esta lógica a un backend en Go, permitiendo adaptarla a nuevas estructuras de datos manteniendo la integridad de los reportes.
+Este documento proporciona una especificación quirúrgica de la lógica de negocio, modelos de datos y reportes de la versión `LocalApp`. Esta versión está diseñada para funcionar de manera local/offline, utilizando archivos Excel locales y un sistema de autenticación local, sirviendo el frontend desde un entorno compilado.
 
 ---
 
-## 1. Fuentes de Datos Originales
+## 1. Arquitectura de Datos y Fuentes
 
-La aplicación se basa en dos archivos Excel principales:
+La aplicación consume datos directamente de archivos Excel. En el entorno `LocalApp`, el backend busca estos archivos en una ruta configurable (`LOCAL_FILES_PATH`), facilitando el modo offline.
 
-1.  **Gestión de Cupos JTT.xlsx**: Contiene el inventario de cupos, costos, ventas proyectadas y disponibilidad.
-2.  **Planilla de pasajeros - Cupos JT.xlsx**: Contiene el detalle de ventas reales, pasajeros y su relación con los cupos.
+### Archivos Fuente
+1.  **Gestion de Cupos JTT.xlsx**: Inventario, costos y rentabilidad.
+2.  **Planilla de pasajeros - Cupos JT.xlsx**: Ventas reales y datos de pasajeros.
 
-### Modelos de Datos (Campos Clave)
+### Modelo de Datos: Cupo (Columnas Clave)
+```javascript
+{
+  "Codigo de Cupo": string,   // ID Único de la salida
+  "Destino": string,          // Destino del viaje
+  "Temporada": string,        // Ej: "Semana Santa 2025"
+  "Cupo": number,             // Total de lugares contratados
+  "Vendidos": number,         // Lugares ya vendidos
+  "Disponibilidad": number,   // Lugares libres (Calculado: Cupo - Vendidos - Cancelados)
+  "NETO 1": number,           // Costo Unitario
+  "Neto Vendedor": number,    // Precio de Venta Unitario
+  "OP": number,               // Utilidad Operativa (Neto Vendedor - NETO 1)
+  "Proveedor": string,        // Compañía (ej: AD, H2, JA)
+  "Salida": date/string       // Fecha de salida
+}
+```
 
-#### A. Modelo: Cupo (CuposData)
-| Campo | Descripción |
+### Modelo de Datos: Pasajero
+```javascript
+{
+  "Cupo": string,             // FK al Codigo de Cupo
+  "NRO": number,              // 1 = Venta, 0 = Acompañante/Infante
+  "Agencia": string,          // Agencia vendedora (Jetmar vs Tienda)
+  "Creado": date/string,      // Fecha de la venta
+  "Fecha Nac": date/string,   // Fecha de nacimiento
+  "Regreso": date/string      // Fecha de regreso (para cálculo de edad)
+}
+```
+
+---
+
+## 2. Lógica del Backend (`api-logic.js`)
+
+El backend actúa como un motor de procesamiento que unifica los archivos Excel y expone los resultados vía API.
+
+### Regla de Oro: La Venta Válida
+Para que una fila de pasajeros sea contada en los reportes de ventas/evolución, debe cumplir:
+```javascript
+function esVentaValida(pax) {
+  const nro = parseInt(pax['NRO']) || 0;
+  if (nro === 1) return true;
+  if (nro === 0) {
+    // Es venta solo si es menor de 2 años al regreso
+    return calcularEdad(pax['Fecha Nac'], pax['Regreso']) < 2;
+  }
+  return false;
+}
+```
+
+### Normalización de Filtros y Búsqueda
+El backend expande filtros que vienen separados por coma o punto y coma:
+```javascript
+function expandFilterValues(val) {
+  if (val == null) return [];
+  let arr = Array.isArray(val) ? val : String(val).split(/[,;]+/);
+  return Array.from(new Set(arr.map(v => v.trim().toLowerCase())));
+}
+```
+
+### Categorización de Producto
+La lógica deduce el tipo de operación basándose en patrones en el código de cupo:
+- **CHARTERS**: Código contiene `_CH-` o `_CH_`.
+- **DESTINO ARG**: Código contiene `DEST_ARG`.
+- **CUPOS**: Si `Tipo Servicio` es `AÉREO`.
+
+---
+
+## 3. Fórmulas Financieras y KPIs
+
+Estos cálculos son fundamentales para la precisión de la migración:
+
+| Métrica | Lógica de Cálculo |
 | :--- | :--- |
-| `Codigo de Cupo` | ID único de la salida/cupo. |
-| `Destino` | Destino geográfico. |
-| `Temporada` / `temporada` | Período de tiempo (ej. Semana Santa 2025). |
-| `Cupo` | Cantidad total de lugares tomados/contratados. |
-| `Vendidos` | Cantidad de lugares vendidos reportados en cupos. |
-| `Cancelados/ Devolución` | Lugares cancelados. |
-| `Disponibilidad` | Lugares libres. |
-| `NETO 1` | Costo unitario por lugar. |
-| `Neto Vendedor` | Precio de venta unitario. |
-| `OP` | Utilidad operativa unitaria (`Neto Vendedor - NETO 1` usualmente). |
-| `Proveedor` / `Compañía` / `Aerolínea` | Proveedor del servicio (ej. AD, H2). |
-| `Tipo Servicio` / `Tipo de servicio` | Ej: Aéreo, Terrestre. |
-| `Salida` | Fecha de salida del viaje. |
+| **Rentabilidad Total** | `SUMA(Vendidos * OP)` |
+| **Costo Real** | `SUMA(Vendidos * NETO 1)` |
+| **Costo Total (Riesgo)** | `SUMA(Cupo * NETO 1)` |
+| **Venta Real** | `SUMA(Vendidos * Neto Vendedor)` |
+| **Venta Total** | `SUMA(Cupo * Neto Vendedor)` |
+| **Riesgo Económico** | `(Lugares Disponibles * NETO 1)` |
 
-#### B. Modelo: Pasajero (PasajerosData)
-| Campo | Descripción |
-| :--- | :--- |
-| `Cupo` | Relación con `Codigo de Cupo`. |
-| `NRO` | Indicador de venta: `1` = Venta, `0` = Infante/Acompañante. |
-| `Agencia` | Agencia que realizó la venta (Jetmar, Tienda Viajes, etc.). |
-| `Creado` | Fecha de creación de la reserva/venta. |
-| `Fecha Nac` | Fecha de nacimiento del pasajero. |
-| `Regreso` | Fecha de regreso del viaje (para cálculo de edad). |
-
-### Campos Técnicos Excluidos
-Para la interfaz y reportes limpios, se ignoran campos de gestión interna o metadatos:
-`INFO EXTRA`, `REGION`, `TASAS`, `TARIFA`, `Código de Reserva`, `Liberados`, `Gestiona`, `Cancelación sin Gastos`, `Responsable del Grupo`, `Status BOL`, `EMITIDO?`, `Utilidad OPERATIVA`, `Visible Jetmar`, `Visible Tienda`, `Link para reservar`, `CI`, `Pasaporte`, `Celular`, `Hotel`, `Traslados`, `Operador del Hotel`, `Mail del Pasajero`, `Vencimiento CI`, `Status BACK`, `Salida`.
+*Nota: El Riesgo representa el costo de los lugares que aún no se han vendido y no han sido cancelados.*
 
 ---
 
-## 2. Lógica de Procesamiento y Enriquecimiento
+## 4. Reportes Específicos
 
-### Normalización de Cadenas
-Se aplica una normalización agresiva para comparaciones:
-- Eliminar acentos (NFD normalization).
-- Convertir a minúsculas.
-- Eliminar espacios extra.
-- Reemplazar múltiples espacios por uno solo.
+### A. Evolución de Pasajeros (`/api/evolucion-pasajeros`)
+Agrupa las ventas válidas por tiempo.
+- **Key**: Mes + Año de la columna `Creado`.
+- **Filtros**: Aplica filtros cruzados de Destino, Temporada y Proveedor antes de agrupar.
 
-### Manejo de Filtros Múltiples
-La aplicación permite filtrar por múltiples valores en un mismo campo (ej: varias temporadas a la vez).
-- Los valores pueden venir como un Array o como una cadena separada por comas (`,`) o puntos y coma (`;`).
-- Al procesar, se expanden estos valores y se comparan individualmente contra los datos normalizados.
+### B. Share por Agencia (`/api/agencias-data`)
+Calcula el market share entre Jetmar y Tienda Viajes.
+- **Regla de Agencia**: Si el nombre normalizado incluye "tienda", se asigna a Tienda Viajes; de lo contrario, a Jetmar.
+- **Especial Destino**: Si hay un filtro de Destino activo, el share se calcula sumando las ventas de todos los cupos asociados a esos destinos.
 
-### Identificación de "Tipo de Producto" (Tipo de Operación)
-Se determina según el `Codigo de Cupo` o `Tipo Servicio`:
-1.  **CHARTERS**: Si el código contiene `_CH-`, `_CH_` o `_CH`.
-2.  **DESTINO ARG**: Si el código contiene `DEST_ARG`, `DEST_ARG-` o `-DEST_ARG-`.
-3.  **CUPOS**: Si el `Tipo Servicio` es `AÉREO` o `AEREO`.
-
-### Extracción de Proveedor (Compañía)
-Se busca en múltiples campos (`Proveedor`, `Compañía`, `Aerolínea`). Si no existe, se intenta deducir del `Codigo de Cupo` (buscando tokens de 2-3 caracteres como `AD`, `H2`, `JA`). Se priorizan códigos cortos (<= 2 caracteres para visualización en ciertos gráficos).
-
-### Cruce de Datos (Join)
-Para reportes de pasajeros, se enriquece el registro del pasajero con datos del cupo asociado usando `Pasajero.Cupo == Cupo.Codigo de Cupo`:
-- Se obtiene `Destino`, `Temporada`, `Proveedor` y `Tipo Servicio` desde el Cupo si no están presentes en el Pasajero.
-- Si el pasajero no tiene un `Codigo de Cupo` exacto, se intenta una búsqueda flexible en `cuposData`.
-
-### Canonización de Entradas
-Existen mapeos para normalizar entradas de usuario a valores canónicos:
-- **Productos**: "ch", "charter" -> `CHARTERS`; "aereo", "cupo" -> `CUPOS`; "dest_arg", "destino argentina" -> `DESTINO ARG`.
+### C. Detalle Destinos (`/api/detalle-destinos`)
+Agregación por `Destino + Temporada`.
+- Realiza una sumatoria de todos los KPIs financieros de los cupos que pertenecen a cada par Destino/Temporada.
 
 ---
 
-## 3. Reglas de Negocio Críticas
+## 5. Implementación del Frontend (`dataProcessor.js`)
 
-### Criterio de "Venta Válida"
-Una fila de pasajeros cuenta como una venta si y solo si:
-1.  `NRO == 1`
-2.  **O** `NRO == 0` Y el pasajero es **menor de 2 años** a la fecha de regreso (`Edad < 2`).
+En el frontend, la lógica espeja la del backend para permitir cálculos en el cliente cuando sea necesario.
 
-### Identificación de Agencias
-- **TIENDA VIAJES**: Nombres normalizados que contienen "tienda", "tienda viajes", "tienda de viajes srl".
-- **JETMAR**: Todo lo que no sea identificado como Tienda Viajes se atribuye a Jetmar (en el contexto de esta app).
+### Carga de Excel con SheetJS
+```javascript
+const workbook = XLSX.read(data, { type: 'array' });
+const sheet = workbook.Sheets[sheetName];
+const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+```
 
-### Deduplicación de Cupos
-Al cargar archivos, se deben filtrar duplicados por `Codigo de Cupo` para evitar que variantes del mismo archivo Excel sumen doble.
-
----
-
-## 4. Fórmulas Financieras (KPIs)
-
-Para un conjunto de datos filtrado:
-
-| KPI | Fórmula |
-| :--- | :--- |
-| **Rentabilidad** | `SUM(Vendidos * OP)` |
-| **Costo (Vendido)** | `SUM(Vendidos * NETO 1)` |
-| **Costo Total (Riesgo)** | `SUM(Cupos Tomados * NETO 1)` |
-| **Venta (Realizada)** | `SUM(Vendidos * Neto Vendedor)` |
-| **Venta Total (Potencial)** | `SUM(Cupos Tomados * Neto Vendedor)` |
-| **Riesgo Económico** | `(SUM(Cupos Tomados - Cancelados) * NETO 1) - Costo (Vendido)` |
-| **Lugares Disponibles** | `Cupos Tomados - Vendidos - Cancelados` |
+### Gestión de Fechas Excel
+Crucial para la migración: Los números seriales de Excel (ej: 45657) deben convertirse sumando días a la fecha base `1899-12-30`.
+```javascript
+new Date(Math.round((excelDate - 25569) * 86400 * 1000))
+```
 
 ---
 
-## 5. Lógica de Reportes (Endpoints / Queries)
+## 6. Autenticación Local (`db/localAuth.js`)
 
-### A. Reporte de Evolución (Pasajeros/Ventas)
-- **Agrupación**: Mes y Año de la fecha `Creado`.
-- **Métrica**: Suma de ventas válidas (ver sección 3).
-- **Granularidad**: Soporta Mes, Semana, Hoy (por hora), Mes Actual, Trimestre (Q1-Q4).
-
-### B. Reporte de Agencias (Market Share)
-- **Cálculo**:
-    1.  Si se filtra por **Destino**: Se agrupan los pasajeros por los cupos que pertenecen a ese destino. Se suma la venta por agencia.
-    2.  Si NO se filtra por Destino: Suma global de ventas válidas por agencia.
-- **Share**: `(Ventas Agencia / Total Ventas) * 100`.
-
-### C. Reporte Detalle por Destino (Tabla Agregada)
-- **Agrupación**: `Destino` + `Temporada`.
-- **Métricas**: Sumatoria de todos los KPIs financieros (Sección 4) para todos los cupos que coincidan con la agrupación.
-
-### D. Reporte "Por Salida" (Detalle Individual)
-- Lista plana de cada cupo único.
-- No hay agregación, se muestran los KPIs financieros por cada `Codigo de Cupo`.
+`LocalApp` utiliza un sistema de archivos `users.json` para validar credenciales y generar tokens JWT locales, eliminando la dependencia de servicios externos de Auth (como Supabase) en modo offline.
 
 ---
 
-## 6. Guía para Adaptación a Nuevo Backend (Go)
+## 7. Guía de Migración Quirúrgica a Go
 
-Al migrar a una nueva estructura de datos (ej. SQL/NoSQL en lugar de Excel):
+Para asegurar que no haya fallos en la migración:
 
-1.  **Mapeo de Atributos**: Asegurar que la nueva estructura tenga campos equivalentes para `NRO`, `OP`, `NETO 1`, `Neto Vendedor`, `Cupo`, `Vendidos` y `Cancelados`.
-2.  **Normalización en Query**: Si se usa SQL, las comparaciones deben usar `LOWER()`, `TRIM()` y idealmente una función para eliminar acentos (unaccent extension en Postgres) para emular la lógica de JS.
-3.  **Lógica de Infantes**: El cálculo de `Edad < 2` debe realizarse en la consulta o en la capa de servicio de Go comparando `FechaNacimiento` vs `FechaRegreso`.
-4.  **Caché**: La app implementa un TTL de 10 minutos para los datos procesados. En Go, se recomienda usar un caché in-memory (tipo `Map` con mutex o `go-cache`) o Redis si se escala horizontalmente.
-5.  **Paralelismo**: Aprovechar las Goroutines para procesar los diferentes reportes (Evolución, Agencias, Detalle) en paralelo cuando se solicita el Dashboard completo.
+1.  **Tipado Estricto**: Definir `Structs` en Go que mapeen exactamente las columnas del Excel (incluyendo los alias como `NETO 1`).
+2.  **Manejo de Nulos**: En Go, usar punteros o tipos `sql.NullString` / `sql.NullFloat64` ya que los Excel suelen tener celdas vacías que deben tratarse como 0 o "".
+3.  **Lógica de Fechas**: Implementar una función robusta para convertir los números seriales de Excel a `time.Time`.
+4.  **Agregaciones**: Utilizar `Map` o `Structs` intermedios para realizar las sumatorias de `Rentabilidad`, `Costo` y `Riesgo` antes de devolver la respuesta JSON.
+5.  **Normalización UNACCENT**: En Go, usar librerías para eliminar diacríticos (acentos) al procesar filtros, igual que hace `normalize()` en JS.
 
 ---
-
-*Documento generado para precisión quirúrgica en migración de sistemas.*
+*Este documento es la fuente de verdad técnica para la estructura y lógica de LocalApp.*
