@@ -52,7 +52,11 @@ class ApiClient {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include' // Incluir cookies en requests cross-origin
+    });
     const data = await response.json();
 
     if (!response.ok) {

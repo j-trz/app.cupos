@@ -58,7 +58,26 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Middlewares globales
-app.use(cors({ origin: '*' })); // Permitir acceso del frontend desde cualquier origen
+const allowedOrigins = [
+  'https://app-cupos-frontend.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+app.use(cors({
+  origin: function(origin, callback) {
+    // Si origin es undefined (request de servidor a servidor), permitirlo
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 // Middleware de auditoría debe estar después de morgan pero antes de las rutas
