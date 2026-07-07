@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import {
     Palette, Type, MousePointer, Layout, Sidebar as SidebarIcon,
     Save, Download, Upload, RefreshCw, Check, Building2, Mail, FileText, Eye,
-    Monitor, Smartphone
+    Monitor, Smartphone, Image, Link
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -20,6 +20,10 @@ const tabs = [
     { id: 'emails', label: 'Emails', icon: Mail },
     { id: 'legal', label: 'Legal', icon: FileText }
 ];
+
+const INPUT_CLASSES = "w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
+const LABEL_CLASSES = "mb-1 block text-xs font-medium text-slate-600";
+const COLOR_INPUT_CLASSES = "h-10 w-14 rounded border border-slate-300";
 
 export default function WhiteLabelConfig() {
     const { user } = useAuth();
@@ -235,10 +239,381 @@ export default function WhiteLabelConfig() {
         );
     }
 
+    // Contenido principal según tab activo
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'identity':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Identidad de la marca</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Nombre de la agencia</label>
+                                <input
+                                    type="text"
+                                    value={config?.identity?.agency_name || ''}
+                                    onChange={(e) => handleIdentityChange('agency_name', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Email de contacto</label>
+                                <input
+                                    type="email"
+                                    value={config?.identity?.contact_email || ''}
+                                    onChange={(e) => handleIdentityChange('contact_email', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={LABEL_CLASSES}>Eslogan</label>
+                                <input
+                                    type="text"
+                                    value={config?.identity?.slogan || ''}
+                                    onChange={(e) => handleIdentityChange('slogan', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Logo URL</label>
+                                <div className="relative">
+                                    <Image className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={config?.identity?.logoUrl || ''}
+                                        onChange={(e) => handleIdentityChange('logoUrl', e.target.value)}
+                                        className={`${INPUT_CLASSES} pl-10`}
+                                        placeholder="https://ejemplo.com/logo.png"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Favicon URL</label>
+                                <input
+                                    type="text"
+                                    value={config?.identity?.faviconUrl || ''}
+                                    onChange={(e) => handleIdentityChange('faviconUrl', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="https://ejemplo.com/favicon.ico"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'colors':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Paleta de colores</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {['primary', 'secondary', 'background', 'surface', 'text_primary', 'text_secondary', 'accent', 'border'].map(colorKey => (
+                                <div key={colorKey}>
+                                    <label className={LABEL_CLASSES} capitalize>{colorKey.replace('_', ' ')}</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="color"
+                                            value={config?.colors?.[colorKey] || '#000000'}
+                                            onChange={(e) => handleColorChange(colorKey, e.target.value)}
+                                            className={COLOR_INPUT_CLASSES}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={config?.colors?.[colorKey] || ''}
+                                            onChange={(e) => handleColorChange(colorKey, e.target.value)}
+                                            className={`${INPUT_CLASSES} font-mono text-xs`}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {themePresets.length > 0 && (
+                            <div className="pt-4 mt-4 border-t border-slate-200">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de temas</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {themePresets.map(preset => (
+                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyThemePreset(preset)}>
+                                            {preset.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            case 'fonts':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Tipografías</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Títulos (Heading)</label>
+                                <input
+                                    type="text"
+                                    value={config?.fonts?.heading || ''}
+                                    onChange={(e) => handleFontChange('heading', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="Inter, system-ui, sans-serif"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Cuerpo (Body)</label>
+                                <input
+                                    type="text"
+                                    value={config?.fonts?.body || ''}
+                                    onChange={(e) => handleFontChange('body', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="Inter, system-ui, sans-serif"
+                                />
+                            </div>
+                        </div>
+                        {fontPresets.length > 0 && (
+                            <div className="pt-4 mt-4 border-t border-slate-200">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de fuentes</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {fontPresets.map(preset => (
+                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyFontPreset(preset)}>
+                                            {preset.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            case 'buttons':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Estilo de botones</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Border Radius</label>
+                                <input
+                                    type="text"
+                                    value={config?.buttons?.borderRadius || ''}
+                                    onChange={(e) => handleButtonChange('borderRadius', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="lg"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Padding X</label>
+                                <input
+                                    type="text"
+                                    value={config?.buttons?.paddingX || ''}
+                                    onChange={(e) => handleButtonChange('paddingX', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="4"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Padding Y</label>
+                                <input
+                                    type="text"
+                                    value={config?.buttons?.paddingY || ''}
+                                    onChange={(e) => handleButtonChange('paddingY', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="2"
+                                />
+                            </div>
+                        </div>
+                        {buttonPresets.length > 0 && (
+                            <div className="pt-4 mt-4 border-t border-slate-200">
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de botones</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {buttonPresets.map(preset => (
+                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyButtonPreset(preset)}>
+                                            {preset.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            case 'sidebar':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Configuración del sidebar</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Ancho</label>
+                                <input
+                                    type="text"
+                                    value={config?.sidebar?.width || ''}
+                                    onChange={(e) => handleSidebarChange('width', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="280px"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Color de fondo</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={config?.sidebar?.backgroundColor || '#000000'}
+                                        onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
+                                        className={COLOR_INPUT_CLASSES}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={config?.sidebar?.backgroundColor || ''}
+                                        onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
+                                        className={`${INPUT_CLASSES} font-mono text-xs`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Color de texto</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={config?.sidebar?.textColor || '#ffffff'}
+                                        onChange={(e) => handleSidebarChange('textColor', e.target.value)}
+                                        className={COLOR_INPUT_CLASSES}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={config?.sidebar?.textColor || ''}
+                                        onChange={(e) => handleSidebarChange('textColor', e.target.value)}
+                                        className={`${INPUT_CLASSES} font-mono text-xs`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Color hover</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={config?.sidebar?.hoverColor || '#ffffff'}
+                                        onChange={(e) => handleSidebarChange('hoverColor', e.target.value)}
+                                        className={COLOR_INPUT_CLASSES}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={config?.sidebar?.hoverColor || ''}
+                                        onChange={(e) => handleSidebarChange('hoverColor', e.target.value)}
+                                        className={`${INPUT_CLASSES} font-mono text-xs`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'layout':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Configuración del layout</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Ancho máximo</label>
+                                <input
+                                    type="text"
+                                    value={config?.layout?.maxWidth || ''}
+                                    onChange={(e) => handleLayoutChange('maxWidth', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="1400px"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Padding</label>
+                                <input
+                                    type="text"
+                                    value={config?.layout?.padding || ''}
+                                    onChange={(e) => handleLayoutChange('padding', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="24px"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'emails':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Configuración de emails</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Color de cabecera</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={config?.emails?.headerColor || '#000000'}
+                                        onChange={(e) => handleEmailsChange('headerColor', e.target.value)}
+                                        className={COLOR_INPUT_CLASSES}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={config?.emails?.headerColor || ''}
+                                        onChange={(e) => handleEmailsChange('headerColor', e.target.value)}
+                                        className={`${INPUT_CLASSES} font-mono text-xs`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>URL del Logo</label>
+                                <input
+                                    type="text"
+                                    value={config?.emails?.logoUrl || ''}
+                                    onChange={(e) => handleEmailsChange('logoUrl', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="https://ejemplo.com/logo-email.png"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={LABEL_CLASSES}>Texto del footer</label>
+                                <input
+                                    type="text"
+                                    value={config?.emails?.footerText || ''}
+                                    onChange={(e) => handleEmailsChange('footerText', e.target.value)}
+                                    className={INPUT_CLASSES}
+                                    placeholder="© 2024 Tu Agencia. Todos los derechos reservados."
+                                />
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'legal':
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Enlaces legales</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASSES}>Términos y condiciones</label>
+                                <div className="relative">
+                                    <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <input
+                                        type="url"
+                                        value={config?.legal?.termsUrl || ''}
+                                        onChange={(e) => handleLegalChange('termsUrl', e.target.value)}
+                                        className={`${INPUT_CLASSES} pl-10`}
+                                        placeholder="https://ejemplo.com/terminos"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASSES}>Política de privacidad</label>
+                                <div className="relative">
+                                    <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <input
+                                        type="url"
+                                        value={config?.legal?.privacyUrl || ''}
+                                        onChange={(e) => handleLegalChange('privacyUrl', e.target.value)}
+                                        className={`${INPUT_CLASSES} pl-10`}
+                                        placeholder="https://ejemplo.com/privacidad"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            default:
+                return null;
+        }
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Configuración de Marca Blanca"
+                title="Configuración de Diseño"
                 description="Personaliza la identidad visual de la plataforma"
                 icon={Palette}
                 action={
@@ -261,466 +636,55 @@ export default function WhiteLabelConfig() {
                 }
             />
 
-            {/* Tabs */}
-            <div className="flex flex-col lg:flex-row gap-6">
-                <div className="w-full lg:w-64 shrink-0">
-                    <div className="bg-white rounded-2xl border border-slate-200 p-2 space-y-1 flex">
-                        {tabs.map(tab => {
-                            const Icon = tab.icon;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${activeTab === tab.id
-                                        ? 'bg-slate-900 text-white'
-                                        : 'text-slate-600 hover:bg-slate-100'
-                                        }`}
-                                >
-                                    <Icon className="h-4 w-4" />
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                    </div>
+            {/* Tabs - Estilo horizontal compacto como email-config */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="flex border-b border-slate-200 p-2 gap-1 bg-slate-50 flex-wrap">
+                    {tabs.map(tab => {
+                        const Icon = tab.icon;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${activeTab === tab.id
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                    }`}
+                            >
+                                <Icon className="h-4 w-4" />
+                                <span>{tab.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
-            </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-                {activeTab === 'identity' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        {activeTab === 'fonts' && (
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">Tipografías</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {['heading', 'body'].map(fontKey => (
-                                        <div key={fontKey}>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{fontKey === 'heading' ? 'Títulos' : 'Cuerpo'}</label>
-                                            <input
-                                                type="text"
-                                                value={config?.fonts?.[fontKey] || ''}
-                                                onChange={(e) => handleFontChange(fontKey, e.target.value)}
-                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                            />
-                                        </div>
-                                    ))}
-                                    {fontPresets.length > 0 && (
-                                        <div className="pt-4 border-t border-slate-200">
-                                            <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de fuentes</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {fontPresets.map(preset => (
-                                                    <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyFontPreset(preset)}>
-                                                        {preset.name}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'colors' && (
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'colors' && 'Colores'}</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                    {['primary', 'secondary', 'background', 'text', 'accent', 'border'].map(colorKey => (
-                                        <div key={colorKey}>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{colorKey}</label>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="color"
-                                                    value={config?.colors?.[colorKey] || '#000000'}
-                                                    onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                                                    className="h-10 w-14 rounded border border-slate-300"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={config?.colors?.[colorKey] || ''}
-                                                    onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                                                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {themePresets.length > 0 && (
-                                        <div className="pt-4 border-t border-slate-200">
-                                            <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de temas</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {themePresets.map(preset => (
-                                                    <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyThemePreset(preset)}>
-                                                        {preset.name}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        <h3 className="text-lg font-semibold text-slate-900">Identidad de la marca</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Nombre de la agencia</label>
-                                <input
-                                    type="text"
-                                    value={config?.identity?.agency_name || ''}
-                                    onChange={(e) => handleIdentityChange('agency_name', e.target.value)}
-                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Email de contacto</label>
-                                <input
-                                    type="email"
-                                    value={config?.identity?.contact_email || ''}
-                                    onChange={(e) => handleIdentityChange('contact_email', e.target.value)}
-                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Eslogan</label>
-                                <input
-                                    type="text"
-                                    value={config?.identity?.slogan || ''}
-                                    onChange={(e) => handleIdentityChange('slogan', e.target.value)}
-                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <div className="p-6">
+                    {/* Vista previa fijo a la derecha */}
+                    <div className="flex gap-6">
+                        {/* Contenido principal */}
+                        <div className="flex-1">{renderContent()}</div>
 
-                {activeTab === 'colors' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        {activeTab === 'layout' && (
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">Layout</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {['maxWidth', 'padding'].map(key => (
-                                        <div key={key}>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
-                                            <input
-                                                type="text"
-                                                value={config?.layout?.[key] || ''}
-                                                onChange={(e) => handleLayoutChange(key, e.target.value)}
-                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'sidebar' && (
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'sidebar' && 'Sidebar'}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600">Ancho</label>
-                                        <input
-                                            type="text"
-                                            value={config?.sidebar?.width || ''}
-                                            onChange={(e) => handleSidebarChange('width', e.target.value)}
-                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
+                        {/* Vista Previa fijo */}
+                        <div className="w-64 shrink-0 space-y-4">
+                            <div className="bg-white rounded-xl border border-slate-200 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-slate-900">Vista previa</h3>
+                                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                                        <button onClick={() => setPreviewMode('desktop')} className={`p-1.5 rounded-md ${previewMode === 'desktop' ? 'bg-white shadow-sm' : ''}`}>
+                                            <Monitor className="h-4 w-4 text-slate-600" />
+                                        </button>
+                                        <button onClick={() => setPreviewMode('mobile')} className={`p-1.5 rounded-md ${previewMode === 'mobile' ? 'bg-white shadow-sm' : ''}`}>
+                                            <Smartphone className="h-4 w-4 text-slate-600" />
+                                        </button>
                                     </div>
-                                    <div>
-                                        <label className="mb-1 block text-xs font-medium text-slate-600">Color de fondo</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                value={config?.sidebar?.backgroundColor || '#000000'}
-                                                onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
-                                                className="h-10 w-14 rounded border border-slate-300"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={config?.sidebar?.backgroundColor || ''}
-                                                onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
-                                                className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                            />
-                                        </div>
+                                </div>
+                                <div className={`border border-dashed border-slate-300 rounded-lg bg-slate-50 flex items-center justify-center py-6 ${previewMode === 'mobile' ? 'max-w-[200px] mx-auto' : ''}`}>
+                                    <div className="text-center space-y-1.5">
+                                        <Eye className="h-6 w-6 text-slate-400 mx-auto" />
+                                        <p className="text-xs text-slate-500">Vista previa</p>
                                     </div>
                                 </div>
                             </div>
-                        )}
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'colors' && 'Colores'}</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {['primary', 'secondary', 'background', 'text', 'accent', 'border'].map(colorKey => (
-                                <div key={colorKey}>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{colorKey}</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="color"
-                                            value={config?.colors?.[colorKey] || '#000000'}
-                                            onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                                            className="h-10 w-14 rounded border border-slate-300"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={config?.colors?.[colorKey] || ''}
-                                            onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                                            className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
                         </div>
-                        {themePresets.length > 0 && (
-                            <div className="pt-4 border-t border-slate-200">
-                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de temas</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {themePresets.map(preset => (
-                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyThemePreset(preset)}>
-                                            {preset.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'fonts' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        {activeTab === 'legal' && (
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'legal' && 'Legal'}</h3>
-                                <div className="space-y-4">
-                                    {['termsUrl', 'privacyUrl'].map(key => (
-                                        <div key={key}>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key === 'termsUrl' ? 'URL Términos' : 'URL Privacidad'}</label>
-                                            <input
-                                                type="text"
-                                                value={config?.legal?.[key] || ''}
-                                                onChange={(e) => handleLegalChange(key, e.target.value)}
-                                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'emails' && (
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">Emails</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {['headerColor', 'footerText', 'logoUrl'].map(key => (
-                                        <div key={key} className={key === 'footerText' ? 'md:col-span-2' : ''}>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
-                                            {key === 'headerColor' ? (
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="color"
-                                                        value={config?.emails?.[key] || '#000000'}
-                                                        onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                                        className="h-10 w-14 rounded border border-slate-300"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={config?.emails?.[key] || ''}
-                                                        onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                                        className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <input
-                                                    type="text"
-                                                    value={config?.emails?.[key] || ''}
-                                                    onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'fonts' && 'Tipografías'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['heading', 'body'].map(fontKey => (
-                                <div key={fontKey}>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{fontKey === 'heading' ? 'Títulos' : 'Cuerpo'}</label>
-                                    <input
-                                        type="text"
-                                        value={config?.fonts?.[fontKey] || ''}
-                                        onChange={(e) => handleFontChange(fontKey, e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        {fontPresets.length > 0 && (
-                            <div className="pt-4 border-t border-slate-200">
-                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de fuentes</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {fontPresets.map(preset => (
-                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyFontPreset(preset)}>
-                                            {preset.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'buttons' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'buttons' && 'Botones'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['borderRadius', 'paddingX', 'paddingY'].map(key => (
-                                <div key={key}>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">{key}</label>
-                                    <input
-                                        type="text"
-                                        value={config?.buttons?.[key] || ''}
-                                        onChange={(e) => handleButtonChange(key, e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        {buttonPresets.length > 0 && (
-                            <div className="pt-4 border-t border-slate-200">
-                                <h4 className="text-sm font-medium text-slate-700 mb-3">Presets de botones</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {buttonPresets.map(preset => (
-                                        <Button key={preset.id} size="sm" variant="secondary" onClick={() => applyButtonPreset(preset)}>
-                                            {preset.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'sidebar' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'sidebar' && 'Sidebar'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Ancho</label>
-                                <input
-                                    type="text"
-                                    value={config?.sidebar?.width || ''}
-                                    onChange={(e) => handleSidebarChange('width', e.target.value)}
-                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Color de fondo</label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="color"
-                                        value={config?.sidebar?.backgroundColor || '#000000'}
-                                        onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
-                                        className="h-10 w-14 rounded border border-slate-300"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={config?.sidebar?.backgroundColor || ''}
-                                        onChange={(e) => handleSidebarChange('backgroundColor', e.target.value)}
-                                        className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'layout' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'layout' && 'Layout'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['maxWidth', 'padding'].map(key => (
-                                <div key={key}>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
-                                    <input
-                                        type="text"
-                                        value={config?.layout?.[key] || ''}
-                                        onChange={(e) => handleLayoutChange(key, e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'emails' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'emails' && 'Emails'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['headerColor', 'footerText', 'logoUrl'].map(key => (
-                                <div key={key} className={key === 'footerText' ? 'md:col-span-2' : ''}>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key}</label>
-                                    {key === 'headerColor' ? (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                value={config?.emails?.[key] || '#000000'}
-                                                onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                                className="h-10 w-14 rounded border border-slate-300"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={config?.emails?.[key] || ''}
-                                                onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                                className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            value={config?.emails?.[key] || ''}
-                                            onChange={(e) => handleEmailsChange(key, e.target.value)}
-                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'legal' && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-slate-900">{activeTab === 'legal' && 'Legal'}</h3>
-                        <div className="space-y-4">
-                            {['termsUrl', 'privacyUrl'].map(key => (
-                                <div key={key}>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600 capitalize">{key === 'termsUrl' ? 'URL Términos' : 'URL Privacidad'}</label>
-                                    <input
-                                        type="text"
-                                        value={config?.legal?.[key] || ''}
-                                        onChange={(e) => handleLegalChange(key, e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Preview */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-slate-900">Vista previa</h3>
-                    <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
-                        <button onClick={() => setPreviewMode('desktop')} className={`p-2 rounded-md ${previewMode === 'desktop' ? 'bg-white shadow-sm' : ''}`}>
-                            <Monitor className="h-4 w-4 text-slate-600" />
-                        </button>
-                        <button onClick={() => setPreviewMode('mobile')} className={`p-2 rounded-md ${previewMode === 'mobile' ? 'bg-white shadow-sm' : ''}`}>
-                            <Smartphone className="h-4 w-4 text-slate-600" />
-                        </button>
-                    </div>
-                </div>
-                <div className={`border border-dashed border-slate-300 rounded-xl bg-slate-50 flex items-center justify-center py-12 ${previewMode === 'mobile' ? 'max-w-sm mx-auto' : ''}`}>
-                    <div className="text-center space-y-2">
-                        <Eye className="h-8 w-8 text-slate-400 mx-auto" />
-                        <p className="text-sm text-slate-500">Vista previa del tema aplicado</p>
                     </div>
                 </div>
             </div>
@@ -735,6 +699,6 @@ export default function WhiteLabelConfig() {
                     Guardar configuración
                 </Button>
             </div>
-        </div >
+        </div>
     );
 }

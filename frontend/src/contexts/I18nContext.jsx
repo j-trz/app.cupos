@@ -15,7 +15,7 @@ const translations = {
     users: 'Usuarios',
     reservations: 'Reservas',
     notifications: 'Notificaciones',
-    whiteLabel: 'Marca Blanca',
+    whiteLabel: 'Diseño',
     emailConfig: 'Configuración de Email',
     aiConfig: 'Configuración de IA',
     permissions: 'Permisos',
@@ -43,7 +43,7 @@ const translations = {
     previous: 'Anterior',
     next: 'Siguiente',
     finish: 'Finalizar',
-    
+
     // Campos de formulario
     username: 'Nombre de usuario',
     email: 'Correo electrónico',
@@ -58,7 +58,7 @@ const translations = {
     quantity: 'Cantidad',
     product: 'Producto',
     customer: 'Cliente',
-    
+
     // Estados
     active: 'Activo',
     inactive: 'Inactivo',
@@ -66,7 +66,7 @@ const translations = {
     confirmed_status: 'Confirmado',
     cancelled: 'Cancelado',
     expired_status: 'Expirado',
-    
+
     // Mensajes
     welcome: 'Bienvenido',
     success: 'Éxito',
@@ -77,7 +77,7 @@ const translations = {
     noResults: 'No se encontraron resultados',
     areYouSure: '¿Estás seguro?',
     actionCannotBeUndone: 'Esta acción no se puede deshacer.',
-    
+
     // Otros
     themeLight: 'Modo Claro',
     themeDark: 'Modo Oscuro',
@@ -96,17 +96,17 @@ const translations = {
     theme_change: 'Cambio de tema',
     language_change: 'Cambio de idioma',
     completed: 'Completado',
-    
+
     // Búsqueda global
     search_results: 'Resultados de búsqueda',
     results_for: 'Resultados para',
     enter_search_term: 'Ingrese un término de búsqueda',
-    
+
     // Atajos de teclado
     keyboard_shortcuts: 'Atajos de teclado',
     show_help: 'Mostrar ayuda',
     press_esc_to_close: 'Presione ESC para cerrar esta ventana',
-    
+
     // Onboarding
     onboarding: 'Guía de Bienvenida',
     onboarding_welcome_message: 'Bienvenido al panel de administración. Esta guía le ayudará a familiarizarse con las principales funciones.',
@@ -157,7 +157,7 @@ const translations = {
     previous: 'Previous',
     next: 'Next',
     finish: 'Finish',
-    
+
     // Form fields
     username: 'Username',
     email: 'Email',
@@ -172,7 +172,7 @@ const translations = {
     quantity: 'Quantity',
     product: 'Product',
     customer: 'Customer',
-    
+
     // Statuses
     active: 'Active',
     inactive: 'Inactive',
@@ -180,7 +180,7 @@ const translations = {
     confirmed_status: 'Confirmed',
     cancelled: 'Cancelled',
     expired_status: 'Expired',
-    
+
     // Messages
     welcome: 'Welcome',
     success: 'Success',
@@ -191,7 +191,7 @@ const translations = {
     noResults: 'No results found',
     areYouSure: 'Are you sure?',
     actionCannotBeUndone: 'This action cannot be undone.',
-    
+
     // Others
     themeLight: 'Light Mode',
     themeDark: 'Dark Mode',
@@ -210,17 +210,17 @@ const translations = {
     theme_change: 'Theme Change',
     language_change: 'Language Change',
     completed: 'Completed',
-    
+
     // Global search
     search_results: 'Search Results',
     results_for: 'Results for',
     enter_search_term: 'Enter a search term',
-    
+
     // Keyboard shortcuts
     keyboard_shortcuts: 'Keyboard Shortcuts',
     show_help: 'Show Help',
     press_esc_to_close: 'Press ESC to close this window',
-    
+
     // Onboarding
     onboarding: 'Welcome Guide',
     onboarding_welcome_message: 'Welcome to the admin panel. This guide will help you familiarize yourself with the main functions.',
@@ -249,7 +249,7 @@ export const I18nProvider = ({ children }) => {
     if (savedLocale) {
       return savedLocale;
     }
-    
+
     // Detectar idioma del navegador
     const browserLang = navigator.language.split('-')[0];
     return browserLang === 'es' || browserLang === 'en' ? browserLang : 'es';

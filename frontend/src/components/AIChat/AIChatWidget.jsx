@@ -1,6 +1,6 @@
 /**
  * Widget flotante de Chat IA - Estilo Vercel
- * Usa colores de marca blanca dinámicamente
+ * Usa colores del diseño dinámicamente
  */
 
 import { useState, useEffect } from 'react';

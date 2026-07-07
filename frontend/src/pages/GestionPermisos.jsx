@@ -27,7 +27,7 @@ const MODULES = [
     { value: 'reservations', label: 'Reservas' },
     { value: 'notifications', label: 'Notificaciones' },
     { value: 'settings', label: 'Configuración' },
-    { value: 'white_label', label: 'Marca Blanca' },
+    { value: 'white_label', label: 'Diseño' },
     { value: 'email', label: 'Email' },
     { value: 'ai', label: 'Inteligencia Artificial' },
     { value: 'permissions', label: 'Permisos' },

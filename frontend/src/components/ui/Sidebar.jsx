@@ -25,7 +25,7 @@ const adminNavItems = [
 
 // Settings items (grouped under Ajustes)
 const settingsItems = [
-  { label: 'Marca Blanca', path: '/marca-blanca', icon: Palette },
+  { label: 'Diseño', path: '/marca-blanca', icon: Palette },
   { label: 'Configuración de Email', path: '/email-config', icon: Mail },
   { label: 'Configuración de IA', path: '/config-ia', icon: Bot },
 ];

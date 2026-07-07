@@ -4,13 +4,15 @@ import EmailConfigService from '../services/emailConfigService';
 import Swal from 'sweetalert2';
 import {
     Mail, Save, TestTube, Send, RefreshCw, Eye, Code, Settings,
-    CheckCircle, XCircle, AlertCircle
+    CheckCircle, XCircle, AlertCircle, Server, Lock, User
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
+
+const INPUT_CLASSES = "w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
+const LABEL_CLASSES = "mb-1 block text-xs font-medium text-slate-600";
 
 export default function EmailConfig() {
     const { user } = useAuth();
@@ -191,15 +193,15 @@ export default function EmailConfig() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Configuración de Email"
-                description="Configura el servidor SMTP y las plantillas de correo"
+                title="Configuración de Correo"
+                description="Configura el servidor SMTP y las plantillas de correo electrónico"
                 icon={Mail}
                 action={
                     <div className="flex items-center gap-2">
                         <Button size="sm" onClick={loadConfig} disabled={loading} title="Refrescar datos">
                             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                         </Button>
-                        <Button size="sm" onClick={handleSave} disabled={saving}>
+                        <Button size="sm" variant="secondary" onClick={handleSave} disabled={saving}>
                             <Save className="h-4 w-4 mr-1" />
                             Guardar
                         </Button>
@@ -207,38 +209,55 @@ export default function EmailConfig() {
                 }
             />
 
+            {/* Stats Cards - En una sola fila */}
             <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={CheckCircle}
-                    label="Estado SMTP"
-                    value={config?.smtp_host ? 'Configurado' : 'Pendiente'}
-                    description={config?.smtp_host ? 'Servidor SMTP configurado' : 'Falta configurar el servidor SMTP'}
-                />
-                <StatCard
-                    icon={Mail}
-                    label="Plantillas"
-                    value={templates.length}
-                    description="Cantidad de plantillas disponibles"
-                />
-                <StatCard
-                    icon={config?.smtp_secure ? CheckCircle : AlertCircle}
-                    label="Seguridad"
-                    value={config?.smtp_secure ? 'TLS/SSL' : 'No seguro'}
-                    description={config?.smtp_secure ? 'Conexión cifrada activada' : 'Conexión sin cifrado'}
-                />
+                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${config?.smtp_host ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <CheckCircle className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <div className="text-sm font-medium text-slate-900">Estado SMTP</div>
+                            <div className="text-xs text-slate-500">{config?.smtp_host ? 'Configurado' : 'Pendiente'}</div>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                            <Mail className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <div className="text-sm font-medium text-slate-900">Plantillas</div>
+                            <div className="text-xs text-slate-500">{templates.length} disponibles</div>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${config?.smtp_secure ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                            {config?.smtp_secure ? <Lock className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                        </div>
+                        <div>
+                            <div className="text-sm font-medium text-slate-900">Seguridad</div>
+                            <div className="text-xs text-slate-500">{config?.smtp_secure ? 'TLS/SSL' : 'No seguro'}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="flex border-b border-slate-200 p-2 gap-1">
+            {/* Tabs - Rediseñado como lista horizontal compacta */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="flex border-b border-slate-200 p-2 gap-1 bg-slate-50">
                     {tabs.map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${activeTab === tab.id
-                                        ? 'bg-slate-900 text-white'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'
                                     }`}
                             >
                                 <Icon className="h-4 w-4" />
@@ -249,71 +268,85 @@ export default function EmailConfig() {
                 </div>
 
                 <div className="p-6">
+                    {/* Tab SMTP */}
                     {activeTab === 'smtp' && (
                         <div className="space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Configuración SMTP</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Host SMTP</label>
-                                    <input
-                                        type="text"
-                                        value={config?.smtp_host || ''}
-                                        onChange={(e) => handleConfigChange('smtp_host', e.target.value)}
-                                        placeholder="smtp.ejemplo.com"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Puerto</label>
-                                    <input
-                                        type="number"
-                                        value={config?.smtp_port || 587}
-                                        onChange={(e) => handleConfigChange('smtp_port', parseInt(e.target.value))}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Usuario</label>
-                                    <input
-                                        type="text"
-                                        value={config?.smtp_user || ''}
-                                        onChange={(e) => handleConfigChange('smtp_user', e.target.value)}
-                                        placeholder="usuario@ejemplo.com"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Contraseña</label>
-                                    <input
-                                        type="password"
-                                        value={config?.smtp_pass || ''}
-                                        onChange={(e) => handleConfigChange('smtp_pass', e.target.value)}
-                                        placeholder="••••••••"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="mb-1 block text-xs font-medium text-slate-600">Email remitente</label>
-                                    <input
-                                        type="email"
-                                        value={config?.email_from || ''}
-                                        onChange={(e) => handleConfigChange('email_from', e.target.value)}
-                                        placeholder="noreply@ejemplo.com"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                </div>
-                                <div className="md:col-span-2 flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="smtp_secure"
-                                        checked={config?.smtp_secure || false}
-                                        onChange={(e) => handleConfigChange('smtp_secure', e.target.checked)}
-                                        className="rounded"
-                                    />
-                                    <label htmlFor="smtp_secure" className="text-sm text-slate-700">Usar conexión segura (TLS/SSL)</label>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 mb-4">Configuración del servidor SMTP</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <label className={LABEL_CLASSES}>Host SMTP</label>
+                                        <div className="relative">
+                                            <Server className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                value={config?.smtp_host || ''}
+                                                onChange={(e) => handleConfigChange('smtp_host', e.target.value)}
+                                                placeholder="smtp.gmail.com"
+                                                className={`${INPUT_CLASSES} pl-10`}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_CLASSES}>Puerto</label>
+                                        <input
+                                            type="number"
+                                            value={config?.smtp_port || 587}
+                                            onChange={(e) => handleConfigChange('smtp_port', parseInt(e.target.value))}
+                                            className={INPUT_CLASSES}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_CLASSES}>Conexión segura</label>
+                                        <select
+                                            value={config?.smtp_secure ? 'true' : 'false'}
+                                            onChange={(e) => handleConfigChange('smtp_secure', e.target.value === 'true')}
+                                            className={INPUT_CLASSES}
+                                        >
+                                            <option value="false">STARTTLS (puerto 587)</option>
+                                            <option value="true">SSL/TLS (puerto 465)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_CLASSES}>Usuario</label>
+                                        <div className="relative">
+                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                value={config?.smtp_user || ''}
+                                                onChange={(e) => handleConfigChange('smtp_user', e.target.value)}
+                                                placeholder="usuario@ejemplo.com"
+                                                className={`${INPUT_CLASSES} pl-10`}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_CLASSES}>Contraseña</label>
+                                        <input
+                                            type="password"
+                                            value={config?.smtp_pass || ''}
+                                            onChange={(e) => handleConfigChange('smtp_pass', e.target.value)}
+                                            placeholder="••••••••"
+                                            className={INPUT_CLASSES}
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className={LABEL_CLASSES}>Email remitente</label>
+                                        <input
+                                            type="email"
+                                            value={config?.email_from || ''}
+                                            onChange={(e) => handleConfigChange('email_from', e.target.value)}
+                                            placeholder="noreply@ejemplo.com"
+                                            className={INPUT_CLASSES}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 pt-4 border-t border-slate-200">
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                                <p className="text-sm text-slate-500">
+                                    <Lock className="h-4 w-4 inline mr-1" />
+                                    La contraseña se almacena de forma segura y encriptada
+                                </p>
                                 <Button onClick={handleTestConnection} disabled={testing} variant="secondary">
                                     {testing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
                                     Probar conexión
@@ -322,56 +355,76 @@ export default function EmailConfig() {
                         </div>
                     )}
 
+                    {/* Tab Plantillas */}
                     {activeTab === 'templates' && (
                         <div className="space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Plantillas de email</h3>
-                            {templates.length === 0 ? (
-                                <div className="text-center py-10 text-slate-500">No hay plantillas configuradas</div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {templates.map(template => (
-                                        <div key={template.id} className="border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:bg-slate-50">
-                                            <div className="flex items-center gap-3">
-                                                <Mail className="h-5 w-5 text-slate-400" />
-                                                <div>
-                                                    <div className="font-medium text-slate-900">{template.name}</div>
-                                                    <div className="text-xs text-slate-500">{template.code}</div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 mb-4">Plantillas de email disponibles</h3>
+                                {templates.length === 0 ? (
+                                    <div className="text-center py-10 text-slate-500">
+                                        <Mail className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                                        <p>No hay plantillas configuradas</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {templates.map(template => (
+                                            <div key={template.id} className="border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 rounded-lg bg-slate-100">
+                                                        <Mail className="h-5 w-5 text-slate-500" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium text-slate-900">{template.name}</div>
+                                                        <div className="text-xs text-slate-500 font-mono">{template.code}</div>
+                                                    </div>
                                                 </div>
+                                                <Button size="sm" variant="ghost" onClick={() => handlePreviewTemplate(template)}>
+                                                    <Eye className="h-4 w-4" />
+                                                </Button>
                                             </div>
-                                            <Button size="sm" variant="ghost" onClick={() => handlePreviewTemplate(template)}>
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
+                    {/* Tab Prueba */}
                     {activeTab === 'test' && (
                         <div className="space-y-6">
-                            <h3 className="text-lg font-semibold text-slate-900">Enviar email de prueba</h3>
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <input
-                                    type="email"
-                                    value={testEmail}
-                                    onChange={(e) => setTestEmail(e.target.value)}
-                                    placeholder="destinatario@ejemplo.com"
-                                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                />
-                                <Button onClick={handleSendTest} disabled={sendingTest}>
-                                    {sendingTest ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                                    Enviar prueba
-                                </Button>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 mb-4">Enviar email de prueba</h3>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Envía un correo electrónico de prueba para verificar que la configuración SMTP funciona correctamente.
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex-1">
+                                        <label className={LABEL_CLASSES}>Email de destino</label>
+                                        <input
+                                            type="email"
+                                            value={testEmail}
+                                            onChange={(e) => setTestEmail(e.target.value)}
+                                            placeholder="destinatario@ejemplo.com"
+                                            className={INPUT_CLASSES}
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <Button onClick={handleSendTest} disabled={sendingTest} className="w-full sm:w-auto">
+                                            {sendingTest ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                                            Enviar prueba
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
 
+            {/* Modal de Vista Previa */}
             <Modal title={`Vista previa: ${selectedTemplate?.name || ''}`} open={showPreview} onClose={() => setShowPreview(false)}>
                 <div className="space-y-4">
-                    <div className="border border-slate-200 rounded-xl overflow-hidden h-96 overflow-y-auto">
+                    <div className="border border-slate-200 rounded-xl overflow-hidden h-96 overflow-y-auto bg-white">
                         {previewHtml ? (
                             <iframe
                                 title="Vista previa"

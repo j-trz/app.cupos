@@ -66,7 +66,7 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Configuración del Sistema</h1>
         <p className="text-muted-foreground">
-          Administra las configuraciones generales y de marca blanca del sistema.
+          Administra las configuraciones generales y de diseño del sistema.
         </p>
       </div>
 
@@ -119,7 +119,7 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
-              Configuración de Marca Blanca
+              Diseño
             </CardTitle>
             <CardDescription>
               Personaliza la apariencia del sistema
