@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"backend-go/internal/database"
 	"backend-go/internal/handlers"
@@ -20,30 +21,49 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	// Configuración CORS
-	corsConfig := func(c *gin.Context) {
-		origins := []string{
-			"https://app-cupos-frontend.vercel.app",
-			"http://localhost:5173",
-			"http://localhost:3000",
+	// Configuración CORS dinámica desde variable de entorno
+	frontendURL := os.Getenv("URL_FRONTEND")
+	if frontendURL == "" {
+		frontendURL = "https://app-cupos-frontend.vercel.app"
+	}
+
+	r.Use(func(c *gin.Context) {
+		clientOrigin := c.GetHeader("Origin")
+
+		// Normalizar origen para comparar
+		normalizedClient := strings.TrimRight(clientOrigin, "/")
+
+		allowedOrigins := []string{
+			strings.TrimRight(frontendURL, "/"),
+			"localhost:5173",
+			"localhost:3000",
 		}
 
-		clientOrigin := c.GetHeader("Origin")
-		allowed := false
+		var allowed bool
+		for _, origin := range allowedOrigins {
+			// Comparamos sin protocolo (http:// o https://)
+			clientNoProto := strings.TrimPrefix(normalizedClient, "http://")
+			clientNoProto = strings.TrimPrefix(clientNoProto, "https://")
 
-		for _, origin := range origins {
-			if origin == clientOrigin {
+			originNoProto := strings.TrimPrefix(origin, "http://")
+			originNoProto = strings.TrimPrefix(originNoProto, "https://")
+			originNoProto = strings.TrimRight(originNoProto, "/")
+
+			if clientNoProto == originNoProto {
 				allowed = true
 				break
 			}
 		}
 
+		// Permitir si está en lista blanca o si no hay origin (curl, postman)
 		if allowed || clientOrigin == "" {
 			c.Header("Access-Control-Allow-Origin", clientOrigin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+			c.Header("Access-Control-Max-Age", "86400")
 
+			// Preflight request
 			if c.Request.Method == "OPTIONS" {
 				c.AbortWithStatus(204)
 				return
@@ -51,9 +71,7 @@ func main() {
 		}
 
 		c.Next()
-	}
-
-	r.Use(corsConfig)
+	})
 
 	api := r.Group("/api")
 	{
