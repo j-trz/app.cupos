@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"backend-go/internal/database"
+	"backend-go/pkg/database"
 	"github.com/gin-gonic/gin"
 )
 

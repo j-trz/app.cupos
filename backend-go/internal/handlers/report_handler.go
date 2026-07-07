@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"backend-go/internal/database"
-	"backend-go/internal/models"
+	"backend-go/pkg/database"
+	"backend-go/pkg/models"
 	"github.com/gin-gonic/gin"
 )
 

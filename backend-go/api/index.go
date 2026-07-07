@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"backend-go/internal/database"
-	"backend-go/internal/handlers"
-	"backend-go/internal/middleware"
+	"backend-go/pkg/database"
+	"backend-go/pkg/handlers"
+	"backend-go/pkg/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

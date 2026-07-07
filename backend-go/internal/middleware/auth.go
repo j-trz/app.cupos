@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"backend-go/internal/database"
+	"backend-go/pkg/database"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )

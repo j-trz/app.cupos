@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"backend-go/internal/models"
+	"backend-go/pkg/models"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

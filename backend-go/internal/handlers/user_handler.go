@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 
-	"backend-go/internal/database"
-	"backend-go/internal/models"
+	"backend-go/pkg/database"
+	"backend-go/pkg/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
