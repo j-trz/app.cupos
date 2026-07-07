@@ -154,25 +154,28 @@ export default function Layout({ children }) {
 
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
+        {/* Header estilo Vercel - Minimalista y elegante */}
+        <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
               {getTitleByPath()}
             </h1>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
             <LanguageSelector />
             <ThemeToggle />
           </div>
         </header>
+
+        {/* Main content con scroll suave */}
         <main
-          className="flex-1 overflow-y-auto p-6"
+          className="flex-1 overflow-y-auto"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
-          <div className="text-gray-900 min-h-full max-w-7xl mx-auto">
+          <div className="min-h-full max-w-7xl mx-auto px-6 py-8">
             {children || <Outlet context={{ user }} />}
           </div>
         </main>
@@ -181,10 +184,15 @@ export default function Layout({ children }) {
       {/* Widget de Chat IA flotante */}
       <AIChatWidget />
 
-      {/* Indicador de conexión SSE */}
+      {/* Indicador de conexión SSE - Estilo discreto */}
       {user && (
-        <div className={`fixed bottom-4 right-4 w-3 h-3 rounded-full transition-colors ${isConnected ? 'bg-green-500' : 'bg-red-500'
-          }`} title={isConnected ? t('connected_to_real_time_notifications') : t('disconnected_from_notifications')} />
+        <div
+          className={`fixed bottom-6 right-6 w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-lg ${isConnected
+              ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
+              : 'bg-red-500 ring-2 ring-red-500/20'
+            }`}
+          title={isConnected ? t('connected_to_real_time_notifications') : t('disconnected_from_notifications')}
+        />
       )}
     </div>
   );

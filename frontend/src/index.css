@@ -1,51 +1,71 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   
-  /* Colors - se aplican dinámicamente desde WhiteLabelContext */
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-secondary: #64748b;
-  --color-secondary-hover: #475569;
+  /* Colors - Estilo Vercel/Zinc */
+  --color-primary: #09090b;
+  --color-primary-hover: #18181b;
+  --color-secondary: #71717a;
+  --color-secondary-hover: #52525b;
   --color-accent: #f59e0b;
-  --color-background: #f8fafc;
+  --color-background: #fafafa;
   --color-surface: #ffffff;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #64748b;
-  --color-border: #e2e8f0;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-info: #3b82f6;
+  --color-text-primary: #18181b;
+  --color-text-secondary: #71717a;
+  --color-border: #e4e4e7;
+  --color-success: #16a34a;
+  --color-warning: #ca8a04;
+  --color-error: #dc2626;
+  --color-info: #2563eb;
   
-  /* Fonts - se aplican dinámicamente desde WhiteLabelContext */
+  /* Dark mode colors */
+  --dark-background: #09090b;
+  --dark-surface: #18181b;
+  --dark-text-primary: #fafafa;
+  --dark-text-secondary: #a1a1aa;
+  --dark-border: #27272a;
+  --dark-primary: #fafafa;
+  --dark-primary-hover: #e4e4e7;
+  
+  /* Fonts */
   --font-heading: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   
-  /* Buttons - se aplican dinámicamente desde WhiteLabelContext */
+  /* Buttons */
   --button-radius: 0.5rem;
   --button-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --button-hover-scale: 1.02;
   --button-transition: all 0.2s ease;
   
-  /* Sidebar - se aplican dinámicamente desde WhiteLabelContext */
-  --sidebar-bg-color: #0f172a;
-  --sidebar-text-color: #e2e8f0;
-  --sidebar-active-bg: #ffffff;
-  --sidebar-active-text: #0f172a;
-  --sidebar-width: 320px;
-  --sidebar-collapsed-width: 80px;
+  /* Sidebar */
+  --sidebar-bg-color: #ffffff;
+  --sidebar-text-color: #18181b;
+  --sidebar-active-bg: #f4f4f5;
+  --sidebar-active-text: #09090b;
+  --sidebar-width: 288px;
+  --sidebar-collapsed-width: 64px;
   
-  /* Layout - se aplican dinámicamente desde WhiteLabelContext */
+  /* Layout */
   --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05);
+}
+
+/* Dark mode override */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--dark-background);
+    --color-surface: var(--dark-surface);
+    --color-text-primary: var(--dark-text-primary);
+    --color-text-secondary: var(--dark-text-secondary);
+    --color-border: var(--dark-border);
+  }
 }
 
 html, body, #root {
@@ -60,139 +80,157 @@ body {
   color: var(--color-text-primary);
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Tamaños de texto mejorados siguiendo el estilo de Vercel */
 .text-label-14 {
   font-size: 0.875rem; /* 14px */
-  line-height: 1.25rem; /* 20px */
+  line-height: 1.375rem; /* 22px */
   font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .text-copy-13 {
   font-size: 0.8125rem; /* 13px */
-  line-height: 1.25rem; /* 20px */
+  line-height: 1.375rem; /* 22px */
   font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .text-copy-14 {
   font-size: 0.875rem; /* 14px */
-  line-height: 1.25rem; /* 20px */
+  line-height: 1.375rem; /* 22px */
   font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .text-heading-14 {
   font-size: 0.875rem; /* 14px */
-  line-height: 1.25rem; /* 20px */
+  line-height: 1.375rem; /* 22px */
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .text-button-14 {
   font-size: 0.875rem; /* 14px */
-  line-height: 1.25rem; /* 20px */
+  line-height: 1.375rem; /* 22px */
   font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 600;
   line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 h1 {
-  font-size: 2rem; /* Reducido de 2.5rem a 2rem para mayor consistencia */
+  font-size: 2rem;
+  letter-spacing: -0.03em;
 }
 
 h2 {
-  font-size: 1.75rem; /* Reducido de 2rem a 1.75rem */
+  font-size: 1.75rem;
+  letter-spacing: -0.025em;
 }
 
 h3 {
-  font-size: 1.5rem; /* Reducido de 1.75rem a 1.5rem */
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
 }
 
 code, pre {
   font-family: var(--font-mono);
 }
 
-/* Estilos para el header */
+/* Estilos para el header - Estilo Vercel */
 header {
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
   border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background-color: rgba(var(--color-surface), 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 /* Estilos para el main */
 main {
-  background-color: #ffffff;
+  background-color: var(--color-background);
   min-height: calc(100vh - 100px);
 }
 
-/* Estilo para cards */
+/* Estilo para cards - Estilo Vercel minimalista */
 .card {
-  background-color: white;
+  background-color: var(--color-surface);
   border-radius: var(--radius-lg);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+  transition: all 0.2s ease;
 }
 
 .card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  transform: translateY(-2px);
+  border-color: var(--color-text-secondary);
+  box-shadow: var(--shadow-md);
 }
 
-/* Estilos para botones */
+/* Estilos para botones - Estilo Vercel */
 .btn {
   border-radius: var(--radius-md);
   padding: 0.5rem 1rem;
   font-weight: 500;
   transition: all 0.15s ease;
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  font-size: 0.875rem; /* text-sm */
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
 }
 
 .btn-primary {
   background-color: var(--color-primary);
   color: white;
+  border-color: var(--color-primary);
 }
 
 .btn-primary:hover {
   background-color: var(--color-primary-hover);
-  transform: var(--button-hover-scale);
+  border-color: var(--color-primary-hover);
 }
 
 .btn-secondary {
-  background-color: var(--color-secondary);
-  color: white;
+  background-color: transparent;
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
 }
 
 .btn-secondary:hover {
-  background-color: var(--color-secondary-hover);
-  transform: var(--button-hover-scale);
+  background-color: var(--color-background);
+  border-color: var(--color-text-secondary);
 }
 
-/* Estilos para inputs */
+/* Estilos para inputs - Estilo Vercel */
 .input {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
   background-color: var(--color-surface);
+  color: var(--color-text-primary);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 3px rgba(9, 9, 11, 0.1);
+}
+
+.input::placeholder {
+  color: var(--color-text-secondary);
 }
 
 @layer utilities {
