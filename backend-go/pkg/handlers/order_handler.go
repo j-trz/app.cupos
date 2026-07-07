@@ -11,9 +11,45 @@ import (
 	"github.com/google/uuid"
 )
 
+// PassengerInput acepta nacimiento como string "YYYY-MM-DD" o RFC3339
+type PassengerInput struct {
+	Nombre       string `json:"nombre"`
+	Apellido     string `json:"apellido"`
+	Documento    string `json:"documento"`
+	Nacimiento   string `json:"nacimiento"` // "1994-10-20" o "1994-10-20T00:00:00Z"
+	Nacionalidad string `json:"nacionalidad"`
+	TipoPasajero string `json:"tipo_pasajero"`
+}
+
 type ReservationInput struct {
 	models.Reservation
-	Passengers []models.Passenger `json:"passengers"`
+	Passengers []PassengerInput `json:"passengers"`
+}
+
+// parseDateFlexible acepta "YYYY-MM-DD" o RFC3339
+func parseDateFlexible(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	formats := []string{"2006-01-02", time.RFC3339, "2006-01-02T15:04:05Z"}
+	for _, f := range formats {
+		if t, err := time.Parse(f, s); err == nil {
+			return &t
+		}
+	}
+	return nil
+}
+
+// toPassengerModel convierte PassengerInput a models.Passenger
+func toPassengerModel(pi PassengerInput) models.Passenger {
+	return models.Passenger{
+		Nombre:       pi.Nombre,
+		Apellido:     pi.Apellido,
+		Documento:    pi.Documento,
+		Nacimiento:   parseDateFlexible(pi.Nacimiento),
+		Nacionalidad: pi.Nacionalidad,
+		TipoPasajero: pi.TipoPasajero,
+	}
 }
 
 func CreateReservation(c *gin.Context) {
@@ -117,23 +153,23 @@ func CreateReservation(c *gin.Context) {
 
 	// 4. Insertar pasajeros
 	if len(input.Passengers) > 0 {
-		for i := range input.Passengers {
-			input.Passengers[i].ReservationID = input.Reservation.ID
-			input.Passengers[i].PedidoID = input.Reservation.PedidoID
+		for i, pi := range input.Passengers {
+			pax := toPassengerModel(pi)
+			pax.ReservationID = input.Reservation.ID
+			pax.PedidoID = input.Reservation.PedidoID
 
 			// Calcular NRO (Regla: el primero es venta, el resto depende de edad/tipo)
 			if i == 0 {
-				input.Passengers[i].NRO = 1
+				pax.NRO = 1
 			} else {
-				// Lógica de "Venta Válida" para acompañantes
-				if isVentaValida(&input.Passengers[i], product.FechaRegreso) {
-					input.Passengers[i].NRO = 1
+				if isVentaValida(&pax, product.FechaRegreso) {
+					pax.NRO = 1
 				} else {
-					input.Passengers[i].NRO = 0
+					pax.NRO = 0
 				}
 			}
 
-			if err := tx.Create(&input.Passengers[i]).Error; err != nil {
+			if err := tx.Create(&pax).Error; err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear pasajeros"})
 				return
