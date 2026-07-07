@@ -85,9 +85,11 @@ export default function Availability() {
   };
 
   // ---- Reserva individual ----
+  const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', tipo_pasajero: 'Adulto' };
+
   const openReservationModal = (product) => {
     setSelectedProduct(product);
-    setForm({ ...EMPTY_FORM, pedido_id: ReservationService.generatePedidoId(), passengers: [] });
+    setForm({ ...EMPTY_FORM, pedido_id: ReservationService.generatePedidoId(), passengers: [{ ...EMPTY_PASSENGER }] });
     setModalOpen(true);
   };
 
@@ -126,13 +128,26 @@ export default function Availability() {
 
   const handleSubmitReservation = async (e) => {
     e.preventDefault();
-    if (!form.contacto_email || !form.contacto_nombre || !form.nombre_pasajero || !form.apellido_pasajero) {
-      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá los campos obligatorios: contacto, nombre y apellido del pasajero.' });
+    if (!form.contacto_nombre?.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá el nombre del contacto.' });
+      return;
+    }
+    if (!form.contacto_email?.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá el email del contacto.' });
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(form.contacto_email)) {
       Swal.fire({ icon: 'warning', title: 'Email inválido', text: 'Ingresá un email de contacto válido.' });
+      return;
+    }
+    if (form.passengers.length === 0) {
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Agregá al menos un pasajero.' });
+      return;
+    }
+    const pasajeroInvalido = form.passengers.some((p) => !p.nombre?.trim() || !p.apellido?.trim());
+    if (pasajeroInvalido) {
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá nombre y apellido de todos los pasajeros.' });
       return;
     }
 

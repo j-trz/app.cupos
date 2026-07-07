@@ -175,6 +175,8 @@ func init() {
 			{
 				agencies.GET("", handlers.ListAgencies)
 				agencies.POST("", middleware.AdminOnly(), handlers.CreateAgency)
+				agencies.PUT("/:id", middleware.AdminOnly(), handlers.UpdateAgency)
+				agencies.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteAgency)
 			}
 
 			// White Label
