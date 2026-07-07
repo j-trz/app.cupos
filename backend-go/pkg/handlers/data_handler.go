@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"backend-go/pkg/database"
@@ -14,8 +15,20 @@ func GetData(c *gin.Context) {
 		return
 	}
 
-	var results []map[string]interface{}
-	if err := database.DB.Table(table).Find(&results).Error; err != nil {
+	results := make([]map[string]interface{}, 0)
+	query := database.DB.Table(table)
+
+	// Aplicar filtros si se proveen como JSON: ?filters={"campo":"valor"}
+	if filtersRaw := c.Query("filters"); filtersRaw != "" {
+		var filters map[string]interface{}
+		if err := json.Unmarshal([]byte(filtersRaw), &filters); err == nil {
+			for key, val := range filters {
+				query = query.Where(key+" = ?", val)
+			}
+		}
+	}
+
+	if err := query.Find(&results).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al consultar la tabla: " + err.Error()})
 		return
 	}
