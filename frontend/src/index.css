@@ -62,6 +62,37 @@ body {
   overflow-x: hidden;
 }
 
+/* Tamaños de texto mejorados siguiendo el estilo de Vercel */
+.text-label-14 {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem; /* 20px */
+  font-weight: 500;
+}
+
+.text-copy-13 {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.25rem; /* 20px */
+  font-weight: 400;
+}
+
+.text-copy-14 {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem; /* 20px */
+  font-weight: 400;
+}
+
+.text-heading-14 {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem; /* 20px */
+  font-weight: 600;
+}
+
+.text-button-14 {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem; /* 20px */
+  font-weight: 500;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 600;
@@ -69,15 +100,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
-  font-size: 2.5rem;
+  font-size: 2rem; /* Reducido de 2.5rem a 2rem para mayor consistencia */
 }
 
 h2 {
-  font-size: 2rem;
+  font-size: 1.75rem; /* Reducido de 2rem a 1.75rem */
 }
 
 h3 {
-  font-size: 1.75rem;
+  font-size: 1.5rem; /* Reducido de 1.75rem a 1.5rem */
 }
 
 code, pre {
@@ -95,7 +126,7 @@ header {
 
 /* Estilos para el main */
 main {
-  background-color: #fafafa;
+  background-color: #ffffff;
   min-height: calc(100vh - 100px);
 }
 
@@ -125,6 +156,7 @@ main {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  font-size: 0.875rem; /* text-sm */
 }
 
 .btn-primary {
@@ -244,7 +276,7 @@ main {
     align-items: center;
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.75rem; /* text-xs */
     font-weight: 500;
   }
 
@@ -309,5 +341,34 @@ main {
   .tooltip:hover .tooltip-text {
     visibility: visible;
     opacity: 1;
+  }
+  
+  /* Estilos específicos para el sidebar similar al de Vercel */
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors;
+  }
+  
+  .sidebar-link-active {
+    @apply bg-white text-slate-950 shadow-sm;
+  }
+  
+  .sidebar-link-inactive {
+    @apply text-slate-300 hover:bg-slate-800 hover:text-white;
+  }
+  
+  .sidebar-submenu {
+    @apply ml-6 mt-1 space-y-1 pl-2 border-l border-slate-700;
+  }
+  
+  .sidebar-submenu-item {
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors;
+  }
+  
+  .sidebar-submenu-item-active {
+    @apply bg-slate-800 text-white;
+  }
+  
+  .sidebar-submenu-item-inactive {
+    @apply text-slate-400 hover:bg-slate-800 hover:text-white;
   }
 }

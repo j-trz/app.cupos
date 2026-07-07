@@ -10,6 +10,7 @@ import (
 type Profile struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	Email             string    `gorm:"unique;not null" json:"email"`
+	Password          string    `json:"password" binding:"required"`
 	EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"`
 	Nombre            string    `json:"nombre"`
 	Agencia           string    `json:"agencia"`

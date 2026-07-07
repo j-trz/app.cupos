@@ -154,10 +154,10 @@ export default function Layout({ children }) {
 
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="sticky top-0 z-10 flex justify-between items-center p-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm">
+        <header className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
               {getTitleByPath()}
@@ -169,7 +169,7 @@ export default function Layout({ children }) {
           </div>
         </header>
         <main
-          className="flex-1 overflow-y-auto bg-gray-50 p-6"
+          className="flex-1 overflow-y-auto p-6"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
           <div className="text-gray-900 min-h-full max-w-7xl mx-auto">

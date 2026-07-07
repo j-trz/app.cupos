@@ -58,13 +58,42 @@ Este documento describe las mejoras realizadas en el diseño del sidebar y panel
 - Se ajustó la jerarquía visual para mejorar la navegación
 - Se optimizó el espacio y la presentación del título de la página
 
+### 5. Corrección de Tamaños de Letra
+
+#### Problemas Identificados:
+- Las proporciones de texto eran desiguales en diferentes secciones
+- Algunos elementos tenían tamaños de fuente demasiado grandes o pequeños
+
+#### Soluciones Implementadas:
+- Se estableció una escala tipográfica consistente con clases específicas:
+  - `.text-label-14`: 14px para etiquetas
+  - `.text-copy-13`: 13px para texto de copia
+  - `.text-copy-14`: 14px para texto de copia
+  - `.text-heading-14`: 14px para encabezados secundarios
+  - `.text-button-14`: 14px para texto de botones
+- Se redujeron los tamaños de encabezados para mayor consistencia:
+  - H1: de 2.5rem a 2rem
+  - H2: de 2rem a 1.75rem
+  - H3: de 1.75rem a 1.5rem
+- Se ajustaron los tamaños de fuente en los elementos del sidebar para coincidir con el estilo de Vercel
+
+### 6. Mejora del Diseño del Sidebar
+
+#### Inspirado en el diseño de Vercel:
+- Se implementó un diseño más limpio y minimalista
+- Se mejoró la jerarquía visual de los elementos del menú
+- Se ajustaron los espacios y paddings para mayor consistencia
+- Se mejoró el manejo de texto truncado para nombres largos
+- Se optimizaron los íconos y su tamaño para mejor reconocimiento
+- Se ajustó el ancho del sidebar de 320px a 320px (32rem) para mayor consistencia
+
 ## Archivos Modificados
 
-1. [frontend/src/components/ui/Sidebar.jsx](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/components/ui/Sidebar.jsx) - Reorganización del menú y submenús
+1. [frontend/src/components/ui/Sidebar.jsx](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/components/ui/Sidebar.jsx) - Reorganización del menú y submenús, corrección de tamaños de letra
 2. [frontend/src/components/ui/Badge.jsx](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/components/ui/Badge.jsx) - Añadidas variantes pastel
 3. [frontend/src/components/ui/FilterBadge.jsx](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/components/ui/FilterBadge.jsx) - Nuevo componente para badges de filtros
 4. [frontend/src/components/AdvancedFilters.jsx](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/components/AdvancedFilters.jsx) - Integración de FilterBadge
-5. [frontend/src/index.css](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/index.css) - Estilos generales modernos
+5. [frontend/src/index.css](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/index.css) - Estilos generales modernos y escalas tipográficas
 6. [frontend/src/components/Layout.jsx](file:///c:/Users/julian.estefan/Desktop/form-cupos/frontend/src/components/Layout.jsx) - Mejoras visuales en el layout general
 
 ## Beneficios
@@ -74,7 +103,8 @@ Este documento describe las mejoras realizadas en el diseño del sidebar y panel
 - **Experiencia de usuario mejorada**: El diseño moderno y consistente mejora la usabilidad
 - **Consistencia visual**: El estilo se asemeja al de plataformas líderes como Vercel.com
 - **Accesibilidad**: Los colores pastel proporcionan buen contraste y son menos intensos visualmente
+- **Tipografía equilibrada**: Los tamaños de letra ahora están mejor proporcionados y son más fáciles de leer
 
 ## Resultado Final
 
-El panel de administración ahora tiene un aspecto más moderno y profesional, similar al estilo de Vercel.com, con una organización lógica de los elementos del menú y una identificación visual clara de los diferentes tipos de filtros mediante badges con colores pastel.
+El panel de administración ahora tiene un aspecto más moderno y profesional, similar al estilo de Vercel.com, con una organización lógica de los elementos del menú, una identificación visual clara de los diferentes tipos de filtros mediante badges con colores pastel y tamaños de letra mejor proporcionados para una mejor experiencia de lectura y navegación.
