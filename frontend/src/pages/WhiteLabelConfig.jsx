@@ -664,7 +664,7 @@ export default function WhiteLabelConfig() {
                         <div className="flex-1">{renderContent()}</div>
 
                         {/* Vista Previa fijo */}
-                        <div className="w-64 shrink-0 space-y-4">
+                        <div className="w-64 shrink-0 space-y-4 flex-1">
                             <div className="bg-white rounded-xl border border-slate-200 p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-sm font-semibold text-slate-900">Vista previa</h3>
