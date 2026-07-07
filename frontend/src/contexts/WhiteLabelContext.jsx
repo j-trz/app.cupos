@@ -122,7 +122,7 @@ export function WhiteLabelProvider({ children }) {
             setIsLoading(true);
             const response = await WhiteLabelService.getConfig();
 
-            if (response.config) {
+            if (response?.config) {
                 const dbConfig = response.config;
 
                 // Transformar formato de DB a formato estructurado

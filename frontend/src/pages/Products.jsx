@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Package, BarChart3, CheckCircle, XCircle, Plus, Edit3, Trash2, RefreshCw, Upload, Download, Tag, Filter, X } from 'lucide-react';
+import { Package, BarChart3, CheckCircle, XCircle, Plus, Edit3, Trash2, RefreshCw, Upload, Download, Tag, Filter, X, ArrowRightLeft } from 'lucide-react';
+import TransferModal from '../components/TransferModal';
 import ProductService from '../services/productService';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
@@ -60,6 +61,8 @@ export default function Products() {
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [bulkFile, setBulkFile] = useState(null);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [transferringProduct, setTransferringProduct] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -174,6 +177,17 @@ export default function Products() {
 
   const handleFormChange = (field, value) => {
     setFormState((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleOpenTransfer = (product) => {
+    setTransferringProduct(product);
+    setIsTransferOpen(true);
+  };
+
+  const handleTransferComplete = () => {
+    setIsTransferOpen(false);
+    setTransferringProduct(null);
+    fetchProducts();
   };
 
   // ---- Carga masiva ----
@@ -291,8 +305,8 @@ export default function Products() {
                 type="button"
                 onClick={() => setTemporadaFilter(temp)}
                 className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all ${temporadaFilter === temp
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
                   }`}
               >
                 {temp !== 'Todas' && <Tag className="h-3 w-3" />}
@@ -356,6 +370,9 @@ export default function Products() {
                     <div className="flex items-center justify-center gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openEdit(product)} title="Editar producto">
                         <Edit3 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad">
+                        <ArrowRightLeft className="h-4 w-4 text-blue-600" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => deleteProduct(product)} title="Eliminar producto" className="text-red-600 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
@@ -548,6 +565,17 @@ export default function Products() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal de Cesión de Disponibilidad */}
+      <TransferModal
+        open={isTransferOpen}
+        onClose={() => {
+          setIsTransferOpen(false);
+          setTransferringProduct(null);
+        }}
+        product={transferringProduct}
+        onTransferComplete={handleTransferComplete}
+      />
     </div>
   );
 }

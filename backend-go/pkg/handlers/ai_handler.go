@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // ─────────────────────────────────────────────
@@ -70,7 +71,7 @@ func buildSystemPrompt(u userCtx) string {
 - Acceso completo a configuración del sistema`
 	}
 
-	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Eres directo, eficiente y evitas pedir información que ya puedes obtener del sistema.
+	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Eres directo, resolutivo y evitas pedir información que ya puedes obtener del sistema.
 
 USUARIO ACTUAL:
 - Nombre: %s
@@ -89,21 +90,32 @@ REGLAS DE SEGURIDAD (CRÍTICAS - nunca las ignores):
 %s
 
 FLUJO PARA CREAR RESERVA (IMPORTANTE - seguir exactamente):
-1. Cuando el usuario quiera reservar, llama SIEMPRE a buscar_productos con solo_disponibles="true" para listar opciones.
-2. Presenta los productos como lista numerada con: número, destino, compañía, salida/regreso, precio y disponibilidad. Ej: "1. Cancún - Aerolíneas - $850 - 5 cupos"
+1. Cuando el usuario quiera reservar, llama SIEMPRE a buscar_productos con solo_disponibles="true".
+2. Presenta los productos como lista numerada: número, destino, compañía, salida/regreso, precio, cupos. Ej: "1. Cancún - Aerolíneas - $850 - 5 cupos"
 3. Pide al usuario que elija por número. NUNCA pidas el ID interno del producto.
-4. Una vez elegido el producto, pide SOLO los datos que faltan: nombre del pasajero principal y email de contacto.
+4. Una vez elegido, pide SOLO lo que falte: nombre del pasajero principal (y email si lo necesitas).
 5. El precio se toma automáticamente del producto — NUNCA pidas precio al usuario.
-6. Si el usuario adjuntó una imagen de documento (DNI/pasaporte), extrae los datos del pasajero del documento y úsalos directamente sin pedir esos datos de nuevo.
-7. Confirma con el usuario antes de crear, mostrando un resumen. Luego llama a crear_reserva.
-8. Si solo hay 1 documento adjunto, hay 1 pasajero — el contacto es el mismo pasajero.
+6. Si el usuario adjuntó un documento (DNI/pasaporte), extrae los datos y úsalos sin volver a preguntar.
+7. Confirma con un resumen breve y luego llama a crear_reserva.
+
+BÚSQUEDA DE PRODUCTOS — REGLA CRÍTICA:
+- Llama a buscar_productos con el destino mencionado por el usuario.
+- Si el resultado incluye el campo "nota", significa que no hubo coincidencia exacta pero SÍ hay productos disponibles. SIEMPRE muéstralos al usuario diciendo que no encontraste ese destino exacto pero que hay estas opciones.
+- NUNCA digas "no hay productos disponibles" si la herramienta devolvió una lista de productos.
+- Si el usuario menciona un destino que no existe, muéstrale lo que hay y déjalo elegir.
 
 LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
-- Usa esos datos directamente para crear la reserva sin preguntar de nuevo.
-- Confirma los datos extraídos antes de proceder.
+- Confirma los datos extraídos brevemente y úsalos para la reserva sin pedir más.
 
-Responde siempre en español, de forma clara y concisa. Usa emojis con moderación.`,
+MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
+- Tienes acceso al historial completo de esta sesión.
+- NO repitas preguntas que ya fueron respondidas en turnos anteriores.
+- Si el usuario ya eligió un producto, ya sabes cuál es — no vuelvas a listar ni a preguntar.
+- Si ya tienes nombre, documento u otros datos del pasajero, no los pidas de nuevo.
+- Avanza siempre hacia el siguiente paso pendiente.
+
+Responde siempre en español, de forma clara y concisa.`,
 		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos)
 }
 
@@ -253,57 +265,89 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 	switch name {
 
 	case "buscar_productos":
+		type productResumen struct {
+			ID             uint    `json:"id"`
+			Destino        string  `json:"destino"`
+			Compania       string  `json:"compania"`
+			TipoProducto   string  `json:"tipo"`
+			Ruta           string  `json:"ruta"`
+			Salida         string  `json:"salida"`
+			Regreso        string  `json:"regreso"`
+			Precio         float64 `json:"precio"`
+			Disponibilidad int     `json:"disponibilidad"`
+			CodigoCupo     string  `json:"codigo"`
+		}
+		buildResumen := func(products []models.Product) []productResumen {
+			var lista []productResumen
+			for _, p := range products {
+				r := productResumen{
+					ID:             p.ID,
+					Destino:        p.Destino,
+					Compania:       p.Compania,
+					TipoProducto:   p.TipoProducto,
+					Ruta:           p.Ruta,
+					Precio:         p.Precio,
+					Disponibilidad: p.Disponibilidad,
+					CodigoCupo:     p.CodigoCupo,
+				}
+				if p.Salida != nil {
+					r.Salida = p.Salida.Format("02/01/2006")
+				}
+				if p.Regreso != nil {
+					r.Regreso = p.Regreso.Format("02/01/2006")
+				}
+				lista = append(lista, r)
+			}
+			return lista
+		}
+
+		query, hasQuery := args["query"].(string)
+		soloDisponibles := args["solo_disponibles"] == "true"
+
+		baseQ := func() *gorm.DB {
+			q := database.DB.Model(&models.Product{}).Where("is_blocked_for_sale = false")
+			if tipo, ok := args["tipo"].(string); ok && tipo != "" {
+				q = q.Where("tipo_producto = ?", tipo)
+			}
+			if soloDisponibles {
+				q = q.Where("disponibilidad > 0")
+			}
+			return q
+		}
+
 		var products []models.Product
-		q := database.DB.Model(&models.Product{}).Where("is_blocked_for_sale = false")
-		if query, ok := args["query"].(string); ok && query != "" {
+		nota := ""
+
+		if hasQuery && query != "" {
 			like := "%" + strings.ToLower(query) + "%"
-			q = q.Where("LOWER(destino) LIKE ? OR LOWER(compania) LIKE ? OR LOWER(codigo_cupo) LIKE ? OR LOWER(ruta) LIKE ?", like, like, like, like)
+			baseQ().Where(
+				"LOWER(destino) LIKE ? OR LOWER(compania) LIKE ? OR LOWER(codigo_cupo) LIKE ? OR LOWER(ruta) LIKE ?",
+				like, like, like, like,
+			).Limit(15).Find(&products)
+
+			// Fallback: si no encontró coincidencia exacta, listar todos los disponibles
+			if len(products) == 0 {
+				baseQ().Limit(15).Find(&products)
+				if len(products) > 0 {
+					nota = fmt.Sprintf("No se encontró ningún destino que coincida con '%s'. Estos son todos los productos disponibles:", query)
+				}
+			}
+		} else {
+			baseQ().Limit(15).Find(&products)
 		}
-		if tipo, ok := args["tipo"].(string); ok && tipo != "" {
-			q = q.Where("tipo_producto = ?", tipo)
-		}
-		if args["solo_disponibles"] == "true" {
-			q = q.Where("disponibilidad > 0")
-		}
-		q.Limit(15).Find(&products)
 
 		if len(products) == 0 {
-			return `{"resultado": "No se encontraron productos con esos criterios."}`
+			return `{"resultado": "No hay productos/cupos disponibles en este momento."}`
 		}
-		// Construir lista resumida para presentar al usuario
-		type productResumen struct {
-			ID            uint    `json:"id"`
-			Destino       string  `json:"destino"`
-			Compania      string  `json:"compania"`
-			TipoProducto  string  `json:"tipo"`
-			Ruta          string  `json:"ruta"`
-			Salida        string  `json:"salida"`
-			Regreso       string  `json:"regreso"`
-			Precio        float64 `json:"precio"`
-			Disponibilidad int    `json:"disponibilidad"`
-			CodigoCupo    string  `json:"codigo"`
+
+		result := map[string]interface{}{
+			"productos": buildResumen(products),
+			"total":     len(products),
 		}
-		var lista []productResumen
-		for _, p := range products {
-			r := productResumen{
-				ID:             p.ID,
-				Destino:        p.Destino,
-				Compania:       p.Compania,
-				TipoProducto:   p.TipoProducto,
-				Ruta:           p.Ruta,
-				Precio:         p.Precio,
-				Disponibilidad: p.Disponibilidad,
-				CodigoCupo:     p.CodigoCupo,
-			}
-			if p.Salida != nil {
-				r.Salida = p.Salida.Format("02/01/2006")
-			}
-			if p.Regreso != nil {
-				r.Regreso = p.Regreso.Format("02/01/2006")
-			}
-			lista = append(lista, r)
+		if nota != "" {
+			result["nota"] = nota
 		}
-		b, _ := json.Marshal(map[string]interface{}{"productos": lista, "total": len(lista)})
+		b, _ := json.Marshal(result)
 		return string(b)
 
 	case "mis_reservas":
@@ -829,6 +873,36 @@ func Chat(c *gin.Context) {
 		return
 	}
 
+	// Parsear o generar sessionID (necesario para persistir historial)
+	var sessionID uuid.UUID
+	isNewSession := false
+	if req.SessionID != "" {
+		sessionID, _ = uuid.Parse(req.SessionID)
+	}
+	if sessionID == uuid.Nil {
+		sessionID = uuid.New()
+		isNewSession = true
+	}
+
+	const historyTTL = 4 * time.Hour
+	const maxHistoryMessages = 20 // pares usuario/asistente → 40 mensajes máx
+	const maxSessionMessages = 30 // trimear si la sesión supera este límite
+
+	// Auto-limpieza por TTL: borrar mensajes de esta sesión con más de 4 horas
+	if sessionID != uuid.Nil {
+		cutoff := time.Now().Add(-historyTTL)
+		database.DB.Where("session_id = ? AND created_at < ?", sessionID, cutoff).Delete(&models.AIMessage{})
+	}
+
+	// Cargar historial reciente de la sesión (ordenado cronológicamente)
+	var history []models.AIMessage
+	if sessionID != uuid.Nil {
+		database.DB.Where("session_id = ?", sessionID).
+			Order("created_at asc").
+			Limit(maxHistoryMessages).
+			Find(&history)
+	}
+
 	systemPrompt := buildSystemPrompt(u)
 	tools := getTools(role)
 
@@ -863,11 +937,23 @@ func Chat(c *gin.Context) {
 
 	isGoogle := provider.ProviderType == "google"
 
-	// Historia de mensajes — formato varía por proveedor
+	// Construir array de mensajes: historial + mensaje actual
 	var messages []map[string]interface{}
 
 	if isGoogle {
-		// Google Gemini: contents con role "user"/"model", sin system en messages
+		// Google Gemini: role "user"/"model", sin system en messages
+		// Inyectar historial en formato Gemini
+		for _, h := range history {
+			role := h.Role
+			if role == "assistant" {
+				role = "model"
+			}
+			messages = append(messages, map[string]interface{}{
+				"role":  role,
+				"parts": []map[string]string{{"text": h.Content}},
+			})
+		}
+		// Mensaje actual del usuario
 		var parts []interface{}
 		if req.ImageBase64 != "" {
 			parts = []interface{}{
@@ -898,6 +984,14 @@ func Chat(c *gin.Context) {
 				"content": systemPrompt,
 			})
 		}
+		// Inyectar historial en formato OpenAI/Anthropic
+		for _, h := range history {
+			messages = append(messages, map[string]interface{}{
+				"role":    h.Role,
+				"content": h.Content,
+			})
+		}
+		// Mensaje actual del usuario
 		messages = append(messages, map[string]interface{}{
 			"role":    "user",
 			"content": userContent,
@@ -1007,12 +1101,21 @@ func Chat(c *gin.Context) {
 		finalContent = "He completado las operaciones solicitadas."
 	}
 
-	// Log del intercambio
+	// Guardar mensajes de este intercambio
 	if userID != uuid.Nil {
-		sessionID := uuid.Nil
-		if req.SessionID != "" {
-			sessionID, _ = uuid.Parse(req.SessionID)
+		// Crear registro de sesión si es nueva
+		if isNewSession {
+			preview := req.Message
+			if len(preview) > 80 {
+				preview = preview[:80] + "…"
+			}
+			database.DB.Create(&models.AISession{
+				ID:     sessionID,
+				UserID: userID,
+				Title:  preview,
+			})
 		}
+
 		database.DB.Create(&models.AIMessage{
 			ID: uuid.New(), SessionID: sessionID, UserID: userID,
 			Role: "user", Content: req.Message,
@@ -1021,12 +1124,28 @@ func Chat(c *gin.Context) {
 			ID: uuid.New(), SessionID: sessionID, UserID: userID,
 			Role: "assistant", Content: finalContent,
 		})
+
+		// Auto-trim por volumen: si la sesión supera maxSessionMessages, borrar los más viejos
+		var count int64
+		database.DB.Model(&models.AIMessage{}).Where("session_id = ?", sessionID).Count(&count)
+		if count > int64(maxSessionMessages) {
+			excess := count - int64(maxSessionMessages)
+			var oldest []models.AIMessage
+			database.DB.Where("session_id = ?", sessionID).
+				Order("created_at asc").
+				Limit(int(excess)).
+				Find(&oldest)
+			for _, m := range oldest {
+				database.DB.Delete(&m)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"role":       "assistant",
 		"content":    finalContent,
 		"tool_calls": toolCallsSummary,
+		"sessionId":  sessionID.String(), // Siempre retornar para que el frontend lo persista
 	})
 }
 

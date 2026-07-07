@@ -10,8 +10,8 @@ class WhiteLabelService {
       const response = await ApiClient.request('/white-label/config');
       return response;
     } catch (error) {
-      console.error('Error al obtener configuración white-label:', error);
-      throw error;
+      // 404 = no hay config aún, se usará la por defecto. No es un error real.
+      return null;
     }
   }
 

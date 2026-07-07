@@ -63,6 +63,10 @@ export function useSSE(options = {}) {
         });
 
         if (!response.ok) {
+          // Errores 5xx = servidor no soporta SSE (ej: Vercel serverless). No reintentar.
+          if (response.status >= 500) {
+            return;
+          }
           throw new Error(`Error de conexión SSE: ${response.status}`);
         }
 
