@@ -125,8 +125,6 @@ func Register(c *gin.Context) {
 	    c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
 	    return
 	}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
-		return
 	}
 
 	// Encriptar la contraseña
