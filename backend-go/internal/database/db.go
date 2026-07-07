@@ -32,7 +32,20 @@ func InitDB() {
 	fmt.Println("Connected to database")
 
 	// Automigrate
-	db.AutoMigrate(&models.Profile{}, &models.Product{}, &models.Reservation{})
+	db.AutoMigrate(
+		&models.Profile{},
+		&models.Product{},
+		&models.Reservation{},
+		&models.Agency{},
+		&models.WhiteLabelConfig{},
+		&models.SystemSetting{},
+		&models.Notification{},
+		&models.Permission{},
+		&models.Role{},
+		&models.UserRole{},
+		&models.EmailSMTPConfig{},
+		&models.AIProvider{},
+	)
 
 	DB = db
 }

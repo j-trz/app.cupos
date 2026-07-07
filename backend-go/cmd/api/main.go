@@ -59,6 +59,31 @@ func main() {
 			{
 				reports.GET("/stats", handlers.GetStats)
 			}
+
+			// Agencias
+			agencies := protected.Group("/agencies")
+			{
+				agencies.GET("/", handlers.ListAgencies)
+				agencies.POST("/", middleware.AdminOnly(), handlers.CreateAgency)
+			}
+
+			// White Label
+			whiteLabel := protected.Group("/white-label")
+			{
+				whiteLabel.GET("/config", handlers.GetWhiteLabelConfig)
+				whiteLabel.PUT("/config/:id", handlers.UpdateWhiteLabelConfig)
+			}
+
+			// RBAC
+			rbac := protected.Group("/")
+			{
+				rbac.GET("/roles", middleware.AdminOnly(), handlers.ListRoles)
+				rbac.GET("/permissions", middleware.AdminOnly(), handlers.ListPermissions)
+				rbac.POST("/user-roles", middleware.AdminOnly(), handlers.AssignRoleToUser)
+			}
+
+			// SSE
+			protected.GET("/sse", handlers.SSEHandler)
 		}
 	}
 

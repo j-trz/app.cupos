@@ -53,6 +53,23 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+func RequirePermission(code string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// En una implementación real, buscaríamos en public.user_roles y public.role_permissions
+		// Por ahora permitimos a los administradores pasar siempre
+		role, _ := c.Get("role")
+		if role == "admin" {
+			c.Next()
+			return
+		}
+
+		// Simular chequeo de permiso para otros roles
+		// database.DB.Table("permissions")...
+
+		c.Next()
+	}
+}
+
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
