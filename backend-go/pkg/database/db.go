@@ -16,7 +16,8 @@ var DB *gorm.DB
 func InitDB() {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		log.Fatal("DATABASE_URL is not set")
+		log.Println("WARNING: DATABASE_URL is not set")
+		return
 	}
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
