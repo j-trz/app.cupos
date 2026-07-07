@@ -34,7 +34,7 @@ func GetEvolutionPassengers(c *gin.Context) {
 		Period string `json:"period"`
 		Total  int64  `json:"total"`
 	}
-	var results []Result
+	results := make([]Result, 0)
 
 	database.DB.Table("passengers").
 		Select("to_char(created_at, 'YYYY-MM') as period, sum(nro) as total").
@@ -51,7 +51,7 @@ func GetAgencyShare(c *gin.Context) {
 		Total   int64   `json:"total"`
 		Venta   float64 `json:"venta"`
 	}
-	var results []Result
+	results := make([]Result, 0)
 
 	database.DB.Table("reservations").
 		Select("CASE WHEN lower(agencia) LIKE '%tienda%' THEN 'Tienda Viajes' ELSE 'Jetmar' END as agencia, count(*) as total, sum(precio_venta) as venta").
@@ -107,7 +107,7 @@ func GetDestinationsDetail(c *gin.Context) {
 		VentaReal    float64 `json:"venta_real"`
 		Riesgo       float64 `json:"riesgo"`
 	}
-	var results []Result
+	results := make([]Result, 0)
 
 	database.DB.Table("products").
 		Select("destino, temporada, sum(vendidos * op) as rentabilidad, sum(vendidos * neto_1) as costo_real, sum(vendidos * precio) as venta_real, sum(disponibilidad * neto_1) as riesgo").
