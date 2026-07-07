@@ -70,7 +70,7 @@ func buildSystemPrompt(u userCtx) string {
 - Acceso completo a configuración del sistema`
 	}
 
-	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Tu objetivo es ayudar al usuario a gestionar reservas, consultar disponibilidad y operar el sistema de forma eficiente.
+	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Eres directo, eficiente y evitas pedir información que ya puedes obtener del sistema.
 
 USUARIO ACTUAL:
 - Nombre: %s
@@ -80,7 +80,7 @@ USUARIO ACTUAL:
 - ID interno: %s
 
 REGLAS DE SEGURIDAD (CRÍTICAS - nunca las ignores):
-1. Un usuario con rol "user" SOLO puede ver sus propias reservas. NUNCA muestres reservas de otros usuarios a un "user".
+1. Un usuario con rol "user" o "agency_user" SOLO puede ver sus propias reservas. NUNCA muestres reservas de otros usuarios.
 2. Los precios netos (neto_1) son confidenciales para usuarios no administradores.
 3. Datos de otros usuarios solo los puede ver el admin.
 4. Siempre verifica el rol antes de ejecutar acciones sensibles.
@@ -88,9 +88,22 @@ REGLAS DE SEGURIDAD (CRÍTICAS - nunca las ignores):
 
 %s
 
-Cuando leas un documento de identidad, extrae: nombre completo, apellido, número de documento, fecha de nacimiento, nacionalidad, fecha de vencimiento (si aplica).
-Cuando el usuario quiera crear una reserva, guíalo paso a paso: producto → datos de contacto → pasajeros → confirmación.
-Responde siempre en español de forma clara y concisa. Usa emojis con moderación para mejorar la legibilidad.`,
+FLUJO PARA CREAR RESERVA (IMPORTANTE - seguir exactamente):
+1. Cuando el usuario quiera reservar, llama SIEMPRE a buscar_productos con solo_disponibles="true" para listar opciones.
+2. Presenta los productos como lista numerada con: número, destino, compañía, salida/regreso, precio y disponibilidad. Ej: "1. Cancún - Aerolíneas - $850 - 5 cupos"
+3. Pide al usuario que elija por número. NUNCA pidas el ID interno del producto.
+4. Una vez elegido el producto, pide SOLO los datos que faltan: nombre del pasajero principal y email de contacto.
+5. El precio se toma automáticamente del producto — NUNCA pidas precio al usuario.
+6. Si el usuario adjuntó una imagen de documento (DNI/pasaporte), extrae los datos del pasajero del documento y úsalos directamente sin pedir esos datos de nuevo.
+7. Confirma con el usuario antes de crear, mostrando un resumen. Luego llama a crear_reserva.
+8. Si solo hay 1 documento adjunto, hay 1 pasajero — el contacto es el mismo pasajero.
+
+LECTURA DE DOCUMENTOS DE IDENTIDAD:
+- Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
+- Usa esos datos directamente para crear la reserva sin preguntar de nuevo.
+- Confirma los datos extraídos antes de proceder.
+
+Responde siempre en español, de forma clara y concisa. Usa emojis con moderación.`,
 		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos)
 }
 
@@ -140,17 +153,20 @@ func getTools(role string) []ToolDef {
 		},
 		{
 			Name:        "crear_reserva",
-			Description: "Crea una nueva reserva en el sistema con los datos de contacto y pasajeros.",
+			Description: "Crea una nueva reserva. El precio se toma automáticamente del producto — nunca pedir al usuario.",
 			Parameters: ToolParam{
 				Type: "object",
 				Properties: map[string]ToolParam{
-					"product_id":        {Type: "string", Description: "ID numérico del producto"},
-					"contacto_nombre":   {Type: "string", Description: "Nombre del contacto principal"},
-					"contacto_email":    {Type: "string", Description: "Email del contacto"},
-					"contacto_telefono": {Type: "string", Description: "Teléfono del contacto"},
-					"precio_venta":      {Type: "string", Description: "Precio de venta total"},
+					"product_id":        {Type: "string", Description: "ID numérico del producto (obtenido de buscar_productos)"},
+					"contacto_nombre":   {Type: "string", Description: "Nombre completo del contacto/pasajero principal"},
+					"contacto_email":    {Type: "string", Description: "Email de contacto (opcional)"},
+					"contacto_telefono": {Type: "string", Description: "Teléfono de contacto (opcional)"},
+					"pasajero_nombre":   {Type: "string", Description: "Nombre del pasajero (del DNI si fue adjuntado)"},
+					"pasajero_apellido": {Type: "string", Description: "Apellido del pasajero (del DNI si fue adjuntado)"},
+					"pasajero_documento":{Type: "string", Description: "Número de documento del pasajero"},
+					"pasajero_nacionalidad": {Type: "string", Description: "Nacionalidad del pasajero"},
 				},
-				Required: []string{"product_id", "contacto_nombre", "precio_venta"},
+				Required: []string{"product_id", "contacto_nombre"},
 			},
 		},
 		{
@@ -254,13 +270,40 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		if len(products) == 0 {
 			return `{"resultado": "No se encontraron productos con esos criterios."}`
 		}
-		// Ocultar neto para no-admin
-		for i := range products {
-			if isRegularUser(u.Role) {
-				products[i].Neto1 = 0
-			}
+		// Construir lista resumida para presentar al usuario
+		type productResumen struct {
+			ID            uint    `json:"id"`
+			Destino       string  `json:"destino"`
+			Compania      string  `json:"compania"`
+			TipoProducto  string  `json:"tipo"`
+			Ruta          string  `json:"ruta"`
+			Salida        string  `json:"salida"`
+			Regreso       string  `json:"regreso"`
+			Precio        float64 `json:"precio"`
+			Disponibilidad int    `json:"disponibilidad"`
+			CodigoCupo    string  `json:"codigo"`
 		}
-		b, _ := json.Marshal(map[string]interface{}{"productos": products, "total": len(products)})
+		var lista []productResumen
+		for _, p := range products {
+			r := productResumen{
+				ID:             p.ID,
+				Destino:        p.Destino,
+				Compania:       p.Compania,
+				TipoProducto:   p.TipoProducto,
+				Ruta:           p.Ruta,
+				Precio:         p.Precio,
+				Disponibilidad: p.Disponibilidad,
+				CodigoCupo:     p.CodigoCupo,
+			}
+			if p.Salida != nil {
+				r.Salida = p.Salida.Format("02/01/2006")
+			}
+			if p.Regreso != nil {
+				r.Regreso = p.Regreso.Format("02/01/2006")
+			}
+			lista = append(lista, r)
+		}
+		b, _ := json.Marshal(map[string]interface{}{"productos": lista, "total": len(lista)})
 		return string(b)
 
 	case "mis_reservas":
@@ -340,11 +383,8 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 			return `{"error": "El producto no tiene disponibilidad"}`
 		}
 
-		precioStr, _ := args["precio_venta"].(string)
-		precio, _ := strconv.ParseFloat(precioStr, 64)
-		if precio == 0 {
-			precio = product.Precio
-		}
+		// Precio: siempre del producto, nunca pedido al usuario
+		precio := product.Precio
 
 		pedidoID := fmt.Sprintf("AI-%d", time.Now().Unix())
 		agencia := u.Agencia
@@ -352,17 +392,28 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 			agencia = "Sin agencia"
 		}
 
+		strArg := func(key string) string {
+			if v, ok := args[key]; ok && v != nil && fmt.Sprintf("%v", v) != "<nil>" {
+				return fmt.Sprintf("%v", v)
+			}
+			return ""
+		}
+
 		reserva := models.Reservation{
-			ProductID:         uint(productID),
-			CreatedBy:         u.ID,
-			Estado:            "bloqueo_temporal",
-			PrecioVenta:       precio,
-			Neto1:             product.Neto1,
-			PedidoID:          pedidoID,
-			Agencia:           agencia,
-			ContactoNombre:    fmt.Sprintf("%v", args["contacto_nombre"]),
-			ContactoEmail:     fmt.Sprintf("%v", args["contacto_email"]),
-			ContactoTelefono:  fmt.Sprintf("%v", args["contacto_telefono"]),
+			ProductID:            uint(productID),
+			CreatedBy:            u.ID,
+			Estado:               "bloqueo_temporal",
+			PrecioVenta:          precio,
+			Neto1:                product.Neto1,
+			PedidoID:             pedidoID,
+			Agencia:              agencia,
+			ContactoNombre:       strArg("contacto_nombre"),
+			ContactoEmail:        strArg("contacto_email"),
+			ContactoTelefono:     strArg("contacto_telefono"),
+			NombrePasajero:       strArg("pasajero_nombre"),
+			ApellidoPasajero:     strArg("pasajero_apellido"),
+			DocumentoPasajero:    strArg("pasajero_documento"),
+			NacionalidadPasajero: strArg("pasajero_nacionalidad"),
 		}
 
 		if err := database.DB.Create(&reserva).Error; err != nil {
