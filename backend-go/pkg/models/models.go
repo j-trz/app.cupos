@@ -106,6 +106,7 @@ type Agency struct {
 	Email     string    `json:"email"`
 	Phone     string    `json:"phone"`
 	Website   string    `json:"website"`
+	Color     string    `gorm:"default:'#3b82f6'" json:"color"`
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -244,16 +245,16 @@ type AIMessage struct {
 
 // AvailabilityTransfer representa una cesión de disponibilidad entre agencias
 type AvailabilityTransfer struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	ProductID     uint       `gorm:"not null" json:"product_id"`
-	SourceAgency  string     `gorm:"not null;column:source_agency" json:"source_agency"`
-	TargetAgency  string     `gorm:"not null;column:target_agency" json:"target_agency"`
-	Quantity      int        `gorm:"not null" json:"quantity"`
-	CreatedBy     uuid.UUID  `gorm:"type:uuid;not null" json:"created_by"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ProductID    uint      `gorm:"not null" json:"product_id"`
+	SourceAgency string    `gorm:"not null;column:source_agency" json:"source_agency"`
+	TargetAgency string    `gorm:"not null;column:target_agency" json:"target_agency"`
+	Quantity     int       `gorm:"not null" json:"quantity"`
+	CreatedBy    uuid.UUID `gorm:"type:uuid;not null" json:"created_by"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 	// Relaciones
-	Product       Product    `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 // Agregar campos de cesión a Reservation

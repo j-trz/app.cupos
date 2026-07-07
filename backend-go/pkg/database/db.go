@@ -91,15 +91,16 @@ func runSQLMigrations(db *gorm.DB) {
 		}
 	}
 
-	// Add columns to reservations table (if they don't exist, ALTER ignores it)
+	// Add columns to tables (if they don't exist, ALTER ignores it)
 	colSQLs := []string{
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS transfer_id UUID REFERENCES availability_transfers(id) ON DELETE SET NULL;`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS original_agency VARCHAR(255);`,
+		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS color VARCHAR(7) DEFAULT '#3b82f6';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {
 			log.Println("WARNING: Column alteration error:", err)
 		}
 	}
-	fmt.Println("Migration applied: reservation columns ensured")
+	fmt.Println("Migration applied: all columns ensured")
 }

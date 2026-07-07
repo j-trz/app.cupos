@@ -115,6 +115,18 @@ func CreateReservation(c *gin.Context) {
 			uuid.New().String()[:8])
 	}
 
+	// Poblar campos del pasajero principal desde passengers[0] si no vienen en el body raíz
+	if len(input.Passengers) > 0 && input.Reservation.NombrePasajero == "" {
+		p := toPassengerModel(input.Passengers[0])
+		input.Reservation.NombrePasajero = p.Nombre
+		input.Reservation.ApellidoPasajero = p.Apellido
+		input.Reservation.DocumentoPasajero = p.Documento
+		input.Reservation.NacionalidadPasajero = p.Nacionalidad
+		if input.Reservation.TipoPasajero == "" {
+			input.Reservation.TipoPasajero = p.TipoPasajero
+		}
+	}
+
 	// 3. Preparar reserva
 	blockMinutes := product.BloqueoTemporalMinutos
 	if blockMinutes <= 0 {

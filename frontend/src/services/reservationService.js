@@ -19,7 +19,8 @@ const adaptProduct = (producto) => ({
 });
 
 const adaptRequest = (item) => ({
-  Pedido_ID: item.Pedido_ID || item.pedido_id || item.id || '',
+  id: item.id || item.ID || '',
+  Pedido_ID: item.Pedido_ID || item.pedido_id || '',
   Agencia: item.Agencia || item.agencia || '',
   Contacto_Nombre: item.Contacto_Nombre || item.contacto_nombre || item.contacto?.nombre || '',
   Contacto_Email: item.Contacto_Email || item.contacto_email || item.contacto?.email || '',
@@ -29,6 +30,7 @@ const adaptRequest = (item) => ({
   Temporada: item.Temporada || item.temporada || '',
   Vuelo_Salida: item.Vuelo_Salida || item.vuelo_salida || item.fecha_salida || '',
   Estado: item.Estado || item.estado || 'Solicitado',
+  Doc_Contable: item.Doc_Contable || item.doc_contable || '',
   Ruta: item.Ruta || item.ruta || '',
   Fecha_Registro: item.Fecha_Registro || item.fecha_registro || item.created_at || '',
   Vuelo_Codigo: item.Vuelo_Codigo || item.vuelo_codigo || '',
@@ -154,11 +156,12 @@ class ReservationService {
   }
 
   static async getConfirmations() {
-    const filters = JSON.stringify({ Estado: 'Confirmado' });
-    const result = await ApiClient.get(`/data?table=reservations&filters=${encodeURIComponent(filters)}`);
+    const result = await ApiClient.get('/orders');
+    const all = Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+    const confirmed = all.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada');
     return {
       success: true,
-      data: Array.isArray(result) ? result.map(adaptRequest) : Array.isArray(result.data) ? result.data.map(adaptRequest) : [],
+      data: confirmed.map(adaptRequest),
     };
   }
 

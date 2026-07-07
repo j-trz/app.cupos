@@ -23,3 +23,6 @@ ALTER TABLE reservations ADD COLUMN IF NOT EXISTS original_agency VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_reservations_transfer_id ON reservations(transfer_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_original_agency ON reservations(original_agency);
+
+-- Columna color para agencies (para el frontend GestionAgencias)
+ALTER TABLE agencies ADD COLUMN IF NOT EXISTS color VARCHAR(7) DEFAULT '#3b82f6';
