@@ -58,12 +58,12 @@ export default function AIChatWidget() {
             {/* Botón Flotante - Estilo Vercel */}
             <button
                 onClick={handleToggle}
-                className="fixed bottom-6 right-6 z-50 group focus:outline-none"
+                className="fixed bottom-6 right-6 group focus:outline-none"
                 aria-label={isOpen ? 'Cerrar chat IA' : 'Abrir chat IA'}
             >
                 {/* Indicador de no leídos */}
                 {unreadCount > 0 && !isOpen && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ring-2 ring-white dark:ring-zinc-900">
+                    <span className="absolute -top-1 z-10 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ring-2 ring-white dark:ring-zinc-900">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}

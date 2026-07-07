@@ -1,14 +1,15 @@
 /**
- * Ventana de Chat IA
- * Contenedor principal del chat que integra mensajes e input
+ * Ventana de Chat IA - Estilo Vercel
+ * Usa colores de marca blanca dinámicamente
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Minus, RotateCcw, Settings, Trash2, MessageSquarePlus } from 'lucide-react';
+import { X, Minus, RotateCcw, Settings, Trash2, MessageSquarePlus, Bot } from 'lucide-react';
 import AIService from '../../services/aiService';
 import AIChatMessage from './AIChatMessage';
 import AIChatInput from './AIChatInput';
 import { useAuth } from '../../contexts/AuthContext';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     const { user } = useAuth();
@@ -155,17 +156,24 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
         }
     };
 
+    const { config } = useWhiteLabel();
+
+    // Colores dinámicos desde WhiteLabelContext
+    const primaryColor = config?.colors?.primary || '#3b82f6';
+    const surfaceColor = config?.colors?.surface || '#ffffff';
+    const backgroundColor = config?.colors?.background || '#fafafa';
+
     return (
-        <div className="w-[400px] h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                        <span className="text-lg">🤖</span>
+        <div className="w-[380px] h-[580px] bg-white dark:bg-zinc-900 rounded-xl shadow-xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
+            {/* Header - Estilo Vercel minimalista */}
+            <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-white dark:text-zinc-900" />
                     </div>
                     <div>
-                        <h3 className="font-semibold text-sm">Asistente IA</h3>
-                        <p className="text-xs text-white/70">
+                        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Asistente IA</h3>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
                             {isTyping ? 'Escribiendo...' : 'En línea'}
                         </p>
                     </div>
@@ -175,7 +183,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Nueva conversación */}
                     <button
                         onClick={handleNewSession}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                         title="Nueva conversación"
                     >
                         <MessageSquarePlus className="w-4 h-4" />
@@ -184,7 +192,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Historial */}
                     <button
                         onClick={() => setShowSessions(!showSessions)}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                         title="Historial de conversaciones"
                     >
                         <RotateCcw className="w-4 h-4" />
@@ -194,7 +202,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {user?.role === 'admin' && (
                         <button
                             onClick={() => window.location.href = '/config-ia'}
-                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                             title="Configuración IA"
                         >
                             <Settings className="w-4 h-4" />
@@ -204,38 +212,29 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Minimizar */}
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                         title="Minimizar"
                     >
                         <Minus className="w-4 h-4" />
-                    </button>
-
-                    {/* Cerrar */}
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                        title="Cerrar"
-                    >
-                        <X className="w-4 h-4" />
                     </button>
                 </div>
             </div>
 
             {/* Panel de sesiones */}
             {showSessions && (
-                <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 max-h-40 overflow-y-auto">
+                <div className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 max-h-36 overflow-y-auto shrink-0">
                     <div className="p-2">
-                        <p className="text-xs text-gray-500 px-2 py-1">Conversaciones recientes</p>
+                        <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-1">Conversaciones recientes</p>
                         {sessions.length === 0 ? (
-                            <p className="text-sm text-gray-400 px-2 py-3 text-center">Sin conversaciones</p>
+                            <p className="text-sm text-zinc-400 px-2 py-3 text-center">Sin conversaciones</p>
                         ) : (
                             sessions.slice(0, 5).map(session => (
                                 <div
                                     key={session.id}
                                     onClick={() => loadSessionMessages(session.id)}
-                                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${currentSessionId === session.id
-                                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                                    className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors my-0.5 ${currentSessionId === session.id
+                                        ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                                         }`}
                                 >
                                     <span className="text-sm truncate flex-1">
@@ -243,9 +242,9 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                                     </span>
                                     <button
                                         onClick={(e) => handleDeleteSession(session.id, e)}
-                                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded"
+                                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-600 rounded-md transition-colors"
                                     >
-                                        <Trash2 className="w-3 h-3" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
                             ))
@@ -255,10 +254,12 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
             )}
 
             {/* Área de mensajes */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white dark:bg-zinc-900">
                 {isLoading && messages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <div className="flex items-center justify-center h-full min-h-[200px]">
+                        <div className="relative">
+                            <div className="w-10 h-10 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 border-t-zinc-900 dark:border-t-zinc-100 animate-spin"></div>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -276,14 +277,14 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         {/* Indicador de escritura */}
                         {isTyping && (
                             <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
-                                    <span className="text-white text-sm">🤖</span>
+                                <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                    <Bot className="w-4 h-4 text-white dark:text-zinc-900" />
                                 </div>
-                                <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-tl-none px-4 py-3">
-                                    <div className="flex gap-1">
-                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                <div className="bg-zinc-100 dark:bg-zinc-800 rounded-xl rounded-tl-none px-4 py-3 border border-zinc-200 dark:border-zinc-700">
+                                    <div className="flex gap-1.5">
+                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                                     </div>
                                 </div>
                             </div>
@@ -291,8 +292,21 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
 
                         {/* Error */}
                         {error && (
-                            <div className="text-center text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
+                            <div className="text-center text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-lg border border-red-200 dark:border-red-800">
                                 {error}
+                            </div>
+                        )}
+
+                        {!isTyping && messages.length === 0 && (
+                            <div className="flex items-center justify-center h-full min-h-[200px] text-center">
+                                <div>
+                                    <div className="w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center mb-3 mx-auto">
+                                        <Bot className="w-6 h-6 text-white dark:text-zinc-900" />
+                                    </div>
+                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                                        Soy tu asistente IA. ¿En qué puedo ayudarte hoy?
+                                    </p>
+                                </div>
                             </div>
                         )}
 
