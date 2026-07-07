@@ -140,11 +140,9 @@ func Register(c *gin.Context) {
 	}
 	profile.EncryptedPassword = string(hashedPassword)
 
-	// Asignar rol por defecto
-	if profile.Role == "" {
-		profile.Role = "agency_user"
-	}
-
+	// Set default role and ensure no admin privileges
+	profile.Role = "agency_user"
+	profile.Admin = false  // Explicitly set admin to false
 	profile.ID = uuid.New()
 
 	if err := database.DB.Create(&profile).Error; err != nil {
@@ -164,8 +162,7 @@ func Register(c *gin.Context) {
 		"nombre":  profile.Nombre,
 		"agencia": profile.Agencia,
 		"role":    profile.Role,
-		"admin":   profile.Admin,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"exp":     time.Now().Add(time.Hour * 24).Unix(),  // Remove admin claim from token
 	})
 
 	tokenString, err := token.SignedString([]byte(secret))
