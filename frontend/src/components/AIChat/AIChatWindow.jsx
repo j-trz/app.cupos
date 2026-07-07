@@ -110,18 +110,19 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
             }
 
             // Agregar respuesta del asistente
+            const responseContent = response.content || response.message || '';
             const assistantMessage = {
                 id: response.id || `resp-${Date.now()}`,
                 role: 'assistant',
-                content: response.message,
+                content: responseContent,
                 toolCalls: response.toolCalls,
                 created_at: new Date().toISOString()
             };
             setMessages(prev => [...prev, assistantMessage]);
 
-            // Notificar al widget padre
-            if (onNewMessage) {
-                onNewMessage(response.message);
+            // Notificar al widget padre (para el badge)
+            if (onNewMessage && responseContent) {
+                onNewMessage(responseContent);
             }
         } catch (err) {
             console.error('Error al enviar mensaje:', err);

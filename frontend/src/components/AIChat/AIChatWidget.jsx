@@ -77,9 +77,10 @@ export default function AIChatWidget() {
                     bg-zinc-900 dark:bg-zinc-100
                     hover:shadow-lg hover:scale-105
                     active:scale-95
+                    ${unreadCount > 0 && !isOpen ? 'animate-pulse' : ''}
                   `}
                 >
-                    <Sparkles className={`w-5 h-5 transition-colors ${isOpen ? 'text-white dark:text-zinc-900' : 'text-white dark:text-zinc-900'}`} />
+                    <Sparkles className="w-5 h-5 text-white dark:text-zinc-900" />
                 </div>
 
                 {/* Tooltip al hacer hover */}

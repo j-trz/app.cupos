@@ -43,9 +43,26 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
   const [openSubmenus, setOpenSubmenus] = useState({});
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
 
   const isAdmin = user?.role === 'admin';
+
+  // Polling de notificaciones no leídas cada 60s
+  useEffect(() => {
+    let mounted = true;
+    const fetchUnread = async () => {
+      try {
+        const result = await NotificationService.getUnreadCount();
+        if (mounted) setUnreadCount(result || 0);
+      } catch {
+        // silencioso
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
 
   // Toggle submenu visibility
   const toggleSubmenu = (submenu) => {
@@ -341,8 +358,16 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
                       <a href="/notificaciones" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                        <Bell className="h-4 w-4 text-zinc-500" />
+                        <div className="relative">
+                          <Bell className="h-4 w-4 text-zinc-500" />
+                          {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white dark:ring-zinc-900" />
+                          )}
+                        </div>
                         <span>Notificaciones</span>
+                        {unreadCount > 0 && (
+                          <span className="ml-auto text-xs font-semibold text-red-500">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                        )}
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

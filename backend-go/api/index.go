@@ -209,6 +209,18 @@ func init() {
 			// RBAC - User Roles
 			protected.POST("/user-roles", middleware.AdminOnly(), handlers.AssignRoleToUser)
 
+			// Notificaciones
+			notifications := protected.Group("/notifications")
+			{
+				notifications.GET("", handlers.GetNotifications)
+				notifications.GET("/unread-count", handlers.GetUnreadCount)
+				notifications.PUT("/read-all", handlers.MarkAllNotificationsRead)
+				notifications.PUT("/:id/read", handlers.MarkNotificationRead)
+				notifications.PUT("/:id/hide", handlers.HideNotification)
+				notifications.POST("", middleware.AdminOnly(), handlers.CreateNotification)
+				notifications.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteNotification)
+			}
+
 			// SSE
 			protected.GET("/sse", handlers.SSEHandler)
 		}

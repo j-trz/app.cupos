@@ -130,11 +130,17 @@ type SystemSetting struct {
 
 type Notification struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Type         string     `gorm:"not null" json:"type"`
+	Type         string     `gorm:"not null;default:'info'" json:"type"`
 	Title        string     `gorm:"not null" json:"title"`
 	Message      string     `gorm:"not null" json:"message"`
+	Icon         string     `gorm:"default:'📢'" json:"icon"`
+	Color        string     `gorm:"default:'blue'" json:"color"`
+	Priority     string     `gorm:"default:'medium'" json:"priority"`
 	TargetUserID *uuid.UUID `gorm:"type:uuid" json:"target_user_id"`
 	TargetRole   string     `json:"target_role"`
+	IsRead       bool       `gorm:"default:false" json:"is_read"`
+	IsHidden     bool       `gorm:"default:false" json:"is_hidden"`
+	CreatedBy    *uuid.UUID `gorm:"type:uuid" json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
