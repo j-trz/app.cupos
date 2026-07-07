@@ -7,6 +7,7 @@ import (
 	"backend-go/internal/database"
 	"backend-go/internal/handlers"
 	"backend-go/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -16,7 +17,43 @@ func main() {
 
 	database.InitDB()
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	// Configuración CORS
+	corsConfig := func(c *gin.Context) {
+		origins := []string{
+			"https://app-cupos-frontend.vercel.app",
+			"http://localhost:5173",
+			"http://localhost:3000",
+		}
+
+		clientOrigin := c.GetHeader("Origin")
+		allowed := false
+
+		for _, origin := range origins {
+			if origin == clientOrigin {
+				allowed = true
+				break
+			}
+		}
+
+		if allowed || clientOrigin == "" {
+			c.Header("Access-Control-Allow-Origin", clientOrigin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(204)
+				return
+			}
+		}
+
+		c.Next()
+	}
+
+	r.Use(corsConfig)
 
 	api := r.Group("/api")
 	{
