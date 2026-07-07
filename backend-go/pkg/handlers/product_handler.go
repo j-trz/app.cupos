@@ -3,12 +3,37 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
 	"github.com/gin-gonic/gin"
 )
+
+// fixNumbers convierte strings numéricos a float64/int para evitar errores de unmarshal
+func fixNumbers(data map[string]interface{}) {
+	floatFields := []string{"precio", "neto_1", "op", "inf_fare", "chd_fare"}
+	intFields := []string{"disponibilidad", "cupo", "vendidos", "bloqueo_temporal_minutos"}
+	for _, field := range floatFields {
+		if v, ok := data[field]; ok {
+			if s, ok := v.(string); ok {
+				if f, err := strconv.ParseFloat(s, 64); err == nil {
+					data[field] = f
+				}
+			}
+		}
+	}
+	for _, field := range intFields {
+		if v, ok := data[field]; ok {
+			if s, ok := v.(string); ok {
+				if i, err := strconv.Atoi(s); err == nil {
+					data[field] = i
+				}
+			}
+		}
+	}
+}
 
 // fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
 func fixDates(data map[string]interface{}) {
@@ -44,6 +69,7 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 	fixDates(rawData)
+	fixNumbers(rawData)
 
 	jsonBytes, _ := json.Marshal(rawData)
 	var product models.Product
@@ -70,6 +96,7 @@ func BulkCreateProducts(c *gin.Context) {
 	}
 	for i := range rawInput.Products {
 		fixDates(rawInput.Products[i])
+		fixNumbers(rawInput.Products[i])
 	}
 	jsonBytes, _ := json.Marshal(rawInput)
 	var input struct {
