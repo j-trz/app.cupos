@@ -21,6 +21,7 @@ func init() {
 
 	gin.SetMode(gin.ReleaseMode)
 	router = gin.New()
+	router.RedirectTrailingSlash = false
 	router.Use(gin.Recovery())
 
 	// Configuración CORS dinámica desde variable de entorno
@@ -112,14 +113,17 @@ func init() {
 				users.PUT("/:id/status", handlers.ToggleUserStatus)
 			}
 
-			// Reportes
+			// Reportes (solo admin y agency_admin)
 			reports := protected.Group("/reports")
+			reports.Use(middleware.AgencyAdminOrAdmin())
 			{
 				reports.GET("/stats", handlers.GetStats)
 				reports.GET("/evolution", handlers.GetEvolutionPassengers)
 				reports.GET("/agency-share", handlers.GetAgencyShare)
 				reports.GET("/destinations-detail", handlers.GetDestinationsDetail)
 			}
+			// Métricas personales para usuarios regulares
+			protected.GET("/reports/user-metrics", handlers.GetUserMetrics)
 
 			// Ajustes
 			settings := protected.Group("/settings")

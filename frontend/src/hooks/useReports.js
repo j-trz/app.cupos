@@ -32,3 +32,11 @@ export const useGeneralReport = (filters = {}) => {
     staleTime: 1000 * 60 * 5,
   });
 };
+
+export const useUserMetrics = () => {
+  return useQuery({
+    queryKey: ['userMetrics'],
+    queryFn: () => ReportService.getUserMetrics(),
+    staleTime: 1000 * 60 * 5,
+  });
+};

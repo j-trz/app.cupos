@@ -56,6 +56,10 @@ export class ReportService {
     
     return await ApiClient.get(endpoint);
   }
+
+  static async getUserMetrics() {
+    return await ApiClient.get('/reports/user-metrics');
+  }
 }
 
 export default ReportService;

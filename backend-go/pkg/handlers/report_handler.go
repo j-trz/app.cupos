@@ -6,6 +6,7 @@ import (
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -61,14 +62,50 @@ func GetAgencyShare(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
+// GetUserMetrics obtiene las métricas personales del usuario autenticado
+func GetUserMetrics(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	// Si es admin o agency_admin, no tiene métricas personales (usa el dashboard general)
+	if role == "admin" || role == "agency_admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este endpoint es solo para usuarios regulares"})
+		return
+	}
+
+	var totalReservations int64
+	var totalSales float64
+	var pendingReservations int64
+	var confirmedReservations int64
+
+	// Total de reservas del usuario
+	database.DB.Model(&models.Reservation{}).Where("created_by = ?", userID).Count(&totalReservations)
+
+	// Ventas totales (reservas confirmadas)
+	database.DB.Model(&models.Reservation{}).Where("created_by = ? AND estado = ?", userID, "confirmada").Select("COALESCE(sum(precio_venta), 0)").Scan(&totalSales)
+
+	// Reservas pendientes
+	database.DB.Model(&models.Reservation{}).Where("created_by = ? AND estado IN ?", userID, []string{"solicitada", "bloqueo_temporal", "pendiente"}).Count(&pendingReservations)
+
+	// Reservas confirmadas
+	database.DB.Model(&models.Reservation{}).Where("created_by = ? AND estado = ?", userID, "confirmada").Count(&confirmedReservations)
+
+	c.JSON(http.StatusOK, gin.H{
+		"totalReservations":     totalReservations,
+		"totalSales":            totalSales,
+		"pendingReservations":   pendingReservations,
+		"confirmedReservations": confirmedReservations,
+	})
+}
+
 func GetDestinationsDetail(c *gin.Context) {
 	type Result struct {
-		Destino        string  `json:"destino"`
-		Temporada      string  `json:"temporada"`
-		Rentabilidad   float64 `json:"rentabilidad"`
-		CostoReal      float64 `json:"costo_real"`
-		VentaReal      float64 `json:"venta_real"`
-		Riesgo         float64 `json:"riesgo"`
+		Destino      string  `json:"destino"`
+		Temporada    string  `json:"temporada"`
+		Rentabilidad float64 `json:"rentabilidad"`
+		CostoReal    float64 `json:"costo_real"`
+		VentaReal    float64 `json:"venta_real"`
+		Riesgo       float64 `json:"riesgo"`
 	}
 	var results []Result
 

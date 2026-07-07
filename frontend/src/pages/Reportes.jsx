@@ -1,15 +1,40 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useEvolutionPassengers, useSalesByAgency, useDestinationsDetail } from '../hooks/useReports';
+import { useAuth } from '../contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Skeleton } from '../components/ui/Skeleton';
-import { Download, Filter } from 'lucide-react';
+import { Download, Filter, Lock } from 'lucide-react';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const Reportes = () => {
   const [filters, setFilters] = useState({});
+  const { user } = useAuth();
+
+  // Solo administradores totales y de agencia pueden acceder
+  const isAdmin = user?.role === 'admin' || user?.role === 'agency_admin';
+
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              Acceso Restringido
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Esta sección es solo para administradores. Contacte a su administrador si necesita acceder a reportes.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const { data: evolution, isLoading: loadingEvol } = useEvolutionPassengers(filters);
   const { data: agencyShare, isLoading: loadingShare } = useSalesByAgency(filters);
