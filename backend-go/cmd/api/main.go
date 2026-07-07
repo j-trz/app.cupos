@@ -22,6 +22,7 @@ func main() {
 	{
 		// Rutas públicas
 		api.POST("/auth/login", handlers.Login)
+		api.POST("/auth/register", handlers.Register)
 
 		// Rutas protegidas
 		protected := api.Group("/")
@@ -51,7 +52,11 @@ func main() {
 			users.Use(middleware.AdminOnly())
 			{
 				users.GET("/", handlers.ListUsers)
+				users.GET("/:id", handlers.GetUserById)
 				users.POST("/", handlers.CreateUser)
+				users.PUT("/:id", handlers.UpdateUser)
+				users.DELETE("/:id", handlers.DeleteUser)
+				users.PUT("/:id/status", handlers.ToggleUserStatus)
 			}
 
 			// Reportes
@@ -107,13 +112,33 @@ func main() {
 				whiteLabel.PUT("/config/:id", handlers.UpdateWhiteLabelConfig)
 			}
 
-			// RBAC
-			rbac := protected.Group("/")
+			// RBAC - Roles
+			roles := protected.Group("/roles")
+			roles.Use(middleware.AdminOnly())
 			{
-				rbac.GET("/roles", middleware.AdminOnly(), handlers.ListRoles)
-				rbac.GET("/permissions", middleware.AdminOnly(), handlers.ListPermissions)
-				rbac.POST("/user-roles", middleware.AdminOnly(), handlers.AssignRoleToUser)
+				roles.GET("/", handlers.ListRoles)
+				roles.GET("/:id", handlers.GetRoleById)
+				roles.POST("/", handlers.CreateRole)
+				roles.PUT("/:id", handlers.UpdateRole)
+				roles.DELETE("/:id", handlers.DeleteRole)
+				roles.GET("/:id/users", handlers.GetRoleUsers)
+				roles.GET("/:id/permissions", handlers.GetRolePermissions)
+				roles.POST("/:id/permissions", handlers.AssignPermissionsToRole)
 			}
+
+			// RBAC - Permisos
+			permissions := protected.Group("/permissions")
+			permissions.Use(middleware.AdminOnly())
+			{
+				permissions.GET("/", handlers.ListPermissions)
+				permissions.GET("/:id", handlers.GetPermissionById)
+				permissions.POST("/", handlers.CreatePermission)
+				permissions.PUT("/:id", handlers.UpdatePermission)
+				permissions.DELETE("/:id", handlers.DeletePermission)
+			}
+
+			// RBAC - User Roles
+			protected.POST("/user-roles", middleware.AdminOnly(), handlers.AssignRoleToUser)
 
 			// SSE
 			protected.GET("/sse", handlers.SSEHandler)

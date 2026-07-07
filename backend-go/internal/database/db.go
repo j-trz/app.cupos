@@ -44,6 +44,7 @@ func InitDB() {
 		&models.Permission{},
 		&models.Role{},
 		&models.UserRole{},
+		&models.RolePermission{},
 		&models.EmailSMTPConfig{},
 		&models.AIProvider{},
 	)

@@ -166,6 +166,12 @@ type UserRole struct {
 	GrantedAt time.Time `json:"granted_at"`
 }
 
+type RolePermission struct {
+	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	RoleID       uuid.UUID `gorm:"type:uuid;not null" json:"role_id"`
+	PermissionID uuid.UUID `gorm:"type:uuid;not null" json:"permission_id"`
+}
+
 type EmailSMTPConfig struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AgencyID  uuid.UUID `gorm:"type:uuid" json:"agency_id"`
