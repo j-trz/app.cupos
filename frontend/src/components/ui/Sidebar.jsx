@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import { useSidebar } from './SidebarProvider.jsx';
@@ -22,9 +22,17 @@ const adminNavItems = [
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Usuarios', path: '/usuarios', icon: Users },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
+];
+
+// Settings items (grouped under Settings)
+const settingsItems = [
   { label: 'Marca Blanca', path: '/marca-blanca', icon: Palette },
-  { label: 'Config Email', path: '/email-config', icon: Mail },
-  { label: 'Config IA', path: '/config-ia', icon: Bot },
+  { label: 'Configuración de Email', path: '/email-config', icon: Mail },
+  { label: 'Configuración de IA', path: '/config-ia', icon: Bot },
+];
+
+// User management items (grouped under Usuarios)
+const userManagementItems = [
   { label: 'Roles', path: '/roles', icon: Shield },
   { label: 'Permisos', path: '/permisos', icon: Key },
 ];
@@ -35,8 +43,23 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
   const [unreadCount, setUnreadCount] = useState(0);
+  const [openSubmenus, setOpenSubmenus] = useState({});
+  const location = useLocation();
 
   const isAdmin = user?.role === 'admin';
+
+  // Toggle submenu visibility
+  const toggleSubmenu = (submenu) => {
+    setOpenSubmenus(prev => ({
+      ...prev,
+      [submenu]: !prev[submenu]
+    }));
+  };
+
+  // Check if current path belongs to a submenu
+  const isSubmenuActive = (items) => {
+    return items.some(item => location.pathname.startsWith(item.path));
+  };
 
   // Fetch unread notifications count
   useEffect(() => {
@@ -72,20 +95,22 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
           <div className="space-y-6">
             <div className={clsx('flex items-center gap-3', collapsed && 'justify-center')}>
               <div className={clsx('rounded-md bg-slate-900 p-2 text-white', collapsed ? 'p-2' : 'p-3')}>
-                <span className="sr-only">Gestión de cupos</span>
+                <span className="sr-only">Gestión de Cupos</span>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                   <path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               {!collapsed && (
                 <div>
-                  <h1 className="mt-1 text-xl font-semibold text-white">Gestión de cupos</h1>
-                  <p className="mt-1 text-xs text-slate-400">Control de reservas y confirmaciones.</p>
+                  <h1 className="mt-1 text-xl font-semibold text-white">Gestión de Cupos</h1>
+                  <p className="mt-1 text-xs text-slate-400">{user.agencia || 'Tu Agencia'}</p>
                 </div>
               )}
             </div>
 
             <nav className="mt-2 flex flex-col gap-2">
+
+              {/* Main navigation items */}
               {navItems.map(({ label, path, icon: Icon }) => (
                 <NavLink
                   key={path}
@@ -124,6 +149,84 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   {!collapsed && <span>{label}</span>}
                 </NavLink>
               ))}
+
+              {/* Settings submenu */}
+              {isAdmin && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => toggleSubmenu('settings')}
+                    className={clsx(
+                      'group flex w-full items-center gap-3 rounded-3xl px-3 py-2 text-sm font-medium transition-colors',
+                      isSubmenuActive(settingsItems) ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+                      collapsed ? 'justify-center px-2' : 'px-4'
+                    )}
+                  >
+                    <Tooltip label="Ajustes">
+                      <Settings className="h-5 w-5" />
+                    </Tooltip>
+                    {!collapsed && <span>Ajustes</span>}
+                    {!collapsed && <ChevronDown className={`ml-auto transition-transform ${openSubmenus.settings ? 'rotate-180' : ''}`} />}
+                  </button>
+                  {!collapsed && openSubmenus.settings && (
+                    <div className="ml-6 mt-1 space-y-1 pl-2 border-l border-slate-700">
+                      {settingsItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className={({ isActive }) =>
+                            clsx(
+                              'flex items-center gap-3 rounded-3xl px-3 py-2 text-sm font-medium transition-colors',
+                              isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            )
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* User management submenu */}
+              {isAdmin && (
+                <div className="mt-1">
+                  <button
+                    onClick={() => toggleSubmenu('userManagement')}
+                    className={clsx(
+                      'group flex w-full items-center gap-3 rounded-3xl px-3 py-2 text-sm font-medium transition-colors',
+                      isSubmenuActive(userManagementItems) ? 'bg-white text-slate-950 shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+                      collapsed ? 'justify-center px-2' : 'px-4'
+                    )}
+                  >
+                    <Tooltip label="Usuarios">
+                      <Users className="h-5 w-5" />
+                    </Tooltip>
+                    {!collapsed && <span>Usuarios</span>}
+                    {!collapsed && <ChevronDown className={`ml-auto transition-transform ${openSubmenus.userManagement ? 'rotate-180' : ''}`} />}
+                  </button>
+                  {!collapsed && openSubmenus.userManagement && (
+                    <div className="ml-6 mt-1 space-y-1 pl-2 border-l border-slate-700">
+                      {userManagementItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className={({ isActive }) =>
+                            clsx(
+                              'flex items-center gap-3 rounded-3xl px-3 py-2 text-sm font-medium transition-colors',
+                              isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            )
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </nav>
           </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '../contexts/I18nContext.jsx';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import FilterBadge from '../ui/FilterBadge.jsx';
 
 const AdvancedFilters = ({ 
   filters, 
@@ -31,7 +32,29 @@ const AdvancedFilters = ({
     setExpanded(false);
   };
 
+  const removeFilter = (filterKey) => {
+    setActiveFilters(prev => {
+      const newFilters = { ...prev };
+      delete newFilters[filterKey];
+      return newFilters;
+    });
+  };
+
   const hasActiveFilters = Object.keys(activeFilters).length > 0;
+
+  // Función para determinar el tipo de filtro para la badge
+  const getFilterType = (filterKey) => {
+    if (filterKey.includes('product') || filterKey.includes('producto')) return 'product';
+    if (filterKey.includes('request') || filterKey.includes('solicitud')) return 'request';
+    if (filterKey.includes('confirmation') || filterKey.includes('confirmacion')) return 'confirmation';
+    if (filterKey.includes('availability') || filterKey.includes('disponibilidad')) return 'availability';
+    if (filterKey.includes('reservation') || filterKey.includes('reserva')) return 'reservation';
+    if (filterKey.includes('agency') || filterKey.includes('agencia')) return 'agency';
+    if (filterKey.includes('user') || filterKey.includes('usuario')) return 'user';
+    if (filterKey.includes('setting') || filterKey.includes('config')) return 'setting';
+    if (filterKey.includes('report') || filterKey.includes('reporte')) return 'report';
+    return 'secondary';
+  };
 
   return (
     <div className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -80,6 +103,28 @@ const AdvancedFilters = ({
           />
         </svg>
       </button>
+
+      {/* Mostrar badges de filtros activos */}
+      {hasActiveFilters && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {Object.entries(activeFilters).map(([key, value]) => {
+            if (!value) return null;
+            
+            // Obtener el label del filtro correspondiente
+            const filter = filters.find(f => f.key === key);
+            const label = filter ? (filter.label || t(key)) : key;
+            
+            return (
+              <FilterBadge
+                key={key}
+                type={getFilterType(key)}
+                text={`${label}: ${value}`}
+                onRemove={() => removeFilter(key)}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {expanded && (
         <div className={`mt-2 p-4 rounded-lg border ${
