@@ -121,8 +121,14 @@ func Register(c *gin.Context) {
 	// Verificar si el email ya existe
 	var existingProfile models.Profile
 	err := database.DB.Where("email = ?", profile.Email).First(&existingProfile).Error
-	if err != nil {
+	if err == nil {
+	    // Email already exists
 	    c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
+	    return
+	}
+	// Check if there was an error other than record not found
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	    c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al verificar el email."})
 	    return
 	}
 	
