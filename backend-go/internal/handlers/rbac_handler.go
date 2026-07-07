@@ -117,8 +117,15 @@ func AssignPermissionsToRole(c *gin.Context) {
 
 	// Crear nuevos permisos
 	for _, permissionId := range input.Permissions {
+		// Convert roleId string to uuid.UUID
+		roleUUID, err := uuid.Parse(roleId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID de rol inválido."})
+			return
+		}
+
 		rolePermission := models.RolePermission{
-			RoleID:     roleId,
+			RoleID:     roleUUID,
 			PermissionID: permissionId,
 		}
 		database.DB.Create(&rolePermission)
