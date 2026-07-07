@@ -26,6 +26,7 @@ import Products from './pages/Products';
 import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import AIConfig from './pages/AIConfig';
+import Reportes from './pages/Reportes';
 import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -241,15 +242,25 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                <Route 
-                  path="/config-ia" 
+                <Route
+                  path="/config-ia"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <AIConfig />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
+                />
+                <Route
+                  path="/reportes"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Reportes />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
                 />
                 <Route 
                   path="/test" 

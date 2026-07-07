@@ -14,7 +14,7 @@ export default function Profile() {
     async function loadProfile() {
       try {
         const result = await ApiClient.get('/auth/profile');
-        setProfile(result.profile || null);
+        setProfile((result && result.profile) || null);
       } catch (error) {
         console.error(error);
       } finally {

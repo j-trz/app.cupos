@@ -44,11 +44,11 @@ export function useSSE(options = {}) {
       eventSourceRef.current.close();
     }
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('api_token');
     if (!token) return;
 
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-    const sseUrl = `${baseUrl}/sse/connect`;
+    const sseUrl = `${baseUrl}/sse`;
 
     // Crear EventSource con headers (usando fetch con ReadableStream para SSE con auth)
     // Nota: EventSource nativo no soporta headers personalizados, 
