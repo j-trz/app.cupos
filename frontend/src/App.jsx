@@ -28,6 +28,7 @@ import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import AIConfig from './pages/AIConfig';
 import TestPage from './pages/TestPage';
+import Reportes from './pages/Reportes';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import './styles/globals.css';
@@ -252,6 +253,16 @@ function App() {
                         </Layout>
                       </ProtectedRoute>
                     } 
+                  />
+                  <Route
+                    path="/reportes"
+                    element={
+                      <ProtectedRoute>
+                        <Layout>
+                          <Reportes />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
                   />
                   <Route 
                     path="/test" 

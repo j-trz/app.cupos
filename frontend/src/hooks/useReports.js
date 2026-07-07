@@ -5,26 +5,23 @@ export const useSalesByAgency = (filters = {}) => {
   return useQuery({
     queryKey: ['salesByAgency', filters],
     queryFn: () => ReportService.getSalesByAgency(filters),
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
+    staleTime: 1000 * 60 * 5,
   });
 };
 
-export const useReservationStatus = (filters = {}) => {
+export const useEvolutionPassengers = (filters = {}) => {
   return useQuery({
-    queryKey: ['reservationStatus', filters],
-    queryFn: () => ReportService.getReservationStatus(filters),
+    queryKey: ['evolutionPassengers', filters],
+    queryFn: () => ReportService.getEvolutionPassengers(filters),
     staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 10,
   });
 };
 
-export const useHistoricalSales = (filters = {}) => {
+export const useDestinationsDetail = (filters = {}) => {
   return useQuery({
-    queryKey: ['historicalSales', filters],
-    queryFn: () => ReportService.getHistoricalSales(filters),
+    queryKey: ['destinationsDetail', filters],
+    queryFn: () => ReportService.getDestinationsDetail(filters),
     staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 10,
   });
 };
 
@@ -33,6 +30,5 @@ export const useGeneralReport = (filters = {}) => {
     queryKey: ['generalReport', filters],
     queryFn: () => ReportService.getGeneralReport(filters),
     staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 10,
   });
 };
