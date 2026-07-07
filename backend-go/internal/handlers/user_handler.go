@@ -120,7 +120,11 @@ func Register(c *gin.Context) {
 
 	// Verificar si el email ya existe
 	var existingProfile models.Profile
-	if err := database.DB.Where("email = ?", profile.Email).First(&existingProfile).Error == nil {
+	err := database.DB.Where("email = ?", profile.Email).First(&existingProfile).Error
+	if err != nil {
+	    c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
+	    return
+	}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
 		return
 	}
