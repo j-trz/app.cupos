@@ -60,6 +60,36 @@ func main() {
 				reports.GET("/stats", handlers.GetStats)
 			}
 
+			// Ajustes
+			settings := protected.Group("/settings")
+			settings.Use(middleware.AdminOnly())
+			{
+				settings.GET("/", handlers.ListSettings)
+				settings.PUT("/:key", handlers.UpdateSetting)
+			}
+
+			// Backup
+			protected.GET("/backup", middleware.AdminOnly(), handlers.GetBackup)
+
+			// Exportación
+			protected.GET("/export/csv/:entityType", handlers.ExportCSV)
+
+			// IA
+			ai := protected.Group("/ai")
+			{
+				ai.POST("/chat", handlers.Chat)
+				ai.GET("/providers", handlers.ListAIProviders)
+			}
+
+			// CRUD Dinámico (Data)
+			data := protected.Group("/data")
+			{
+				data.GET("/", handlers.GetData)
+				data.POST("/", handlers.ExecuteCRUD)
+				data.PUT("/", handlers.ExecuteCRUD)
+				data.DELETE("/", handlers.ExecuteCRUD)
+			}
+
 			// Agencias
 			agencies := protected.Group("/agencies")
 			{
