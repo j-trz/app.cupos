@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
@@ -340,10 +340,12 @@ export default function GestionReservas() {
             <TableRow>
               <TableHead>ID Pedido</TableHead>
               <TableHead>Agencia</TableHead>
+              <TableHead>Origen</TableHead>
               <TableHead>Contacto / Pasajero</TableHead>
               <TableHead>Destino</TableHead>
               <TableHead>Salida</TableHead>
               <TableHead>Vencimiento</TableHead>
+              <TableHead>Cesión</TableHead>
               <TableHead>Doc.Contable</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-center">Acciones</TableHead>
@@ -351,9 +353,9 @@ export default function GestionReservas() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-10">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center py-10">Cargando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-10 text-slate-400">
+              <TableRow><TableCell colSpan={10} className="text-center py-10 text-slate-400">
                 {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
               </TableCell></TableRow>
             ) : filtered.map(r => {
@@ -362,6 +364,15 @@ export default function GestionReservas() {
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
                   <TableCell>{r.agencia || '—'}</TableCell>
+                  {/* Origen -Agency (para cesiones) */}
+                  <TableCell>
+                    {r.original_agency ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-slate-500">Original:</span>
+                        <span className="text-xs font-medium">{r.original_agency}</span>
+                      </div>
+                    ) : '—'}
+                  </TableCell>
                   <TableCell>
                     <div className="text-sm">{r.contacto_nombre || '—'}</div>
                     {(r.nombre_pasajero || r.apellido_pasajero) && (
@@ -386,6 +397,19 @@ export default function GestionReservas() {
                         <AlertCircle className="h-3 w-3" /> Pendiente
                       </button>
                     ) : <span className="text-xs text-slate-300">—</span>}
+                  </TableCell>
+                  {/* Cesión Badge */}
+                  <TableCell>
+                    {r.transfer_id ? (
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
+                          <ArrowRightLeft className="h-3 w-3" /> Cesión
+                        </Badge>
+                        <span className="text-[10px] text-slate-400 font-mono truncate max-w-[100px]" title={r.transfer_id}>
+                          {r.transfer_id.slice(0, 8)}...
+                        </span>
+                      </div>
+                    ) : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={getEstadoVariant(r.estado)}>{getEstadoLabel(r.estado)}</Badge>
@@ -466,7 +490,7 @@ export default function GestionReservas() {
               {editReservation && (
                 <Field label="Estado">
                   <select value={form.estado} onChange={e => setField('estado', e.target.value)} className={inputCls + ' bg-white'}>
-                    {['bloqueo_temporal','confirmado','procesando','completado','cancelado'].map(s => (
+                    {['bloqueo_temporal', 'confirmado', 'procesando', 'completado', 'cancelado'].map(s => (
                       <option key={s} value={s}>{getEstadoLabel(s)}</option>
                     ))}
                   </select>
@@ -516,7 +540,7 @@ export default function GestionReservas() {
               </Field>
               <Field label="Tipo">
                 <select value={form.tipo_pasajero} onChange={e => setField('tipo_pasajero', e.target.value)} className={inputCls + ' bg-white'}>
-                  {['Adulto','Niño','Infante'].map(t => <option key={t}>{t}</option>)}
+                  {['Adulto', 'Niño', 'Infante'].map(t => <option key={t}>{t}</option>)}
                 </select>
               </Field>
             </div>

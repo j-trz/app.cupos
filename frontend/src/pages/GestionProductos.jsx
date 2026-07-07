@@ -9,14 +9,17 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, Download, ArrowRightLeft } from 'lucide-react';
+import TransferModal from '../components/TransferModal';
 import { useToast } from '../hooks/use-toast';
 
 const GestionProductos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [transferringProduct, setTransferringProduct] = useState(null);
 
   const { toast } = useToast();
   const { data: products, isLoading, isError } = useProducts({ search: searchTerm });
@@ -81,6 +84,18 @@ const GestionProductos = () => {
   const handleEditProduct = (product) => {
     setEditingProduct(product);
     setIsModalOpen(true);
+  };
+
+  const handleOpenTransfer = (product) => {
+    setTransferringProduct(product);
+    setIsTransferOpen(true);
+  };
+
+  const handleTransferComplete = () => {
+    setIsTransferOpen(false);
+    setTransferringProduct(null);
+    // Recargar productos después de una cesión exitosa
+    setSearchTerm(prev => prev);
   };
 
   const handleBulkUpload = async (file) => {
@@ -228,13 +243,23 @@ const GestionProductos = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditProduct(product)}
+                            title="Editar"
                           >
-                            <Edit className="h4 w-4" />
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenTransfer(product)}
+                            title="Ceder Disponibilidad"
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteProduct(product.id)}
+                            title="Eliminar"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -260,6 +285,17 @@ const GestionProductos = () => {
           }
         />
       )}
+
+      {/* Modal de Cesión de Disponibilidad */}
+      <TransferModal
+        open={isTransferOpen}
+        onClose={() => {
+          setIsTransferOpen(false);
+          setTransferringProduct(null);
+        }}
+        product={transferringProduct}
+        onTransferComplete={handleTransferComplete}
+      />
     </div>
   );
 };
