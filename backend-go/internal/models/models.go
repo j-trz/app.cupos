@@ -6,14 +6,15 @@ import (
 )
 
 type Profile struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Email     string    `gorm:"unique;not null" json:"email"`
-	Nombre    string    `json:"nombre"`
-	Agencia   string    `json:"agencia"`
-	Admin     bool      `gorm:"default:false" json:"admin"`
-	Role      string    `gorm:"default:'agency_user'" json:"role"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	Email             string    `gorm:"unique;not null" json:"email"`
+	EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"`
+	Nombre            string    `json:"nombre"`
+	Agencia           string    `json:"agencia"`
+	Admin             bool      `gorm:"default:false" json:"admin"`
+	Role              string    `gorm:"default:'agency_user'" json:"role"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type Product struct {
