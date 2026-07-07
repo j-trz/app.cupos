@@ -88,6 +88,7 @@ func init() {
 			products := protected.Group("/products")
 			{
 				products.GET("", handlers.GetProducts)
+				products.GET("/:id", handlers.GetProductByID)
 				products.POST("", middleware.AdminOnly(), handlers.CreateProduct)
 				products.POST("/bulk", middleware.AdminOnly(), handlers.BulkCreateProducts)
 			}
@@ -97,7 +98,10 @@ func init() {
 			{
 				orders.GET("", handlers.GetAllReservations)
 				orders.POST("", handlers.CreateReservation)
-				orders.POST("/:id/confirm", middleware.AdminOnly(), handlers.ConfirmReservation)
+				orders.GET("/:id", handlers.GetReservationByID)
+				orders.PUT("/:id", handlers.UpdateReservation)
+				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
+				orders.POST("/:id/confirm", handlers.ConfirmReservation)
 				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)
 			}
 

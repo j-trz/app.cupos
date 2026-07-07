@@ -51,7 +51,6 @@ func GetProducts(c *gin.Context) {
 	var products []models.Product
 	database.DB.Find(&products)
 
-	// Ocultar Neto1 si no es admin
 	role, _ := c.Get("role")
 	if role != "admin" {
 		for i := range products {
@@ -60,6 +59,20 @@ func GetProducts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, products)
+}
+
+func GetProductByID(c *gin.Context) {
+	id := c.Param("id")
+	var product models.Product
+	if err := database.DB.First(&product, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+	role, _ := c.Get("role")
+	if role != "admin" {
+		product.Neto1 = 0
+	}
+	c.JSON(http.StatusOK, product)
 }
 
 func CreateProduct(c *gin.Context) {

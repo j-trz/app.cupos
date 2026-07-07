@@ -57,12 +57,12 @@ type Reservation struct {
 	CreatedBy            uuid.UUID  `gorm:"type:uuid" json:"created_by"`
 	Estado               string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
 	BloqueoExpiraAt      *time.Time `json:"bloqueo_expira_at"`
-	PrecioVenta          float64    `gorm:"not null" json:"precio_venta"`
+	PrecioVenta          float64    `json:"precio_venta"`
 	Neto1                float64    `json:"neto_1"`
 	PedidoID             string     `gorm:"not null" json:"pedido_id"`
-	Agencia              string     `gorm:"not null" json:"agencia"`
+	Agencia              string     `json:"agencia"`
 	ContactoNombre       string     `gorm:"not null" json:"contacto_nombre"`
-	ContactoEmail        string     `gorm:"not null" json:"contacto_email"`
+	ContactoEmail        string     `json:"contacto_email"`
 	ContactoTelefono     string     `json:"contacto_telefono"`
 	VueloCodigo          string     `json:"vuelo_codigo"`
 	VueloDestino         string     `json:"vuelo_destino"`

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock } from 'lucide-react';
 import ReservationService from '../services/reservationService';
+import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
@@ -11,52 +12,74 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
-const emptyReservation = {
+const emptyForm = {
+  product_id: '',
   pedido_id: '',
   agencia: '',
   contacto_nombre: '',
   contacto_email: '',
   contacto_telefono: '',
-  vuelo_codigo: '',
-  vuelo_destino: '',
-  vuelo_compania: '',
-  vuelo_salida: '',
   nombre_pasajero: '',
   apellido_pasajero: '',
   documento_pasajero: '',
-  estado: 'bloqueo_temporal',
+  nacionalidad_pasajero: '',
+  tipo_pasajero: 'Adulto',
   precio_venta: '',
-  neto_1: '',
+  doc_contable: '',
+  estado: 'bloqueo_temporal',
 };
 
 const formatDate = (value) => {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+};
+
+const formatExpiry = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  const now = new Date();
+  const diffMs = date - now;
+  if (diffMs <= 0) return { label: 'Expirado', color: 'text-red-600' };
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffM = Math.floor((diffMs % 3600000) / 60000);
+  if (diffH < 1) return { label: `${diffM}m restantes`, color: 'text-orange-500' };
+  if (diffH < 24) return { label: `${diffH}h ${diffM}m restantes`, color: 'text-yellow-600' };
+  return { label: `${Math.floor(diffH / 24)}d restantes`, color: 'text-green-600' };
 };
 
 const getEstadoVariant = (estado) => {
-  if (estado === 'confirmado') return 'success';
+  if (estado === 'confirmado' || estado === 'confirmada') return 'success';
   if (estado === 'procesando') return 'warning';
-  if (estado === 'completado') return 'default';
   if (estado === 'cancelado') return 'danger';
   return 'default';
 };
 
-const getEstadoLabel = (estado) => {
-  const map = {
-    bloqueo_temporal: 'Bloqueo Temporal',
-    confirmado: 'Confirmado',
-    procesando: 'Procesando',
-    completado: 'Completado',
-    cancelado: 'Cancelado',
-  };
-  return map[estado] || estado;
-};
+const getEstadoLabel = (estado) => ({
+  bloqueo_temporal: 'Bloqueo Temporal',
+  confirmado: 'Confirmado',
+  confirmada: 'Confirmado',
+  procesando: 'Procesando',
+  completado: 'Completado',
+  cancelado: 'Cancelado',
+}[estado] || estado);
+
+// ─── Input helper ───────────────────────────────
+function Field({ label, required, hint, children }) {
+  return (
+    <div>
+      <label className="mb-1 flex items-center gap-1 text-xs font-medium text-slate-600">
+        {label}
+        {required && <span className="text-red-500">*</span>}
+        {hint && <span className="font-normal text-slate-400">— {hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function GestionReservas() {
   const [reservations, setReservations] = useState([]);
@@ -64,170 +87,197 @@ export default function GestionReservas() {
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editReservation, setEditReservation] = useState(null);
-  const [formState, setFormState] = useState(emptyReservation);
+  const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('Todas');
+  const [productInfo, setProductInfo] = useState(null);
+  const [productLoading, setProductLoading] = useState(false);
+  const [docModal, setDocModal] = useState(null); // { id, pedido_id }
+  const [docValue, setDocValue] = useState('');
 
   const fetchReservations = async () => {
     setLoading(true);
     try {
       const items = await ReservationService.listReservations();
       setReservations(items);
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudieron cargar las reservas' });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudieron cargar las reservas' });
       setReservations([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchReservations();
-  }, []);
+  useEffect(() => { fetchReservations(); }, []);
 
   const refresh = async () => {
     setRefreshing(true);
-    try {
-      await fetchReservations();
-      Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Reservas actualizadas correctamente', timer: 1500, showConfirmButton: false });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setRefreshing(false);
-    }
+    await fetchReservations();
+    setRefreshing(false);
   };
 
   const estados = useMemo(() => {
-    const set = new Set();
-    reservations.forEach((r) => {
-      if (r.estado) set.add(r.estado);
-    });
+    const set = new Set(reservations.map(r => r.estado).filter(Boolean));
     return ['Todas', ...Array.from(set).sort()];
   }, [reservations]);
 
-  const filteredReservations = useMemo(() => {
-    let result = reservations;
-    if (estadoFilter !== 'Todas') {
-      result = result.filter((r) => r.estado === estadoFilter);
-    }
+  const filtered = useMemo(() => {
+    let r = reservations;
+    if (estadoFilter !== 'Todas') r = r.filter(x => x.estado === estadoFilter);
     if (searchTerm) {
-      result = result.filter((r) =>
-        r.pedido_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.contacto_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.vuelo_destino?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.agencia?.toLowerCase().includes(searchTerm.toLowerCase())
+      const q = searchTerm.toLowerCase();
+      r = r.filter(x =>
+        x.pedido_id?.toLowerCase().includes(q) ||
+        x.contacto_nombre?.toLowerCase().includes(q) ||
+        x.vuelo_destino?.toLowerCase().includes(q) ||
+        x.agencia?.toLowerCase().includes(q) ||
+        x.nombre_pasajero?.toLowerCase().includes(q)
       );
     }
-    return result;
+    return r;
   }, [reservations, estadoFilter, searchTerm]);
 
+  // ─── Producto lookup ─────────────────────────
+  const lookupProduct = useCallback(async (id) => {
+    if (!id) return;
+    setProductLoading(true);
+    setProductInfo(null);
+    try {
+      const result = await ApiClient.get(`/products/${id}`);
+      setProductInfo(result);
+      setForm(prev => ({
+        ...prev,
+        precio_venta: result.precio || prev.precio_venta,
+      }));
+    } catch {
+      setProductInfo({ _error: 'Producto no encontrado' });
+    } finally {
+      setProductLoading(false);
+    }
+  }, []);
+
+  const setField = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+  // ─── Dialog ──────────────────────────────────
   const openCreate = () => {
     setEditReservation(null);
-    setFormState(emptyReservation);
+    setForm(emptyForm);
+    setProductInfo(null);
     setDialogOpen(true);
   };
 
-  const openEdit = (reservation) => {
-    setEditReservation(reservation);
-    setFormState({ ...reservation });
+  const openEdit = (r) => {
+    setEditReservation(r);
+    setForm({
+      product_id: r.product_id || '',
+      pedido_id: r.pedido_id || '',
+      agencia: r.agencia || '',
+      contacto_nombre: r.contacto_nombre || '',
+      contacto_email: r.contacto_email || '',
+      contacto_telefono: r.contacto_telefono || '',
+      nombre_pasajero: r.nombre_pasajero || '',
+      apellido_pasajero: r.apellido_pasajero || '',
+      documento_pasajero: r.documento_pasajero || '',
+      nacionalidad_pasajero: r.nacionalidad_pasajero || '',
+      tipo_pasajero: r.tipo_pasajero || 'Adulto',
+      precio_venta: r.precio_venta || '',
+      doc_contable: r.doc_contable || '',
+      estado: r.estado || 'bloqueo_temporal',
+    });
+    setProductInfo(null);
     setDialogOpen(true);
   };
 
   const closeDialog = () => {
     setDialogOpen(false);
     setEditReservation(null);
-    setFormState(emptyReservation);
-  };
-
-  const handleFormChange = (field, value) => {
-    setFormState((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleDelete = async (reservation) => {
-    const result = await Swal.fire({
-      title: '¿Eliminar reserva?',
-      text: `¿Eliminar reserva ${reservation.pedido_id}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-    });
-    if (!result.isConfirmed) return;
-    try {
-      await ReservationService.deleteReservation(reservation.id);
-      Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Reserva eliminada correctamente', timer: 1500, showConfirmButton: false });
-      fetchReservations();
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo eliminar la reserva' });
-    }
-  };
-
-  const handleConfirm = async (reservation) => {
-    try {
-      await ReservationService.confirmReservation(reservation.id);
-      Swal.fire({ icon: 'success', title: 'Éxito', text: 'Reserva confirmada', timer: 1500, showConfirmButton: false });
-      fetchReservations();
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo confirmar la reserva' });
-    }
-  };
-
-  const handleResendEmail = async (reservation) => {
-    try {
-      await ReservationService.resendReservationEmail(reservation.id);
-      Swal.fire({ icon: 'success', title: 'Éxito', text: 'Email reenviado correctamente', timer: 1500, showConfirmButton: false });
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo reenviar el email' });
-    }
+    setForm(emptyForm);
+    setProductInfo(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.contacto_nombre.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Atención', text: 'El nombre del contacto es requerido.' });
+      return;
+    }
+    if (!editReservation && !form.product_id) {
+      Swal.fire({ icon: 'warning', title: 'Atención', text: 'Seleccioná un producto.' });
+      return;
+    }
+
+    const payload = {
+      ...form,
+      product_id: form.product_id ? Number(form.product_id) : undefined,
+      precio_venta: form.precio_venta ? Number(form.precio_venta) : 0,
+    };
+    // Quitar campos vacíos
+    Object.keys(payload).forEach(k => {
+      if (payload[k] === '' || payload[k] === undefined) delete payload[k];
+    });
+
     try {
       if (editReservation) {
-        await ReservationService.updateReservation(editReservation.id, formState);
-        Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Reserva actualizada correctamente', timer: 1500, showConfirmButton: false });
+        await ReservationService.updateReservation(editReservation.id, payload);
+        Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
       } else {
-        await ReservationService.createReservation(formState);
-        Swal.fire({ icon: 'success', title: 'Creado', text: 'Reserva creada correctamente', timer: 1500, showConfirmButton: false });
+        await ReservationService.createReservation(payload);
+        Swal.fire({ icon: 'success', title: 'Reserva creada', timer: 1500, showConfirmButton: false });
       }
       closeDialog();
       fetchReservations();
-    } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo guardar la reserva' });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo guardar la reserva' });
     }
   };
 
-  const fields = useMemo(
-    () => [
-      { name: 'pedido_id', label: 'ID Pedido', required: true },
-      { name: 'agencia', label: 'Agencia', required: true },
-      { name: 'contacto_nombre', label: 'Contacto', required: true },
-      { name: 'contacto_email', label: 'Email Contacto', type: 'email', required: true },
-      { name: 'contacto_telefono', label: 'Teléfono Contacto', type: 'tel' },
-      { name: 'vuelo_codigo', label: 'Código Vuelo', required: true },
-      { name: 'vuelo_destino', label: 'Destino', required: true },
-      { name: 'vuelo_compania', label: 'Compañía', required: true },
-      { name: 'vuelo_salida', label: 'Fecha Salida', type: 'date', required: true },
-      { name: 'nombre_pasajero', label: 'Nombre Pasajero', required: true },
-      { name: 'apellido_pasajero', label: 'Apellido Pasajero', required: true },
-      { name: 'documento_pasajero', label: 'Documento Pasajero', required: true },
-      { name: 'estado', label: 'Estado', type: 'select' },
-      { name: 'precio_venta', label: 'Precio Venta', type: 'number', required: true },
-      { name: 'neto_1', label: 'Neto', type: 'number', required: true },
-    ],
-    []
-  );
+  const handleConfirm = async (r) => {
+    try {
+      await ReservationService.confirmReservation(r.id);
+      Swal.fire({ icon: 'success', title: 'Confirmada', timer: 1500, showConfirmButton: false });
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+    }
+  };
 
-  const estadoOptions = [
-    { value: 'bloqueo_temporal', label: 'Bloqueo Temporal' },
-    { value: 'confirmado', label: 'Confirmado' },
-    { value: 'procesando', label: 'Procesando' },
-    { value: 'completado', label: 'Completado' },
-    { value: 'cancelado', label: 'Cancelado' },
-  ];
+  const handleDelete = async (r) => {
+    const res = await Swal.fire({
+      title: `¿Eliminar ${r.pedido_id}?`, icon: 'warning',
+      showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+    if (!res.isConfirmed) return;
+    try {
+      await ReservationService.deleteReservation(r.id);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+    }
+  };
+
+  const handleResendEmail = async (r) => {
+    try {
+      await ReservationService.resendReservationEmail(r.id);
+      Swal.fire({ icon: 'success', title: 'Email reenviado', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+    }
+  };
+
+  // ─── Doc Contable modal ───────────────────────
+  const openDocModal = (r) => { setDocModal(r); setDocValue(r.doc_contable || ''); };
+  const handleSaveDoc = async () => {
+    if (!docValue.trim()) return;
+    try {
+      await ReservationService.addDocContable(docModal.id, { doc_contable: docValue });
+      Swal.fire({ icon: 'success', title: 'Guardado', timer: 1200, showConfirmButton: false });
+      setDocModal(null);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -237,41 +287,26 @@ export default function GestionReservas() {
         icon={Calendar}
         action={
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={refresh}
-              disabled={refreshing}
-              title="Refrescar datos"
-            >
+            <Button size="sm" onClick={refresh} disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
-            <Button size="sm" onClick={openCreate} title="Nueva reserva">
-              <Plus className="h-4 w-4 mr-1" />
-              Nueva Reserva
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva Reserva
             </Button>
           </div>
         }
       />
 
+      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={BarChart3}
-          label="Total reservas"
-          value={filteredReservations.length}
-          description={estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total de reservas.'}
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Confirmadas"
-          value={filteredReservations.filter((r) => r.estado === 'confirmado').length}
-          description="Reservas confirmadas."
-        />
-        <StatCard
-          icon={Calendar}
-          label="Pendientes"
-          value={filteredReservations.filter((r) => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length}
-          description="Reservas en proceso."
-        />
+        <StatCard icon={BarChart3} label="Total reservas" value={filtered.length}
+          description={estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total'} />
+        <StatCard icon={CheckCircle} label="Confirmadas"
+          value={filtered.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada').length}
+          description="Reservas confirmadas" />
+        <StatCard icon={Calendar} label="Pendientes"
+          value={filtered.filter(r => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length}
+          description="En proceso" />
       </div>
 
       <Card>
@@ -282,34 +317,18 @@ export default function GestionReservas() {
               <p className="text-sm text-slate-500">Gestioná las reservas y sus estados.</p>
             </div>
           </div>
-
-          {/* Buscador */}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Buscar por pedido, contacto, destino o agencia..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="text" placeholder="Buscar por pedido, contacto, destino..."
+              value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
           </div>
-
-          {/* Filtros de estado */}
           {estados.length > 1 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Estado:</span>
-              {estados.map((est) => (
-                <button
-                  key={est}
-                  type="button"
-                  onClick={() => setEstadoFilter(est)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-                    }`}
-                >
-                  {est !== 'Todas' && getEstadoLabel(est)}
-                  {est === 'Todas' && 'Todas'}
+              {estados.map(est => (
+                <button key={est} type="button" onClick={() => setEstadoFilter(est)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {est === 'Todas' ? 'Todas' : getEstadoLabel(est)}
                 </button>
               ))}
             </div>
@@ -319,112 +338,231 @@ export default function GestionReservas() {
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-center">ID Pedido</TableHead>
-              <TableHead className="text-center">Agencia</TableHead>
-              <TableHead className="text-center">Contacto</TableHead>
-              <TableHead className="text-center">Vuelo</TableHead>
-              <TableHead className="text-center">Destino</TableHead>
-              <TableHead className="text-center">Salida</TableHead>
-              <TableHead className="text-center">Estado</TableHead>
+              <TableHead>ID Pedido</TableHead>
+              <TableHead>Agencia</TableHead>
+              <TableHead>Contacto / Pasajero</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Salida</TableHead>
+              <TableHead>Vencimiento</TableHead>
+              <TableHead>Doc.Contable</TableHead>
+              <TableHead>Estado</TableHead>
               <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell className="text-center py-10" colSpan={8}>
-                  Cargando reservas...
-                </TableCell>
-              </TableRow>
-            ) : filteredReservations.length === 0 ? (
-              <TableRow>
-                <TableCell className="text-center py-10" colSpan={8}>
-                  {searchTerm || estadoFilter !== 'Todas'
-                    ? 'No se encontraron reservas con los filtros aplicados.'
-                    : 'No hay reservas registradas.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredReservations.map((reservation) => (
-                <TableRow key={reservation.id}>
-                  <TableCell className="text-center font-medium">{reservation.pedido_id}</TableCell>
-                  <TableCell className="text-center">{reservation.agencia || '—'}</TableCell>
-                  <TableCell className="text-center">{reservation.contacto_nombre || '—'}</TableCell>
-                  <TableCell className="text-center">{reservation.vuelo_codigo || '—'}</TableCell>
-                  <TableCell className="text-center">{reservation.vuelo_destino || '—'}</TableCell>
-                  <TableCell className="text-center">{formatDate(reservation.vuelo_salida)}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={getEstadoVariant(reservation.estado)}>
-                      {getEstadoLabel(reservation.estado)}
-                    </Badge>
+              <TableRow><TableCell colSpan={9} className="text-center py-10">Cargando...</TableCell></TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow><TableCell colSpan={9} className="text-center py-10 text-slate-400">
+                {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
+              </TableCell></TableRow>
+            ) : filtered.map(r => {
+              const expiry = r.estado === 'bloqueo_temporal' ? formatExpiry(r.bloqueo_expira_at) : null;
+              return (
+                <TableRow key={r.id}>
+                  <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
+                  <TableCell>{r.agencia || '—'}</TableCell>
+                  <TableCell>
+                    <div className="text-sm">{r.contacto_nombre || '—'}</div>
+                    {(r.nombre_pasajero || r.apellido_pasajero) && (
+                      <div className="text-xs text-slate-400">{r.nombre_pasajero} {r.apellido_pasajero}</div>
+                    )}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell>{r.vuelo_destino || '—'}</TableCell>
+                  <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
+                  <TableCell>
+                    {expiry ? (
+                      <span className={`flex items-center gap-1 text-xs ${expiry.color}`}>
+                        <Clock className="h-3 w-3" />{expiry.label}
+                      </span>
+                    ) : '—'}
+                  </TableCell>
+                  <TableCell>
+                    {r.doc_contable ? (
+                      <span className="text-xs text-green-600 font-medium">✓ {r.doc_contable}</span>
+                    ) : r.estado === 'bloqueo_temporal' ? (
+                      <button type="button" onClick={() => openDocModal(r)}
+                        className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-700 underline">
+                        <AlertCircle className="h-3 w-3" /> Pendiente
+                      </button>
+                    ) : <span className="text-xs text-slate-300">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getEstadoVariant(r.estado)}>{getEstadoLabel(r.estado)}</Badge>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center justify-center gap-1">
-                      {reservation.estado && reservation.estado !== 'confirmado' && (
-                        <Button variant="ghost" size="sm" onClick={() => handleConfirm(reservation)} title="Confirmar reserva">
+                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && (
+                        <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" onClick={() => handleResendEmail(reservation)} title="Reenviar email">
+                      <Button variant="ghost" size="sm" onClick={() => handleResendEmail(r)} title="Reenviar email">
                         <Send className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(reservation)} title="Editar reserva">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(r)} title="Editar">
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(reservation)} title="Eliminar reserva" className="text-red-600 hover:text-red-700">
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} title="Eliminar" className="text-red-500 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              );
+            })}
           </TableBody>
         </TableComponent>
       </Card>
 
-      {/* Modal de Crear/Editar Reserva */}
-      <Modal title={editReservation ? 'Editar Reserva' : 'Nueva Reserva'} open={dialogOpen} onClose={closeDialog}>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
-            {fields.map((field) => (
-              <div key={field.name} className={field.type === 'textarea' ? 'col-span-2' : 'col-span-1'}>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  {field.label} {field.required && '*'}
-                </label>
-                {field.type === 'select' ? (
-                  <select
-                    value={formState[field.name] || ''}
-                    onChange={(e) => handleFormChange(field.name, e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 bg-white"
-                  >
-                    {estadoOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+      {/* ─── Modal Crear / Editar ─── */}
+      <Modal title={editReservation ? 'Editar Reserva' : 'Nueva Reserva'} open={dialogOpen} onClose={closeDialog} size="xl">
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* PRODUCTO */}
+          {!editReservation && (
+            <section>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Producto</h3>
+              <Field label="ID del Producto" required hint="ingresá el ID y presioná Buscar">
+                <div className="flex gap-2">
+                  <input type="number" value={form.product_id} onChange={e => setField('product_id', e.target.value)}
+                    className={inputCls} placeholder="Ej: 42" />
+                  <Button type="button" size="sm" onClick={() => lookupProduct(form.product_id)} disabled={!form.product_id || productLoading}>
+                    <Search className="h-4 w-4 mr-1" />{productLoading ? 'Buscando...' : 'Buscar'}
+                  </Button>
+                </div>
+              </Field>
+              {productInfo && !productInfo._error && (
+                <div className="mt-2 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm space-y-1">
+                  <div className="font-medium text-slate-800">{productInfo.destino} — {productInfo.compania}</div>
+                  <div className="text-slate-500 text-xs">
+                    {productInfo.codigo_cupo} · Salida: {formatDate(productInfo.fecha_salida || productInfo.salida)} · Disponibilidad: {productInfo.disponibilidad} cupos
+                  </div>
+                  <div className="text-slate-700 font-semibold">Precio: ${productInfo.precio}</div>
+                </div>
+              )}
+              {productInfo?._error && (
+                <p className="mt-1 text-xs text-red-500">{productInfo._error}</p>
+              )}
+            </section>
+          )}
+
+          {/* RESERVA */}
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Datos de la Reserva</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="ID Pedido" hint="se genera automáticamente si se deja vacío">
+                <input type="text" value={form.pedido_id} onChange={e => setField('pedido_id', e.target.value)}
+                  className={inputCls} placeholder="Auto-generado" />
+              </Field>
+              <Field label="Agencia">
+                <input type="text" value={form.agencia} onChange={e => setField('agencia', e.target.value)}
+                  className={inputCls} placeholder="Nombre de la agencia" />
+              </Field>
+              <Field label="Precio de Venta" hint={!editReservation ? 'del producto si se deja en 0' : undefined}>
+                <input type="number" value={form.precio_venta} onChange={e => setField('precio_venta', e.target.value)}
+                  className={inputCls} placeholder="0" min="0" step="0.01" />
+              </Field>
+              {editReservation && (
+                <Field label="Estado">
+                  <select value={form.estado} onChange={e => setField('estado', e.target.value)} className={inputCls + ' bg-white'}>
+                    {['bloqueo_temporal','confirmado','procesando','completado','cancelado'].map(s => (
+                      <option key={s} value={s}>{getEstadoLabel(s)}</option>
                     ))}
                   </select>
-                ) : (
-                  <input
-                    type={field.type || 'text'}
-                    value={formState[field.name] ? (field.type === 'date' ? String(formState[field.name]).split('T')[0] : formState[field.name]) : ''}
-                    onChange={(e) => handleFormChange(field.name, e.target.value)}
-                    required={field.required}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder={field.label}
-                  />
-                )}
+                </Field>
+              )}
+            </div>
+          </section>
+
+          {/* CONTACTO */}
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contacto</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nombre del Contacto" required>
+                <input type="text" value={form.contacto_nombre} onChange={e => setField('contacto_nombre', e.target.value)}
+                  className={inputCls} placeholder="Nombre completo" required />
+              </Field>
+              <Field label="Email">
+                <input type="email" value={form.contacto_email} onChange={e => setField('contacto_email', e.target.value)}
+                  className={inputCls} placeholder="email@ejemplo.com" />
+              </Field>
+              <Field label="Teléfono">
+                <input type="tel" value={form.contacto_telefono} onChange={e => setField('contacto_telefono', e.target.value)}
+                  className={inputCls} placeholder="+598 99..." />
+              </Field>
+            </div>
+          </section>
+
+          {/* PASAJERO */}
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero Principal</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nombre">
+                <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
+                  className={inputCls} placeholder="Nombre" />
+              </Field>
+              <Field label="Apellido">
+                <input type="text" value={form.apellido_pasajero} onChange={e => setField('apellido_pasajero', e.target.value)}
+                  className={inputCls} placeholder="Apellido" />
+              </Field>
+              <Field label="Documento">
+                <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
+                  className={inputCls} placeholder="CI / Pasaporte" />
+              </Field>
+              <Field label="Nacionalidad">
+                <input type="text" value={form.nacionalidad_pasajero} onChange={e => setField('nacionalidad_pasajero', e.target.value)}
+                  className={inputCls} placeholder="Uruguayo/a" />
+              </Field>
+              <Field label="Tipo">
+                <select value={form.tipo_pasajero} onChange={e => setField('tipo_pasajero', e.target.value)} className={inputCls + ' bg-white'}>
+                  {['Adulto','Niño','Infante'].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+            </div>
+          </section>
+
+          {/* DOC CONTABLE */}
+          <section className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+            <div className="flex items-start gap-2 mb-2">
+              <FileText className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-orange-700">Documento Contable</p>
+                <p className="text-xs text-orange-600">Opcional al crear. Debe cargarse antes de que venza el bloqueo temporal.</p>
               </div>
-            ))}
-          </div>
+            </div>
+            <input type="text" value={form.doc_contable} onChange={e => setField('doc_contable', e.target.value)}
+              className="w-full rounded-xl border border-orange-300 bg-white px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-200"
+              placeholder="Nro de documento contable (ej: FC-0001)" />
+          </section>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
             <Button variant="secondary" type="button" onClick={closeDialog}>
-              <X className="h-4 w-4 mr-1" />Cancelar
+              <X className="h-4 w-4 mr-1" /> Cancelar
             </Button>
-            <Button type="submit">
-              Guardar
-            </Button>
+            <Button type="submit">Guardar</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* ─── Modal Doc Contable rápido ─── */}
+      <Modal title="Agregar Documento Contable" open={!!docModal} onClose={() => setDocModal(null)} size="sm">
+        {docModal && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Reserva <span className="font-mono font-medium">{docModal.pedido_id}</span>
+            </p>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Número de documento contable</label>
+              <input type="text" value={docValue} onChange={e => setDocValue(e.target.value)}
+                className={inputCls} placeholder="FC-0001, REC-123, etc." autoFocus />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={() => setDocModal(null)}>Cancelar</Button>
+              <Button type="button" onClick={handleSaveDoc} disabled={!docValue.trim()}>Guardar</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

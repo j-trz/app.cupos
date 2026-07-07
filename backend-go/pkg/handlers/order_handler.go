@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -72,6 +73,12 @@ func CreateReservation(c *gin.Context) {
 		return
 	}
 
+	// Auto-generar pedido_id si no viene
+	if input.Reservation.PedidoID == "" {
+		input.Reservation.PedidoID = fmt.Sprintf("PED-%d-%s", time.Now().Year(),
+			uuid.New().String()[:8])
+	}
+
 	// 3. Preparar reserva
 	blockMinutes := product.BloqueoTemporalMinutos
 	if blockMinutes <= 0 {
@@ -79,7 +86,13 @@ func CreateReservation(c *gin.Context) {
 	}
 	expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
 	input.Reservation.BloqueoExpiraAt = &expiresAt
-	input.Reservation.Estado = "bloqueo_temporal"
+
+	// Si se carga el doc contable al crear, confirmar automáticamente
+	if input.Reservation.DocContable != "" {
+		input.Reservation.Estado = "confirmado"
+	} else {
+		input.Reservation.Estado = "bloqueo_temporal"
+	}
 
 	// Datos del producto a la reserva
 	input.Reservation.Neto1 = product.Neto1
@@ -207,4 +220,85 @@ func DeleteReservation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Reserva eliminada."})
+}
+
+func UpdateReservation(c *gin.Context) {
+	id := c.Param("id")
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	var input map[string]interface{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// No permitir cambiar campos críticos via update general
+	delete(input, "id")
+	delete(input, "created_by")
+	delete(input, "created_at")
+
+	if err := database.DB.Model(&reservation).Updates(input).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar la reserva."})
+		return
+	}
+
+	database.DB.First(&reservation, id)
+	c.JSON(http.StatusOK, reservation)
+}
+
+func AddDocContable(c *gin.Context) {
+	id := c.Param("id")
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	var input struct {
+		DocContable string `json:"doc_contable"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || input.DocContable == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "doc_contable es requerido."})
+		return
+	}
+
+	updates := map[string]interface{}{
+		"doc_contable": input.DocContable,
+		"estado":       "confirmado",
+	}
+	if err := database.DB.Model(&reservation).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar el documento."})
+		return
+	}
+
+	database.DB.First(&reservation, id)
+	c.JSON(http.StatusOK, reservation)
+}
+
+func GetReservationByID(c *gin.Context) {
+	id := c.Param("id")
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	userIDStr, _ := c.Get("userID")
+	if role != "admin" && role != "agency_admin" {
+		var uid uuid.UUID
+		if s, ok := userIDStr.(string); ok {
+			uid, _ = uuid.Parse(s)
+		}
+		if reservation.CreatedBy != uid {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Sin permiso."})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, reservation)
 }
