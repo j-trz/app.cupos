@@ -9,11 +9,14 @@ class AIService {
   /**
    * Enviar mensaje al asistente IA
    */
-  static async sendMessage(message, sessionId = null, providerId = null) {
+  static async sendMessage(message, sessionId = null, imageBase64 = null, imageMime = null, providerId = null) {
     const payload = { message };
     if (sessionId) payload.sessionId = sessionId;
     if (providerId) payload.providerId = providerId;
-
+    if (imageBase64) {
+      payload.imageBase64 = imageBase64;
+      payload.imageMime = imageMime || 'image/jpeg';
+    }
     return ApiClient.post('/ai/chat', payload);
   }
 

@@ -88,12 +88,13 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
         setShowSessions(false);
     };
 
-    const handleSendMessage = async (content) => {
+    const handleSendMessage = async (content, imageData = null) => {
         // Agregar mensaje del usuario inmediatamente
         const userMessage = {
             id: `temp-${Date.now()}`,
             role: 'user',
             content,
+            imagePreview: imageData?.dataUrl || null,
             created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, userMessage]);
@@ -101,7 +102,12 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
         setError(null);
 
         try {
-            const response = await AIService.sendMessage(content, currentSessionId);
+            const response = await AIService.sendMessage(
+                content,
+                currentSessionId,
+                imageData?.base64 || null,
+                imageData?.mime || null
+            );
 
             // Actualizar ID de sesión si es nueva
             if (!currentSessionId && response.sessionId) {
@@ -272,6 +278,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                                 timestamp={msg.created_at}
                                 toolCalls={msg.tool_calls || msg.toolCalls}
                                 isError={msg.isError}
+                                imagePreview={msg.imagePreview}
                             />
                         ))}
 
