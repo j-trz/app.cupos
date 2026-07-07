@@ -87,16 +87,16 @@ func init() {
 			// Productos
 			products := protected.Group("/products")
 			{
-				products.GET("/", handlers.GetProducts)
-				products.POST("/", middleware.AdminOnly(), handlers.CreateProduct)
+				products.GET("", handlers.GetProducts)
+				products.POST("", middleware.AdminOnly(), handlers.CreateProduct)
 				products.POST("/bulk", middleware.AdminOnly(), handlers.BulkCreateProducts)
 			}
 
 			// Reservas (Ordenes)
 			orders := protected.Group("/orders")
 			{
-				orders.GET("/", handlers.GetAllReservations)
-				orders.POST("/", handlers.CreateReservation)
+				orders.GET("", handlers.GetAllReservations)
+				orders.POST("", handlers.CreateReservation)
 				orders.POST("/:id/confirm", middleware.AdminOnly(), handlers.ConfirmReservation)
 				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)
 			}
@@ -105,9 +105,9 @@ func init() {
 			users := protected.Group("/users")
 			users.Use(middleware.AdminOnly())
 			{
-				users.GET("/", handlers.ListUsers)
+				users.GET("", handlers.ListUsers)
 				users.GET("/:id", handlers.GetUserById)
-				users.POST("/", handlers.CreateUser)
+				users.POST("", handlers.CreateUser)
 				users.PUT("/:id", handlers.UpdateUser)
 				users.DELETE("/:id", handlers.DeleteUser)
 				users.PUT("/:id/status", handlers.ToggleUserStatus)
@@ -129,7 +129,7 @@ func init() {
 			settings := protected.Group("/settings")
 			settings.Use(middleware.AdminOnly())
 			{
-				settings.GET("/", handlers.ListSettings)
+				settings.GET("", handlers.ListSettings)
 				settings.PUT("/:key", handlers.UpdateSetting)
 			}
 
@@ -149,17 +149,17 @@ func init() {
 			// CRUD Dinámico (Data)
 			data := protected.Group("/data")
 			{
-				data.GET("/", handlers.GetData)
-				data.POST("/", handlers.ExecuteCRUD)
-				data.PUT("/", handlers.ExecuteCRUD)
-				data.DELETE("/", handlers.ExecuteCRUD)
+				data.GET("", handlers.GetData)
+				data.POST("", handlers.ExecuteCRUD)
+				data.PUT("", handlers.ExecuteCRUD)
+				data.DELETE("", handlers.ExecuteCRUD)
 			}
 
 			// Agencias
 			agencies := protected.Group("/agencies")
 			{
-				agencies.GET("/", handlers.ListAgencies)
-				agencies.POST("/", middleware.AdminOnly(), handlers.CreateAgency)
+				agencies.GET("", handlers.ListAgencies)
+				agencies.POST("", middleware.AdminOnly(), handlers.CreateAgency)
 			}
 
 			// White Label
@@ -173,9 +173,9 @@ func init() {
 			roles := protected.Group("/roles")
 			roles.Use(middleware.AdminOnly())
 			{
-				roles.GET("/", handlers.ListRoles)
+				roles.GET("", handlers.ListRoles)
 				roles.GET("/:id", handlers.GetRoleById)
-				roles.POST("/", handlers.CreateRole)
+				roles.POST("", handlers.CreateRole)
 				roles.PUT("/:id", handlers.UpdateRole)
 				roles.DELETE("/:id", handlers.DeleteRole)
 				roles.GET("/:id/users", handlers.GetRoleUsers)
@@ -187,9 +187,9 @@ func init() {
 			permissions := protected.Group("/permissions")
 			permissions.Use(middleware.AdminOnly())
 			{
-				permissions.GET("/", handlers.ListPermissions)
+				permissions.GET("", handlers.ListPermissions)
 				permissions.GET("/:id", handlers.GetPermissionById)
-				permissions.POST("/", handlers.CreatePermission)
+				permissions.POST("", handlers.CreatePermission)
 				permissions.PUT("/:id", handlers.UpdatePermission)
 				permissions.DELETE("/:id", handlers.DeletePermission)
 			}
