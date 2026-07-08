@@ -1,21 +1,286 @@
-import { useState, useEffect } from 'react';
-import { BarChart3, Plane, CreditCard, Calendar, CheckCircle, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  BarChart3, Plane, CreditCard, Calendar, CheckCircle, RefreshCw,
+  Clock, AlertCircle, Bell, FileText, ChevronRight, TrendingUp,
+  User, MapPin, ArrowRight,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useGeneralReport, useUserMetrics } from '../hooks/useReports';
 import { useAuth } from '../contexts/AuthContext';
 import ReservationService from '../services/reservationService';
+import NotificationService from '../services/notificationService';
 import DashboardCharts from '../components/DashboardCharts';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
-import TableComponent from '../components/ui/Table.jsx';
-import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
+/* ─── Helpers ─────────────────────────────────────────────── */
+const formatDate = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+};
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'USD' }).format(value || 0);
+
+const getEstadoVariant = (estado) => {
+  if (estado === 'confirmada' || estado === 'confirmado') return 'success';
+  if (estado === 'bloqueo_temporal') return 'warning';
+  if (estado === 'cancelada') return 'danger';
+  return 'default';
+};
+
+const getEstadoLabel = (estado) => ({
+  bloqueo_temporal: 'Bloqueo temporal',
+  confirmada: 'Confirmada',
+  confirmado: 'Confirmado',
+  pendiente: 'Pendiente',
+  cancelada: 'Cancelada',
+}[estado] || estado);
+
+const greetingFor = (name) => {
+  const h = new Date().getHours();
+  const greeting = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  return `${greeting}${name ? `, ${name.split(' ')[0]}` : ''}`;
+};
+
+const todayLabel = () =>
+  new Date().toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' });
+
+const initials = (name = '') =>
+  name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+
+const NOTIF_ICON = { info: Bell, success: CheckCircle, warning: AlertCircle, error: AlertCircle };
+const NOTIF_COLOR = {
+  info: 'text-blue-500', success: 'text-emerald-500',
+  warning: 'text-amber-500', error: 'text-red-500',
+};
+
+/* ─── Sub-componentes ────────────────────────────────────── */
+
+function WelcomeBanner({ user, totalReservas, bloqueadas }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-8 py-7 text-white shadow-lg">
+      {/* decoración */}
+      <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
+      <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
+
+      <div className="flex items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          {/* avatar */}
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg font-bold ring-2 ring-white/20">
+            {initials(user?.nombre || user?.email)}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white/60">{todayLabel()}</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight">
+              {greetingFor(user?.nombre)}
+            </h1>
+            <p className="mt-1 text-sm text-white/70">
+              Tenés <span className="font-semibold text-white">{totalReservas}</span> reservas
+              {bloqueadas > 0 && (
+                <> · <span className="font-semibold text-amber-300">{bloqueadas} con doc. pendiente</span></>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* indicador rápido */}
+        {bloqueadas > 0 && (
+          <div className="hidden sm:flex items-center gap-2 rounded-2xl bg-amber-400/20 px-4 py-2.5 ring-1 ring-amber-400/30">
+            <AlertCircle className="h-4 w-4 text-amber-300" />
+            <span className="text-sm font-medium text-amber-200">
+              {bloqueadas} reserva{bloqueadas > 1 ? 's' : ''} requieren acción
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BlockedReservationsWidget({ reservations, onGoToRequests }) {
+  const blocked = reservations.filter((r) => r.estado === 'bloqueo_temporal');
+  if (blocked.length === 0) return null;
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/40">
+      <div className="flex items-center justify-between border-b border-amber-200 px-6 py-4">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-amber-900">Acción requerida</h2>
+            <p className="text-xs text-amber-700">
+              {blocked.length} reserva{blocked.length > 1 ? 's' : ''} esperando documento contable
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onGoToRequests}
+          className="text-amber-700 border-amber-300 hover:bg-amber-100 text-xs"
+        >
+          Ver solicitudes <ArrowRight className="ml-1 h-3 w-3" />
+        </Button>
+      </div>
+
+      <div className="divide-y divide-amber-100">
+        {blocked.slice(0, 3).map((r) => (
+          <div key={r.id} className="flex items-center justify-between px-6 py-3.5">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white border border-amber-200">
+                <Plane className="h-3.5 w-3.5 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">
+                  {r.vuelo_destino || r.destino || '—'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {r.pedido_id} · {r.nombre_pasajero} {r.apellido_pasajero}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 ml-4 shrink-0">
+              <span className="text-xs text-slate-400">{formatDate(r.vuelo_salida)}</span>
+              <Button
+                size="sm"
+                onClick={onGoToRequests}
+                className="text-xs bg-amber-500 hover:bg-amber-600 text-white border-0"
+              >
+                <FileText className="h-3 w-3 mr-1" />
+                Agregar doc
+              </Button>
+            </div>
+          </div>
+        ))}
+        {blocked.length > 3 && (
+          <div className="px-6 py-3 text-center">
+            <button
+              onClick={onGoToRequests}
+              className="text-xs text-amber-700 hover:text-amber-900 font-medium"
+            >
+              Ver {blocked.length - 3} más en Solicitudes →
+            </button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function RecentReservationsWidget({ reservations, loading }) {
+  const recent = reservations.slice(0, 6);
+  return (
+    <Card className="flex flex-col h-full">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <h2 className="text-sm font-semibold text-slate-900">Últimas reservas</h2>
+        <p className="text-xs text-slate-500 mt-0.5">Tus {recent.length} reservas más recientes</p>
+      </div>
+      <div className="flex-1 divide-y divide-slate-100">
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-sm text-slate-400">
+            Cargando...
+          </div>
+        ) : recent.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <Calendar className="h-8 w-8 text-slate-200" />
+            <p className="text-sm text-slate-400">Sin reservas aún</p>
+          </div>
+        ) : (
+          recent.map((r) => (
+            <div key={r.id} className="flex items-center gap-3 px-5 py-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                <MapPin className="h-3.5 w-3.5 text-slate-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">
+                  {r.vuelo_destino || '—'}
+                </p>
+                <p className="text-xs text-slate-400 truncate">
+                  {r.pedido_id} · {formatDate(r.vuelo_salida)}
+                </p>
+              </div>
+              <Badge variant={getEstadoVariant(r.estado)} className="shrink-0 text-xs">
+                {getEstadoLabel(r.estado)}
+              </Badge>
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function NotificationsWidget({ notifications, loading }) {
+  const recent = notifications.slice(0, 5);
+  return (
+    <Card className="flex flex-col h-full">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Notificaciones</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Últimas novedades</p>
+          </div>
+          {notifications.filter((n) => !n.is_read).length > 0 && (
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+              {notifications.filter((n) => !n.is_read).length}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 divide-y divide-slate-100">
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-sm text-slate-400">
+            Cargando...
+          </div>
+        ) : recent.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <Bell className="h-8 w-8 text-slate-200" />
+            <p className="text-sm text-slate-400">Sin notificaciones</p>
+          </div>
+        ) : (
+          recent.map((n) => {
+            const Icon = NOTIF_ICON[n.type] || Bell;
+            return (
+              <div
+                key={n.id}
+                className={`flex items-start gap-3 px-5 py-3.5 ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+              >
+                <div className={`mt-0.5 shrink-0 ${NOTIF_COLOR[n.type] || 'text-slate-400'}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 leading-snug">{n.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                </div>
+                {!n.is_read && (
+                  <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ─── Dashboard principal ────────────────────────────────── */
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [reservations, setReservations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'agency_admin';
 
@@ -23,212 +288,74 @@ const Dashboard = () => {
   const { data: reports, isLoading: isLoadingReports } = useGeneralReport(filters);
   const { data: userMetrics, isLoading: isLoadingUserMetrics } = useUserMetrics();
 
-  const dashboardLoading = isAdmin ? isLoadingReports : isLoadingUserMetrics;
-
-  const fetchReservations = async () => {
+  const fetchReservations = useCallback(async () => {
     setLoading(true);
     try {
       const items = await ReservationService.listReservations();
-      setReservations(items);
-    } catch (error) {
-      console.error('Error fetching reservations:', error);
+      setReservations(Array.isArray(items) ? items : []);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    setLoadingNotifs(true);
+    try {
+      const items = await NotificationService.getUserNotifications({ limit: 5 });
+      setNotifications(Array.isArray(items) ? items : []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchReservations();
+    if (!isAdmin) fetchNotifications();
   }, []);
 
-  const getEstadoVariant = (estado) => {
-    if (estado === 'confirmada') return 'success';
-    if (estado === 'bloqueo_temporal' || estado === 'pendiente') return 'warning';
-    if (estado === 'cancelada') return 'danger';
-    return 'default';
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchReservations(), !isAdmin && fetchNotifications()].filter(Boolean));
+    setRefreshing(false);
   };
 
-  const getEstadoLabel = (estado) => {
-    const map = {
-      bloqueo_temporal: 'Bloqueo Temporal',
-      confirmada: 'Confirmada',
-      pendiente: 'Pendiente',
-      cancelada: 'Cancelada',
-    };
-    return map[estado] || estado;
-  };
+  /* ── métricas derivadas ── */
+  const confirmed = reservations.filter((r) => r.estado === 'confirmada' || r.estado === 'confirmado').length;
+  const blocked = reservations.filter((r) => r.estado === 'bloqueo_temporal').length;
+  const pending = reservations.filter((r) => r.estado === 'pendiente').length;
 
-  const formatDate = (value) => {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
-  const formatCurrency = (value) => {
-    if (!value) return '$0';
-    return new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'USD' }).format(value);
-  };
-
-  // Últimas reservas para mostrar en el dashboard
-  const recentReservations = reservations.slice(0, 5);
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description={isAdmin
-          ? 'Vista general del sistema y métricas clave.'
-          : 'Resumen de tus reservas, ventas y actividad reciente.'
-        }
-        icon={BarChart3}
-        action={
-          <Button
-            size="sm"
-            onClick={fetchReservations}
-            disabled={loading}
-            title="Refrescar datos"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-        }
-      />
-
-      {/* Tarjetas de métricas */}
-      {dashboardLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-slate-100 p-2 h-9 w-9" />
-                <div className="space-y-2">
-                  <div className="h-3 w-20 bg-slate-100 rounded" />
-                  <div className="h-5 w-12 bg-slate-100 rounded" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : isAdmin ? (
-        // Métricas para administradores
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={Calendar}
-            label="Total Reservas"
-            value={reports?.totalReservations || 0}
-            description="Reservas en el sistema"
-          />
-          <StatCard
-            icon={CreditCard}
-            label="Ventas Totales"
-            value={formatCurrency(reports?.totalSales || 0)}
-            description="Ventas confirmadas"
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="Usuarios Activos"
-            value={reports?.activeUsers || 0}
-            description="Últimos 30 días"
-          />
-          <StatCard
-            icon={Plane}
-            label="Disponibilidad Promedio"
-            value={`${reports?.avgAvailability || 0}%`}
-            description="Cupos disponibles"
-          />
-        </div>
-      ) : (
-        // Métricas personales para usuarios no admin
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={Calendar}
-            label="Mis Reservas"
-            value={userMetrics?.totalReservations || 0}
-            description="Total de reservas creadas"
-          />
-          <StatCard
-            icon={CreditCard}
-            label="Mis Ventas"
-            value={formatCurrency(userMetrics?.totalSales || 0)}
-            description="Ventas confirmadas"
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="Reservas Confirmadas"
-            value={userMetrics?.confirmedReservations || 0}
-            description="Confirmadas"
-          />
-          <StatCard
-            icon={Plane}
-            label="Pendientes"
-            value={userMetrics?.pendingReservations || 0}
-            description="En espera de confirmación"
-          />
-        </div>
-      )}
-
-      {/* Tabla de últimas reservas (solo para no admin) */}
-      {!isAdmin && (
-        <Card>
-          <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Últimas Reservas</h2>
-              <p className="text-sm text-slate-500">Tus reservas más recientes.</p>
-            </div>
+  /* ── vista admin ── */
+  if (isAdmin) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard"
+          description="Vista general del sistema y métricas clave."
+          icon={BarChart3}
+          action={
+            <Button size="sm" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          }
+        />
+        {isLoadingReports ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-24" />
+            ))}
           </div>
-
-          <TableComponent>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-center">ID Pedido</TableHead>
-                <TableHead className="text-center">Destino</TableHead>
-                <TableHead className="text-center">Pasajero</TableHead>
-                <TableHead className="text-center">Salida</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
-                <TableHead className="text-center">Venta</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell className="text-center py-10" colSpan={6}>
-                    Cargando reservas...
-                  </TableCell>
-                </TableRow>
-              ) : recentReservations.length === 0 ? (
-                <TableRow>
-                  <TableCell className="text-center py-10" colSpan={6}>
-                    No hay reservas registradas.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                recentReservations.map((reservation) => (
-                  <TableRow key={reservation.id}>
-                    <TableCell className="text-center font-medium">{reservation.pedido_id}</TableCell>
-                    <TableCell className="text-center">{reservation.vuelo_destino || '—'}</TableCell>
-                    <TableCell className="text-center">
-                      {reservation.nombre_pasajero} {reservation.apellido_pasajero}
-                    </TableCell>
-                    <TableCell className="text-center">{formatDate(reservation.vuelo_salida)}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={getEstadoVariant(reservation.estado)}>
-                        {getEstadoLabel(reservation.estado)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">{formatCurrency(reservation.precio_venta)}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </TableComponent>
-        </Card>
-      )}
-
-      {/* Gráficos solo para administradores */}
-      {isAdmin && (
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard icon={Calendar} label="Total Reservas" value={reports?.totalReservations || 0} description="Reservas en el sistema" />
+            <StatCard icon={CreditCard} label="Ventas Totales" value={formatCurrency(reports?.totalSales || 0)} description="Ventas confirmadas" />
+            <StatCard icon={CheckCircle} label="Usuarios Activos" value={reports?.activeUsers || 0} description="Últimos 30 días" />
+            <StatCard icon={Plane} label="Disponibilidad Promedio" value={`${reports?.avgAvailability || 0}%`} description="Cupos disponibles" />
+          </div>
+        )}
         <DashboardCharts
           reports={reports}
           dateRange={filters.dateRange}
@@ -236,7 +363,74 @@ const Dashboard = () => {
           onDateRangeChange={() => { }}
           onAgencyFilterChange={() => { }}
         />
+      </div>
+    );
+  }
+
+  /* ── vista usuario ── */
+  return (
+    <div className="space-y-5">
+      {/* Header mínimo */}
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="secondary" onClick={handleRefresh} disabled={refreshing} title="Actualizar">
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+
+      {/* Banner de bienvenida */}
+      <WelcomeBanner
+        user={user}
+        totalReservas={reservations.length}
+        bloqueadas={blocked}
+      />
+
+      {/* Stat cards */}
+      {isLoadingUserMetrics ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-20" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            icon={Calendar}
+            label="Mis reservas"
+            value={reservations.length || userMetrics?.totalReservations || 0}
+            description="Total creadas"
+          />
+          <StatCard
+            icon={CheckCircle}
+            label="Confirmadas"
+            value={confirmed || userMetrics?.confirmedReservations || 0}
+            description="Reservas confirmadas"
+          />
+          <StatCard
+            icon={Clock}
+            label="Bloqueos temporales"
+            value={blocked || userMetrics?.pendingReservations || 0}
+            description="Pendientes de doc. contable"
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Mis ventas"
+            value={formatCurrency(userMetrics?.totalSales || 0)}
+            description="Ventas confirmadas"
+          />
+        </div>
       )}
+
+      {/* Widget de bloqueos urgentes */}
+      <BlockedReservationsWidget
+        reservations={reservations}
+        onGoToRequests={() => navigate('/solicitudes')}
+      />
+
+      {/* Columnas: últimas reservas + notificaciones */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <RecentReservationsWidget reservations={reservations} loading={loading} />
+        <NotificationsWidget notifications={notifications} loading={loadingNotifs} />
+      </div>
     </div>
   );
 };
