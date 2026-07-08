@@ -51,11 +51,11 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
   const isAdmin = user?.role === 'admin';
 
-  // White-label sidebar colors
-  const sbBg = config?.sidebar?.bg_color || '#0f172a';
-  const sbText = config?.sidebar?.text_color || '#f8fafc';
-  const sbActiveBg = config?.sidebar?.active_bg || config?.colors?.primary || '#3b82f6';
-  const sbHoverBg = config?.sidebar?.hover_bg || '#1e293b';
+  // White-label sidebar colors (match WhiteLabelConfig.jsx property names)
+  const sbBg = config?.sidebar?.backgroundColor || '#0f172a';
+  const sbText = config?.sidebar?.textColor || '#f8fafc';
+  const sbActiveBg = config?.sidebar?.activeColor || config?.colors?.primary || '#3b82f6';
+  const sbHoverBg = config?.sidebar?.hoverColor || '#1e293b';
 
   // Polling de notificaciones no leídas cada 60s
   useEffect(() => {

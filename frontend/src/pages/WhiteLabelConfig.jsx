@@ -6,12 +6,13 @@ import Swal from 'sweetalert2';
 import {
     Palette, Type, MousePointer, Layout, Sidebar as SidebarIcon,
     Save, Download, Upload, RefreshCw, Check, Building2, Mail, FileText, Eye,
-    Monitor, Smartphone, Image, Link, Globe, Shirt, CupSoda, Send
+    Image, Link
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import Badge from '../components/ui/Badge.jsx';
+import WhiteLabelPreviewModal from '../components/WhiteLabelPreviewModal.jsx';
 
 // ─── Colores preset para quick-pick ────────────────────────────
 const PRESET_COLORS = {
@@ -65,71 +66,8 @@ const tabs = [
 ];
 
 // ═══════════════════════════════════════════════════════════════
-// Mini Preview Components (renderizan con estilo personalizado)
+// Mini Preview Components (usados en el formulario)
 // ═══════════════════════════════════════════════════════════════
-
-function PreviewSidebar({ config, isCollapsed }) {
-    const s = config.sidebar;
-    const c = config.colors;
-    const f = config.fonts;
-
-    return (
-        <div style={{
-            width: isCollapsed ? 56 : (parseInt(s.width) || 280),
-            minHeight: 200,
-            backgroundColor: s.backgroundColor || '#0f172a',
-            color: s.textColor || '#f8fafc',
-            fontFamily: f.body,
-            borderRadius: 8,
-            padding: 12,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            transition: 'all 0.3s ease',
-            overflow: 'hidden',
-        }}>
-            {!isCollapsed && (
-                <>
-                    <div className="flex items-center gap-2 mb-3 pb-2 border-b" style={{ borderColor: `${s.textColor || '#f8fafc'}20` }}>
-                        {config.identity?.logoUrl ? (
-                            <img src={config.identity.logoUrl} alt="" className="h-6 w-6 rounded" onError={(e) => e.target.style.display = 'none'} />
-                        ) : (
-                            <div className="h-6 w-6 rounded" style={{ backgroundColor: c.primary }} />
-                        )}
-                        <span className="text-sm font-semibold truncate">{config.identity?.agency_name || 'Mi Agencia'}</span>
-                    </div>
-                    {['Dashboard', 'Reservas', 'Productos', 'Agencias'].map((item, i) => (
-                        <div key={item} className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors"
-                            style={{
-                                backgroundColor: i === 0 ? (s.activeColor || c.primary) : 'transparent',
-                                color: i === 0 ? (s.activeColor ? '#fff' : s.textColor) : (s.textColor || '#f8fafc'),
-                                opacity: i === 0 ? 1 : 0.7,
-                            }}
-                            onMouseEnter={(e) => {
-                                if (i !== 0) e.currentTarget.style.backgroundColor = s.hoverColor || '#1e293b';
-                                e.currentTarget.style.opacity = '1';
-                            }}
-                            onMouseLeave={(e) => {
-                                if (i !== 0) e.currentTarget.style.backgroundColor = 'transparent';
-                                e.currentTarget.style.opacity = '0.7';
-                            }}>
-                            <div className="h-4 w-4 rounded bg-current opacity-30" />
-                            <span className="truncate">{item}</span>
-                        </div>
-                    ))}
-                </>
-            )}
-            {isCollapsed && (
-                <>
-                    <div className="h-8 w-8 rounded mx-auto mt-2" style={{ backgroundColor: c.primary }} />
-                    {['Dashboard', 'Reservas', 'Productos'].map((_, i) => (
-                        <div key={i} className="h-8 w-8 rounded mx-auto" style={{ backgroundColor: `${s.textColor || '#f8fafc'}20` }} />
-                    ))}
-                </>
-            )}
-        </div>
-    );
-}
 
 function PreviewButton({ config, label = 'Botón Primario' }) {
     const b = config.buttons;
@@ -160,131 +98,6 @@ function PreviewButton({ config, label = 'Botón Primario' }) {
     );
 }
 
-function PreviewCard({ config }) {
-    const c = config.colors;
-    const f = config.fonts;
-    const l = config.layout;
-    const radiusMap = { sm: '6px', md: '8px', lg: '12px', xl: '16px' };
-
-    return (
-        <div style={{
-            backgroundColor: c.surface,
-            borderRadius: radiusMap[l.borderRadius] || '12px',
-            border: `1px solid ${c.border}`,
-            padding: 16,
-            fontFamily: f.body,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        }}>
-            <div style={{ fontFamily: f.heading, fontSize: '16px', fontWeight: '600', color: c.text_primary, marginBottom: 8 }}>
-                {config.identity?.agency_name || 'Mi Agencia de Viajes'}
-            </div>
-            <p style={{ fontSize: '13px', color: c.text_secondary, lineHeight: 1.5, marginBottom: 12 }}>
-                {config.identity?.slogan || 'Creamos experiencias de viaje inolvidables para nuestros clientes.'}
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-                <PreviewButton config={config} label=" Reservar " />
-                <button style={{
-                    backgroundColor: 'transparent',
-                    color: c.primary,
-                    borderRadius: radiusMap[b.borderRadius] || '8px',
-                    border: `1px solid ${c.border}`,
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '8px',
-                    paddingBottom: '8px',
-                    fontWeight: '500',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                }}>Ver más</button>
-            </div>
-        </div>
-    );
-}
-
-function PreviewEmail({ config }) {
-    const c = config.colors;
-    const f = config.fonts;
-    return (
-        <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 8,
-            border: `1px solid ${c.border}`,
-            overflow: 'hidden',
-            fontFamily: f.body,
-            fontSize: '12px',
-        }}>
-            {/* Header */}
-            <div style={{ backgroundColor: c.primary, padding: 16, textAlign: 'center' }}>
-                {config.identity?.logoUrl ? (
-                    <img src={config.identity.logoUrl} alt="" className="h-5 w-5 rounded mx-auto mb-1" />
-                ) : (
-                    <div className="h-5 w-5 rounded mx-auto mb-1" style={{ backgroundColor: '#ffffff80' }} />
-                )}
-                <div style={{ color: '#ffffff', fontWeight: '600', fontSize: '13px' }}>
-                    {config.identity?.agency_name || 'Mi Agencia'}
-                </div>
-            </div>
-            {/* Body */}
-            <div style={{ padding: 16 }}>
-                <p style={{ color: c.text_primary, marginBottom: 8 }}>Hola viajero,</p>
-                <p style={{ color: c.text_secondary, lineHeight: 1.5 }}>Tu reserva #TR-2024 ha sido confirmada. Pronto recibirás los detalles en tu email.</p>
-                <button style={{
-                    backgroundColor: c.primary, color: '#fff', padding: '6px 16px',
-                    borderRadius: '6px', border: 'none', fontSize: '12px', marginTop: 8,
-                    cursor: 'pointer',
-                }}>Ver detalles</button>
-            </div>
-            {/* Footer */}
-            <div style={{ padding: 12, borderTop: `1px solid ${c.border}`, textAlign: 'center' }}>
-                <p style={{ color: c.text_secondary, fontSize: '10px' }}>© 2024 {config.identity?.agency_name || 'Mi Agencia'}. Todos los derechos reservados.</p>
-            </div>
-        </div>
-    );
-}
-
-function PreviewLogin({ config }) {
-    const c = config.colors;
-    const f = config.fonts;
-    return (
-        <div style={{
-            backgroundColor: c.background,
-            borderRadius: 12,
-            border: `1px solid ${c.border}`,
-            padding: 20,
-            fontFamily: f.body,
-            maxWidth: 280,
-        }}>
-            <div className="text-center mb-4">
-                {config.identity?.logoUrl ? (
-                    <img src={config.identity.logoUrl} alt="" className="h-8 w-8 rounded mx-auto mb-2" />
-                ) : (
-                    <div className="h-8 w-8 rounded mx-auto mb-2" style={{ backgroundColor: c.primary }} />
-                )}
-                <h3 style={{ fontFamily: f.heading, fontSize: '15px', fontWeight: '600', color: c.text_primary }}>
-                    {config.identity?.agency_name || 'Mi Agencia'}
-                </h3>
-            </div>
-            <input placeholder="Email" style={{ ...inputStyle(c), marginBottom: 8, fontSize: '12px' }} readOnly value="usuario@email.com" />
-            <input placeholder="Contraseña" style={{ ...inputStyle(c), marginBottom: 12, fontSize: '12px' }} readOnly value="••••••••" />
-            <PreviewButton config={config} label=" Ingresar " />
-        </div>
-    );
-}
-
-function inputStyle(c) {
-    return {
-        width: '100%',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        border: `1px solid ${c.border}`,
-        fontSize: '14px',
-        color: c.text_primary,
-        backgroundColor: c.surface,
-        outline: 'none',
-        boxSizing: 'border-box',
-    };
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Main Component
 // ═══════════════════════════════════════════════════════════════
@@ -300,10 +113,7 @@ export default function WhiteLabelConfig() {
     const [saving, setSaving] = useState(false);
 
     // Vista previa estado
-    const [previewMode, setPreviewMode] = useState('desktop');
-    const [showSidebar, setShowSidebar] = useState(true);
-    const [showCollapsable, setShowCollapsable] = useState(false);
-    const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+    const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
     useEffect(() => {
         loadConfig();
@@ -426,6 +236,10 @@ export default function WhiteLabelConfig() {
                 action={
                     <div className="flex items-center gap-2">
                         <Badge variant={isDefault ? 'warning' : 'success'}>{isDefault ? 'Predeterminado' : 'Personalizado'}</Badge>
+                        <Button variant="secondary" size="sm" onClick={() => setPreviewModalOpen(true)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Vista previa
+                        </Button>
                         <Button size="sm" onClick={loadConfig} disabled={loading} title="Recargar">
                             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                         </Button>
@@ -440,9 +254,9 @@ export default function WhiteLabelConfig() {
                 }
             />
 
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6">
-                {/* ═══ PANEL IZQUIERDO: Tabs + Formulario ═══ */}
-                <div className="min-w-0">
+            {/* ═══ FORMULARIO (full width) ═══ */}
+            <div className="w-full">
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                         {/* Tabs */}
                         <div className="flex border-b border-slate-200 p-2 gap-1 bg-slate-50 flex-wrap">
@@ -766,124 +580,30 @@ export default function WhiteLabelConfig() {
                     </div>
 
                     {/* Bottom actions */}
-                    <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-6 mt-6">
-                        <Button variant="secondary" onClick={handleReset}>
-                            Restablecer
-                        </Button>
-                        <Button onClick={handleSave} disabled={saving}>
-                            {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                            Guardar configuración
-                        </Button>
-                    </div>
-                </div>
-
-                {/* ═══ PANEL DERECHO: Vista Previa en vivo ═══ */}
-                <div className="w-full xl:w-80 shrink-0 space-y-4 sticky top-6 self-start max-h-[calc(100vh-120px)] overflow-y-auto pr-1">
-                    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                                <Eye className="h-4 w-4" /> Vista previa en vivo
-                            </h3>
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-200 p-6 bg-slate-50">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Palette className="h-3.5 w-3.5" />
+                            <span>Los cambios se aplican en tiempo real. Hacé click en "Guardar" para persistirlos.</span>
                         </div>
-
-                        {/* Toggle vistas */}
-                        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-                            {([
-                                ['login', <Globe className="h-3.5 w-3.5" />, 'Login'],
-                                ['card', <Shirt className="h-3.5 w-3.5" />, 'Card'],
-                                ['email', <Send className="h-3.5 w-3.5" />, 'Email'],
-                            ]).map(([mode, icon, label]) => (
-                                <button key={mode} onClick={() => setPreviewMode(mode)}
-                                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${previewMode === mode ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    {icon}
-                                    <span className="hidden sm:inline">{label}</span>
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Preview Content */}
-                        <div className="border border-dashed border-slate-200 rounded-lg bg-slate-50/50 p-4 min-h-[280px] overflow-auto">
-                            {previewMode === 'login' && (
-                                <div className="space-y-3">
-                                    <p className="text-[10px] text-slate-400 uppercase tracking-wide text-center mb-2">Login</p>
-                                    <PreviewLogin config={config} />
-                                </div>
-                            )}
-                            {previewMode === 'card' && (
-                                <div className="space-y-3">
-                                    <p className="text-[10px] text-slate-400 uppercase tracking-wide text-center mb-2">Dashboard Card</p>
-                                    <PreviewCard config={config} />
-                                    {/* Mini sidebar toggle */}
-                                    <div className="pt-2 border-t border-slate-200">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">Sidebar</p>
-                                            <label className="flex items-center gap-1.5 cursor-pointer">
-                                                <input type="checkbox" checked={showSidebar} onChange={e => setShowSidebar(e.target.checked)}
-                                                    className="rounded border-slate-300" />
-                                                <span className="text-[10px] text-slate-500">Visible</span>
-                                            </label>
-                                        </div>
-                                        {showSidebar && <PreviewSidebar config={config} isCollapsed={false} />}
-                                    </div>
-                                </div>
-                            )}
-                            {previewMode === 'email' && (
-                                <div className="space-y-3">
-                                    <p className="text-[10px] text-slate-400 uppercase tracking-wide text-center mb-2">Email tipo</p>
-                                    <PreviewEmail config={config} />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Quick stats */}
-                        <div className="pt-2 border-t border-slate-200 space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="text-slate-500">Primary</span>
-                                <div className="flex items-center gap-2">
-                                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: c.primary }} />
-                                    <span className="font-mono text-slate-600">{c.primary}</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="text-slate-500">Heading</span>
-                                <span className="font-mono text-slate-600 truncate ml-2" style={{ fontFamily: f.heading }}>
-                                    {f.heading?.split(',')[0] || 'Inter'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="text-slate-500">Body</span>
-                                <span className="font-mono text-slate-600 truncate ml-2" style={{ fontFamily: f.body }}>
-                                    {f.body?.split(',')[0] || 'Inter'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="text-slate-500">Buttons</span>
-                                <span className="text-slate-600">Radius: {b.borderRadius || 'md'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Configurations summary */}
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 text-white space-y-3">
                         <div className="flex items-center gap-2">
-                            <Palette className="h-4 w-4 text-slate-300" />
-                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">Resumen</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                            {Object.keys(PRESET_COLORS).map(name => (
-                                <span key={name} className="px-2 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/80">
-                                    {name}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="pt-2 border-t border-white/10">
-                            <p className="text-[10px] text-slate-400">
-                                Cambios aplicados automáticamente. Hacé click en "Guardar" para persistirlos.
-                            </p>
+                            <Button variant="secondary" onClick={handleReset}>
+                                Restablecer
+                            </Button>
+                            <Button onClick={handleSave} disabled={saving}>
+                                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                Guardar configuración
+                            </Button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Modal de vista previa */}
+            <WhiteLabelPreviewModal
+                open={previewModalOpen}
+                onClose={() => setPreviewModalOpen(false)}
+                config={config}
+            />
         </div>
     );
 }
