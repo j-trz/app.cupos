@@ -14,7 +14,6 @@ import GestionAgencias from './pages/GestionAgencias';
 import GestionTemas from './pages/GestionTemas';
 import GestionRoles from './pages/GestionRoles';
 import GestionPermisos from './pages/GestionPermisos';
-import ConfiguracionCorreo from './pages/ConfiguracionCorreo';
 import PanelControl from './pages/PanelControl';
 import Availability from './pages/Availability';
 import Profile from './pages/Profile';
@@ -27,6 +26,7 @@ import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import AIConfig from './pages/AIConfig';
 import Reportes from './pages/Reportes';
+import LogsDelSitio from './pages/LogsDelSitio';
 import GestionNominas from './pages/GestionNominas';
 import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
@@ -143,17 +143,7 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                <Route 
-                  path="/correo" 
-                  element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <ConfiguracionCorreo />
-                      </Layout>
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
+                <Route
                   path="/panel-control" 
                   element={
                     <ProtectedRoute>
@@ -269,6 +259,16 @@ function App() {
                     <ProtectedRoute>
                       <Layout>
                         <Reportes />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/logs"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <LogsDelSitio />
                       </Layout>
                     </ProtectedRoute>
                   }

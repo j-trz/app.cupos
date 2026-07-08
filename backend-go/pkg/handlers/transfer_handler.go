@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
+	"backend-go/pkg/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // TransferInput representa el payload para crear una cesión
@@ -25,10 +28,15 @@ func CreateTransfer(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Get("userID")
+	userIDStr, _ := c.Get("userID")
 	agencia, _ := c.Get("agencia")
 
 	sourceAgency := agencia.(string)
+
+	var createdBy uuid.UUID
+	if s, ok := userIDStr.(string); ok {
+		createdBy, _ = uuid.Parse(s)
+	}
 
 	// Validar que origen y destino sean diferentes
 	if sourceAgency == input.TargetAgency {
@@ -62,7 +70,7 @@ func CreateTransfer(c *gin.Context) {
 
 	// 1. Descontar del producto original (stock de origen)
 	if err := tx.Model(&models.Product{}).Where("id = ?", input.ProductID).
-		Update("disponibilidad", database.DB.Raw("disponibilidad - ?", input.Quantity)).Error; err != nil {
+		Update("disponibilidad", gorm.Expr("disponibilidad - ?", input.Quantity)).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
 		return
@@ -100,7 +108,7 @@ func CreateTransfer(c *gin.Context) {
 		SourceAgency: sourceAgency,
 		TargetAgency: input.TargetAgency,
 		Quantity:     input.Quantity,
-		CreatedBy:    userID.(uuid.UUID),
+		CreatedBy:    createdBy,
 	}
 	if err := tx.Create(&transfer).Error; err != nil {
 		tx.Rollback()
@@ -112,6 +120,12 @@ func CreateTransfer(c *gin.Context) {
 
 	// Recargar producto para devolver estado actualizado
 	database.DB.First(&product, input.ProductID)
+
+	createdByPtr := &createdBy
+	services.NotifyAgency(input.TargetAgency, createdByPtr, "info", "Recibiste una cesión de disponibilidad",
+		fmt.Sprintf("La agencia %s te cedió %d cupos del producto %s hacia %s", sourceAgency, input.Quantity, product.CodigoCupo, product.Destino))
+	services.NotifyRole("admin", createdByPtr, "info", "Nueva cesión entre agencias",
+		fmt.Sprintf("%s cedió %d cupos de %s a %s", sourceAgency, input.Quantity, product.CodigoCupo, input.TargetAgency))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"transfer":     transfer,

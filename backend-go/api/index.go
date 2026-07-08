@@ -23,6 +23,7 @@ func init() {
 	router = gin.New()
 	router.RedirectTrailingSlash = false
 	router.Use(gin.Recovery())
+	router.Use(middleware.RequestLogger())
 
 	// Configuración CORS dinámica desde variable de entorno
 	frontendURL := os.Getenv("URL_FRONTEND")
@@ -77,6 +78,9 @@ func init() {
 		// Rutas públicas
 		api.POST("/auth/login", handlers.Login)
 		api.POST("/auth/register", handlers.Register)
+
+		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
+		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
 
 		// Rutas protegidas
 		protected := api.Group("/")
@@ -239,8 +243,22 @@ func init() {
 			// Lista completa solo para admin
 			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
 
-			// SSE
-			protected.GET("/sse", handlers.SSEHandler)
+			// Logs del sitio (solo admin)
+			protected.GET("/logs", middleware.AdminOnly(), handlers.GetSystemLogs)
+
+			// Configuración de email (SMTP + plantillas) por agencia
+			emailConfig := protected.Group("/email-config")
+			{
+				emailConfig.GET("/config", handlers.GetEmailConfig)
+				emailConfig.POST("/config", handlers.CreateEmailConfig)
+				emailConfig.PUT("/config/:id", handlers.UpdateEmailConfig)
+				emailConfig.DELETE("/config/:id", handlers.DeleteEmailConfig)
+				emailConfig.POST("/test", handlers.TestEmailConnection)
+				emailConfig.POST("/send-test", handlers.SendTestEmail)
+				emailConfig.GET("/templates", handlers.GetEmailTemplates)
+				emailConfig.PUT("/templates/:id", handlers.UpdateEmailTemplate)
+				emailConfig.GET("/templates/:id/preview", handlers.PreviewEmailTemplate)
+			}
 		}
 	}
 }

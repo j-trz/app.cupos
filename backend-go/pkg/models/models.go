@@ -51,6 +51,17 @@ type Product struct {
 	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
+// Estados posibles de Reservation.Estado (antes convivían "confirmado"/"confirmada" como
+// valores distintos sin querer; se unifican acá para que el cron y las notificaciones
+// puedan filtrar de forma consistente).
+const (
+	EstadoBloqueoTemporal      = "bloqueo_temporal"
+	EstadoConfirmada           = "confirmada"
+	EstadoSolicitudCancelacion = "solicitud_cancelacion"
+	EstadoCancelada            = "cancelada"
+	EstadoExpirada             = "expirada"
+)
+
 type Reservation struct {
 	ID                   uint       `gorm:"primaryKey" json:"id"`
 	ProductID            uint       `json:"product_id"`
@@ -80,8 +91,10 @@ type Reservation struct {
 	FichaVenta           string     `json:"ficha_venta"`
 	DocContable          string     `json:"doc_contable"`
 	DocContableExpiresAt *time.Time `json:"doc_contable_expires_at"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	// ExpirationWarningSentAt evita reenviar el aviso de "por vencer" en cada corrida del cron.
+	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
 type Passenger struct {
@@ -138,10 +151,28 @@ type Notification struct {
 	Priority     string     `gorm:"default:'medium'" json:"priority"`
 	TargetUserID *uuid.UUID `gorm:"type:uuid" json:"target_user_id"`
 	TargetRole   string     `json:"target_role"`
+	TargetAgency string     `json:"target_agency"`
 	IsRead       bool       `gorm:"default:false" json:"is_read"`
 	IsHidden     bool       `gorm:"default:false" json:"is_hidden"`
 	CreatedBy    *uuid.UUID `gorm:"type:uuid" json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
+}
+
+// SystemLog registra requests y eventos de negocio (errores, cron, email) para
+// la sección de administración "Logs del sitio".
+type SystemLog struct {
+	ID         uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Level      string     `gorm:"default:'info';index" json:"level"` // info | warning | error
+	Source     string     `gorm:"index" json:"source"`               // http | cron | email | ...
+	Method     string     `json:"method"`
+	Path       string     `json:"path"`
+	StatusCode int        `json:"status_code"`
+	Message    string     `json:"message"`
+	Details    string     `json:"details"`
+	UserID     *uuid.UUID `gorm:"type:uuid" json:"user_id"`
+	Agencia    string     `json:"agencia"`
+	DurationMs int64      `json:"duration_ms"`
+	CreatedAt  time.Time  `gorm:"index" json:"created_at"`
 }
 
 type Permission struct {
@@ -180,16 +211,31 @@ type RolePermission struct {
 }
 
 type EmailSMTPConfig struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	AgencyID  uuid.UUID `gorm:"type:uuid" json:"agency_id"`
-	SMTPHost  string    `json:"smtp_host"`
-	SMTPPort  int       `json:"smtp_port"`
-	SMTPUser  string    `json:"smtp_user"`
-	SMTPPass  string    `json:"smtp_pass"`
-	EmailFrom string    `json:"email_from"`
-	IsActive  bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AgencyID   uuid.UUID `gorm:"type:uuid" json:"agency_id"`
+	SMTPHost   string    `json:"smtp_host"`
+	SMTPPort   int       `json:"smtp_port"`
+	SMTPUser   string    `json:"smtp_user"`
+	SMTPPass   string    `json:"smtp_pass"`
+	SMTPSecure bool      `gorm:"default:false" json:"smtp_secure"`
+	EmailFrom  string    `json:"email_from"`
+	IsActive   bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// EmailTemplate define el asunto/cuerpo de un email transaccional identificado
+// por Code (ej. "reservation_blocked"). AgencyID nulo = plantilla global/default,
+// usada cuando la agencia no definió una propia para ese Code.
+type EmailTemplate struct {
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Code      string     `gorm:"not null;index" json:"code"`
+	Name      string     `json:"name"`
+	Subject   string     `json:"subject"`
+	BodyHTML  string     `json:"body_html"`
+	AgencyID  *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 type AIProvider struct {

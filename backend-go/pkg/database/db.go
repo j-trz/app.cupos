@@ -43,6 +43,8 @@ func InitDB() {
 		&models.UserRole{},
 		&models.RolePermission{},
 		&models.EmailSMTPConfig{},
+		&models.EmailTemplate{},
+		&models.SystemLog{},
 		&models.AIProvider{},
 		&models.AIAction{},
 		&models.AISession{},
@@ -52,7 +54,61 @@ func InitDB() {
 	// Run SQL migrations for columns/tables that need ALTER statements
 	runSQLMigrations(db)
 
+	seedEmailTemplates(db)
+
 	DB = db
+}
+
+// seedEmailTemplates crea las plantillas globales por defecto (AgencyID = nil)
+// si todavía no existen, para que el envío de emails transaccionales funcione
+// aunque una agencia nunca haya personalizado sus plantillas.
+func seedEmailTemplates(db *gorm.DB) {
+	defaults := []models.EmailTemplate{
+		{
+			Code:     "reservation_blocked",
+			Name:     "Reserva en bloqueo temporal",
+			Subject:  "Tu reserva {{pedido_id}} está en bloqueo temporal",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> quedó en bloqueo temporal y vence el {{vence}}. Confirmala antes de esa fecha o el cupo se liberará automáticamente.</p>",
+		},
+		{
+			Code:     "reservation_expiring_soon",
+			Name:     "Reserva por vencer",
+			Subject:  "Tu reserva {{pedido_id}} está por vencer",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> vence en menos de {{minutos}} minutos. Confirmala para no perder el cupo.</p>",
+		},
+		{
+			Code:     "reservation_expired",
+			Name:     "Reserva expirada",
+			Subject:  "Tu reserva {{pedido_id}} expiró",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> expiró por vencimiento del bloqueo temporal y el cupo fue liberado.</p>",
+		},
+		{
+			Code:     "reservation_confirmed",
+			Name:     "Reserva confirmada",
+			Subject:  "Tu reserva {{pedido_id}} fue confirmada",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> fue confirmada correctamente.</p>",
+		},
+		{
+			Code:     "new_product",
+			Name:     "Nuevo producto disponible",
+			Subject:  "Nuevo producto disponible: {{codigo_cupo}}",
+			BodyHTML: "<p>Se agregó un nuevo producto a disponibilidad:</p><p><b>{{codigo_cupo}}</b> hacia {{destino}} ({{compania}})</p>",
+		},
+		{
+			Code:     "test_email",
+			Name:     "Email de prueba",
+			Subject:  "Email de prueba",
+			BodyHTML: "<p>Este es un email de prueba para verificar la configuración SMTP.</p>",
+		},
+	}
+
+	for _, tpl := range defaults {
+		var count int64
+		db.Model(&models.EmailTemplate{}).Where("code = ? AND agency_id IS NULL", tpl.Code).Count(&count)
+		if count == 0 {
+			db.Create(&tpl)
+		}
+	}
 }
 
 // runSQLMigrations executes raw SQL migration statements

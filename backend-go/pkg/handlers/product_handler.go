@@ -2,14 +2,34 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
+	"backend-go/pkg/services"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
+
+// createdByFromContext extrae el uuid del usuario autenticado desde el contexto Gin (o nil si no hay).
+func createdByFromContext(c *gin.Context) *uuid.UUID {
+	val, ok := c.Get("userID")
+	if !ok {
+		return nil
+	}
+	s, ok := val.(string)
+	if !ok {
+		return nil
+	}
+	uid, err := uuid.Parse(s)
+	if err != nil {
+		return nil
+	}
+	return &uid
+}
 
 // fixNumbers convierte strings numéricos a float64/int para evitar errores de unmarshal
 func fixNumbers(data map[string]interface{}) {
@@ -96,6 +116,10 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	database.DB.Create(&product)
+
+	services.NotifyBroadcast(createdByFromContext(c), "new_product", "Nuevo producto disponible",
+		fmt.Sprintf("Se agregó el producto %s hacia %s (%s)", product.CodigoCupo, product.Destino, product.Compania))
+
 	c.JSON(http.StatusCreated, product)
 }
 
@@ -145,6 +169,12 @@ func BulkCreateProducts(c *gin.Context) {
 	}
 
 	tx.Commit()
+
+	if len(input.Products) > 0 {
+		services.NotifyBroadcast(createdByFromContext(c), "new_product", "Nuevos productos disponibles",
+			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", len(input.Products)))
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Bulk creation successful", "count": len(input.Products)})
 }
 

@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../hooks/use-toast';
 
 const PanelControl = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleAction = (action) => {
     toast({
@@ -27,7 +29,7 @@ const PanelControl = () => {
               <Button variant="outline" className="w-full" onClick={() => handleAction('Monitoreo del Sistema')}>
                 Monitoreo del Sistema
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => handleAction('Logs del Sistema')}>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/logs')}>
                 Logs del Sistema
               </Button>
               <Button variant="outline" className="w-full" onClick={() => handleAction('Recursos del Sistema')}>
@@ -41,7 +43,7 @@ const PanelControl = () => {
               <CardTitle>Seguridad</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button variant="outline" className="w-full" onClick={() => handleAction('Auditoría de Seguridad')}>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/logs')}>
                 Auditoría de Seguridad
               </Button>
               <Button variant="outline" className="w-full" onClick={() => handleAction('Políticas de Seguridad')}>

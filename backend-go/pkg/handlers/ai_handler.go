@@ -446,7 +446,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		reserva := models.Reservation{
 			ProductID:            uint(productID),
 			CreatedBy:            u.ID,
-			Estado:               "bloqueo_temporal",
+			Estado:               models.EstadoBloqueoTemporal,
 			PrecioVenta:          precio,
 			Neto1:                product.Neto1,
 			PedidoID:             pedidoID,
@@ -480,7 +480,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		}
 		id, _ := args["reserva_id"].(string)
 		if err := database.DB.Model(&models.Reservation{}).Where("id = ?", id).
-			Update("estado", "confirmado").Error; err != nil {
+			Update("estado", models.EstadoConfirmada).Error; err != nil {
 			return `{"error": "No se pudo confirmar la reserva"}`
 		}
 		return fmt.Sprintf(`{"exito": true, "mensaje": "Reserva %s confirmada correctamente"}`, id)
@@ -494,7 +494,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		var reserva models.Reservation
 		if database.DB.First(&reserva, id).Error == nil {
 			database.DB.Model(&models.Product{}).Where("id = ?", reserva.ProductID).
-				UpdateColumn("disponibilidad", database.DB.Raw("disponibilidad + 1"))
+				UpdateColumn("disponibilidad", gorm.Expr("disponibilidad + 1"))
 		}
 		database.DB.Delete(&models.Reservation{}, id)
 		return fmt.Sprintf(`{"exito": true, "mensaje": "Reserva %s cancelada"}`, id)
@@ -506,13 +506,13 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		var totalReservas, confirmadas, pendientes int64
 		var totalProductos int64
 		database.DB.Model(&models.Reservation{}).Count(&totalReservas)
-		database.DB.Model(&models.Reservation{}).Where("estado = 'confirmado'").Count(&confirmadas)
-		database.DB.Model(&models.Reservation{}).Where("estado = 'bloqueo_temporal'").Count(&pendientes)
+		database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoConfirmada).Count(&confirmadas)
+		database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoBloqueoTemporal).Count(&pendientes)
 		database.DB.Model(&models.Product{}).Count(&totalProductos)
 
 		var totalVentas float64
 		database.DB.Model(&models.Reservation{}).
-			Where("estado = 'confirmado'").
+			Where("estado = ?", models.EstadoConfirmada).
 			Select("COALESCE(SUM(precio_venta), 0)").
 			Scan(&totalVentas)
 

@@ -20,6 +20,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.RequestLogger())
 
 	// Configuración CORS dinámica desde variable de entorno
 	frontendURL := os.Getenv("URL_FRONTEND")
@@ -79,6 +80,9 @@ func main() {
 		api.POST("/auth/login", handlers.Login)
 		api.POST("/auth/register", handlers.Register)
 
+		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
+		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
+
 		// Rutas protegidas
 		protected := api.Group("/")
 		protected.Use(middleware.AuthMiddleware())
@@ -89,6 +93,7 @@ func main() {
 			products := protected.Group("/products")
 			{
 				products.GET("/", handlers.GetProducts)
+				products.GET("/:id", handlers.GetProductByID)
 				products.POST("/", middleware.AdminOnly(), handlers.CreateProduct)
 				products.POST("/bulk", middleware.AdminOnly(), handlers.BulkCreateProducts)
 			}
@@ -98,7 +103,11 @@ func main() {
 			{
 				orders.GET("/", handlers.GetAllReservations)
 				orders.POST("/", handlers.CreateReservation)
-				orders.POST("/:id/confirm", middleware.AdminOnly(), handlers.ConfirmReservation)
+				orders.GET("/:id", handlers.GetReservationByID)
+				orders.PUT("/:id", handlers.UpdateReservation)
+				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
+				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
+				orders.POST("/:id/confirm", handlers.ConfirmReservation)
 				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)
 			}
 
@@ -142,6 +151,17 @@ func main() {
 			{
 				ai.POST("/chat", handlers.Chat)
 				ai.GET("/providers", handlers.ListAIProviders)
+				ai.POST("/providers", middleware.AdminOnly(), handlers.CreateAIProvider)
+				ai.PUT("/providers/:id", middleware.AdminOnly(), handlers.UpdateAIProvider)
+				ai.DELETE("/providers/:id", middleware.AdminOnly(), handlers.DeleteAIProvider)
+				ai.POST("/providers/:id/test", middleware.AdminOnly(), handlers.TestAIProvider)
+				ai.GET("/actions", handlers.ListAIActions)
+				ai.POST("/actions", middleware.AdminOnly(), handlers.CreateAIAction)
+				ai.PUT("/actions/:id", middleware.AdminOnly(), handlers.UpdateAIAction)
+				ai.DELETE("/actions/:id", middleware.AdminOnly(), handlers.DeleteAIAction)
+				ai.GET("/sessions", handlers.ListAISessions)
+				ai.GET("/stats", handlers.GetAIStats)
+				ai.GET("/logs", handlers.GetAILogs)
 			}
 
 			// CRUD Dinámico (Data)
@@ -158,13 +178,17 @@ func main() {
 			{
 				agencies.GET("/", handlers.ListAgencies)
 				agencies.POST("/", middleware.AdminOnly(), handlers.CreateAgency)
+				agencies.PUT("/:id", middleware.AdminOnly(), handlers.UpdateAgency)
+				agencies.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteAgency)
 			}
 
 			// White Label
 			whiteLabel := protected.Group("/white-label")
 			{
 				whiteLabel.GET("/config", handlers.GetWhiteLabelConfig)
-				whiteLabel.PUT("/config/:id", handlers.UpdateWhiteLabelConfig)
+				whiteLabel.POST("/config", middleware.AgencyAdminOrAdmin(), handlers.CreateWhiteLabelConfig)
+				whiteLabel.PUT("/config/:id", middleware.AgencyAdminOrAdmin(), handlers.UpdateWhiteLabelConfig)
+				whiteLabel.DELETE("/config/:id", middleware.AgencyAdminOrAdmin(), handlers.DeleteWhiteLabelConfig)
 			}
 
 			// RBAC - Roles
@@ -195,8 +219,42 @@ func main() {
 			// RBAC - User Roles
 			protected.POST("/user-roles", middleware.AdminOnly(), handlers.AssignRoleToUser)
 
-			// SSE
-			protected.GET("/sse", handlers.SSEHandler)
+			// Notificaciones
+			notifications := protected.Group("/notifications")
+			{
+				notifications.GET("", handlers.GetNotifications)
+				notifications.GET("/unread-count", handlers.GetUnreadCount)
+				notifications.PUT("/read-all", handlers.MarkAllNotificationsRead)
+				notifications.PUT("/:id/read", handlers.MarkNotificationRead)
+				notifications.PUT("/:id/hide", handlers.HideNotification)
+				notifications.POST("", middleware.AdminOnly(), handlers.CreateNotification)
+				notifications.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteNotification)
+			}
+
+			// Cesión de disponibilidad (Transfers)
+			transfers := protected.Group("/transfers")
+			{
+				transfers.GET("", handlers.GetUserTransfers)
+				transfers.POST("", handlers.CreateTransfer)
+			}
+			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
+
+			// Logs del sitio (solo admin)
+			protected.GET("/logs", middleware.AdminOnly(), handlers.GetSystemLogs)
+
+			// Configuración de email (SMTP + plantillas) por agencia
+			emailConfig := protected.Group("/email-config")
+			{
+				emailConfig.GET("/config", handlers.GetEmailConfig)
+				emailConfig.POST("/config", handlers.CreateEmailConfig)
+				emailConfig.PUT("/config/:id", handlers.UpdateEmailConfig)
+				emailConfig.DELETE("/config/:id", handlers.DeleteEmailConfig)
+				emailConfig.POST("/test", handlers.TestEmailConnection)
+				emailConfig.POST("/send-test", handlers.SendTestEmail)
+				emailConfig.GET("/templates", handlers.GetEmailTemplates)
+				emailConfig.PUT("/templates/:id", handlers.UpdateEmailTemplate)
+				emailConfig.GET("/templates/:id/preview", handlers.PreviewEmailTemplate)
+			}
 		}
 	}
 

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
+import Swal from 'sweetalert2';
 import { useSidebar } from './SidebarProvider.jsx';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shadcn-tooltip';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
@@ -23,6 +24,7 @@ const adminNavItems = [
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
   { label: 'Nóminas', path: '/nominas', icon: Users },
+  { label: 'Logs del sitio', path: '/logs', icon: ScrollText },
 ];
 
 // Settings items (grouped under Ajustes)
@@ -48,30 +50,50 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const [openSubmenus, setOpenSubmenus] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
+  const previousUnreadRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
 
-  // White-label sidebar colors (match WhiteLabelConfig.jsx property names)
-  const sbBg = config?.sidebar?.backgroundColor || '#0f172a';
-  const sbText = config?.sidebar?.textColor || '#f8fafc';
-  const sbActiveBg = config?.sidebar?.activeColor || config?.colors?.primary || '#3b82f6';
-  const sbHoverBg = config?.sidebar?.hoverColor || '#1e293b';
+  // White-label sidebar colors (match WhiteLabelContext.jsx property names)
+  const sbBg = config?.sidebar?.bg_color || '#0f172a';
+  const sbText = config?.sidebar?.text_color || '#f8fafc';
+  const sbActiveBg = config?.sidebar?.active_bg || config?.colors?.primary || '#3b82f6';
+  const sbHoverBg = config?.sidebar?.hover_bg || '#1e293b';
 
-  // Polling de notificaciones no leídas cada 60s
+  // Polling de notificaciones no leídas cada 20s (reemplaza al SSE, que no
+  // funciona en el backend serverless). Si el contador sube desde la última
+  // lectura, se avisa con un toast liviano.
   useEffect(() => {
     let mounted = true;
     const fetchUnread = async () => {
       try {
         const result = await NotificationService.getUnreadCount();
-        if (mounted) setUnreadCount(result || 0);
+        if (!mounted) return;
+        const count = result || 0;
+        if (previousUnreadRef.current !== null && count > previousUnreadRef.current) {
+          const newOnes = count - previousUnreadRef.current;
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: newOnes === 1 ? 'Tenés 1 notificación nueva' : `Tenés ${newOnes} notificaciones nuevas`,
+            showConfirmButton: false,
+            timer: 4000,
+            timerProgressBar: true,
+            didOpen: (el) => el.addEventListener('click', () => navigate('/notificaciones')),
+          });
+        }
+        previousUnreadRef.current = count;
+        setUnreadCount(count);
       } catch {
         // silencioso
       }
     };
     fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
+    const interval = setInterval(fetchUnread, 20000);
     return () => { mounted = false; clearInterval(interval); };
-  }, []);
+  }, [navigate]);
 
   // Toggle submenu visibility
   const toggleSubmenu = (submenu) => {

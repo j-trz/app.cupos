@@ -157,12 +157,13 @@ export function WhiteLabelProvider({ children }) {
                         transition: dbConfig.button_transition || DEFAULT_CONFIG.buttons.transition
                     },
                     sidebar: {
-                        bg_color: dbConfig.sidebar_bg_color || DEFAULT_CONFIG.sidebar.bg_color,
-                        text_color: dbConfig.sidebar_text_color || DEFAULT_CONFIG.sidebar.text_color,
-                        active_bg: dbConfig.sidebar_active_bg || DEFAULT_CONFIG.sidebar.active_bg,
-                        active_text: dbConfig.sidebar_active_text || DEFAULT_CONFIG.sidebar.active_text,
-                        width: dbConfig.sidebar_width || DEFAULT_CONFIG.sidebar.width,
-                        collapsed_width: dbConfig.sidebar_collapsed_width || DEFAULT_CONFIG.sidebar.collapsed_width
+                        bg_color: dbConfig.sidebar?.backgroundColor || dbConfig.sidebar_bg_color || DEFAULT_CONFIG.sidebar.bg_color,
+                        text_color: dbConfig.sidebar?.textColor || dbConfig.sidebar_text_color || DEFAULT_CONFIG.sidebar.text_color,
+                        active_bg: dbConfig.sidebar?.activeColor || dbConfig.sidebar_active_bg || DEFAULT_CONFIG.sidebar.active_bg,
+                        active_text: dbConfig.sidebar?.activeText || dbConfig.sidebar_active_text || DEFAULT_CONFIG.sidebar.active_text,
+                        hover_bg: dbConfig.sidebar?.hoverColor || dbConfig.sidebar_hover_bg || DEFAULT_CONFIG.sidebar.hover_bg,
+                        width: dbConfig.sidebar?.width || dbConfig.sidebar_width || DEFAULT_CONFIG.sidebar.width,
+                        collapsed_width: dbConfig.sidebar?.collapsedWidth || dbConfig.sidebar_collapsed_width || DEFAULT_CONFIG.sidebar.collapsed_width
                     },
                     layout: {
                         border_radius_sm: dbConfig.border_radius_sm || DEFAULT_CONFIG.layout.border_radius_sm,

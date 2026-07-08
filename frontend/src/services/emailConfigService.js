@@ -78,6 +78,13 @@ class EmailConfigService {
       body: JSON.stringify(template)
     });
   }
+
+  /**
+   * Obtener vista previa renderizada de una plantilla
+   */
+  static async previewTemplate(id) {
+    return ApiClient.request(`/email-config/templates/${id}/preview`);
+  }
 }
 
 export default EmailConfigService;

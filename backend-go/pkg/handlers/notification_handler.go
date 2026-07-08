@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"io"
 	"net/http"
 
 	"backend-go/pkg/database"
@@ -11,18 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// SSE (mantener existente)
-func SSEHandler(c *gin.Context) {
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Header("Transfer-Encoding", "chunked")
-
-	c.Stream(func(w io.Writer) bool {
-		return false // serverless: no long-lived connections
-	})
-}
-
 // ─────────────────────────────────────────────
 // NOTIFICATIONS
 // ─────────────────────────────────────────────
@@ -30,11 +17,12 @@ func SSEHandler(c *gin.Context) {
 func GetNotifications(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	role, _ := c.Get("role")
+	agencia, _ := c.Get("agencia")
 
 	notifications := make([]models.Notification, 0)
 
 	query := database.DB.Where("is_hidden = false").
-		Where("target_user_id = ? OR target_role = ? OR (target_user_id IS NULL AND target_role = '')", userID, role)
+		Where("target_user_id = ? OR target_role = ? OR target_agency = ? OR (target_user_id IS NULL AND target_role = '' AND target_agency = '')", userID, role, agencia)
 
 	if c.Query("onlyUnread") == "true" {
 		query = query.Where("is_read = false")
@@ -49,11 +37,12 @@ func GetNotifications(c *gin.Context) {
 func GetUnreadCount(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	role, _ := c.Get("role")
+	agencia, _ := c.Get("agencia")
 
 	var count int64
 	database.DB.Model(&models.Notification{}).
 		Where("is_read = false AND is_hidden = false").
-		Where("target_user_id = ? OR target_role = ? OR (target_user_id IS NULL AND target_role = '')", userID, role).
+		Where("target_user_id = ? OR target_role = ? OR target_agency = ? OR (target_user_id IS NULL AND target_role = '' AND target_agency = '')", userID, role, agencia).
 		Count(&count)
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "unreadCount": count})
@@ -68,9 +57,10 @@ func MarkNotificationRead(c *gin.Context) {
 func MarkAllNotificationsRead(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	role, _ := c.Get("role")
+	agencia, _ := c.Get("agencia")
 
 	database.DB.Model(&models.Notification{}).
-		Where("target_user_id = ? OR target_role = ? OR (target_user_id IS NULL AND target_role = '')", userID, role).
+		Where("target_user_id = ? OR target_role = ? OR target_agency = ? OR (target_user_id IS NULL AND target_role = '' AND target_agency = '')", userID, role, agencia).
 		Update("is_read", true)
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Todas las notificaciones marcadas como leídas"})
@@ -91,8 +81,10 @@ func CreateNotification(c *gin.Context) {
 	notification.ID = uuid.New()
 
 	createdByVal, _ := c.Get("userID")
-	if uid, ok := createdByVal.(uuid.UUID); ok {
-		notification.CreatedBy = &uid
+	if s, ok := createdByVal.(string); ok {
+		if uid, err := uuid.Parse(s); err == nil {
+			notification.CreatedBy = &uid
+		}
 	}
 
 	if notification.Icon == "" {
