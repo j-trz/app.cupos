@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { useEvolutionRevenue, useSalesByAgency, useDestinationsDetail, useTopProducts, useRiskAlerts } from '../hooks/useReports';
+import { useEvolutionRevenue, useSalesByAgency, useDestinationsDetail, useTopProducts, useRiskAlerts, useOccupancy } from '../hooks/useReports';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock } from 'lucide-react';
 import ReportFilters from '../components/reports/ReportFilters';
@@ -11,9 +11,10 @@ import TopDestinationsChart from '../components/reports/TopDestinationsChart';
 import OccupancyHeatmap from '../components/reports/OccupancyHeatmap';
 import RiskAlertsTable from '../components/reports/RiskAlertsTable';
 import DestinationDetailTable from '../components/reports/DestinationDetailTable';
+import ProductPerformanceTable from '../components/reports/ProductPerformanceTable';
 
 const Reportes = () => {
-  const [filters, setFilters] = useState({ dateRange: '6m', destino: 'all' });
+  const [filters, setFilters] = useState({ dateRange: '6m', destino: 'all', aerolinea: 'all', temporada: 'all' });
   const { user } = useAuth();
 
   // Solo administradores totales y de agencia pueden acceder
@@ -44,6 +45,7 @@ const Reportes = () => {
   const { data: destinations, isLoading: loadingDest } = useDestinationsDetail(filters);
   const { data: topProducts, isLoading: loadingTop } = useTopProducts({ metric: 'rentabilidad', limit: 5 });
   const { data: riskAlerts, isLoading: loadingRisk } = useRiskAlerts();
+  const { data: occupancy, isLoading: loadingOccupancy } = useOccupancy(filters);
 
   // Calcular KPIs del último período
   const latestStats = evolution?.[evolution.length - 1] || {};
@@ -64,8 +66,18 @@ const Reportes = () => {
     console.log('Exportar reportes con filtros:', filters);
   };
 
+  // Extract unique destinations from data for filter dropdown
+  const destinationsList = [...new Set((destinations || []).map(d => d.destino).filter(Boolean))];
+
+  // Transform destinations data for product performance table
+  const productPerformanceData = (destinations || []).map(d => ({
+    ...d,
+    rentabilidad_percent: d.venta_real > 0 ? (d.rentabilidad / d.venta_real) * 100 : 0,
+    riesgo_percent: d.costo_real > 0 ? (d.riesgo / d.costo_real) * 100 : 0,
+  }));
+
   return (
-    <div className="container mx-auto py-4 space-y-4">
+    <div className="w-full space-y-3">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -75,7 +87,12 @@ const Reportes = () => {
       </div>
 
       {/* Filtros */}
-      <ReportFilters filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
+      <ReportFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        onExport={handleExport}
+        destinations={destinationsList}
+      />
 
       {/* KPIs Row */}
       <KPIsRow stats={stats} />
@@ -89,11 +106,14 @@ const Reportes = () => {
       {/* Row 3: Análisis detallado */}
       <div className="grid grid-cols-3 gap-4">
         <TopDestinationsChart data={topProducts} loading={loadingTop} />
-        <OccupancyHeatmap data={destinations} loading={loadingDest} />
+        <OccupancyHeatmap data={occupancy || destinations} loading={loadingOccupancy || loadingDest} />
         <RiskAlertsTable data={riskAlerts} loading={loadingRisk} />
       </div>
 
-      {/* Row 4: Tabla detallada (colapsable) */}
+      {/* Row 4: Tabla de rendimiento por producto */}
+      <ProductPerformanceTable data={productPerformanceData} loading={loadingDest} />
+
+      {/* Row 5: Tabla detallada (colapsable) */}
       <DestinationDetailTable data={destinations} loading={loadingDest} />
     </div>
   );
