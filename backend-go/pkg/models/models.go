@@ -53,10 +53,16 @@ type Product struct {
 	InfFare                float64    `json:"inf_fare"`
 	ChdFare                float64    `json:"chd_fare"`
 	IsBlockedForSale       bool       `gorm:"default:false" json:"is_blocked_for_sale"`
+	// Agencia es la agencia DUEÑA de este cupo. Ya no existe un "catálogo
+	// general" visible para todas las agencias por defecto: sin cesión de por
+	// medio, un producto solo lo ve (y lo puede reservar) su propia agencia
+	// dueña (y el admin, que ve todo). Otra agencia solo lo ve si se le cedió
+	// disponibilidad (ver RestrictedAgency más abajo).
+	Agencia string `gorm:"column:agencia" json:"agencia"`
 	// RestrictedAgency, si está seteado, hace que este producto solo sea
 	// visible/reservable para esa agencia (+ admin) — se usa en los productos
 	// "espejo" que crea una cesión, para que el cupo cedido lo vea únicamente
-	// la agencia destino y no el resto del catálogo compartido (en Disponibilidad).
+	// la agencia destino y no el catálogo de la agencia dueña.
 	RestrictedAgency string `gorm:"column:restricted_agency" json:"restricted_agency,omitempty"`
 	// SourceAgency es quién cedió ESTE producto-espejo puntual (la agencia
 	// cedente inmediata de este hop). A diferencia de RestrictedAgency (quién

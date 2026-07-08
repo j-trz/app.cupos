@@ -63,10 +63,27 @@ class ApiClient {
       headers,
       credentials: 'include' // Incluir cookies en requests cross-origin
     });
-    const data = await response.json();
+
+    // No asumir que el body es JSON: una ruta inexistente devuelve el 404 en
+    // texto plano de Gin ("404 page not found"), y JSON.parse sobre eso tira
+    // un error críptico ("Unexpected non-whitespace character... position 4",
+    // porque el "404" inicial sí parsea como número JSON válido) que no dice
+    // nada sobre la causa real. Leemos como texto y parseamos nosotros.
+    const rawText = await response.text();
+    let data = null;
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${rawText.slice(0, 200)}`);
+        }
+        return rawText;
+      }
+    }
 
     if (!response.ok) {
-      throw new Error(data.error || data.message || `HTTP ${response.status}`);
+      throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
     }
 
     return data;

@@ -311,24 +311,27 @@ const GestionProductos = () => {
                     <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
                     <TableCell>{product.compania}</TableCell>
                     <TableCell>
-                      {product.restricted_agency || product.source_agency ? (
-                        <div className="flex flex-col gap-1">
-                          {/* Si soy el dueño original (o el admin viendo todo) */}
-                          {product.restricted_agency && (user.role === 'admin' || user.agencia === product.source_agency) && (
-                            <Badge variant="outline" className="w-fit text-[10px]">
-                              Prestado a {agencyName(product.restricted_agency)}
-                            </Badge>
-                          )}
-                          {/* Si soy la agencia que recibió el cupo */}
-                          {product.source_agency && (user.role === 'admin' || user.agencia === product.restricted_agency) && (
-                            <span className="text-[10px] text-slate-400">
-                              Cedido por {agencyName(product.source_agency)}
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium text-slate-700">
+                          {product.agencia ? agencyName(product.agencia) : (
+                            <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
+                              Sin agencia dueña
                             </span>
                           )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">Catálogo general</span>
-                      )}
+                        </span>
+                        {/* Si soy el dueño original (o el admin viendo todo) */}
+                        {product.restricted_agency && (user.role === 'admin' || user.agencia === product.source_agency) && (
+                          <Badge variant="outline" className="w-fit text-[10px]">
+                            Prestado a {agencyName(product.restricted_agency)}
+                          </Badge>
+                        )}
+                        {/* Si soy la agencia que recibió el cupo */}
+                        {product.source_agency && (user.role === 'admin' || user.agencia === product.restricted_agency) && (
+                          <span className="text-[10px] text-slate-400">
+                            Cedido por {agencyName(product.source_agency)}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {product.ruta ? (

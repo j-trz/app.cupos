@@ -68,12 +68,13 @@ func fixDates(data map[string]interface{}) {
 	}
 }
 
-// GetProducts lista productos. Por defecto (scope de "disponibilidad" /
-// reserva) un cupo cedido (restricted_agency) solo lo ve la agencia que lo
-// tiene hoy. Con ?scope=management (usado por las pantallas de gestión,
-// no por Disponibilidad) también lo ve la agencia que lo cedió
-// (source_agency) — para que la cedente pueda seguir viéndolo/gestionarlo
-// y, si hace falta, volver a cederlo hacia atrás.
+// GetProducts lista productos. No existe un "catálogo general" visible para
+// todas las agencias: cada producto tiene una agencia dueña (Agencia) y por
+// defecto solo esa agencia (+ admin) lo ve. Una agencia distinta lo ve
+// únicamente si le cedieron disponibilidad (restricted_agency). Con
+// ?scope=management (usado por las pantallas de gestión, no por
+// Disponibilidad) la agencia dueña también ve los productos que cedió a
+// otras (source_agency), para poder seguir gestionándolos/recuperarlos.
 func GetProducts(c *gin.Context) {
 	// Inicializado como slice vacío (no nil): si el query no matchea filas,
 	// GORM deja el slice como está y un nil slice serializa a JSON "null" en
@@ -93,14 +94,14 @@ func GetProducts(c *gin.Context) {
 	query := database.DB
 	if managementScope {
 		if role != "admin" {
-			query = query.Where("LOWER(restricted_agency) = '' OR LOWER(restricted_agency) = LOWER(?) OR LOWER(source_agency) = LOWER(?)", agencia, agencia)
+			query = query.Where("LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?) OR LOWER(source_agency) = LOWER(?)", agencia, agencia, agencia)
 		}
 	} else {
 		// Vista de reserva (Disponibilidad): nunca mostrar cupos agotados, ni
-		// bloqueados para venta, ni cedidos a otra agencia que no sea la mía.
+		// bloqueados para venta, ni de una agencia que no es la mía ni me cedió.
 		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false")
 		if role != "admin" {
-			query = query.Where("LOWER(restricted_agency) = '' OR LOWER(restricted_agency) = LOWER(?)", agencia)
+			query = query.Where("LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?)", agencia, agencia)
 		}
 	}
 	query.Find(&products)
@@ -125,9 +126,12 @@ func GetProductByID(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	agenciaRaw, _ := agenciaVal.(string)
 	agencia := services.ResolveAgencyCode(agenciaRaw)
-	isRestrictedToOther := product.RestrictedAgency != "" && !strings.EqualFold(product.RestrictedAgency, agencia)
+	// Visible si: soy la agencia dueña, me lo cedieron (restricted_agency), o
+	// yo lo cedí a alguien (source_agency, para poder seguir gestionándolo).
+	isOwner := product.Agencia != "" && strings.EqualFold(product.Agencia, agencia)
+	wasCededToMe := product.RestrictedAgency != "" && strings.EqualFold(product.RestrictedAgency, agencia)
 	wasSourcedByMe := product.SourceAgency != "" && strings.EqualFold(product.SourceAgency, agencia)
-	if role != "admin" && isRestrictedToOther && !wasSourcedByMe {
+	if role != "admin" && !isOwner && !wasCededToMe && !wasSourcedByMe {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
 		return
 	}
@@ -227,13 +231,60 @@ func UpdateProduct(c *gin.Context) {
 		"carryon", "handbag", "checkedbag",
 		"inf_fare", "chd_fare",
 		"is_blocked_for_sale",
-		"source_agency",
+		"agencia", "source_agency",
 	).Save(&updated).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto: " + err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, updated)
+}
+
+// DeleteProduct elimina un producto. No existía ningún endpoint para esto —
+// el frontend ya llamaba a DELETE /products/:id, pero como la ruta nunca se
+// registró, Gin devolvía su 404 default en texto plano ("404 page not
+// found"), que el cliente intentaba parsear como JSON y fallaba con un error
+// críptico ("Unexpected non-whitespace character... position 4", porque el
+// "404" inicial sí es un número JSON válido).
+//
+// Se bloquea el borrado en dos casos para no romper trazabilidad/datos:
+//   - Tiene reservas asociadas (dejaría reservas huérfanas apuntando a un
+//     producto inexistente).
+//   - Es un producto-espejo de una cesión con stock todavía activo (hay que
+//     recuperarlo primero con el rollback existente).
+func DeleteProduct(c *gin.Context) {
+	id := c.Param("id")
+	var product models.Product
+	if err := database.DB.First(&product, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+
+	var reservationCount int64
+	database.DB.Model(&models.Reservation{}).Where("product_id = ?", product.ID).Count(&reservationCount)
+	if reservationCount > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("No se puede eliminar: tiene %d reserva(s) asociada(s)", reservationCount)})
+		return
+	}
+
+	if product.TransferID != nil && product.Disponibilidad > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Este cupo fue cedido y todavía tiene stock activo. Recuperalo antes de eliminarlo."})
+		return
+	}
+
+	var transferCount int64
+	database.DB.Model(&models.AvailabilityTransfer{}).Where("product_id = ?", product.ID).Count(&transferCount)
+	if transferCount > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "No se puede eliminar: este producto tiene cesiones registradas. Recuperá los cupos cedidos antes de eliminarlo."})
+		return
+	}
+
+	if err := database.DB.Delete(&models.Product{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar el producto: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Producto eliminado correctamente"})
 }
 
 func BulkCreateProducts(c *gin.Context) {

@@ -3,6 +3,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
 import { toDateOnlyString } from '../lib/dateOnly.js';
+import { useAgencies } from '../hooks/useAgencies';
 
 // Tipos de producto soportados. El campo "ruta" se relabela según el tipo
 // (Cabina para Crucero, Habitación para Hotel) — la lógica de negocio
@@ -22,6 +23,7 @@ const RUTA_LABEL_BY_TIPO = {
 
 const EMPTY_FORM = {
   codigo_cupo: '',
+  agencia: '',
   destino: '',
   compania: '',
   disponibilidad: '',
@@ -50,6 +52,7 @@ function toFormValues(product) {
   const fmt = toDateOnlyString;
   return {
     codigo_cupo: product.codigo_cupo || '',
+    agencia: product.agencia || '',
     destino: product.destino || '',
     compania: product.compania || '',
     disponibilidad: product.disponibilidad ?? '',
@@ -78,6 +81,7 @@ function toPayload(form) {
   const num = (v) => (v === '' || v === null || v === undefined ? 0 : Number(v));
   return {
     codigo_cupo: form.codigo_cupo,
+    agencia: form.agencia,
     destino: form.destino,
     compania: form.compania,
     disponibilidad: num(form.disponibilidad),
@@ -111,6 +115,7 @@ const ProductForm = ({
 }) => {
   const [form, setForm] = useState(() => toFormValues(isEditing ? defaultValues : null));
   const [errors, setErrors] = useState({});
+  const { data: agencies = [] } = useAgencies();
 
   const set = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -119,6 +124,7 @@ const ProductForm = ({
 
   const validate = () => {
     const e = {};
+    if (!form.agencia) e.agencia = 'Requerido';
     if (!form.destino.trim()) e.destino = 'Requerido';
     if (!form.compania.trim()) e.compania = 'Requerido';
     if (form.disponibilidad === '' || isNaN(Number(form.disponibilidad))) e.disponibilidad = 'Número requerido';
@@ -193,6 +199,22 @@ const ProductForm = ({
                 </div>
               </div>
             )}
+            <div className="space-y-1">
+              <Label htmlFor="agencia">Agencia Dueña *</Label>
+              <select
+                id="agencia"
+                value={form.agencia}
+                onChange={(e) => set('agencia', e.target.value)}
+                className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ${errors.agencia ? 'border-red-500' : 'border-input'}`}
+              >
+                <option value="">Seleccionar agencia...</option>
+                {agencies.map((a) => (
+                  <option key={a.id} value={a.code}>{a.name}</option>
+                ))}
+              </select>
+              {errors.agencia && <p className="text-xs text-red-500">{errors.agencia}</p>}
+              <p className="text-xs text-slate-400">Solo esta agencia (y el admin) va a ver este cupo, salvo que lo cedas a otra.</p>
+            </div>
             {field('destino', 'Destino', 'text', { required: true })}
             {field('compania', 'Compañía', 'text', { required: true })}
             <div className="space-y-1">

@@ -58,16 +58,19 @@ func CreateTransfer(c *gin.Context) {
 	}
 
 	// La agencia cedente de ESTA cesión: si el producto ya es un espejo de
-	// otra cesión, es quien lo tiene hoy (RestrictedAgency) — no el catálogo
-	// general. Si es un producto del catálogo compartido (sin restricción),
-	// la agencia cedente es la del usuario que ejecuta la acción.
-	sourceAgency := callerAgencia
+	// otra cesión, es quien lo tiene hoy (RestrictedAgency). Si es un producto
+	// "de origen" (no un espejo), la cedente es su agencia dueña (Agencia) —
+	// ya no existe un catálogo compartido sin dueño.
+	sourceAgency := product.Agencia
 	if product.RestrictedAgency != "" {
 		sourceAgency = product.RestrictedAgency
 		if role != "admin" && !strings.EqualFold(callerAgencia, product.RestrictedAgency) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "No podés ceder un cupo que no te pertenece"})
 			return
 		}
+	} else if role != "admin" && !strings.EqualFold(callerAgencia, product.Agencia) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No podés ceder un cupo que no te pertenece"})
+		return
 	}
 
 	// Validar que origen y destino sean diferentes

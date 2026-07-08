@@ -96,6 +96,7 @@ func init() {
 				products.GET("/:id", handlers.GetProductByID)
 				products.POST("", middleware.AdminOnly(), handlers.CreateProduct)
 				products.PUT("/:id", middleware.AdminOnly(), handlers.UpdateProduct)
+				products.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteProduct)
 				products.POST("/bulk", middleware.AdminOnly(), handlers.BulkCreateProducts)
 			}
 
