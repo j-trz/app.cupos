@@ -1,5 +1,16 @@
 import ApiClient from './apiClient';
 
+// El backend puede responder un array plano o {data:[...]}, y en algunos
+// endpoints devuelve JSON null (200) cuando el query no matchea filas (un
+// slice de Go sin inicializar serializa como null, no []). Esta función
+// normaliza cualquiera de esos casos a un array, sin romper si `result` es
+// null/undefined.
+const toArray = (result) => {
+  if (Array.isArray(result)) return result;
+  if (result && Array.isArray(result.data)) return result.data;
+  return [];
+};
+
 const adaptProduct = (producto) => ({
   id: producto.id,
   codigo_cupo: producto.codigo_cupo,
@@ -31,21 +42,27 @@ const adaptRequest = (item) => ({
   Agencia: item.Agencia || item.agencia || '',
   Contacto_Nombre: item.Contacto_Nombre || item.contacto_nombre || item.contacto?.nombre || '',
   Contacto_Email: item.Contacto_Email || item.contacto_email || item.contacto?.email || '',
-  Vuelo_Destino: item.Vuelo_Destino || item.vuelo_destino || item.destino || '',
+  Vuelo_Destino: item.Vuelo_Destino || item.vuelo_destino || item.destino || item.product?.destino || '',
   Nombre_Pasajero: item.Nombre_Pasajero || item.nombre_pasajero || '',
   Apellido_Pasajero: item.Apellido_Pasajero || item.apellido_pasajero || '',
-  Temporada: item.Temporada || item.temporada || '',
-  Vuelo_Salida: item.Vuelo_Salida || item.vuelo_salida || item.fecha_salida || '',
+  Temporada: item.Temporada || item.temporada || item.product?.temporada || '',
+  Vuelo_Salida: item.Vuelo_Salida || item.vuelo_salida || item.fecha_salida || item.product?.fecha_salida || '',
   Estado: item.Estado || item.estado || 'Solicitado',
   Doc_Contable: item.Doc_Contable || item.doc_contable || '',
-  Ruta: item.Ruta || item.ruta || '',
+  Ruta: item.Ruta || item.ruta || item.vuelo_ruta || item.product?.ruta || '',
   Fecha_Registro: item.Fecha_Registro || item.fecha_registro || item.created_at || '',
-  Vuelo_Codigo: item.Vuelo_Codigo || item.vuelo_codigo || '',
-  Vuelo_Compania: item.Vuelo_Compania || item.vuelo_compania || '',
-  Vuelo_Precio: item.Vuelo_Precio || item.vuelo_precio || '',
+  Vuelo_Codigo: item.Vuelo_Codigo || item.vuelo_codigo || item.product?.codigo_cupo || '',
+  Vuelo_Compania: item.Vuelo_Compania || item.vuelo_compania || item.product?.compania || '',
+  Vuelo_Precio: item.Vuelo_Precio || item.vuelo_precio || item.product?.precio || '',
   Usuario_Email: item.Usuario_Email || item.usuario_email || '',
-  Pnr: item.Pnr || item.pnr || '',
-  Ficha: item.Ficha || item.ficha || '',
+  Pnr: item.Pnr || item.pnr || item.product?.pnr || '',
+  Ficha: item.Ficha || item.ficha || item.ficha_venta || '',
+  TipoProducto: item.product?.tipo_producto || item.tipo_producto || '',
+  InfFare: item.product?.inf_fare ?? 0,
+  ChdFare: item.product?.chd_fare ?? 0,
+  CarryOn: !!item.product?.carryon,
+  HandBag: !!item.product?.handbag,
+  CheckedBag: !!item.product?.checkedbag,
 });
 
 class ReservationService {
@@ -55,7 +72,7 @@ class ReservationService {
       const queryParams = new URLSearchParams(params).toString();
       const endpoint = queryParams ? `/orders?${queryParams}` : '/orders';
       const result = await ApiClient.get(endpoint);
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+      return toArray(result);
     } catch (error) {
       console.error('Error fetching reservations:', error);
       throw error;
@@ -141,11 +158,7 @@ class ReservationService {
 
   static async getAvailability() {
     const result = await ApiClient.get('/products');
-    const products = Array.isArray(result)
-      ? result
-      : Array.isArray(result.data)
-      ? result.data
-      : [];
+    const products = toArray(result);
     return {
       success: true,
       data: products.map(adaptProduct),
@@ -169,13 +182,13 @@ class ReservationService {
     const result = await ApiClient.get('/orders');
     return {
       success: true,
-      data: Array.isArray(result) ? result.map(adaptRequest) : Array.isArray(result.data) ? result.data.map(adaptRequest) : [],
+      data: toArray(result).map(adaptRequest),
     };
   }
 
   static async getConfirmations() {
     const result = await ApiClient.get('/orders');
-    const all = Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+    const all = toArray(result);
     const confirmed = all.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada');
     return {
       success: true,
@@ -196,7 +209,7 @@ class ReservationService {
   static async getMyBlockedReservations() {
     try {
       const result = await ApiClient.get('/orders/my-blocked');
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+      return toArray(result);
     } catch (error) {
       console.error('Error fetching blocked reservations:', error);
       throw error;
@@ -232,6 +245,31 @@ class ReservationService {
       return result;
     } catch (error) {
       console.error(`Error updating passenger ${passengerId} ticket:`, error);
+      throw error;
+    }
+  }
+
+  // Edita los datos propios de un pasajero (nombre, apellido, documento,
+  // nacimiento, nacionalidad, tipo_pasajero, tarifas) — distinto de
+  // updatePassengerTicket, que solo toca numero_ticket/estado/doc_contable.
+  static async updatePassenger(reservationId, passengerId, data) {
+    try {
+      const result = await ApiClient.put(`/orders/${reservationId}/passengers/${passengerId}/full`, data);
+      return result;
+    } catch (error) {
+      console.error(`Error updating passenger ${passengerId}:`, error);
+      throw error;
+    }
+  }
+
+  // Duplica un pasajero dentro del mismo pedido (ej. grupo familiar con datos
+  // similares), ocupando 1 lugar más si hay disponibilidad.
+  static async duplicatePassenger(reservationId, passengerId) {
+    try {
+      const result = await ApiClient.post(`/orders/${reservationId}/passengers/${passengerId}/duplicate`);
+      return result;
+    } catch (error) {
+      console.error(`Error duplicating passenger ${passengerId}:`, error);
       throw error;
     }
   }

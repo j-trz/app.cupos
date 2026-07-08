@@ -31,6 +31,10 @@ const emptyForm = {
   precio_venta: '',
   doc_contable: '',
   estado: 'bloqueo_temporal',
+  vuelo_destino: '',
+  vuelo_salida: '',
+  bloqueo_expira_at: '',
+  ficha_venta: '',
 };
 
 const formatDate = formatDateOnly;
@@ -248,6 +252,10 @@ export default function GestionReservas() {
       precio_venta: r.precio_venta || '',
       doc_contable: r.doc_contable || '',
       estado: r.estado || 'bloqueo_temporal',
+      vuelo_destino: r.vuelo_destino || '',
+      vuelo_salida: r.vuelo_salida ? String(r.vuelo_salida).slice(0, 10) : '',
+      bloqueo_expira_at: r.bloqueo_expira_at ? String(r.bloqueo_expira_at).slice(0, 16) : '',
+      ficha_venta: r.ficha_venta || '',
     });
     setProductInfo(null);
     setDialogOpen(true);
@@ -276,6 +284,22 @@ export default function GestionReservas() {
       product_id: form.product_id ? Number(form.product_id) : undefined,
       precio_venta: form.precio_venta ? Number(form.precio_venta) : 0,
     };
+    // El input datetime-local manda "YYYY-MM-DDTHH:mm" sin segundos ni offset,
+    // que el backend no reconoce (solo "YYYY-MM-DD" y RFC3339 completo).
+    if (payload.bloqueo_expira_at && payload.bloqueo_expira_at.length === 16) {
+      payload.bloqueo_expira_at = `${payload.bloqueo_expira_at}:00Z`;
+    }
+    if (editReservation) {
+      // Los datos de pasajero (nombre/apellido/documento/nacionalidad/tipo)
+      // se editan desde Nóminas, no desde este formulario — el backend ya
+      // los bloquea, pero se limpian acá también para no mandar campos que
+      // el usuario no llegó a ver/tocar en modo edición.
+      delete payload.nombre_pasajero;
+      delete payload.apellido_pasajero;
+      delete payload.documento_pasajero;
+      delete payload.nacionalidad_pasajero;
+      delete payload.tipo_pasajero;
+    }
     // Quitar campos vacíos
     Object.keys(payload).forEach(k => {
       if (payload[k] === '' || payload[k] === undefined) delete payload[k];
@@ -457,6 +481,7 @@ export default function GestionReservas() {
               <TableHead className="text-center">Ruta</TableHead>
               <TableHead>Salida</TableHead>
               <TableHead>Vencimiento</TableHead>
+              <TableHead>Ficha</TableHead>
               <TableHead>Cesión</TableHead>
               <TableHead>Doc.Contable</TableHead>
               <TableHead>Ticket</TableHead>
@@ -470,9 +495,9 @@ export default function GestionReservas() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={20} className="text-center py-10">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={21} className="text-center py-10">Cargando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={20} className="text-center py-10 text-slate-400">
+              <TableRow><TableCell colSpan={21} className="text-center py-10 text-slate-400">
                 {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
               </TableCell></TableRow>
             ) : filtered.flatMap(r => {
@@ -514,12 +539,16 @@ export default function GestionReservas() {
                   </TableCell>
                   <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
                   <TableCell>
-                    {expiry ? (
-                      <span className={`flex items-center gap-1 text-xs ${expiry.color}`}>
-                        <Clock className="h-3 w-3" />{expiry.label}
-                      </span>
-                    ) : '—'}
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs text-slate-600">{formatDate(r.bloqueo_expira_at) || '—'}</span>
+                      {expiry && (
+                        <span className={`flex items-center gap-1 text-xs ${expiry.color}`}>
+                          <Clock className="h-3 w-3" />{expiry.label}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
+                  <TableCell className="text-xs">{r.ficha_venta || '—'}</TableCell>
                   {/* Cesión: en la agencia cedente muestra la salida de stock;
                       en la reserva real hecha con ese cupo, de qué agencia vino */}
                   <TableCell>
@@ -664,6 +693,31 @@ export default function GestionReservas() {
             </div>
           </section>
 
+          {/* VUELO / VENCIMIENTO — solo en edición, son datos del pedido, no del pasajero */}
+          {editReservation && (
+            <section>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Vuelo y Vencimiento</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Destino">
+                  <input type="text" value={form.vuelo_destino} onChange={e => setField('vuelo_destino', e.target.value)}
+                    className={inputCls} placeholder="Destino" />
+                </Field>
+                <Field label="Salida">
+                  <input type="date" value={form.vuelo_salida} onChange={e => setField('vuelo_salida', e.target.value)}
+                    className={inputCls} />
+                </Field>
+                <Field label="Vencimiento del bloqueo">
+                  <input type="datetime-local" value={form.bloqueo_expira_at} onChange={e => setField('bloqueo_expira_at', e.target.value)}
+                    className={inputCls} />
+                </Field>
+                <Field label="Ficha">
+                  <input type="text" value={form.ficha_venta} onChange={e => setField('ficha_venta', e.target.value)}
+                    className={inputCls} placeholder="Ficha de venta" />
+                </Field>
+              </div>
+            </section>
+          )}
+
           {/* CONTACTO */}
           <section>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contacto</h3>
@@ -684,34 +738,42 @@ export default function GestionReservas() {
             </div>
           </section>
 
-          {/* PASAJERO */}
-          <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero</h3>
-            <p className="mb-2 text-xs text-slate-400">Cada pasajero ocupa 1 lugar y se crea como su propio ticket. Para cargar varios pasajeros en el mismo pedido, usá la pantalla de Disponibilidad.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Nombre">
-                <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
-                  className={inputCls} placeholder="Nombre" />
-              </Field>
-              <Field label="Apellido">
-                <input type="text" value={form.apellido_pasajero} onChange={e => setField('apellido_pasajero', e.target.value)}
-                  className={inputCls} placeholder="Apellido" />
-              </Field>
-              <Field label="Documento">
-                <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
-                  className={inputCls} placeholder="CI / Pasaporte" />
-              </Field>
-              <Field label="Nacionalidad">
-                <input type="text" value={form.nacionalidad_pasajero} onChange={e => setField('nacionalidad_pasajero', e.target.value)}
-                  className={inputCls} placeholder="Uruguayo/a" />
-              </Field>
-              <Field label="Tipo">
-                <select value={form.tipo_pasajero} onChange={e => setField('tipo_pasajero', e.target.value)} className={inputCls + ' bg-white'}>
-                  {['Adulto', 'Niño', 'Infante'].map(t => <option key={t}>{t}</option>)}
-                </select>
-              </Field>
-            </div>
-          </section>
+          {/* PASAJERO — solo al crear. Una vez creada la reserva, los datos de
+              pasajero se editan por pasajero individual desde Nóminas. */}
+          {!editReservation && (
+            <section>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero</h3>
+              <p className="mb-2 text-xs text-slate-400">Cada pasajero ocupa 1 lugar y se crea como su propio ticket. Para cargar varios pasajeros en el mismo pedido, usá la pantalla de Disponibilidad.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Nombre">
+                  <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
+                    className={inputCls} placeholder="Nombre" />
+                </Field>
+                <Field label="Apellido">
+                  <input type="text" value={form.apellido_pasajero} onChange={e => setField('apellido_pasajero', e.target.value)}
+                    className={inputCls} placeholder="Apellido" />
+                </Field>
+                <Field label="Documento">
+                  <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
+                    className={inputCls} placeholder="CI / Pasaporte" />
+                </Field>
+                <Field label="Nacionalidad">
+                  <input type="text" value={form.nacionalidad_pasajero} onChange={e => setField('nacionalidad_pasajero', e.target.value)}
+                    className={inputCls} placeholder="Uruguayo/a" />
+                </Field>
+                <Field label="Tipo">
+                  <select value={form.tipo_pasajero} onChange={e => setField('tipo_pasajero', e.target.value)} className={inputCls + ' bg-white'}>
+                    {['Adulto', 'Niño', 'Infante'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </Field>
+              </div>
+            </section>
+          )}
+          {editReservation && (
+            <p className="text-xs text-slate-400 -mt-2">
+              Los datos de los pasajeros (nombre, documento, tipo, etc.) se editan individualmente desde <span className="font-medium text-slate-500">Gestión de Nóminas</span>.
+            </p>
+          )}
 
           {/* DOC CONTABLE */}
           <section className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">

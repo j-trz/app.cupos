@@ -19,7 +19,12 @@ export const updateUserSchema = z.object({
   rol: z.string().min(1, 'El rol es requerido'),
   agencia: z.string().optional(),
   activo: z.boolean().optional(),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').optional(),
+  // El form de edición siempre manda password: '' (nunca se pide al editar),
+  // y z.string().optional() solo acepta undefined, no ''. Eso hacía fallar
+  // la validación en TODA edición sin ningún error visible (el campo de
+  // password ni siquiera se muestra en modo edición), así que "Actualizar"
+  // no hacía nada. Se acepta explícitamente '' además del mínimo de 6.
+  password: z.union([z.literal(''), z.string().min(6, 'La contraseña debe tener al menos 6 caracteres')]).optional(),
 });
 
 // Esquema para validación de productos

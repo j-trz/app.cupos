@@ -312,10 +312,14 @@ func isVentaValida(pax *models.Passenger, fechaRegreso *time.Time) bool {
 type reservationWithVendor struct {
 	models.Reservation
 	VendedorEmail string `json:"vendedor_email"`
+	// Product viaja embebido para que las pantallas de gestión (GestionReservas,
+	// Requests, Confirmations) puedan mostrar temporada/equipaje/ruta/tarifas
+	// del producto aunque la reserva sea vieja y no tenga esos datos copiados.
+	Product *models.Product `json:"product,omitempty"`
 }
 
 func GetAllReservations(c *gin.Context) {
-	var reservations []models.Reservation
+	reservations := []models.Reservation{}
 	role, _ := c.Get("role")
 	agencia, _ := c.Get("agencia")
 
@@ -330,12 +334,18 @@ func GetAllReservations(c *gin.Context) {
 	query.Order("created_at desc").Find(&reservations)
 
 	vendorIDSet := make(map[uuid.UUID]struct{}, len(reservations))
+	productIDSet := make(map[uint]struct{}, len(reservations))
 	for _, r := range reservations {
 		vendorIDSet[r.CreatedBy] = struct{}{}
+		productIDSet[r.ProductID] = struct{}{}
 	}
 	vendorIDs := make([]uuid.UUID, 0, len(vendorIDSet))
 	for id := range vendorIDSet {
 		vendorIDs = append(vendorIDs, id)
+	}
+	productIDs := make([]uint, 0, len(productIDSet))
+	for id := range productIDSet {
+		productIDs = append(productIDs, id)
 	}
 
 	emailByID := make(map[uuid.UUID]string, len(vendorIDs))
@@ -347,9 +357,41 @@ func GetAllReservations(c *gin.Context) {
 		}
 	}
 
+	productByID := make(map[uint]models.Product, len(productIDs))
+	if len(productIDs) > 0 {
+		var products []models.Product
+		database.DB.Where("id IN ?", productIDs).Find(&products)
+		for _, p := range products {
+			productByID[p.ID] = p
+		}
+	}
+
 	response := make([]reservationWithVendor, len(reservations))
 	for i, r := range reservations {
-		response[i] = reservationWithVendor{Reservation: r, VendedorEmail: emailByID[r.CreatedBy]}
+		item := reservationWithVendor{Reservation: r, VendedorEmail: emailByID[r.CreatedBy]}
+		if p, ok := productByID[r.ProductID]; ok {
+			pCopy := p
+			item.Product = &pCopy
+			// Reservas viejas creadas antes de copiar estos datos del producto
+			// quedaron con estos campos vacíos: se completan al vuelo desde el
+			// producto para que las tablas no muestren celdas en blanco.
+			if item.VueloDestino == "" {
+				item.VueloDestino = p.Destino
+			}
+			if item.VueloCompania == "" {
+				item.VueloCompania = p.Compania
+			}
+			if item.VueloSalida == nil {
+				item.VueloSalida = p.FechaSalida
+			}
+			if item.VueloRuta == "" {
+				item.VueloRuta = p.Ruta
+			}
+			if item.VueloCodigo == "" {
+				item.VueloCodigo = p.CodigoCupo
+			}
+		}
+		response[i] = item
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -484,13 +526,33 @@ func UpdateReservation(c *gin.Context) {
 		return
 	}
 
-	// No permitir cambiar campos críticos via update general
-	delete(input, "id")
-	delete(input, "created_by")
-	delete(input, "created_at")
+	// No permitir cambiar campos críticos ni datos de pasajero via update
+	// general del pedido: los datos de pasajero se editan por pasajero
+	// individual desde Nóminas (UpdatePassenger), no a nivel de Reservation.
+	blocked := []string{
+		"id", "created_by", "created_at", "product_id", "transfer_id", "original_agency",
+		"nombre_pasajero", "apellido_pasajero", "documento_pasajero",
+		"nacimiento_pasajero", "nacionalidad_pasajero", "tipo_pasajero",
+	}
+	for _, key := range blocked {
+		delete(input, key)
+	}
+
+	// Igual que en UpdateProduct: GORM Updates sobre un map usa los valores
+	// tal cual llegan sin la type-coercion que sí aplica Save() sobre un
+	// struct, así que las fechas que llegan como "YYYY-MM-DD" hay que
+	// convertirlas a *time.Time a mano antes de aplicar el update.
+	dateFields := []string{"vuelo_salida", "bloqueo_expira_at"}
+	for _, field := range dateFields {
+		if v, ok := input[field]; ok {
+			if s, ok := v.(string); ok {
+				input[field] = parseDateFlexible(s)
+			}
+		}
+	}
 
 	if err := database.DB.Model(&reservation).Updates(input).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar la reserva."})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar la reserva: " + err.Error()})
 		return
 	}
 
@@ -640,4 +702,133 @@ func UpdatePassengerTicket(c *gin.Context) {
 
 	database.DB.First(&passenger, passenger.ID)
 	c.JSON(http.StatusOK, passenger)
+}
+
+// UpdatePassenger edita los datos propios de UN pasajero (nombre, apellido,
+// documento, nacimiento, nacionalidad, tipo_pasajero, tarifas) desde Nóminas
+// — es la única vía para tocar estos campos; GestionReservas ya no los expone
+// porque los datos de pasajero se gestionan a nivel pasajero, no de pedido.
+func UpdatePassenger(c *gin.Context) {
+	reservationID := c.Param("id")
+	passengerID := c.Param("passengerId")
+
+	var passenger models.Passenger
+	if err := database.DB.Where("id = ? AND reservation_id = ?", passengerID, reservationID).First(&passenger).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pasajero no encontrado en esta reserva."})
+		return
+	}
+
+	var input struct {
+		Nombre       string   `json:"nombre"`
+		Apellido     string   `json:"apellido"`
+		Documento    string   `json:"documento"`
+		Nacimiento   string   `json:"nacimiento"`
+		Nacionalidad string   `json:"nacionalidad"`
+		TipoPasajero string   `json:"tipo_pasajero"`
+		PrecioVenta  *float64 `json:"precio_venta"`
+		Neto1        *float64 `json:"neto_1"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{
+		"nombre":        input.Nombre,
+		"apellido":      input.Apellido,
+		"documento":     input.Documento,
+		"nacionalidad":  input.Nacionalidad,
+		"tipo_pasajero": input.TipoPasajero,
+		"nacimiento":    parseDateFlexible(input.Nacimiento),
+	}
+	if input.PrecioVenta != nil {
+		updates["precio_venta"] = *input.PrecioVenta
+	}
+	if input.Neto1 != nil {
+		updates["neto_1"] = *input.Neto1
+	}
+
+	if err := database.DB.Model(&passenger).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el pasajero: " + err.Error()})
+		return
+	}
+
+	database.DB.First(&passenger, passenger.ID)
+	c.JSON(http.StatusOK, passenger)
+}
+
+// DuplicatePassenger crea un pasajero nuevo dentro del mismo pedido copiando
+// los datos de uno existente (grupo familiar con datos similares, ej.) —
+// ocupa 1 lugar más del producto y respeta su disponibilidad igual que crear
+// una reserva nueva.
+func DuplicatePassenger(c *gin.Context) {
+	reservationID := c.Param("id")
+	passengerID := c.Param("passengerId")
+
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, reservationID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	var source models.Passenger
+	if err := database.DB.Where("id = ? AND reservation_id = ?", passengerID, reservationID).First(&source).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pasajero no encontrado en esta reserva."})
+		return
+	}
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var product models.Product
+	if err := tx.First(&product, reservation.ProductID).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+	if product.Disponibilidad < 1 {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente para duplicar el pasajero"})
+		return
+	}
+
+	product.Disponibilidad -= 1
+	product.Vendidos += 1
+	if err := tx.Save(&product).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+		return
+	}
+
+	newPassenger := models.Passenger{
+		ReservationID:   reservation.ID,
+		PedidoID:        reservation.PedidoID,
+		Nombre:          source.Nombre,
+		Apellido:        source.Apellido,
+		Documento:       source.Documento,
+		Nacimiento:      source.Nacimiento,
+		Nacionalidad:    source.Nacionalidad,
+		TipoPasajero:    source.TipoPasajero,
+		Estado:          reservation.Estado,
+		PrecioVenta:     source.PrecioVenta,
+		Neto1:           source.Neto1,
+		DocContable:     source.DocContable,
+		BloqueoExpiraAt: reservation.BloqueoExpiraAt,
+	}
+	if err := tx.Create(&newPassenger).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al duplicar el pasajero"})
+		return
+	}
+
+	tx.Commit()
+
+	services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Pasajero duplicado",
+		fmt.Sprintf("Se agregó un pasajero duplicado de %s %s al pedido %s", source.Nombre, source.Apellido, reservation.PedidoID))
+
+	c.JSON(http.StatusCreated, newPassenger)
 }

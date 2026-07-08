@@ -180,7 +180,7 @@ func CreateTransfer(c *gin.Context) {
 
 // ListTransfers lista todas las cesiones (solo admin)
 func ListTransfers(c *gin.Context) {
-	var transfers []models.AvailabilityTransfer
+	transfers := []models.AvailabilityTransfer{}
 
 	// Preload producto
 	database.DB.Preload("Product").Order("created_at desc").Find(&transfers)
@@ -193,7 +193,7 @@ func GetUserTransfers(c *gin.Context) {
 	agencia, _ := c.Get("agencia")
 	role, _ := c.Get("role")
 
-	var transfers []models.AvailabilityTransfer
+	transfers := []models.AvailabilityTransfer{}
 
 	query := database.DB.Preload("Product").Order("created_at desc")
 
@@ -207,12 +207,20 @@ func GetUserTransfers(c *gin.Context) {
 }
 
 // ReclaimTransfer recupera el stock de un producto cedido (producto espejo)
-// y lo devuelve al producto origen.
+// y lo devuelve al producto origen. Acepta un body opcional {"quantity": N}
+// para devolver solo una parte de lo cedido (ej. se cedieron 5 y se quieren
+// recuperar solo 2) — si no se manda, se recupera todo lo que quede
+// disponible en el espejo (comportamiento anterior, compatible hacia atrás).
 func ReclaimTransfer(c *gin.Context) {
 	productID := c.Param("id")
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 	role, _ := c.Get("role")
+
+	var input struct {
+		Quantity int `json:"quantity"`
+	}
+	_ = c.ShouldBindJSON(&input)
 
 	var mirrorProduct models.Product
 	if err := database.DB.First(&mirrorProduct, productID).Error; err != nil {
@@ -253,6 +261,16 @@ func ReclaimTransfer(c *gin.Context) {
 	}
 
 	qtyToReclaim := mirrorProduct.Disponibilidad
+	if input.Quantity > 0 {
+		if input.Quantity > mirrorProduct.Disponibilidad {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":     "La cantidad a devolver supera la disponibilidad cedida",
+				"available": mirrorProduct.Disponibilidad,
+			})
+			return
+		}
+		qtyToReclaim = input.Quantity
+	}
 
 	tx := database.DB.Begin()
 	defer func() {
@@ -269,11 +287,11 @@ func ReclaimTransfer(c *gin.Context) {
 		return
 	}
 
-	// Restar al espejo
+	// Restar al espejo solo la cantidad devuelta (puede ser parcial)
 	if err := tx.Model(&models.Product{}).Where("id = ?", mirrorProduct.ID).
-		Update("disponibilidad", 0).Error; err != nil {
+		Update("disponibilidad", gorm.Expr("disponibilidad - ?", qtyToReclaim)).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al vaciar producto espejo"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar producto espejo"})
 		return
 	}
 
@@ -300,5 +318,5 @@ func ReclaimTransfer(c *gin.Context) {
 	}
 
 	tx.Commit()
-	c.JSON(http.StatusOK, gin.H{"message": "Cupos recuperados"})
+	c.JSON(http.StatusOK, gin.H{"message": "Cupos recuperados", "quantity": qtyToReclaim})
 }

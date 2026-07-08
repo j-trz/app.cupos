@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
+import ReservationService from '../services/reservationService';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
@@ -9,6 +11,7 @@ import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import Modal from '../components/Modal.jsx';
 import { useAgencies } from '../hooks/useAgencies';
 import { formatDateOnly } from '../lib/dateOnly.js';
 
@@ -48,6 +51,9 @@ const buildPassengerRows = (r) => {
     return r.passengers.map((p, idx) => ({
       ...base,
       key: `${r.id}-${p.id ?? idx}`,
+      // passengerId real (no el índice) — hace falta para poder editar/
+      // eliminar/duplicar este pasajero puntual contra el backend.
+      passengerId: p.id ?? null,
       nombre: p.nombre || '—',
       apellido: p.apellido || '—',
       documento: p.documento || '—',
@@ -66,6 +72,9 @@ const buildPassengerRows = (r) => {
   return [{
     ...base,
     key: `${r.id}-principal`,
+    // Reservas viejas sin desglose de pasajeros: no hay un Passenger real
+    // contra el cual editar/eliminar/duplicar, así que se deja sin id.
+    passengerId: null,
     nombre: r.nombre_pasajero || '—',
     apellido: r.apellido_pasajero || '—',
     documento: r.documento_pasajero || '—',
@@ -153,7 +162,7 @@ const exportToExcel = (reservations, products) => {
 
 // ─── Product section (collapsible) ───────────────────────────────────────────
 
-function ProductSection({ product, reservations, agencyName }) {
+function ProductSection({ product, reservations, agencyName, onEdit, onDelete, onDuplicate }) {
   const [expanded, setExpanded] = useState(false);
 
   const estado = (r) => r.estado || '';
@@ -235,6 +244,7 @@ function ProductSection({ product, reservations, agencyName }) {
                 <TableHead>Precio Venta</TableHead>
                 <TableHead>Neto 1</TableHead>
                 <TableHead>OP</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -281,6 +291,35 @@ function ProductSection({ product, reservations, agencyName }) {
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.neto1)}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{product?.op ?? '—'}</TableCell>
+                  <TableCell>
+                    {row.passengerId ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => onEdit(row)}
+                          title="Editar pasajero"
+                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onDuplicate(row)}
+                          title="Duplicar pasajero"
+                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(row)}
+                          title="Eliminar pasajero"
+                          className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-zinc-400">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -293,12 +332,20 @@ function ProductSection({ product, reservations, agencyName }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+const EMPTY_PASSENGER_FORM = {
+  nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '',
+  tipo_pasajero: 'Adulto', precio_venta: '', neto_1: '',
+};
+
 export default function GestionNominas() {
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [editingRow, setEditingRow] = useState(null);
+  const [editForm, setEditForm] = useState(EMPTY_PASSENGER_FORM);
+  const [savingPassenger, setSavingPassenger] = useState(false);
 
   const { data: agencies = [] } = useAgencies();
   const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
@@ -339,6 +386,88 @@ export default function GestionNominas() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const openEditPassenger = (row) => {
+    setEditingRow(row);
+    setEditForm({
+      nombre: row.nombre === '—' ? '' : row.nombre,
+      apellido: row.apellido === '—' ? '' : row.apellido,
+      documento: row.documento === '—' ? '' : row.documento,
+      nacimiento: row.nacimiento ? String(row.nacimiento).slice(0, 10) : '',
+      nacionalidad: row.nacionalidad === '—' ? '' : row.nacionalidad,
+      tipo_pasajero: row.tipoPasajero === '—' ? 'Adulto' : row.tipoPasajero,
+      precio_venta: row.precioVenta ?? '',
+      neto_1: row.neto1 ?? '',
+    });
+  };
+
+  const closeEditPassenger = () => {
+    setEditingRow(null);
+    setEditForm(EMPTY_PASSENGER_FORM);
+  };
+
+  const handleSavePassenger = async () => {
+    if (!editingRow) return;
+    setSavingPassenger(true);
+    try {
+      await ReservationService.updatePassenger(editingRow.reservaId, editingRow.passengerId, {
+        nombre: editForm.nombre,
+        apellido: editForm.apellido,
+        documento: editForm.documento,
+        nacimiento: editForm.nacimiento || null,
+        nacionalidad: editForm.nacionalidad,
+        tipo_pasajero: editForm.tipo_pasajero,
+        precio_venta: editForm.precio_venta === '' ? null : Number(editForm.precio_venta),
+        neto_1: editForm.neto_1 === '' ? null : Number(editForm.neto_1),
+      });
+      Swal.fire({ icon: 'success', title: 'Pasajero actualizado', timer: 1500, showConfirmButton: false });
+      closeEditPassenger();
+      await fetchData();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo actualizar el pasajero.' });
+    } finally {
+      setSavingPassenger(false);
+    }
+  };
+
+  const handleDeletePassenger = async (row) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar pasajero?',
+      html: `Se eliminará a <b>${row.nombre} ${row.apellido}</b> del pedido <b>${row.pedidoId}</b> y se liberará su lugar.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await ReservationService.deletePassenger(row.reservaId, row.passengerId);
+      Swal.fire({ icon: 'success', title: 'Pasajero eliminado', timer: 1500, showConfirmButton: false });
+      await fetchData();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo eliminar el pasajero.' });
+    }
+  };
+
+  const handleDuplicatePassenger = async (row) => {
+    const result = await Swal.fire({
+      title: '¿Duplicar pasajero?',
+      html: `Se creará un nuevo pasajero en el pedido <b>${row.pedidoId}</b> con los mismos datos de <b>${row.nombre} ${row.apellido}</b>, ocupando 1 lugar más.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, duplicar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await ReservationService.duplicatePassenger(row.reservaId, row.passengerId);
+      Swal.fire({ icon: 'success', title: 'Pasajero duplicado', timer: 1500, showConfirmButton: false });
+      await fetchData();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo duplicar el pasajero (revisá la disponibilidad del producto).' });
+    }
+  };
 
   // Group reservations by product_id
   const grouped = useMemo(() => {
@@ -484,11 +613,118 @@ export default function GestionNominas() {
                 product={product}
                 reservations={grouped[pid]}
                 agencyName={agencyName}
+                onEdit={openEditPassenger}
+                onDelete={handleDeletePassenger}
+                onDuplicate={handleDuplicatePassenger}
               />
             );
           })}
         </div>
       )}
+
+      {/* Modal de edición de pasajero */}
+      <Modal
+        title="Editar Pasajero"
+        open={!!editingRow}
+        onClose={closeEditPassenger}
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Nombre</label>
+              <input
+                type="text"
+                value={editForm.nombre}
+                onChange={(e) => setEditForm((f) => ({ ...f, nombre: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Apellido</label>
+              <input
+                type="text"
+                value={editForm.apellido}
+                onChange={(e) => setEditForm((f) => ({ ...f, apellido: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Documento</label>
+              <input
+                type="text"
+                value={editForm.documento}
+                onChange={(e) => setEditForm((f) => ({ ...f, documento: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Nacimiento</label>
+              <input
+                type="date"
+                value={editForm.nacimiento}
+                onChange={(e) => setEditForm((f) => ({ ...f, nacimiento: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Nacionalidad</label>
+              <input
+                type="text"
+                value={editForm.nacionalidad}
+                onChange={(e) => setEditForm((f) => ({ ...f, nacionalidad: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Tipo</label>
+              <select
+                value={editForm.tipo_pasajero}
+                onChange={(e) => setEditForm((f) => ({ ...f, tipo_pasajero: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="Adulto">Adulto</option>
+                <option value="Menor">Menor</option>
+                <option value="Infante">Infante</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Precio Venta</label>
+              <input
+                type="number"
+                step="0.01"
+                value={editForm.precio_venta}
+                onChange={(e) => setEditForm((f) => ({ ...f, precio_venta: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Neto 1</label>
+              <input
+                type="number"
+                step="0.01"
+                value={editForm.neto_1}
+                onChange={(e) => setEditForm((f) => ({ ...f, neto_1: e.target.value }))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+            <Button variant="outline" onClick={closeEditPassenger} disabled={savingPassenger}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePassenger} disabled={savingPassenger}>
+              {savingPassenger ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

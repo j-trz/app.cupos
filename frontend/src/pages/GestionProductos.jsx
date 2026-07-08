@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Swal from 'sweetalert2';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
@@ -12,13 +13,15 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
+import TransferService from '../services/transferService';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useToast } from '../hooks/use-toast';
 import { useAgencies } from '../hooks/useAgencies';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import ItineraryTable from '../components/ItineraryTable.jsx';
 
 const formatDate = formatDateOnly;
 
@@ -35,6 +38,7 @@ const GestionProductos = () => {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [transferringProduct, setTransferringProduct] = useState(null);
+  const [routeModalProduct, setRouteModalProduct] = useState(null);
 
   const { toast } = useToast();
   const { data: agencies = [] } = useAgencies();
@@ -95,20 +99,21 @@ const GestionProductos = () => {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este producto?')) {
-      try {
-        await deleteProductMutation.mutateAsync(productId);
-        toast({
-          title: 'Éxito',
-          description: 'Producto eliminado correctamente',
-        });
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: error.message || 'Error al eliminar el producto',
-          variant: 'destructive',
-        });
-      }
+    const result = await Swal.fire({
+      title: '¿Eliminar producto?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await deleteProductMutation.mutateAsync(productId);
+      Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Producto eliminado correctamente', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al eliminar el producto' });
     }
   };
 
@@ -130,31 +135,37 @@ const GestionProductos = () => {
   };
 
   const handleReclaimTransfer = async (product) => {
-    if (window.confirm(`¿Estás seguro de que deseas recuperar los ${product.disponibilidad} cupos cedidos a ${agencyName(product.restricted_agency)}?`)) {
-      try {
-        const response = await fetch(`/api/transfers/${product.id}/reclaim`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error || 'Error al recuperar cupo');
-        }
-        toast({
-          title: 'Éxito',
-          description: 'Cupos recuperados correctamente',
-        });
-        // Recargar productos
-        setSearchTerm(prev => prev);
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: error.message || 'Error al recuperar el cupo',
-          variant: 'destructive',
-        });
-      }
+    const maxQty = product.disponibilidad;
+    const { value: quantity, isConfirmed } = await Swal.fire({
+      title: 'Recuperar cupos cedidos',
+      html: `Cedido a <b>${agencyName(product.restricted_agency)}</b>. Disponible para recuperar: <b>${maxQty}</b> cupos.`,
+      input: 'number',
+      inputLabel: 'Cantidad a recuperar',
+      inputValue: maxQty,
+      inputAttributes: { min: 1, max: maxQty, step: 1 },
+      showCancelButton: true,
+      confirmButtonText: 'Recuperar',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        const n = Number(value);
+        if (!value || Number.isNaN(n) || n < 1) return 'Ingresá una cantidad válida';
+        if (n > maxQty) return `No podés recuperar más de ${maxQty} cupos`;
+      },
+    });
+    if (!isConfirmed) return;
+    try {
+      const res = await TransferService.reclaimTransfer(product.id, Number(quantity));
+      Swal.fire({
+        icon: 'success',
+        title: 'Cupos recuperados',
+        text: `Se recuperaron ${res?.quantity ?? quantity} cupos.`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      // Recargar productos
+      setSearchTerm(prev => prev);
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al recuperar el cupo' });
     }
   };
 
@@ -314,7 +325,21 @@ const GestionProductos = () => {
                         <span className="text-slate-400">Catálogo general</span>
                       )}
                     </TableCell>
-                    <TableCell>{product.ruta || '—'}</TableCell>
+                    <TableCell>
+                      {product.ruta ? (
+                        <button
+                          type="button"
+                          onClick={() => setRouteModalProduct(product)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                          title="Ver detalle de la ruta"
+                        >
+                          <MapPin className="h-3 w-3" />
+                          Ruta
+                        </button>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>{product.pnr || '—'}</TableCell>
                     <TableCell>{product.ficha || '—'}</TableCell>
                     <TableCell>{product.temporada || '—'}</TableCell>
@@ -390,6 +415,29 @@ const GestionProductos = () => {
         product={transferringProduct}
         onTransferComplete={handleTransferComplete}
       />
+
+      {/* Modal Ver Ruta */}
+      {routeModalProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Detalle de Ruta</h2>
+                  <p className="text-sm text-slate-500">{routeModalProduct.codigo_cupo} — {routeModalProduct.destino}</p>
+                </div>
+              </div>
+              <button onClick={() => setRouteModalProduct(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <ItineraryTable ruta={routeModalProduct.ruta} showCopyButton={true} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

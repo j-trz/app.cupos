@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Trophy, TrendingUp, RefreshCw } from 'lucide-react';
+import clsx from 'clsx';
+import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, Backpack, ShoppingBag, Luggage } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -10,13 +11,42 @@ import StatCard from '../components/ui/StatCard.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import ItineraryTable from '../components/ItineraryTable.jsx';
 
 const statusLabel = (status) => status || 'Confirmado';
+
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!value || Number.isNaN(n)) return '—';
+  return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
+function BaggageIcon({ icon: Icon, included, label }) {
+  const isIncluded = !!included;
+  return (
+    <span role="img" aria-label={`${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`} className="relative inline-flex h-6 w-6 items-center justify-center">
+      <Icon className={clsx('h-4 w-4', isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
+      {!isIncluded && <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />}
+    </span>
+  );
+}
+
+function BaggageFranchise({ item }) {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <BaggageIcon icon={Backpack} included={item.CarryOn} label="Carry-on" />
+      <BaggageIcon icon={ShoppingBag} included={item.HandBag} label="Handbag" />
+      <BaggageIcon icon={Luggage} included={item.CheckedBag} label="Valija despachada" />
+    </div>
+  );
+}
 
 export default function Confirmations() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [routeModal, setRouteModal] = useState(null); // { codigo_cupo, destino, ruta }
 
   const stats = useMemo(
     () => [
@@ -114,20 +144,26 @@ export default function Confirmations() {
               <TableHead className="text-center">Agencia</TableHead>
               <TableHead className="text-center">Pasajero</TableHead>
               <TableHead className="text-center">Destino</TableHead>
+              <TableHead className="text-center">Compañía</TableHead>
+              <TableHead className="text-center">Tipo</TableHead>
+              <TableHead className="text-center">Temporada</TableHead>
               <TableHead className="text-center">Salida</TableHead>
+              <TableHead className="text-center">Ruta</TableHead>
+              <TableHead className="text-center">Equipaje</TableHead>
+              <TableHead className="text-center">Tarifa</TableHead>
               <TableHead className="text-center">Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={6}>
+                <TableCell className="text-center py-10" colSpan={12}>
                   Cargando confirmaciones...
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={6}>
+                <TableCell className="text-center py-10" colSpan={12}>
                   No hay confirmaciones registradas.
                 </TableCell>
               </TableRow>
@@ -138,7 +174,27 @@ export default function Confirmations() {
                   <TableCell className="text-center">{item.Agencia || '—'}</TableCell>
                   <TableCell className="text-center">{`${item.Nombre_Pasajero || '-'} ${item.Apellido_Pasajero || ''}`.trim()}</TableCell>
                   <TableCell className="text-center">{item.Vuelo_Destino || '—'}</TableCell>
+                  <TableCell className="text-center">{item.Vuelo_Compania || '—'}</TableCell>
+                  <TableCell className="text-center">{item.TipoProducto || '—'}</TableCell>
+                  <TableCell className="text-center">{item.Temporada || '—'}</TableCell>
                   <TableCell className="text-center">{formatDate(item.Vuelo_Salida)}</TableCell>
+                  <TableCell className="text-center">
+                    {item.Ruta ? (
+                      <button
+                        type="button"
+                        onClick={() => setRouteModal({ codigo_cupo: item.Vuelo_Codigo, destino: item.Vuelo_Destino, ruta: item.Ruta })}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver detalle de la ruta"
+                      >
+                        <MapPin className="h-3 w-3" />
+                        Ruta
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center"><BaggageFranchise item={item} /></TableCell>
+                  <TableCell className="text-center">{formatMoney(item.Vuelo_Precio)}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="success">{statusLabel(item.Estado)}</Badge>
                   </TableCell>
@@ -148,6 +204,29 @@ export default function Confirmations() {
           </TableBody>
         </TableComponent>
       </Card>
+
+      {/* Modal Ver Ruta */}
+      {routeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Detalle de Ruta</h2>
+                  <p className="text-sm text-slate-500">{routeModal.codigo_cupo} — {routeModal.destino}</p>
+                </div>
+              </div>
+              <button onClick={() => setRouteModal(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <ItineraryTable ruta={routeModal.ruta} showCopyButton={true} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

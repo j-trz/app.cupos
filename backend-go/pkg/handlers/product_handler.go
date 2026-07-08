@@ -75,7 +75,11 @@ func fixDates(data map[string]interface{}) {
 // (source_agency) — para que la cedente pueda seguir viéndolo/gestionarlo
 // y, si hace falta, volver a cederlo hacia atrás.
 func GetProducts(c *gin.Context) {
-	var products []models.Product
+	// Inicializado como slice vacío (no nil): si el query no matchea filas,
+	// GORM deja el slice como está y un nil slice serializa a JSON "null" en
+	// vez de "[]", lo que rompe cualquier código frontend que asuma un array
+	// (ej. agencias que solo ven cupos cedidos y no tienen catálogo propio).
+	products := []models.Product{}
 	role, _ := c.Get("role")
 	agencia, _ := c.Get("agencia")
 	managementScope := c.Query("scope") == "management"

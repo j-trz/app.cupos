@@ -132,7 +132,7 @@ func UpdateMyProfile(c *gin.Context) {
 }
 
 func ListUsers(c *gin.Context) {
-	var users []models.Profile
+	users := []models.Profile{}
 	database.DB.Order("created_at desc").Find(&users)
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": users})
 }
@@ -263,31 +263,52 @@ func UpdateUser(c *gin.Context) {
 	// binding:"required" pensado para el alta — bindear la edición directo
 	// contra ese struct hacía fallar CADA actualización porque el formulario
 	// de edición nunca manda password.
+	// Todos los campos son punteros para poder distinguir "no vino en el
+	// request" de "vino en false/''" — el formulario de edición hoy no manda
+	// telefono ni admin, y con campos no-puntero esos valores se pisaban a
+	// blanco/false en cada actualización aunque el usuario no los tocara.
 	var input struct {
-		Nombre   string `json:"nombre"`
-		Apellido string `json:"apellido"`
-		Telefono string `json:"telefono"`
-		Agencia  string `json:"agencia"`
-		Role     string `json:"role"`
-		Admin    bool   `json:"admin"`
-		IsActive bool   `json:"activo"`
+		Nombre   *string `json:"nombre"`
+		Apellido *string `json:"apellido"`
+		Telefono *string `json:"telefono"`
+		Agencia  *string `json:"agencia"`
+		Role     *string `json:"role"`
+		Admin    *bool   `json:"admin"`
+		IsActive *bool   `json:"activo"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Actualizar campos (map, no struct, para que los booleans en false se
-	// graben igual — GORM's Updates con struct ignora campos en su zero value).
-	database.DB.Model(&profile).Updates(map[string]interface{}{
-		"nombre":    input.Nombre,
-		"apellido":  input.Apellido,
-		"telefono":  input.Telefono,
-		"agencia":   input.Agencia,
-		"role":      input.Role,
-		"admin":     input.Admin,
-		"is_active": input.IsActive,
-	})
+	// Actualizar solo los campos que vinieron en el request (map, no struct,
+	// para que los booleans en false se graben igual — GORM's Updates con
+	// struct ignora campos en su zero value).
+	updates := map[string]interface{}{}
+	if input.Nombre != nil {
+		updates["nombre"] = *input.Nombre
+	}
+	if input.Apellido != nil {
+		updates["apellido"] = *input.Apellido
+	}
+	if input.Telefono != nil {
+		updates["telefono"] = *input.Telefono
+	}
+	if input.Agencia != nil {
+		updates["agencia"] = *input.Agencia
+	}
+	if input.Role != nil {
+		updates["role"] = *input.Role
+	}
+	if input.Admin != nil {
+		updates["admin"] = *input.Admin
+	}
+	if input.IsActive != nil {
+		updates["is_active"] = *input.IsActive
+	}
+	if len(updates) > 0 {
+		database.DB.Model(&profile).Updates(updates)
+	}
 
 	database.DB.First(&profile, "id = ?", id)
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile})

@@ -7,7 +7,7 @@ class AlertRuleService {
       const queryParams = new URLSearchParams(params).toString();
       const endpoint = queryParams ? `/alert-rules?${queryParams}` : '/alert-rules';
       const result = await ApiClient.get(endpoint);
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+      return Array.isArray(result) ? result : Array.isArray(result?.data) ? result.data : [];
     } catch (error) {
       console.error('Error fetching alert rules:', error);
       throw error;

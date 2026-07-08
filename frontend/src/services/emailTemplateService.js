@@ -7,7 +7,7 @@ class EmailTemplateService {
       const queryParams = new URLSearchParams(params).toString();
       const endpoint = queryParams ? `/email-templates?${queryParams}` : '/email-templates';
       const result = await ApiClient.get(endpoint);
-      return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
+      return Array.isArray(result) ? result : Array.isArray(result?.data) ? result.data : [];
     } catch (error) {
       console.error('Error fetching email templates:', error);
       throw error;
