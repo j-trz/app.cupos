@@ -158,6 +158,9 @@ func runSQLMigrations(db *gorm.DB) {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_white_label_configs_agency_id ON white_label_configs(agency_id);`,
 		// Email config: agency_id nullable para permitir config global sin agencia
 		`ALTER TABLE email_smtp_configs ALTER COLUMN agency_id DROP NOT NULL;`,
+		// Profile.Password nunca debió persistirse (ahora es gorm:"-"): se
+		// borra la columna para no dejar contraseñas en texto plano en la base.
+		`ALTER TABLE profiles DROP COLUMN IF EXISTS password;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

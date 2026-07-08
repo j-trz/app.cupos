@@ -225,7 +225,7 @@ const GestionUsuarios = () => {
                     {user.nombre} {user.apellido}
                   </TableCell>
                   <TableCell className="text-center">{user.email}</TableCell>
-                  <TableCell className="text-center">{user.rol}</TableCell>
+                  <TableCell className="text-center">{user.role}</TableCell>
                   <TableCell className="text-center">{user.agencia || '—'}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant={user.activo ? 'success' : 'danger'}>

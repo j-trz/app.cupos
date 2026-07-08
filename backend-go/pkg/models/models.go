@@ -10,7 +10,9 @@ import (
 type Profile struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	Email             string    `gorm:"unique;not null" json:"email"`
-	Password          string    `json:"password" binding:"required"`
+	// Password nunca se persiste (gorm:"-"): solo se usa para recibir el valor
+	// en texto plano del request y hashearlo hacia EncryptedPassword.
+	Password          string    `gorm:"-" json:"password,omitempty" binding:"required"`
 	EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"`
 	Nombre            string    `json:"nombre"`
 	Apellido          string    `json:"apellido"`

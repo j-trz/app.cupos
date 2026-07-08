@@ -128,8 +128,8 @@ func UpdateMyProfile(c *gin.Context) {
 
 func ListUsers(c *gin.Context) {
 	var users []models.Profile
-	database.DB.Find(&users)
-	c.JSON(http.StatusOK, gin.H{"success": true, "users": users})
+	database.DB.Order("created_at desc").Find(&users)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": users})
 }
 
 func CreateUser(c *gin.Context) {
@@ -139,17 +139,22 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	profile.ID = uuid.New()
-
-	// Encriptar la contraseña si se proporciona
-	if profile.EncryptedPassword != "" {
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(profile.EncryptedPassword), bcrypt.DefaultCost)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al encriptar la contraseña."})
-			return
-		}
-		profile.EncryptedPassword = string(hashedPassword)
+	// El campo bindeado desde JSON es Password (texto plano); EncryptedPassword
+	// tiene json:"-" y nunca llega en el request, así que hashear ese campo
+	// (como se hacía antes) dejaba la contraseña sin encriptar guardada.
+	if profile.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "La contraseña es requerida."})
+		return
 	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al encriptar la contraseña."})
+		return
+	}
+	profile.EncryptedPassword = string(hashedPassword)
+	profile.Password = ""
+
+	profile.ID = uuid.New()
 
 	if err := database.DB.Create(&profile).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear el usuario."})

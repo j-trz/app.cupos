@@ -37,7 +37,7 @@ const UserForm = ({
       email: defaultValues.email || '',
       nombre: defaultValues.nombre || '',
       apellido: defaultValues.apellido || '',
-      rol: defaultValues.rol || '',
+      rol: defaultValues.role || '',
       agencia: defaultValues.agencia || '',
       activo: defaultValues.activo ?? true,
       password: ''
