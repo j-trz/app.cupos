@@ -108,6 +108,7 @@ func init() {
 				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
 				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
 				orders.POST("/:id/confirm", handlers.ConfirmReservation)
+				orders.PUT("/:id/passengers/:passengerId", handlers.UpdatePassengerTicket)
 				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)
 			}
 

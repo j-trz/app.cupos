@@ -10,6 +10,7 @@ const adaptProduct = (producto) => ({
   fecha_regreso: producto.fecha_regreso || producto.regreso || '',
   precio: producto.precio || '',
   ruta: producto.ruta || '',
+  tipo_producto: producto.tipo_producto || '',
   temporada: producto.temporada || '',
   pnr: producto.pnr || '',
   ficha: producto.ficha || '',
@@ -206,6 +207,17 @@ class ReservationService {
       return result;
     } catch (error) {
       console.error(`Error adding doc_contable to reservation ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Actualiza el ticket de un pasajero individual (numero_ticket/estado/doc_contable)
+  static async updatePassengerTicket(reservationId, passengerId, data) {
+    try {
+      const result = await ApiClient.put(`/orders/${reservationId}/passengers/${passengerId}`, data);
+      return result;
+    } catch (error) {
+      console.error(`Error updating passenger ${passengerId} ticket:`, error);
       throw error;
     }
   }

@@ -54,8 +54,6 @@ export default function Layout({ children }) {
         return t('confirmations');
       case '/reportes':
         return 'Reportes Avanzados';
-      case '/products':
-        return t('products');
       case '/marca-blanca':
         return t('whiteLabel');
       case '/email-config':

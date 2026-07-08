@@ -50,7 +50,7 @@ const DEFAULT_CONFIG = {
     },
     fonts: { heading: 'Inter, system-ui, sans-serif', body: 'Inter, system-ui, sans-serif' },
     buttons: { borderRadius: 'md', paddingX: '4', paddingY: '2', fontWeight: 'medium' },
-    sidebar: { width: '280px', backgroundColor: '#0f172a', textColor: '#f8fafc', hoverColor: '#1e293b', activeColor: '#3b82f6' },
+    sidebar: { width: '280px', backgroundColor: '#0f172a', textColor: '#f8fafc', hoverColor: '#1e293b', hoverTextColor: '#ffffff', activeColor: '#3b82f6' },
     layout: { maxWidth: '100%', padding: '24px', borderRadius: 'lg' },
     legal: { termsUrl: '', privacyUrl: '' },
 };
@@ -207,7 +207,7 @@ export default function WhiteLabelConfig() {
             colors: cfg.colors,
             fonts: { heading: cfg.fonts.heading, body: cfg.fonts.body },
             buttons: { radius: btnRadiusToRem(cfg.buttons.borderRadius), shadow: 'none', hover_scale: '1.02', transition: 'all 0.2s ease' },
-            sidebar: { bg_color: cfg.sidebar.backgroundColor, text_color: cfg.sidebar.textColor, active_bg: cfg.sidebar.activeColor, active_text: '#fff', hover_bg: cfg.sidebar.hoverColor || '#1e293b', width: cfg.sidebar.width, collapsed_width: '56px' },
+            sidebar: { bg_color: cfg.sidebar.backgroundColor, text_color: cfg.sidebar.textColor, active_bg: cfg.sidebar.activeColor, active_text: '#fff', hover_bg: cfg.sidebar.hoverColor || '#1e293b', hover_text: cfg.sidebar.hoverTextColor || '#ffffff', width: cfg.sidebar.width, collapsed_width: '56px' },
             layout: { border_radius_sm: '4px', border_radius_md: '8px', border_radius_lg: cfg.buttons.borderRadius === 'lg' ? '12px' : '8px', border_radius_xl: '16px', shadow_sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)', shadow_md: '0 4px 6px -1px rgb(0 0 0 / 0.1)', shadow_lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }
         }
     });
@@ -508,11 +508,20 @@ export default function WhiteLabelConfig() {
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600">Hover</label>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Hover (fondo)</label>
                                             <div className="flex items-center gap-2">
                                                 <input type="color" value={s.hoverColor || '#1e293b'} onChange={e => up('sidebar', 'hoverColor', e.target.value)}
                                                     className={COLOR_INPUT_CLASSES} />
                                                 <input type="text" value={s.hoverColor || '#1e293b'} onChange={e => up('sidebar', 'hoverColor', e.target.value)}
+                                                    className={`${INPUT_CLASSES} font-mono text-xs`} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Hover (texto)</label>
+                                            <div className="flex items-center gap-2">
+                                                <input type="color" value={s.hoverTextColor || '#ffffff'} onChange={e => up('sidebar', 'hoverTextColor', e.target.value)}
+                                                    className={COLOR_INPUT_CLASSES} />
+                                                <input type="text" value={s.hoverTextColor || '#ffffff'} onChange={e => up('sidebar', 'hoverTextColor', e.target.value)}
                                                     className={`${INPUT_CLASSES} font-mono text-xs`} />
                                             </div>
                                         </div>

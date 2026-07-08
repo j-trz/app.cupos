@@ -13,14 +13,21 @@ import (
 	"gorm.io/gorm"
 )
 
-// PassengerInput acepta nacimiento como string "YYYY-MM-DD" o RFC3339
+// PassengerInput acepta nacimiento como string "YYYY-MM-DD" o RFC3339.
+// PrecioVenta/Neto1/DocContable son opcionales: si no vienen, cada pasajero
+// hereda el valor a nivel pedido (Reservation) al crearse — cada pasajero
+// ocupa 1 lugar y se crea como su propio ticket individual, pero por defecto
+// no requiere tarifas distintas por persona salvo que se las indique.
 type PassengerInput struct {
-	Nombre       string `json:"nombre"`
-	Apellido     string `json:"apellido"`
-	Documento    string `json:"documento"`
-	Nacimiento   string `json:"nacimiento"` // "1994-10-20" o "1994-10-20T00:00:00Z"
-	Nacionalidad string `json:"nacionalidad"`
-	TipoPasajero string `json:"tipo_pasajero"`
+	Nombre       string   `json:"nombre"`
+	Apellido     string   `json:"apellido"`
+	Documento    string   `json:"documento"`
+	Nacimiento   string   `json:"nacimiento"` // "1994-10-20" o "1994-10-20T00:00:00Z"
+	Nacionalidad string   `json:"nacionalidad"`
+	TipoPasajero string   `json:"tipo_pasajero"`
+	PrecioVenta  *float64 `json:"precio_venta,omitempty"`
+	Neto1        *float64 `json:"neto_1,omitempty"`
+	DocContable  string   `json:"doc_contable,omitempty"`
 }
 
 type ReservationInput struct {
@@ -117,8 +124,27 @@ func CreateReservation(c *gin.Context) {
 			uuid.New().String()[:8])
 	}
 
-	// Poblar campos del pasajero principal desde passengers[0] si no vienen en el body raíz
-	if len(input.Passengers) > 0 && input.Reservation.NombrePasajero == "" {
+	// Si no viene un array de pasajeros explícito (ej. formularios que solo
+	// cargan "el pasajero principal"), se sintetiza uno a partir de los campos
+	// planos de la reserva — cada pasajero SIEMPRE se crea como su propio
+	// ticket individual (1 lugar, 1 fila en `passengers`), nunca queda
+	// implícito solo en los campos de Reservation.
+	if len(input.Passengers) == 0 {
+		input.Passengers = []PassengerInput{{
+			Nombre:       input.Reservation.NombrePasajero,
+			Apellido:     input.Reservation.ApellidoPasajero,
+			Documento:    input.Reservation.DocumentoPasajero,
+			Nacionalidad: input.Reservation.NacionalidadPasajero,
+			TipoPasajero: input.Reservation.TipoPasajero,
+		}}
+		if input.Reservation.NacimientoPasajero != nil {
+			input.Passengers[0].Nacimiento = input.Reservation.NacimientoPasajero.Format("2006-01-02")
+		}
+	}
+
+	// Poblar campos del pasajero principal (compatibilidad con pantallas que
+	// todavía leen el resumen desde la propia Reservation).
+	if input.Reservation.NombrePasajero == "" {
 		p := toPassengerModel(input.Passengers[0])
 		input.Reservation.NombrePasajero = p.Nombre
 		input.Reservation.ApellidoPasajero = p.Apellido
@@ -165,29 +191,43 @@ func CreateReservation(c *gin.Context) {
 		return
 	}
 
-	// 4. Insertar pasajeros
-	if len(input.Passengers) > 0 {
-		for i, pi := range input.Passengers {
-			pax := toPassengerModel(pi)
-			pax.ReservationID = input.Reservation.ID
-			pax.PedidoID = input.Reservation.PedidoID
+	// 4. Insertar pasajeros — cada uno es su propio ticket (1 lugar), todos
+	// comparten el mismo pedido_id/ReservationID.
+	for i, pi := range input.Passengers {
+		pax := toPassengerModel(pi)
+		pax.ReservationID = input.Reservation.ID
+		pax.PedidoID = input.Reservation.PedidoID
+		pax.Estado = input.Reservation.Estado
+		pax.BloqueoExpiraAt = input.Reservation.BloqueoExpiraAt
 
-			// Calcular NRO (Regla: el primero es venta, el resto depende de edad/tipo)
-			if i == 0 {
+		pax.PrecioVenta = input.Reservation.PrecioVenta
+		if pi.PrecioVenta != nil {
+			pax.PrecioVenta = *pi.PrecioVenta
+		}
+		pax.Neto1 = input.Reservation.Neto1
+		if pi.Neto1 != nil {
+			pax.Neto1 = *pi.Neto1
+		}
+		pax.DocContable = input.Reservation.DocContable
+		if pi.DocContable != "" {
+			pax.DocContable = pi.DocContable
+		}
+
+		// Calcular NRO (Regla: el primero es venta, el resto depende de edad/tipo)
+		if i == 0 {
+			pax.NRO = 1
+		} else {
+			if isVentaValida(&pax, product.FechaRegreso) {
 				pax.NRO = 1
 			} else {
-				if isVentaValida(&pax, product.FechaRegreso) {
-					pax.NRO = 1
-				} else {
-					pax.NRO = 0
-				}
+				pax.NRO = 0
 			}
+		}
 
-			if err := tx.Create(&pax).Error; err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear pasajeros"})
-				return
-			}
+		if err := tx.Create(&pax).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear pasajeros"})
+			return
 		}
 	}
 
@@ -303,6 +343,8 @@ func ConfirmReservation(c *gin.Context) {
 
 	reservation.Estado = models.EstadoConfirmada
 	database.DB.Save(&reservation)
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).
+		Update("estado", models.EstadoConfirmada)
 
 	actor := createdByFromContext(c)
 	services.NotifyRole("admin", actor, "request_confirmed", "Reserva confirmada",
@@ -342,6 +384,8 @@ func DeleteReservation(c *gin.Context) {
 				"vendidos":       gorm.Expr("vendidos - ?", passengersCount),
 			})
 	}
+
+	database.DB.Where("reservation_id = ?", id).Delete(&models.Passenger{})
 
 	if err := database.DB.Delete(&models.Reservation{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar la reserva."})
@@ -408,6 +452,8 @@ func AddDocContable(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar el documento."})
 		return
 	}
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).
+		Updates(updates)
 
 	database.DB.First(&reservation, id)
 	c.JSON(http.StatusOK, reservation)
@@ -444,6 +490,8 @@ func RequestCancellation(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al procesar solicitud."})
 		return
 	}
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).
+		Update("estado", models.EstadoSolicitudCancelacion)
 
 	database.DB.First(&reservation, id)
 
@@ -475,4 +523,51 @@ func GetReservationByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, reservation)
+}
+
+// UpdatePassengerTicket actualiza el ticket de UN pasajero puntual (numero_ticket,
+// estado, doc_contable) sin afectar al resto de los pasajeros del mismo pedido —
+// cada pasajero progresa de forma individual aunque comparta reserva/pedido.
+func UpdatePassengerTicket(c *gin.Context) {
+	reservationID := c.Param("id")
+	passengerID := c.Param("passengerId")
+
+	var passenger models.Passenger
+	if err := database.DB.Where("id = ? AND reservation_id = ?", passengerID, reservationID).First(&passenger).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pasajero no encontrado en esta reserva."})
+		return
+	}
+
+	var input struct {
+		NumeroTicket string `json:"numero_ticket"`
+		Estado       string `json:"estado"`
+		DocContable  string `json:"doc_contable"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if input.NumeroTicket != "" {
+		updates["numero_ticket"] = input.NumeroTicket
+	}
+	if input.Estado != "" {
+		updates["estado"] = input.Estado
+	}
+	if input.DocContable != "" {
+		updates["doc_contable"] = input.DocContable
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No se enviaron campos para actualizar."})
+		return
+	}
+
+	if err := database.DB.Model(&passenger).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el ticket del pasajero."})
+		return
+	}
+
+	database.DB.First(&passenger, passenger.ID)
+	c.JSON(http.StatusOK, passenger)
 }

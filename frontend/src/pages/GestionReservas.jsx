@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
@@ -11,6 +11,7 @@ import StatCard from '../components/ui/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import { useAgencies } from '../hooks/useAgencies';
 
 const emptyForm = {
   product_id: '',
@@ -36,6 +37,12 @@ const formatDate = (value) => {
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 };
 
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!value || Number.isNaN(n)) return '—';
+  return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 const formatExpiry = (value) => {
   if (!value) return null;
   const date = new Date(value);
@@ -52,7 +59,8 @@ const formatExpiry = (value) => {
 const getEstadoVariant = (estado) => {
   if (estado === 'confirmado' || estado === 'confirmada') return 'success';
   if (estado === 'procesando') return 'warning';
-  if (estado === 'cancelado') return 'danger';
+  if (estado === 'cancelado' || estado === 'cancelada' || estado === 'solicitud_cancelacion') return 'danger';
+  if (estado === 'expirada') return 'danger';
   return 'default';
 };
 
@@ -63,7 +71,48 @@ const getEstadoLabel = (estado) => ({
   procesando: 'Procesando',
   completado: 'Completado',
   cancelado: 'Cancelado',
-}[estado] || estado);
+  cancelada: 'Cancelado',
+  solicitud_cancelacion: 'Sol. Cancelación',
+  expirada: 'Expirada',
+}[estado] || estado || '—');
+
+// Explota una reserva (pedido) en filas — una por pasajero. Contacto y
+// pasajero quedan separados: el contacto es quien figura en la reserva, cada
+// pasajero es su propio ticket individual (1 lugar, comparte pedido_id).
+// Si la reserva no tiene pasajeros desglosados (dato histórico previo a este
+// cambio) cae a los campos *_pasajero de la propia reserva como fallback.
+const buildPassengerRows = (r) => {
+  if (Array.isArray(r.passengers) && r.passengers.length > 0) {
+    return r.passengers.map((p) => ({
+      reservation: r,
+      key: `${r.id}-${p.id}`,
+      passengerId: p.id,
+      nombre: p.nombre || '—',
+      apellido: p.apellido || '—',
+      documento: p.documento || '—',
+      tipoPasajero: p.tipo_pasajero || '—',
+      estado: p.estado || r.estado || '',
+      docContable: p.doc_contable || r.doc_contable || '',
+      numeroTicket: p.numero_ticket || '',
+      precioVenta: p.precio_venta || r.precio_venta,
+      neto1: p.neto_1 || r.neto_1,
+    }));
+  }
+  return [{
+    reservation: r,
+    key: `${r.id}-principal`,
+    passengerId: null,
+    nombre: r.nombre_pasajero || '—',
+    apellido: r.apellido_pasajero || '—',
+    documento: r.documento_pasajero || '—',
+    tipoPasajero: r.tipo_pasajero || '—',
+    estado: r.estado || '',
+    docContable: r.doc_contable || '',
+    numeroTicket: '',
+    precioVenta: r.precio_venta,
+    neto1: r.neto_1,
+  }];
+};
 
 // ─── Input helper ───────────────────────────────
 function Field({ label, required, hint, children }) {
@@ -83,6 +132,7 @@ const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm fo
 
 export default function GestionReservas() {
   const [reservations, setReservations] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -94,12 +144,20 @@ export default function GestionReservas() {
   const [productLoading, setProductLoading] = useState(false);
   const [docModal, setDocModal] = useState(null); // { id, pedido_id }
   const [docValue, setDocValue] = useState('');
+  const [ticketModal, setTicketModal] = useState(null); // { reservationId, passengerId, pedidoId, nombre }
+  const [ticketValue, setTicketValue] = useState('');
+
+  const { data: agencies = [] } = useAgencies();
 
   const fetchReservations = async () => {
     setLoading(true);
     try {
-      const items = await ReservationService.listReservations();
+      const [items, productsResult] = await Promise.all([
+        ReservationService.listReservations(),
+        ApiClient.get('/products'),
+      ]);
       setReservations(items);
+      setProducts(Array.isArray(productsResult) ? productsResult : Array.isArray(productsResult?.data) ? productsResult.data : []);
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudieron cargar las reservas' });
       setReservations([]);
@@ -131,11 +189,15 @@ export default function GestionReservas() {
         x.contacto_nombre?.toLowerCase().includes(q) ||
         x.vuelo_destino?.toLowerCase().includes(q) ||
         x.agencia?.toLowerCase().includes(q) ||
-        x.nombre_pasajero?.toLowerCase().includes(q)
+        x.nombre_pasajero?.toLowerCase().includes(q) ||
+        (x.passengers || []).some(p => `${p.nombre} ${p.apellido}`.toLowerCase().includes(q))
       );
     }
     return r;
   }, [reservations, estadoFilter, searchTerm]);
+
+  const agencyName = (code) => agencies.find(a => a.code === code)?.name || code || '—';
+  const productOp = (productId) => products.find(p => String(p.id) === String(productId))?.op ?? '—';
 
   // ─── Producto lookup ─────────────────────────
   const lookupProduct = useCallback(async (id) => {
@@ -244,6 +306,7 @@ export default function GestionReservas() {
   const handleDelete = async (r) => {
     const res = await Swal.fire({
       title: `¿Eliminar ${r.pedido_id}?`, icon: 'warning',
+      text: 'Se eliminarán también todos los pasajeros de esta reserva.',
       showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
       confirmButtonColor: '#d33',
     });
@@ -279,11 +342,34 @@ export default function GestionReservas() {
     }
   };
 
+  // ─── Ticket individual por pasajero ───────────
+  const openTicketModal = (row) => {
+    if (!row.passengerId) return;
+    setTicketModal({ reservationId: row.reservation.id, passengerId: row.passengerId, pedidoId: row.reservation.pedido_id, nombre: `${row.nombre} ${row.apellido}` });
+    setTicketValue(row.numeroTicket || '');
+  };
+  const handleSaveTicket = async () => {
+    if (!ticketValue.trim()) return;
+    try {
+      await ReservationService.updatePassengerTicket(ticketModal.reservationId, ticketModal.passengerId, { numero_ticket: ticketValue });
+      Swal.fire({ icon: 'success', title: 'Ticket guardado', timer: 1200, showConfirmButton: false });
+      setTicketModal(null);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+    }
+  };
+
+  const totalPassengers = useMemo(
+    () => filtered.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
+    [filtered]
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Gestión de Reservas"
-        description="Administra las reservas y su estado de confirmación."
+        description="Administra las reservas y sus pasajeros."
         icon={Calendar}
         action={
           <div className="flex items-center gap-2">
@@ -298,9 +384,11 @@ export default function GestionReservas() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <StatCard icon={BarChart3} label="Total reservas" value={filtered.length}
           description={estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total'} />
+        <StatCard icon={Ticket} label="Pasajeros" value={totalPassengers}
+          description="Tickets individuales (incluye acompañantes)" />
         <StatCard icon={CheckCircle} label="Confirmadas"
           value={filtered.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada').length}
           description="Reservas confirmadas" />
@@ -314,11 +402,11 @@ export default function GestionReservas() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Lista de Reservas</h2>
-              <p className="text-sm text-slate-500">Gestioná las reservas y sus estados.</p>
+              <p className="text-sm text-slate-500">Cada fila es un pasajero individual; varios pasajeros pueden compartir el mismo pedido.</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <input type="text" placeholder="Buscar por pedido, contacto, destino..."
+            <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero..."
               value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
           </div>
@@ -340,45 +428,46 @@ export default function GestionReservas() {
             <TableRow>
               <TableHead>ID Pedido</TableHead>
               <TableHead>Agencia</TableHead>
-              <TableHead>Origen</TableHead>
-              <TableHead>Contacto / Pasajero</TableHead>
+              <TableHead>Contacto</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Apellido</TableHead>
+              <TableHead>Documento</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Destino</TableHead>
               <TableHead>Salida</TableHead>
               <TableHead>Vencimiento</TableHead>
               <TableHead>Cesión</TableHead>
               <TableHead>Doc.Contable</TableHead>
+              <TableHead>Ticket</TableHead>
+              <TableHead>Precio Venta</TableHead>
+              <TableHead>Neto 1</TableHead>
+              <TableHead>OP</TableHead>
+              <TableHead>Vendedor</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={10} className="text-center py-10">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={19} className="text-center py-10">Cargando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="text-center py-10 text-slate-400">
+              <TableRow><TableCell colSpan={19} className="text-center py-10 text-slate-400">
                 {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
               </TableCell></TableRow>
-            ) : filtered.map(r => {
+            ) : filtered.flatMap(r => {
               const expiry = r.estado === 'bloqueo_temporal' ? formatExpiry(r.bloqueo_expira_at) : null;
-              return (
-                <TableRow key={r.id}>
+              return buildPassengerRows(r).map(row => (
+                <TableRow key={row.key}>
                   <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
-                  <TableCell>{r.agencia || '—'}</TableCell>
-                  {/* Origen -Agency (para cesiones) */}
-                  <TableCell>
-                    {r.original_agency ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs text-slate-500">Original:</span>
-                        <span className="text-xs font-medium">{r.original_agency}</span>
-                      </div>
-                    ) : '—'}
-                  </TableCell>
+                  <TableCell>{agencyName(r.agencia)}</TableCell>
                   <TableCell>
                     <div className="text-sm">{r.contacto_nombre || '—'}</div>
-                    {(r.nombre_pasajero || r.apellido_pasajero) && (
-                      <div className="text-xs text-slate-400">{r.nombre_pasajero} {r.apellido_pasajero}</div>
-                    )}
+                    <div className="text-xs text-slate-400">{r.contacto_email}</div>
                   </TableCell>
+                  <TableCell className="font-medium text-slate-900">{row.nombre}</TableCell>
+                  <TableCell>{row.apellido}</TableCell>
+                  <TableCell>{row.documento}</TableCell>
+                  <TableCell>{row.tipoPasajero}</TableCell>
                   <TableCell>{r.vuelo_destino || '—'}</TableCell>
                   <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
                   <TableCell>
@@ -387,16 +476,6 @@ export default function GestionReservas() {
                         <Clock className="h-3 w-3" />{expiry.label}
                       </span>
                     ) : '—'}
-                  </TableCell>
-                  <TableCell>
-                    {r.doc_contable ? (
-                      <span className="text-xs text-green-600 font-medium">✓ {r.doc_contable}</span>
-                    ) : r.estado === 'bloqueo_temporal' ? (
-                      <button type="button" onClick={() => openDocModal(r)}
-                        className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-700 underline">
-                        <AlertCircle className="h-3 w-3" /> Pendiente
-                      </button>
-                    ) : <span className="text-xs text-slate-300">—</span>}
                   </TableCell>
                   {/* Cesión Badge */}
                   <TableCell>
@@ -412,28 +491,54 @@ export default function GestionReservas() {
                     ) : '—'}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getEstadoVariant(r.estado)}>{getEstadoLabel(r.estado)}</Badge>
+                    {row.docContable ? (
+                      <span className="text-xs text-green-600 font-medium">✓ {row.docContable}</span>
+                    ) : row.estado === 'bloqueo_temporal' ? (
+                      <button type="button" onClick={() => openDocModal(r)}
+                        className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-700 underline">
+                        <AlertCircle className="h-3 w-3" /> Pendiente
+                      </button>
+                    ) : <span className="text-xs text-slate-300">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    {row.numeroTicket ? (
+                      <button type="button" onClick={() => openTicketModal(row)} className="text-xs font-mono text-slate-700 hover:underline">
+                        {row.numeroTicket}
+                      </button>
+                    ) : row.passengerId ? (
+                      <button type="button" onClick={() => openTicketModal(row)}
+                        className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 underline">
+                        <Ticket className="h-3 w-3" /> Asignar
+                      </button>
+                    ) : <span className="text-xs text-slate-300">—</span>}
+                  </TableCell>
+                  <TableCell>{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell>{formatMoney(row.neto1)}</TableCell>
+                  <TableCell>{productOp(r.product_id)}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{r.vendedor_email || '—'}</TableCell>
+                  <TableCell>
+                    <Badge variant={getEstadoVariant(row.estado)}>{getEstadoLabel(row.estado)}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
                       {r.estado !== 'confirmado' && r.estado !== 'confirmada' && (
-                        <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar">
+                        <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar pedido completo">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => handleResendEmail(r)} title="Reenviar email">
                         <Send className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(r)} title="Editar">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(r)} title="Editar reserva">
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} title="Eliminar" className="text-red-500 hover:text-red-700">
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} title="Eliminar reserva (y sus pasajeros)" className="text-red-500 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              );
+              ));
             })}
           </TableBody>
         </TableComponent>
@@ -473,15 +578,19 @@ export default function GestionReservas() {
 
           {/* RESERVA */}
           <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Datos de la Reserva</h3>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Datos del Pedido</h3>
             <div className="grid grid-cols-2 gap-3">
               <Field label="ID Pedido" hint="se genera automáticamente si se deja vacío">
                 <input type="text" value={form.pedido_id} onChange={e => setField('pedido_id', e.target.value)}
                   className={inputCls} placeholder="Auto-generado" />
               </Field>
               <Field label="Agencia">
-                <input type="text" value={form.agencia} onChange={e => setField('agencia', e.target.value)}
-                  className={inputCls} placeholder="Nombre de la agencia" />
+                <select value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls + ' bg-white'}>
+                  <option value="">Seleccionar agencia...</option>
+                  {agencies.map(a => (
+                    <option key={a.id} value={a.code}>{a.name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="Precio de Venta" hint={!editReservation ? 'del producto si se deja en 0' : undefined}>
                 <input type="number" value={form.precio_venta} onChange={e => setField('precio_venta', e.target.value)}
@@ -502,6 +611,7 @@ export default function GestionReservas() {
           {/* CONTACTO */}
           <section>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contacto</h3>
+            <p className="mb-2 text-xs text-slate-400">La persona de contacto no es necesariamente un pasajero del viaje.</p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nombre del Contacto" required>
                 <input type="text" value={form.contacto_nombre} onChange={e => setField('contacto_nombre', e.target.value)}
@@ -520,7 +630,8 @@ export default function GestionReservas() {
 
           {/* PASAJERO */}
           <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero Principal</h3>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero</h3>
+            <p className="mb-2 text-xs text-slate-400">Cada pasajero ocupa 1 lugar y se crea como su propio ticket. Para cargar varios pasajeros en el mismo pedido, usá la pantalla de Disponibilidad.</p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nombre">
                 <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
@@ -584,6 +695,26 @@ export default function GestionReservas() {
             <div className="flex justify-end gap-2">
               <Button variant="secondary" type="button" onClick={() => setDocModal(null)}>Cancelar</Button>
               <Button type="button" onClick={handleSaveDoc} disabled={!docValue.trim()}>Guardar</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ─── Modal Ticket individual ─── */}
+      <Modal title="Número de Ticket" open={!!ticketModal} onClose={() => setTicketModal(null)} size="sm">
+        {ticketModal && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Pedido <span className="font-mono font-medium">{ticketModal.pedidoId}</span> — {ticketModal.nombre}
+            </p>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Número de ticket</label>
+              <input type="text" value={ticketValue} onChange={e => setTicketValue(e.target.value)}
+                className={inputCls} placeholder="Ej: 075-1234567890" autoFocus />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={() => setTicketModal(null)}>Cancelar</Button>
+              <Button type="button" onClick={handleSaveTicket} disabled={!ticketValue.trim()}>Guardar</Button>
             </div>
           </div>
         )}

@@ -63,6 +63,7 @@ func warnExpiringReservations(now time.Time) int {
 
 		sentAt := now
 		database.DB.Model(&models.Reservation{}).Where("id = ?", r.ID).Update("expiration_warning_sent_at", &sentAt)
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", r.ID).Update("expiration_warning_sent_at", &sentAt)
 	}
 	return len(reservations)
 }
@@ -89,6 +90,7 @@ func expireOverdueReservations(now time.Time) int {
 			})
 
 		database.DB.Model(&models.Reservation{}).Where("id = ?", r.ID).Update("estado", models.EstadoExpirada)
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", r.ID).Update("estado", models.EstadoExpirada)
 
 		services.NotifyUser(r.CreatedBy, nil, "warning", "Tu reserva expiró",
 			fmt.Sprintf("La reserva del pedido %s expiró por vencimiento del bloqueo temporal y el cupo fue liberado.", r.PedidoID))

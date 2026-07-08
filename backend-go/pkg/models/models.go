@@ -13,6 +13,8 @@ type Profile struct {
 	Password          string    `json:"password" binding:"required"`
 	EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"`
 	Nombre            string    `json:"nombre"`
+	Apellido          string    `json:"apellido"`
+	Telefono          string    `json:"telefono"`
 	Agencia           string    `json:"agencia"`
 	Admin             bool      `gorm:"default:false" json:"admin"`
 	Role              string    `gorm:"default:'agency_user'" json:"role"`
@@ -101,6 +103,9 @@ type Reservation struct {
 	Passengers []Passenger `gorm:"foreignKey:ReservationID" json:"passengers,omitempty"`
 }
 
+// Passenger es la unidad real de "cupo aéreo": cada pasajero ocupa 1 lugar y
+// se crea siempre de forma individual (con su propio ticket), aunque varios
+// pasajeros compartan PedidoID/ReservationID por haberse reservado juntos.
 type Passenger struct {
 	ID            uint       `gorm:"primaryKey" json:"id"`
 	ReservationID uint       `json:"reservation_id"`
@@ -112,8 +117,18 @@ type Passenger struct {
 	Nacionalidad  string     `json:"nacionalidad"`
 	TipoPasajero  string     `json:"tipo_pasajero"`
 	NRO           int        `json:"nro"` // 1 = Venta, 0 = Acompañante
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	// Campos de ticket individual: cada pasajero progresa de forma
+	// independiente dentro del mismo pedido.
+	Estado                  string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
+	NumeroTicket            string     `json:"numero_ticket"`
+	PrecioVenta             float64    `json:"precio_venta"`
+	Neto1                   float64    `json:"neto_1"`
+	DocContable             string     `json:"doc_contable"`
+	DocContableExpiresAt    *time.Time `json:"doc_contable_expires_at"`
+	BloqueoExpiraAt         *time.Time `json:"bloqueo_expira_at"`
+	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
 type Agency struct {

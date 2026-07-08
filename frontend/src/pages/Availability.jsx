@@ -297,6 +297,7 @@ export default function Availability() {
           <TableHeader>
             <TableRow>
               <TableHead className="text-center">Cupo</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Destino</TableHead>
               <TableHead>Compañía</TableHead>
               <TableHead>Disponibilidad</TableHead>
@@ -313,13 +314,13 @@ export default function Availability() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={12}>
+                <TableCell className="text-center py-10" colSpan={13}>
                   Cargando disponibilidad...
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={12}>
+                <TableCell className="text-center py-10" colSpan={13}>
                   {temporadaFilter !== 'Todas'
                     ? `No hay cupos para la temporada "${temporadaFilter}".`
                     : 'No hay cupos disponibles.'}
@@ -329,6 +330,7 @@ export default function Availability() {
               filteredData.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="text-center font-medium">{item.codigo_cupo}</TableCell>
+                  <TableCell className="text-center">{item.tipo_producto || '—'}</TableCell>
                   <TableCell className="text-center">{item.destino}</TableCell>
                   <TableCell className="text-center">{item.compania}</TableCell>
                   <TableCell className="text-center">

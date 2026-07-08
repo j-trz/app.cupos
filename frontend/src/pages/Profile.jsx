@@ -154,7 +154,7 @@ export default function Profile() {
           <div className="flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-semibold text-slate-900">
-                {profile.nombre || 'Mi Perfil'}
+                {profile.nombre || 'Mi Perfil'} {profile.apellido || ""}
               </h2>
               <Badge variant={roleBadgeVariant}>{roleLabel}</Badge>
             </div>

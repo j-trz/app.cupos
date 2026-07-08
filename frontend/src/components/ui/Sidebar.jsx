@@ -20,7 +20,7 @@ const navItems = [
 
 // Admin-only items
 const adminNavItems = [
-  { label: 'Productos', path: '/products', icon: Package },
+  { label: 'Productos', path: '/productos', icon: Package },
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
   { label: 'Nóminas', path: '/nominas', icon: Users },
@@ -59,7 +59,11 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const sbBg = config?.sidebar?.bg_color || '#0f172a';
   const sbText = config?.sidebar?.text_color || '#f8fafc';
   const sbActiveBg = config?.sidebar?.active_bg || config?.colors?.primary || '#3b82f6';
+  const sbActiveText = config?.sidebar?.active_text || '#ffffff';
   const sbHoverBg = config?.sidebar?.hover_bg || '#1e293b';
+  const sbHoverText = config?.sidebar?.hover_text || '#ffffff';
+  const logoUrl = config?.identity?.logoUrl || '';
+  const agencyName = config?.identity?.agency_name || 'Gestión de Cupos';
 
   // Polling de notificaciones no leídas cada 20s (reemplaza al SSE, que no
   // funciona en el backend serverless). Si el contador sube desde la última
@@ -143,7 +147,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
         style={{ backgroundColor: sbBg, color: sbText }}
         className={clsx(
           'relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out',
-          collapsed ? 'w-16' : 'w-72'
+          collapsed ? 'w-16' : 'w-68'
         )}
       >
         <div className="flex h-full flex-col justify-between">
@@ -151,18 +155,22 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
             {/* Header del sidebar con logo, nombre de plataforma y agencia - Estilo Vercel */}
             <div className={clsx('px-3 py-3', collapsed ? 'flex justify-center' : '')}>
               <div className={clsx('flex items-center gap-2', collapsed ? '' : 'mb-3')}>
-                <div className={clsx(
-                  'flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm shrink-0',
-                  collapsed ? 'h-8 w-8' : 'h-9 w-9'
-                )}>
-                  <Sparkles className={clsx(collapsed ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
-                </div>
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className={clsx('shrink-0 object-contain', collapsed ? 'h-8 w-8' : 'h-9 w-9')} />
+                ) : (
+                  <div className={clsx(
+                    'flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm shrink-0',
+                    collapsed ? 'h-8 w-8' : 'h-9 w-9'
+                  )}>
+                    <Sparkles className={clsx(collapsed ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+                  </div>
+                )}
                 {!collapsed && (
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xl font-medium text-zinc-700 dark:text-zinc-300 truncate leading-tight">
-                      Gestión de Cupos
+                    <span className="text-xl font-medium truncate leading-tight" style={{ color: sbText }}>
+                      {agencyName}
                     </span>
-                    <p className="text-[12px] text-zinc-500 dark:text-zinc-400 truncate">
+                    <p className="text-[12px] truncate" style={{ color: sbText }}>
                       {user.agencia || 'Tu Agencia'}
                     </p>
                   </div>
@@ -221,7 +229,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
                     if (!isActive) {
                       el.style.backgroundColor = sbHoverBg;
-                      el.style.color = '#fff';
+                      el.style.color = sbHoverText;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -333,7 +341,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     onMouseEnter={(e) => {
                       if (!isSubmenuActive(settingsItems)) {
                         e.currentTarget.style.backgroundColor = sbHoverBg;
-                        e.currentTarget.style.color = '#fff';
+                        e.currentTarget.style.color = sbHoverText;
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -374,7 +382,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                             const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
                             if (!isActive) {
                               el.style.backgroundColor = sbHoverBg;
-                              el.style.color = '#fff';
+                              el.style.color = sbHoverText;
                             }
                           }}
                           onMouseLeave={(e) => {
@@ -419,7 +427,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     onMouseEnter={(e) => {
                       if (!isSubmenuActive(userManagementItems)) {
                         e.currentTarget.style.backgroundColor = sbHoverBg;
-                        e.currentTarget.style.color = '#fff';
+                        e.currentTarget.style.color = sbHoverText;
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -460,7 +468,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                             const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
                             if (!isActive) {
                               el.style.backgroundColor = sbHoverBg;
-                              el.style.color = '#fff';
+                              el.style.color = sbHoverText;
                             }
                           }}
                           onMouseLeave={(e) => {
@@ -491,23 +499,32 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
             </nav>
           </div>
 
-          {/* Footer: user info and logout - Estilo Vercel */}
+          {/* Footer: user info and logout - Estilo Vercel con white-label */}
           <div className={clsx('px-2 pb-4', collapsed ? 'flex justify-center' : '')}>
-            <div className={clsx(
-              'relative flex w-full items-center rounded-lg  transition-all duration-200',
-              collapsed
-                ? 'justify-center'
-                : 'border-zinc-200 dark:border-zinc-800 bg-zinc-300/30 dark:bg-zinc-900/30 p-2 hover:border-zinc-300 dark:hover:border-zinc-700'
-            )}>
-              <div className="h-8 w-8 flex-shrink-0 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-white text-xs font-semibold">
+            <div
+              className="relative flex w-full items-center rounded-lg transition-all duration-200"
+              style={{
+                padding: collapsed ? '0' : '0.5rem',
+                justifyContent: collapsed ? 'center' : undefined,
+                border: collapsed ? 'none' : `1px solid ${sbText}20`,
+                backgroundColor: `${sbText}10`,
+              }}
+            >
+              <div
+                className="h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{
+                  background: `linear-gradient(to bottom right, ${sbActiveBg}, ${sbHoverBg})`,
+                  color: sbActiveText,
+                }}
+              >
                 {(user.nombre || user.email || 'I')[0]?.toUpperCase()}
               </div>
               {!collapsed ? (
                 <div className="flex-1 min-w-0 ml-2">
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                  <p className="text-sm font-medium truncate" style={{ color: sbText }}>
                     {user.nombre || user.email || 'Invitado'}
                   </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                  <p className="text-xs truncate" style={{ color: `${sbText}99` }}>
                     {user.role === 'admin' ? 'Administrador' : user.agencia || 'Agencia'}
                   </p>
                 </div>
@@ -517,7 +534,10 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <DropdownMenuTrigger asChild>
                     <button
                       aria-label="Abrir opciones de perfil"
-                      className="ml-auto inline-flex items-center rounded-md p-1.5 text-zinc-500 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+                      className="ml-auto inline-flex items-center rounded-md p-1.5 transition-colors"
+                      style={{ color: sbText }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = sbHoverBg; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                     >
                       <ChevronDown className="h-4 w-4" />
                     </button>

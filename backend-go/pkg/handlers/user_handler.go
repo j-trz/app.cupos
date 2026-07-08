@@ -49,13 +49,15 @@ func Login(c *gin.Context) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":      profile.ID,
-		"email":   profile.Email,
-		"nombre":  profile.Nombre,
-		"agencia": profile.Agencia,
-		"role":    profile.Role,
-		"admin":   profile.Admin,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"id":       profile.ID,
+		"email":    profile.Email,
+		"nombre":   profile.Nombre,
+		"apellido": profile.Apellido,
+		"telefono": profile.Telefono,
+		"agencia":  profile.Agencia,
+		"role":     profile.Role,
+		"admin":    profile.Admin,
+		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(secret))
@@ -96,8 +98,8 @@ func UpdateMyProfile(c *gin.Context) {
 
 	var input struct {
 		Nombre   string `json:"nombre"`
-		Apellido string `json:"apellido"` // not a DB column yet; ignored in updates
-		Telefono string `json:"telefono"` // not a DB column yet; ignored in updates
+		Apellido string `json:"apellido"`
+		Telefono string `json:"telefono"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -108,10 +110,14 @@ func UpdateMyProfile(c *gin.Context) {
 	if input.Nombre != "" {
 		updates["nombre"] = input.Nombre
 	}
-	// Apellido and Telefono are not present in the Profile model; add them to the
-	// model and database schema before uncommenting the lines below.
-	// if input.Apellido != "" { updates["apellido"] = input.Apellido }
-	// if input.Telefono != "" { updates["telefono"] = input.Telefono }
+
+	if input.Apellido != "" {
+		updates["apellido"] = input.Apellido
+	}
+
+	if input.Telefono != "" {
+		updates["telefono"] = input.Telefono
+	}
 
 	if len(updates) > 0 {
 		database.DB.Model(&profile).Updates(updates)

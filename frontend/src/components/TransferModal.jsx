@@ -24,7 +24,8 @@ export default function TransferModal({ open, onClose, product, onTransferComple
         try {
             const data = await AgencyService.listAgencies();
             // Filtrar para mostrar solo agencias diferentes a la del usuario
-            const filtered = data.filter(a => a.name !== user?.agencia);
+            // (user.agencia guarda el código de agencia, no el nombre)
+            const filtered = data.filter(a => a.code !== user?.agencia);
             setAgencies(filtered);
         } catch (error) {
             console.error('Error fetching agencies:', error);

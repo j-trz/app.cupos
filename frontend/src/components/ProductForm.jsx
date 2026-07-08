@@ -4,6 +4,22 @@ import { Input } from './ui/Input';
 import { Label } from './ui/Label';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from './ui/Card';
 
+// Tipos de producto soportados. El campo "ruta" se relabela según el tipo
+// (Cabina para Crucero, Habitación para Hotel) — la lógica de negocio
+// específica por tipo (tarifas por categoría, noches de estadía, etc.) se
+// suma en una siguiente iteración; por ahora es solo estructura + etiquetas.
+const TIPOS_PRODUCTO = [
+  { value: 'Aereo', label: 'Aéreo' },
+  { value: 'Hotel', label: 'Hotel' },
+  { value: 'Crucero', label: 'Crucero' },
+];
+
+const RUTA_LABEL_BY_TIPO = {
+  Hotel: 'Habitación',
+  Crucero: 'Cabina',
+  Aereo: 'Ruta',
+};
+
 const EMPTY_FORM = {
   codigo_cupo: '',
   destino: '',
@@ -19,7 +35,7 @@ const EMPTY_FORM = {
   pnr: '',
   ficha: '',
   temporada: '',
-  tipo_producto: '',
+  tipo_producto: 'Aereo',
   bloqueo_temporal_minutos: '',
   carryon: false,
   handbag: false,
@@ -51,7 +67,7 @@ function toFormValues(product) {
     pnr: product.pnr || '',
     ficha: product.ficha || '',
     temporada: product.temporada || '',
-    tipo_producto: product.tipo_producto || '',
+    tipo_producto: product.tipo_producto || 'Aereo',
     bloqueo_temporal_minutos: product.bloqueo_temporal_minutos ?? '',
     carryon: product.carryon ?? false,
     handbag: product.handbag ?? false,
@@ -138,6 +154,8 @@ const ProductForm = ({
     </div>
   );
 
+  const rutaLabel = RUTA_LABEL_BY_TIPO[form.tipo_producto] || 'Ruta';
+
   const check = (id, label) => (
     <label htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none">
       <input
@@ -190,10 +208,10 @@ const ProductForm = ({
             {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
           </div>
 
-          {/* OP y Ruta */}
+          {/* OP y Ruta/Cabina/Habitación (según tipo de producto) */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {field('op', 'OP', 'number', { step: '0.01', min: '0' })}
-            {field('ruta', 'Ruta')}
+            {field('ruta', rutaLabel)}
             {field('pnr', 'PNR')}
           </div>
 
@@ -201,7 +219,19 @@ const ProductForm = ({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {field('ficha', 'Ficha')}
             {field('temporada', 'Temporada')}
-            {field('tipo_producto', 'Tipo de Producto')}
+            <div className="space-y-1">
+              <Label htmlFor="tipo_producto">Tipo de Producto *</Label>
+              <select
+                id="tipo_producto"
+                value={form.tipo_producto}
+                onChange={(e) => set('tipo_producto', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {TIPOS_PRODUCTO.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Equipaje */}

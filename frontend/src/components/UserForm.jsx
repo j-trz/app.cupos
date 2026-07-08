@@ -8,6 +8,7 @@ import { Label } from './ui/Label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select';
 import { Checkbox } from './ui/Checkbox';
 import PermissionSelector from './PermissionSelector';
+import { useAgencies } from '../hooks/useAgencies';
 
 const UserForm = ({
   onSubmit,
@@ -45,6 +46,8 @@ const UserForm = ({
 
   const watchedActive = watch('activo');
   const watchedRole = watch('rol');
+  const watchedAgencia = watch('agencia');
+  const { data: agencies = [] } = useAgencies();
 
   const roleLabels = {
     admin: 'Administrador',
@@ -113,7 +116,18 @@ const UserForm = ({
         </div>
         <div className="space-y-1">
           <Label htmlFor="agencia">Agencia</Label>
-          <Input id="agencia" {...register('agencia')} />
+          <Select value={watchedAgencia} onValueChange={(value) => setValue('agencia', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar agencia">
+                {agencies.find((a) => a.code === watchedAgencia)?.name || watchedAgencia || null}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {agencies.map((agency) => (
+                <SelectItem key={agency.id} value={agency.code}>{agency.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

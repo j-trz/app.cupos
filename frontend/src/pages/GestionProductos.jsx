@@ -201,7 +201,7 @@ const GestionProductos = () => {
 
       {/* Tabla de productos */}
       {isLoading ? (
-        <SkeletonTable columns={7} rows={5} />
+        <SkeletonTable columns={8} rows={5} />
       ) : products?.data && products.data.length > 0 ? (
         <Card>
           <CardContent className="p-0">
@@ -210,6 +210,7 @@ const GestionProductos = () => {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Código</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tipo</th>
                     <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Destino</th>
                     <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Compañía</th>
                     <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Precio / Neto</th>
@@ -223,6 +224,7 @@ const GestionProductos = () => {
                   {products.data.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-muted/10">
                       <td className="p-4 align-middle font-mono text-sm font-medium">{product.codigo_cupo}</td>
+                      <td className="p-4 align-middle text-sm">{product.tipo_producto || '—'}</td>
                       <td className="p-4 align-middle font-medium">{product.destino}</td>
                       <td className="p-4 align-middle">{product.compania}</td>
                       <td className="p-4 align-middle">

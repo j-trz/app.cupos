@@ -21,7 +21,6 @@ import Settings from './pages/Settings';
 import Notificaciones from './pages/Notificaciones';
 import Requests from './pages/Requests';
 import Confirmations from './pages/Confirmations';
-import Products from './pages/Products';
 import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import AIConfig from './pages/AIConfig';
@@ -209,16 +208,6 @@ function App() {
                     <ProtectedRoute>
                       <Layout>
                         <Confirmations />
-                      </Layout>
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/products" 
-                  element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <Products />
                       </Layout>
                     </ProtectedRoute>
                   } 

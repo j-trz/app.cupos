@@ -5,6 +5,13 @@ const WhiteLabelContext = createContext(null);
 
 // Configuración por defecto
 const DEFAULT_CONFIG = {
+    identity: {
+        agency_name: '',
+        contact_email: '',
+        slogan: '',
+        logoUrl: '',
+        faviconUrl: ''
+    },
     colors: {
         primary: '#3b82f6',
         primary_hover: '#2563eb',
@@ -38,6 +45,7 @@ const DEFAULT_CONFIG = {
         active_bg: '#ffffff',
         active_text: '#0f172a',
         hover_bg: '#1e293b',
+        hover_text: '#ffffff',
         width: '320px',
         collapsed_width: '80px'
     },
@@ -129,6 +137,13 @@ export function WhiteLabelProvider({ children }) {
 
                 // Transformar formato de DB a formato estructurado
                 const newConfig = {
+                    identity: {
+                        agency_name: dbConfig.identity?.agency_name || dbConfig.agency_name || '',
+                        contact_email: dbConfig.identity?.contact_email || dbConfig.contact_email || '',
+                        slogan: dbConfig.identity?.slogan || dbConfig.slogan || '',
+                        logoUrl: dbConfig.identity?.logoUrl || dbConfig.logoUrl || '',
+                        faviconUrl: dbConfig.identity?.faviconUrl || dbConfig.faviconUrl || ''
+                    },
                     colors: {
                         primary: dbConfig.primary_color || DEFAULT_CONFIG.colors.primary,
                         primary_hover: dbConfig.primary_hover_color || DEFAULT_CONFIG.colors.primary_hover,
@@ -162,6 +177,7 @@ export function WhiteLabelProvider({ children }) {
                         active_bg: dbConfig.sidebar?.activeColor || dbConfig.sidebar_active_bg || DEFAULT_CONFIG.sidebar.active_bg,
                         active_text: dbConfig.sidebar?.activeText || dbConfig.sidebar_active_text || DEFAULT_CONFIG.sidebar.active_text,
                         hover_bg: dbConfig.sidebar?.hoverColor || dbConfig.sidebar_hover_bg || DEFAULT_CONFIG.sidebar.hover_bg,
+                        hover_text: dbConfig.sidebar?.hoverTextColor || dbConfig.sidebar_hover_text || DEFAULT_CONFIG.sidebar.hover_text,
                         width: dbConfig.sidebar?.width || dbConfig.sidebar_width || DEFAULT_CONFIG.sidebar.width,
                         collapsed_width: dbConfig.sidebar?.collapsedWidth || dbConfig.sidebar_collapsed_width || DEFAULT_CONFIG.sidebar.collapsed_width
                     },

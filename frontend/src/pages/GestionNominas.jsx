@@ -25,22 +25,21 @@ const formatMoney = (value) => {
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-// Combina los campos de la reserva con los del pasajero (si viene desglosado
-// vía Passengers) o cae a los campos *Pasajero de la reserva (reservas
-// creadas sin desglose de pasajeros, un único pasajero "principal").
+// Combina los campos compartidos del pedido (Reservation) con los propios de
+// cada pasajero (Passenger) — cada pasajero es su propio ticket individual:
+// estado, doc contable, precio de venta, neto 1 y número de ticket son datos
+// DE ESE pasajero, no del pedido. Si el pasajero no trae un valor propio
+// (reservas históricas creadas antes de este cambio), cae al valor del pedido
+// como fallback.
 const buildPassengerRows = (r) => {
   const base = {
     reservaId: r.id,
     pedidoId: r.pedido_id || r.id || '—',
-    estado: r.estado || '',
     contactoNombre: r.contacto_nombre || '—',
     contactoEmail: r.contacto_email || '—',
     contactoTelefono: r.contacto_telefono || '—',
-    docContable: r.doc_contable || '—',
     fichaVenta: r.ficha_venta || '—',
     vendedorEmail: r.vendedor_email || '—',
-    precioVenta: r.precio_venta,
-    neto1: r.neto_1,
   };
 
   if (Array.isArray(r.passengers) && r.passengers.length > 0) {
@@ -54,6 +53,11 @@ const buildPassengerRows = (r) => {
       nacionalidad: p.nacionalidad || '—',
       tipoPasajero: p.tipo_pasajero || '—',
       esVentaPrincipal: p.nro === 1,
+      estado: p.estado || r.estado || '',
+      docContable: p.doc_contable || r.doc_contable || '—',
+      numeroTicket: p.numero_ticket || '—',
+      precioVenta: p.precio_venta || r.precio_venta,
+      neto1: p.neto_1 || r.neto_1,
     }));
   }
 
@@ -67,6 +71,11 @@ const buildPassengerRows = (r) => {
     nacionalidad: r.nacionalidad_pasajero || '—',
     tipoPasajero: r.tipo_pasajero || '—',
     esVentaPrincipal: null,
+    estado: r.estado || '',
+    docContable: r.doc_contable || '—',
+    numeroTicket: '—',
+    precioVenta: r.precio_venta,
+    neto1: r.neto_1,
   }];
 };
 
@@ -107,6 +116,7 @@ const buildRow = (r, products) => {
     'Email Contacto': row.contactoEmail,
     'Teléfono Contacto': row.contactoTelefono,
     'Doc Contable': row.docContable,
+    'Ticket': row.numeroTicket,
     'Ficha': row.fichaVenta,
     'Vendedor': row.vendedorEmail,
     'Precio Venta': row.precioVenta ?? '',
@@ -168,6 +178,7 @@ function ProductSection({ product, reservations }) {
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
               {product?.codigo_cupo || '—'}
+              {product?.tipo_producto && ` · ${product.tipo_producto}`}
             </p>
           </div>
           <div className="hidden sm:block">
@@ -214,6 +225,7 @@ function ProductSection({ product, reservations }) {
                 <TableHead>Email Contacto</TableHead>
                 <TableHead>Tel. Contacto</TableHead>
                 <TableHead>Doc. Contable</TableHead>
+                <TableHead>Ticket</TableHead>
                 <TableHead>Ficha</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Precio Venta</TableHead>
@@ -247,6 +259,7 @@ function ProductSection({ product, reservations }) {
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoEmail}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoTelefono}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.docContable}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300 font-mono text-xs">{row.numeroTicket}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.vendedorEmail}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
