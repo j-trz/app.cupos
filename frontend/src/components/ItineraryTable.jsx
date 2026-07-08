@@ -86,38 +86,112 @@ export const AIRPORTS = {
 
 const FALLBACK_LOGO = 'https://documents.sabre.com/static/images/tc/mail/icon-air.png';
 
-function parseRuta(ruta) {
-  if (!ruta) return [];
-  try {
-    let parsed = ruta;
-    if (typeof ruta === 'string') {
-      try { parsed = JSON.parse(ruta); } catch { parsed = ruta; }
+/**
+ * Parsea una línea de segmento GDS/PNR.
+ * Identifica cada campo por su PATRÓN, no por posición fija.
+ */
+function parseSegmentLine(line) {
+  const tokens = line.trim().split(/\s+/);
+  const result = {
+    segmento: '',
+    compania: '',
+    vuelo: '',
+    origen: '',
+    destino: '',
+    fechaSalida: '',
+    salida: '',
+    llegada: '',
+    fechaLlegada: '',
+    nextDay: false,
+  };
+
+  let i = 0;
+
+  // 1. Nro de segmento — primer token numérico
+  if (/^\d+$/.test(tokens[i])) result.segmento = tokens[i++];
+
+  // 2. Aerolínea + vuelo — combinado "UX1301" o separado "UX" "046"
+  const combinedRe = /^([A-Z]{2})(\d{3,4})$/;
+  if (combinedRe.test(tokens[i])) {
+    [, result.compania, result.vuelo] = tokens[i++].match(combinedRe);
+  } else if (/^[A-Z]{2}$/.test(tokens[i])) {
+    result.compania = tokens[i++];
+    if (/^\d{3,4}$/.test(tokens[i])) result.vuelo = tokens[i++];
+  }
+
+  // 3. Clase de reserva — letra única (ignorar)
+  if (/^[A-Z]$/.test(tokens[i])) i++;
+
+  // 4. Fecha de salida — DDMON / DMON (ej: "15SEP", "1OCT")
+  if (/^\d{1,2}[A-Z]{3}$/.test(tokens[i])) result.fechaSalida = tokens[i++];
+
+  // 5. O&D — 6 letras mayúsculas consecutivas
+  //    Puede venir suelto "MVDMAD", prefijado "2*MVDMAD", o separado "5 TLVFCO"
+  while (i < tokens.length && !result.origen) {
+    const m = tokens[i].match(/([A-Z]{6})/);
+    if (m) {
+      result.origen = m[1].slice(0, 3);
+      result.destino = m[1].slice(3);
     }
-    if (parsed && typeof parsed === 'object' && parsed.vuelos && Array.isArray(parsed.vuelos)) {
-      return parsed.vuelos.map((v) => ({
-        compania: v.aerolinea || v.compania || '',
-        vuelo: v.numeroVuelo || v.vuelo || '',
-        fecha: v.fecha || '',
-        origen: v.origen || '',
-        destino: v.destino || '',
-        salida: v.horaSalida || v.salida || '',
-        llegada: v.horaLlegada || v.llegada || '',
-        clase: v.clase || v.cabina || '',
-      }));
-    }
-  } catch { /* ignore */ }
-  const tokens = String(ruta).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim().split(' ');
-  const vuelos = [];
-  for (let i = 0; i < tokens.length; i += 7) {
-    if (tokens.length - i >= 7) {
-      vuelos.push({
-        compania: tokens[i], vuelo: tokens[i + 1], fecha: tokens[i + 2],
-        origen: tokens[i + 3], destino: tokens[i + 4],
-        salida: tokens[i + 5], llegada: tokens[i + 6],
-      });
+    i++;
+  }
+
+  // 6. Horarios — dos tokens de exactamente 4 dígitos (HHMM)
+  //    Tokens como "DK1", "E", "789" no matchean y se saltan solos
+  for (; i < tokens.length; i++) {
+    if (/^\d{4}$/.test(tokens[i])) {
+      if (!result.salida) { result.salida = tokens[i]; }
+      else { result.llegada = tokens[i]; i++; break; }
     }
   }
-  return vuelos;
+
+  // 7. Fecha de llegada — primer token fecha tras los horarios
+  if (i < tokens.length && /^\d{1,2}[A-Z]{3}$/.test(tokens[i])) {
+    result.fechaLlegada = tokens[i];
+  }
+
+  // 8. Lógica +1 día
+  //    Primero compara fechas explícitas; si no hay, cruza medianoche por horarios
+  if (result.fechaSalida && result.fechaLlegada) {
+    result.nextDay = result.fechaSalida !== result.fechaLlegada;
+  } else if (result.salida && result.llegada) {
+    result.nextDay = parseInt(result.llegada, 10) < parseInt(result.salida, 10);
+  }
+
+  return result;
+}
+
+/**
+ * Entry point: acepta JSON (objeto o string) o texto GDS/PNR crudo.
+ */
+function parseRuta(ruta) {
+  if (!ruta) return [];
+
+  // Intentar datos estructurados primero (backward compat)
+  try {
+    const parsed = typeof ruta === 'string' ? JSON.parse(ruta) : ruta;
+    if (parsed?.vuelos && Array.isArray(parsed.vuelos)) {
+      return parsed.vuelos.map((v) => ({
+        segmento: v.segmento || '',
+        compania: v.aerolinea || v.compania || '',
+        vuelo: v.numeroVuelo || v.vuelo || '',
+        origen: v.origen || '',
+        destino: v.destino || '',
+        fechaSalida: v.fecha || v.fechaSalida || '',
+        salida: v.horaSalida || v.salida || '',
+        llegada: v.horaLlegada || v.llegada || '',
+        fechaLlegada: v.fechaLlegada || '',
+        nextDay: v.nextDay || false,
+      }));
+    }
+  } catch { /* no es JSON, continuar con parser de texto */ }
+
+  // Parsear texto GDS/PNR línea por línea
+  return String(ruta)
+    .split('\n')
+    .filter((line) => /^\s*\d+\s+[A-Z]/.test(line)) // solo líneas de segmento
+    .map(parseSegmentLine)
+    .filter((v) => v.compania && v.vuelo);
 }
 
 async function loadImgBitmap(url) {
