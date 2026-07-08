@@ -163,6 +163,14 @@ func runSQLMigrations(db *gorm.DB) {
 		// Fix foreign key to have ON DELETE CASCADE for availability_transfers -> products
 		`ALTER TABLE availability_transfers DROP CONSTRAINT IF EXISTS fk_availability_transfers_product;`,
 		`ALTER TABLE availability_transfers ADD CONSTRAINT fk_availability_transfers_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;`,
+		// Fix boolean columns: set DEFAULT false y actualizar NULLs existentes a false
+		// (estas columnas se crearon sin DEFAULT y quedan en NULL cuando el form envía false)
+		`ALTER TABLE products ALTER COLUMN carryon SET DEFAULT false;`,
+		`ALTER TABLE products ALTER COLUMN handbag SET DEFAULT false;`,
+		`ALTER TABLE products ALTER COLUMN checkedbag SET DEFAULT false;`,
+		`UPDATE products SET carryon = false WHERE carryon IS NULL;`,
+		`UPDATE products SET handbag = false WHERE handbag IS NULL;`,
+		`UPDATE products SET checkedbag = false WHERE checkedbag IS NULL;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

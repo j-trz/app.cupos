@@ -47,9 +47,9 @@ type Product struct {
 	Temporada              string     `json:"temporada"`
 	TipoProducto           string     `json:"tipo_producto"`
 	BloqueoTemporalMinutos int        `json:"bloqueo_temporal_minutos"`
-	CarryOn                bool       `gorm:"column:carryon" json:"carryon"`
-	HandBag                bool       `gorm:"column:handbag" json:"handbag"`
-	CheckedBag             bool       `gorm:"column:checkedbag" json:"checkedbag"`
+	CarryOn                bool       `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag                bool       `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag             bool       `gorm:"column:checkedbag;default:false" json:"checkedbag"`
 	InfFare                float64    `json:"inf_fare"`
 	ChdFare                float64    `json:"chd_fare"`
 	IsBlockedForSale       bool       `gorm:"default:false" json:"is_blocked_for_sale"`

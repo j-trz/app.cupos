@@ -206,7 +206,17 @@ func UpdateProduct(c *gin.Context) {
 	updated.TransferID = existing.TransferID
 	updated.CreatedAt = existing.CreatedAt
 
-	if err := database.DB.Save(&updated).Error; err != nil {
+	if err := database.DB.Select(
+		"destino", "compania", "disponibilidad", "cupo",
+		"fecha_salida", "fecha_regreso", "salida", "regreso",
+		"precio", "neto_1", "op",
+		"ruta", "pnr", "ficha", "temporada", "tipo_producto",
+		"bloqueo_temporal_minutos",
+		"carryon", "handbag", "checkedbag",
+		"inf_fare", "chd_fare",
+		"is_blocked_for_sale",
+		"source_agency",
+	).Save(&updated).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto: " + err.Error()})
 		return
 	}
