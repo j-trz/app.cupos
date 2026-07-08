@@ -265,8 +265,8 @@ const Documentacion = () => {
 
                     {/* Footer */}
                     <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                        <p>{agency_name} - Sistema de Gestión de Cupos de Viajes Aéreos</p>
-                        <p className="mt-1">© 2026 {agency_name} - Todos los derechos reservados</p>
+                        <p>Sistema de Gestión de Cupos de Viajes Aéreos</p>
+                        <p className="mt-1">© 2026 Sistema de Gestión de Cupos - Todos los derechos reservados</p>
                     </div>
                 </div>
             </main>

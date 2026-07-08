@@ -6,6 +6,8 @@ import Sidebar from './ui/Sidebar.jsx';
 import AIChatWidget from './AIChat/AIChatWidget.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
+import { useSSE } from '../hooks/useSSE';
+import Swal from 'sweetalert2';
 
 export default function Layout({ children }) {
   const { user, signOut } = useAuth();
@@ -36,8 +38,8 @@ export default function Layout({ children }) {
         return t('roles');
       case '/permisos':
         return t('permissions');
-      case '/logs':
-        return 'Logs del sitio';
+      case '/correo':
+        return t('emailConfig');
       case '/panel-control':
         return t('settings');
       case '/availability':
@@ -54,8 +56,8 @@ export default function Layout({ children }) {
         return t('confirmations');
       case '/reportes':
         return 'Reportes Avanzados';
-      case '/documentacion':
-        return 'Documentación';
+      case '/products':
+        return t('products');
       case '/marca-blanca':
         return t('whiteLabel');
       case '/email-config':
@@ -74,33 +76,103 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
+  // Callbacks para notificaciones SSE
+  const handleNotification = (data) => {
+    const { title, message, type, priority } = data;
+
+    // Mostrar toast de notificación
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: type === 'alert' ? 'warning' : type === 'error' ? 'error' : type === 'success' ? 'success' : 'info',
+      title: title || t('info'),
+      text: message,
+      showConfirmButton: false,
+      timer: 5000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer);
+        toast.addEventListener('mouseleave', Swal.resumeTimer);
+      }
+    });
+  };
+
+  const handleReservationUpdate = (data) => {
+    const { type, reservationId, message } = data;
+
+    let icon = 'info';
+    let title = t('reservations');
+
+    if (type === 'reservation_created') {
+      icon = 'success';
+      title = t('reservations') + ' ' + t('created').toLowerCase(); // Assuming 'created' is in translations
+    } else if (type === 'reservation_confirmed') {
+      icon = 'success';
+      title = t('reservations') + ' ' + t('confirmed').toLowerCase(); // Assuming 'confirmed' is in translations
+    } else if (type === 'reservation_expired') {
+      icon = 'warning';
+      title = t('reservations') + ' ' + t('expired').toLowerCase(); // Assuming 'expired' is in translations
+    }
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon,
+      title,
+      text: message || `${t('reservations')} #${reservationId}`,
+      showConfirmButton: false,
+      timer: 4000,
+      timerProgressBar: true
+    });
+  };
+
+  const handleProductUpdate = (data) => {
+    const { type, productCode, message } = data;
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: type === 'product_low_availability' ? 'warning' : 'info',
+      title: type === 'product_low_availability' ? t('low_availability') : t('product_updated'), // Assuming these are in translations
+      text: message || `${t('product')} ${productCode}`,
+      showConfirmButton: false,
+      timer: 5000,
+      timerProgressBar: true
+    });
+  };
+
+  // Conectar al servicio SSE
+  const { isConnected } = useSSE({
+    enabled: !!user,
+    onNotification: handleNotification,
+    onReservationUpdate: handleReservationUpdate,
+    onProductUpdate: handleProductUpdate,
+    onError: (error) => {
+      console.error('SSE Error:', error);
+    }
+  });
+
+
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header estilo Vercel - Minimalista y elegante */}
-        <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
+        <header className="sticky top-0 z-10 flex justify-between items-center p-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
               {getTitleByPath()}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-4">
             <LanguageSelector />
             <ThemeToggle />
           </div>
         </header>
-
-        {/* Main content con scroll suave */}
         <main
-          className="flex-1 overflow-y-auto"
+          className="flex-1 overflow-y-auto bg-gray-50 p-6"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
-          <div className={
-            location.pathname === '/reportes'
-              ? 'min-h-full w-full px-4 py-4'
-              : 'min-h-full w-full max-w-[1800px] mx-auto px-6 py-6'
-          }>
+          <div className="text-gray-900 min-h-full max-w-7xl mx-auto">
             {children || <Outlet context={{ user }} />}
           </div>
         </main>
@@ -108,6 +180,12 @@ export default function Layout({ children }) {
 
       {/* Widget de Chat IA flotante */}
       <AIChatWidget />
+
+      {/* Indicador de conexión SSE */}
+      {user && (
+        <div className={`fixed bottom-4 right-4 w-3 h-3 rounded-full transition-colors ${isConnected ? 'bg-green-500' : 'bg-red-500'
+          }`} title={isConnected ? t('connected_to_real_time_notifications') : t('disconnected_from_notifications')} />
+      )}
     </div>
   );
 }
