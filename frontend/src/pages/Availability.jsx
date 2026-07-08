@@ -28,14 +28,16 @@ const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
 
 // Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
 function BaggageIcon({ icon: Icon, included, label }) {
-  const isIncluded = typeof included === 'string' ? included === 'true' : !!included;
+  const isIncluded = !!included;
+  const ariaLabel = `${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`;
 
   return (
     <span
+      role="img"
+      aria-label={ariaLabel}
       className="relative inline-flex h-6 w-6 items-center justify-center"
-      title={`${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`}
     >
-      <Icon className={`h-4 w-4 ${isIncluded ? 'text-emerald-600' : 'text-slate-300'}`} />
+      <Icon className={clsx('h-4 w-4', isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
       {!isIncluded && (
         <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />
       )}
@@ -46,9 +48,9 @@ function BaggageIcon({ icon: Icon, included, label }) {
 function BaggageFranchise({ item }) {
   return (
     <div className="flex items-center justify-center gap-2">
-      <BaggageIcon icon={Backpack} included={!!item.carryon} label="Carry-on" />
-      <BaggageIcon icon={ShoppingBag} included={!!item.handbag} label="Handbag" />
-      <BaggageIcon icon={Luggage} included={!!item.checkedbag} label="Valija despachada" />
+      <BaggageIcon icon={Backpack} included={item.carryon} label="Carry-on" />
+      <BaggageIcon icon={ShoppingBag} included={item.handbag} label="Handbag" />
+      <BaggageIcon icon={Luggage} included={item.checkedbag} label="Valija despachada" />
     </div>
   );
 }
