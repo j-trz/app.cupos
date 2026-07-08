@@ -159,8 +159,10 @@ func runSQLMigrations(db *gorm.DB) {
 		// Email config: agency_id nullable para permitir config global sin agencia
 		`ALTER TABLE email_smtp_configs ALTER COLUMN agency_id DROP NOT NULL;`,
 		// Profile.Password nunca debió persistirse (ahora es gorm:"-"): se
-		// borra la columna para no dejar contraseñas en texto plano en la base.
 		`ALTER TABLE profiles DROP COLUMN IF EXISTS password;`,
+		// Fix foreign key to have ON DELETE CASCADE for availability_transfers -> products
+		`ALTER TABLE availability_transfers DROP CONSTRAINT IF EXISTS fk_availability_transfers_product;`,
+		`ALTER TABLE availability_transfers ADD CONSTRAINT fk_availability_transfers_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {
