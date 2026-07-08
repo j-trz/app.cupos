@@ -283,7 +283,7 @@ export default function WhiteLabelConfig() {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="mb-1 block text-xs font-medium text-slate-600">Nombre de la agencia *</label>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Nombre del sitio *</label>
                                             <div className="relative">
                                                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                                 <input type="text" value={id.agency_name || ''} onChange={e => up('identity', 'agency_name', e.target.value)}
