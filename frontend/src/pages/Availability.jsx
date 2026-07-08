@@ -28,13 +28,15 @@ const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
 
 // Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
 function BaggageIcon({ icon: Icon, included, label }) {
+  const isIncluded = typeof included === 'string' ? included === 'true' : !!included;
+
   return (
     <span
       className="relative inline-flex h-6 w-6 items-center justify-center"
-      title={`${label}: ${included ? 'Incluido' : 'No incluido'}`}
+      title={`${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`}
     >
-      <Icon className={`h-4 w-4 ${included ? 'text-emerald-600' : 'text-slate-300'}`} />
-      {!included && (
+      <Icon className={`h-4 w-4 ${isIncluded ? 'text-emerald-600' : 'text-slate-300'}`} />
+      {!isIncluded && (
         <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />
       )}
     </span>

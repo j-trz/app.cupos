@@ -70,7 +70,13 @@ function DocSteps({ steps }) {
 }
 
 function DocList({ items, color = 'blue' }) {
-  const dotColors = { blue: 'bg-blue-500', green: 'bg-emerald-500', orange: 'bg-orange-500', red: 'bg-red-500' };
+  const dotColors = {
+    blue: 'bg-blue-500',
+    green: 'bg-emerald-500',
+    orange: 'bg-orange-500',
+    red: 'bg-red-500'
+  };
+
   return (
     <ul className="space-y-1.5 my-2">
       {items.map((item, i) => (
@@ -367,7 +373,7 @@ export default function Documentacion() {
             <DocSubsection title="¿Para qué sirve el Asistente IA?" color="blue" icon={Info}>
               <DocParagraph>
                 El Asistente IA es un chat integrado que te permite <strong>consultar disponibilidad, crear reservas y gestionar tu trabajo
-                usando lenguaje natural</strong>, como si hablaras con un colega. No necesitás saber qué botón presionar: simplemente
+                  usando lenguaje natural</strong>, como si hablaras con un colega. No necesitás saber qué botón presionar: simplemente
                 describís lo que querés hacer.
               </DocParagraph>
             </DocSubsection>
