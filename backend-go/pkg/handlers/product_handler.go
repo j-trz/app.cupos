@@ -85,7 +85,11 @@ func GetProducts(c *gin.Context) {
 		if managementScope {
 			query = query.Where("restricted_agency = '' OR restricted_agency = ? OR source_agency = ?", agencia, agencia)
 		} else {
-			query = query.Where("restricted_agency = '' OR restricted_agency = ?", agencia)
+			query = query.Where("(restricted_agency = '' OR restricted_agency = ?) AND is_blocked_for_sale = false", agencia, agencia)
+		}
+	} else {
+		if !managementScope {
+			query = query.Where("is_blocked_for_sale = false")
 		}
 	}
 	query.Find(&products)

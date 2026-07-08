@@ -206,7 +206,7 @@ func CreateReservation(c *gin.Context) {
 
 	if err := tx.Create(&input.Reservation).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear la reserva"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear la reserva: " + err.Error()})
 		return
 	}
 

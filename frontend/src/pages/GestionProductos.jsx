@@ -12,11 +12,12 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useToast } from '../hooks/use-toast';
 import { useAgencies } from '../hooks/useAgencies';
+import { useAuth } from '../contexts/AuthContext';
 import { formatDateOnly } from '../lib/dateOnly.js';
 
 const formatDate = formatDateOnly;
@@ -37,6 +38,7 @@ const GestionProductos = () => {
 
   const { toast } = useToast();
   const { data: agencies = [] } = useAgencies();
+  const { user } = useAuth();
   const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
   // scope=management: además del catálogo compartido y lo restringido a mi
   // agencia, también trae lo que YO cedí a otra agencia (source_agency) —
@@ -125,6 +127,35 @@ const GestionProductos = () => {
     setTransferringProduct(null);
     // Recargar productos después de una cesión exitosa
     setSearchTerm(prev => prev);
+  };
+
+  const handleReclaimTransfer = async (product) => {
+    if (window.confirm(`¿Estás seguro de que deseas recuperar los ${product.disponibilidad} cupos cedidos a ${agencyName(product.restricted_agency)}?`)) {
+      try {
+        const response = await fetch(`/api/transfers/${product.id}/reclaim`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Error al recuperar cupo');
+        }
+        toast({
+          title: 'Éxito',
+          description: 'Cupos recuperados correctamente',
+        });
+        // Recargar productos
+        setSearchTerm(prev => prev);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Error al recuperar el cupo',
+          variant: 'destructive',
+        });
+      }
+    }
   };
 
   const handleBulkUpload = async (file) => {
@@ -266,12 +297,14 @@ const GestionProductos = () => {
                     <TableCell>
                       {product.restricted_agency || product.source_agency ? (
                         <div className="flex flex-col gap-1">
-                          {product.restricted_agency && (
+                          {/* Si soy el dueño original (o el admin viendo todo) */}
+                          {product.restricted_agency && (user.role === 'admin' || user.agencia === product.source_agency) && (
                             <Badge variant="outline" className="w-fit text-[10px]">
                               Prestado a {agencyName(product.restricted_agency)}
                             </Badge>
                           )}
-                          {product.source_agency && (
+                          {/* Si soy la agencia que recibió el cupo */}
+                          {product.source_agency && (user.role === 'admin' || user.agencia === product.restricted_agency) && (
                             <span className="text-[10px] text-slate-400">
                               Cedido por {agencyName(product.source_agency)}
                             </span>
@@ -316,6 +349,12 @@ const GestionProductos = () => {
                         <Button variant="outline" size="sm" onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad">
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
+                        {/* Botón para recuperar cupo cedido (si soy el cedente) */}
+                        {product.restricted_agency && product.source_agency === user.agencia && (
+                          <Button variant="outline" size="sm" onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800">
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
                           <Trash2 className="h-4 w-4" />
                         </Button>

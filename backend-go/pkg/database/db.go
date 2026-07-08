@@ -169,36 +169,25 @@ func runSQLMigrations(db *gorm.DB) {
 	}
 	fmt.Println("Migration applied: all columns ensured")
 
-	addAgencyForeignKeys(db)
+	dropAgencyForeignKeys(db)
 }
 
-// addAgencyForeignKeys vincula profiles.agencia y reservations.agencia contra
-// agencies.code con una constraint FK real. Es "best-effort": si hay datos
-// existentes que no coinciden con ningún código de agencia (typos, nombres
-// libres cargados antes de este cambio), la constraint falla y queda
-// solo logueada como warning — no debe tumbar el arranque del servidor.
-// Una vez que los datos se normalizan (vía los selects nuevos del frontend),
-// basta reiniciar el servidor para que la constraint se aplique.
-func addAgencyForeignKeys(db *gorm.DB) {
+// dropAgencyForeignKeys revierte las FK duras profiles.agencia/reservations.agencia
+// -> agencies.code que se habían agregado como "best-effort". El problema: una vez
+// que la constraint lograba aplicarse, cualquier INSERT con agencia vacía (ej. una
+// reserva creada por un admin, que no fuerza agencia) o con un valor que no matcheara
+// exactamente un agencies.code quedaba rechazado a nivel de base de datos con un 500
+// genérico ("Error al crear la reserva"), sin que el error real (FK violation) llegue
+// a verse. La integridad de agencia queda a cargo de los <select> del frontend, igual
+// que el resto del sistema (que ya matchea code/name de forma laxa donde corresponde).
+func dropAgencyForeignKeys(db *gorm.DB) {
 	fkSQLs := []string{
-		`DO $$
-		BEGIN
-			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_profiles_agencia') THEN
-				ALTER TABLE profiles ADD CONSTRAINT fk_profiles_agencia
-					FOREIGN KEY (agencia) REFERENCES agencies(code) ON UPDATE CASCADE;
-			END IF;
-		END $$;`,
-		`DO $$
-		BEGIN
-			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reservations_agencia') THEN
-				ALTER TABLE reservations ADD CONSTRAINT fk_reservations_agencia
-					FOREIGN KEY (agencia) REFERENCES agencies(code) ON UPDATE CASCADE;
-			END IF;
-		END $$;`,
+		`ALTER TABLE profiles DROP CONSTRAINT IF EXISTS fk_profiles_agencia;`,
+		`ALTER TABLE reservations DROP CONSTRAINT IF EXISTS fk_reservations_agencia;`,
 	}
 	for _, sql := range fkSQLs {
 		if err := db.Exec(sql).Error; err != nil {
-			log.Println("WARNING: No se pudo agregar FK de agencia (probablemente hay datos existentes sin coincidencia exacta con agencies.code):", err)
+			log.Println("WARNING: No se pudo quitar FK de agencia:", err)
 		}
 	}
 }

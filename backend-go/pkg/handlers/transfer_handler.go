@@ -197,7 +197,6 @@ func GetUserTransfers(c *gin.Context) {
 
 	query := database.DB.Preload("Product").Order("created_at desc")
 
-	// Si no es admin, filtrar por la agencia del usuario
 	if role != "admin" {
 		query = query.Where("source_agency = ? OR target_agency = ?", agencia, agencia)
 	}
@@ -205,4 +204,101 @@ func GetUserTransfers(c *gin.Context) {
 	query.Find(&transfers)
 
 	c.JSON(http.StatusOK, transfers)
+}
+
+// ReclaimTransfer recupera el stock de un producto cedido (producto espejo)
+// y lo devuelve al producto origen.
+func ReclaimTransfer(c *gin.Context) {
+	productID := c.Param("id")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
+	role, _ := c.Get("role")
+
+	var mirrorProduct models.Product
+	if err := database.DB.First(&mirrorProduct, productID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto cedido no encontrado"})
+		return
+	}
+
+	if mirrorProduct.RestrictedAgency == "" || mirrorProduct.SourceAgency == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este producto no es una cesión"})
+		return
+	}
+
+	if role != "admin" && callerAgencia != mirrorProduct.SourceAgency {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tienes permiso para recuperar este cupo"})
+		return
+	}
+
+	if mirrorProduct.Disponibilidad <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad para recuperar"})
+		return
+	}
+
+	if mirrorProduct.TransferID == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falta el TransferID original"})
+		return
+	}
+
+	var transfer models.AvailabilityTransfer
+	if err := database.DB.First(&transfer, mirrorProduct.TransferID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Registro de transferencia no encontrado"})
+		return
+	}
+
+	var originalProduct models.Product
+	if err := database.DB.First(&originalProduct, transfer.ProductID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Producto origen no encontrado"})
+		return
+	}
+
+	qtyToReclaim := mirrorProduct.Disponibilidad
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Devolver al original
+	if err := tx.Model(&models.Product{}).Where("id = ?", originalProduct.ID).
+		Update("disponibilidad", gorm.Expr("disponibilidad + ?", qtyToReclaim)).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar producto origen"})
+		return
+	}
+
+	// Restar al espejo
+	if err := tx.Model(&models.Product{}).Where("id = ?", mirrorProduct.ID).
+		Update("disponibilidad", 0).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al vaciar producto espejo"})
+		return
+	}
+
+	// Registrar reserva de devolución
+	var createdBy uuid.UUID
+	if s, ok := c.Get("userID"); ok {
+		if sStr, ok := s.(string); ok {
+			createdBy, _ = uuid.Parse(sStr)
+		}
+	}
+	cesionReservation := models.Reservation{
+		ProductID:      originalProduct.ID,
+		CreatedBy:      createdBy,
+		Estado:         models.EstadoCedida,
+		PedidoID:       fmt.Sprintf("RECUP-%s", transfer.ID.String()[:8]),
+		Agencia:        mirrorProduct.SourceAgency,
+		TransferID:     mirrorProduct.TransferID,
+		ContactoNombre: fmt.Sprintf("Recuperación de %d cupos de %s", qtyToReclaim, mirrorProduct.RestrictedAgency),
+	}
+	if err := tx.Create(&cesionReservation).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al registrar recuperación"})
+		return
+	}
+
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{"message": "Cupos recuperados"})
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download } from 'lucide-react';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download, MapPin } from 'lucide-react';
+import ItineraryTable from '../components/ItineraryTable';
 import ReservationService from '../services/reservationService';
 import BackofficeService from '../services/backofficeService';
 import Swal from 'sweetalert2';
@@ -59,6 +60,8 @@ export default function Availability() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [temporadaFilter, setTemporadaFilter] = useState('Todas');
+  // Modal de ruta
+  const [routeModalProduct, setRouteModalProduct] = useState(null);
 
   useEffect(() => {
     fetchAvailability();
@@ -433,7 +436,21 @@ export default function Availability() {
                   <TableCell className="text-center">{formatDate(item.fecha_salida)}</TableCell>
                   <TableCell className="text-center">{formatDate(item.fecha_regreso)}</TableCell>
                   <TableCell className="text-center">{item.temporada || '—'}</TableCell>
-                  <TableCell className="text-center">{item.ruta || '—'}</TableCell>
+                  <TableCell className="text-center">
+                    {item.ruta ? (
+                      <button
+                        type="button"
+                        onClick={() => setRouteModalProduct(item)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver detalle de la ruta"
+                      >
+                        <MapPin className="h-3 w-3" />
+                        Ruta
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">
                     <BaggageFranchise item={item} />
                   </TableCell>
@@ -595,6 +612,41 @@ export default function Availability() {
           </Button>
         </div>
       </Modal>
+
+      {/* ─── Modal Ver Ruta ─── */}
+      {routeModalProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Detalle de Ruta
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    {routeModalProduct.codigo_cupo} — {routeModalProduct.destino}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRouteModalProduct(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {/* Contenido */}
+            <div className="p-5">
+              <ItineraryTable ruta={routeModalProduct.ruta} showCopyButton={true} />
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

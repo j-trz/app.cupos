@@ -13,6 +13,7 @@ import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import ItineraryPDF from '../components/ItineraryPDF.jsx';
 
 const emptyForm = {
   product_id: '',
@@ -144,6 +145,7 @@ export default function GestionReservas() {
   const [docValue, setDocValue] = useState('');
   const [ticketModal, setTicketModal] = useState(null); // { reservationId, passengerId, pedidoId, nombre }
   const [ticketValue, setTicketValue] = useState('');
+  const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
 
   const { data: agencies = [] } = useAgencies();
 
@@ -553,6 +555,16 @@ export default function GestionReservas() {
                       <Button variant="ghost" size="sm" onClick={() => handleDeletePassenger(row)} title="Eliminar este pasajero" className="text-red-500 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      {row.numeroTicket && (
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          const reservation = r;
+                          const passengers = [row]; // Pasamos el pasajero de esta fila
+                          const product = { ruta: r.vuelo_ruta, destino: r.vuelo_destino };
+                          setPdfModalData({ reservation, passengers, product });
+                        }} title="Generar Itinerario">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -735,6 +747,17 @@ export default function GestionReservas() {
               <Button type="button" onClick={handleSaveTicket} disabled={!ticketValue.trim()}>Guardar</Button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* ─── Modal Itinerario PDF ─── */}
+      <Modal title="Itinerario PDF" open={!!pdfModalData} onClose={() => setPdfModalData(null)} size="3xl">
+        {pdfModalData && (
+          <ItineraryPDF 
+            reservation={pdfModalData.reservation} 
+            passengers={pdfModalData.passengers} 
+            product={pdfModalData.product} 
+          />
         )}
       </Modal>
     </div>

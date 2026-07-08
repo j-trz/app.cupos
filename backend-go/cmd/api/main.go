@@ -242,6 +242,7 @@ func main() {
 			{
 				transfers.GET("", handlers.GetUserTransfers)
 				transfers.POST("", handlers.CreateTransfer)
+				transfers.POST("/:id/reclaim", handlers.ReclaimTransfer)
 			}
 			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
 
