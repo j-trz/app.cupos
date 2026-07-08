@@ -27,6 +27,7 @@ import AIConfig from './pages/AIConfig';
 import Reportes from './pages/Reportes';
 import LogsDelSitio from './pages/LogsDelSitio';
 import GestionNominas from './pages/GestionNominas';
+import Documentacion from './pages/Documentacion';
 import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -42,55 +43,55 @@ function App() {
             <div className="App">
               <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route 
-                  path="/" 
+                <Route
+                  path="/"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Dashboard />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/dashboard" 
+                <Route
+                  path="/dashboard"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Dashboard />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/usuarios" 
+                <Route
+                  path="/usuarios"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionUsuarios />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/productos" 
+                <Route
+                  path="/productos"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionProductos />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/reservas" 
+                <Route
+                  path="/reservas"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionReservas />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 <Route
                   path="/nominas"
@@ -112,125 +113,125 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route 
-                  path="/temas" 
+                <Route
+                  path="/temas"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionTemas />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/roles" 
+                <Route
+                  path="/roles"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionRoles />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/permisos" 
+                <Route
+                  path="/permisos"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionPermisos />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 <Route
-                  path="/panel-control" 
+                  path="/panel-control"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <PanelControl />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/availability" 
+                <Route
+                  path="/availability"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Availability />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/profile" 
+                <Route
+                  path="/profile"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Profile />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/settings" 
+                <Route
+                  path="/settings"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Settings />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/notificaciones" 
+                <Route
+                  path="/notificaciones"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Notificaciones />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/requests" 
+                <Route
+                  path="/requests"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Requests />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/confirmations" 
+                <Route
+                  path="/confirmations"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <Confirmations />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/marca-blanca" 
+                <Route
+                  path="/marca-blanca"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <WhiteLabelConfig />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/email-config" 
+                <Route
+                  path="/email-config"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <EmailConfig />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 <Route
                   path="/config-ia"
@@ -262,24 +263,34 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route 
-                  path="/test" 
+                <Route
+                  path="/documentacion"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Documentacion />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/test"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <TestPage />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 {/* Ruta para pruebas sin protección */}
-                <Route 
-                  path="/test-public" 
+                <Route
+                  path="/test-public"
                   element={
                     <Layout>
                       <TestPage />
                     </Layout>
-                  } 
+                  }
                 />
               </Routes>
               <ToastNotification />
