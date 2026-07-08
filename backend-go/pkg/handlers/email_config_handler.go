@@ -36,8 +36,11 @@ func resolveAgencyForEmailConfig(c *gin.Context) (agencyID *uuid.UUID, agencyCod
 		return nil, "", nil
 	}
 
-	var agency models.Agency
-	if dbErr := database.DB.Where("code = ?", agenciaCode).First(&agency).Error; dbErr != nil {
+	// El valor de "agencia" en Profile/JWT puede ser el código o el nombre de
+	// la agencia según de dónde se haya cargado — se acepta cualquiera de
+	// los dos para no perder la asociación silenciosamente.
+	agency, dbErr := services.FindAgencyByCodeOrName(agenciaCode)
+	if dbErr != nil {
 		// Agencia sin registro formal en la tabla agencies: seguimos con el código,
 		// SendTemplateEmail cae al fallback SMTP global en ese caso.
 		return nil, agenciaCode, nil
@@ -173,8 +176,7 @@ func GetEmailTemplates(c *gin.Context) {
 
 	query := database.DB.Where("agency_id IS NULL")
 	if agencyCode != "" {
-		var agency models.Agency
-		if err := database.DB.Where("code = ?", agencyCode).First(&agency).Error; err == nil {
+		if agency, err := services.FindAgencyByCodeOrName(agencyCode); err == nil {
 			query = database.DB.Where("agency_id IS NULL OR agency_id = ?", agency.ID)
 		}
 	}

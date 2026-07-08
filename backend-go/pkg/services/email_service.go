@@ -21,10 +21,26 @@ type resolvedSMTPConfig struct {
 	EmailFrom string
 }
 
-// resolveSMTPConfig busca la config SMTP activa de la agencia (por código) y,
-// si no existe, cae a las variables de entorno globales (SMTP_HOST, etc.).
+// FindAgencyByCodeOrName busca una Agency aceptando tanto su código como su
+// nombre — el campo "agencia" de Profile/JWT históricamente guardó una u
+// otra cosa según la pantalla que lo haya cargado, así que buscar solo por
+// código deja afuera a cualquier cuenta cuyo valor sea en realidad el nombre.
+func FindAgencyByCodeOrName(value string) (*models.Agency, error) {
+	var agency models.Agency
+	if err := database.DB.Where("code = ? OR name = ?", value, value).First(&agency).Error; err != nil {
+		return nil, err
+	}
+	return &agency, nil
+}
+
+// resolveSMTPConfig busca, en orden: la config SMTP activa de la agencia, la
+// config global guardada en base (sin agencia asociada) y por último las
+// variables de entorno globales (SMTP_HOST, etc.).
 func resolveSMTPConfig(agencyCode string) (*resolvedSMTPConfig, error) {
 	if cfg, ok := lookupAgencySMTPConfig(agencyCode); ok {
+		return cfg, nil
+	}
+	if cfg, ok := lookupGlobalSMTPConfig(); ok {
 		return cfg, nil
 	}
 
@@ -49,12 +65,26 @@ func lookupAgencySMTPConfig(agencyCode string) (*resolvedSMTPConfig, bool) {
 	if agencyCode == "" {
 		return nil, false
 	}
-	var agency models.Agency
-	if err := database.DB.Where("code = ?", agencyCode).First(&agency).Error; err != nil {
+	agency, err := FindAgencyByCodeOrName(agencyCode)
+	if err != nil {
 		return nil, false
 	}
 	var cfg models.EmailSMTPConfig
 	if err := database.DB.Where("agency_id = ? AND is_active = true", agency.ID).First(&cfg).Error; err != nil {
+		return nil, false
+	}
+	return &resolvedSMTPConfig{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Pass: cfg.SMTPPass,
+		Secure: cfg.SMTPSecure, EmailFrom: cfg.EmailFrom,
+	}, true
+}
+
+// lookupGlobalSMTPConfig busca una EmailSMTPConfig sin agencia asociada
+// (AgencyID IS NULL) — la config "por defecto" que un admin puede cargar
+// desde /email-config cuando su cuenta no tiene una agencia específica.
+func lookupGlobalSMTPConfig() (*resolvedSMTPConfig, bool) {
+	var cfg models.EmailSMTPConfig
+	if err := database.DB.Where("agency_id IS NULL AND is_active = true").First(&cfg).Error; err != nil {
 		return nil, false
 	}
 	return &resolvedSMTPConfig{
@@ -69,8 +99,7 @@ func resolveTemplate(agencyCode, code string) (*models.EmailTemplate, error) {
 	var tpl models.EmailTemplate
 
 	if agencyCode != "" {
-		var agency models.Agency
-		if err := database.DB.Where("code = ?", agencyCode).First(&agency).Error; err == nil {
+		if agency, err := FindAgencyByCodeOrName(agencyCode); err == nil {
 			if err := database.DB.Where("code = ? AND agency_id = ?", code, agency.ID).First(&tpl).Error; err == nil {
 				return &tpl, nil
 			}
