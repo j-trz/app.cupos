@@ -23,7 +23,16 @@ const GestionProductos = () => {
   const [transferringProduct, setTransferringProduct] = useState(null);
 
   const { toast } = useToast();
-  const { data: products, isLoading, isError } = useProducts({ search: searchTerm });
+  const { data: productsResult, isLoading, isError } = useProducts({ search: searchTerm });
+  // El backend devuelve el array "pelado" (no { data: [...] }) — igual que
+  // consumen /products el resto de las pantallas (Nóminas, Disponibilidad,
+  // Reservas). Sin este fallback, products.data siempre daba undefined y la
+  // tabla nunca se mostraba, aunque hubiera productos.
+  const products = Array.isArray(productsResult)
+    ? productsResult
+    : Array.isArray(productsResult?.data)
+      ? productsResult.data
+      : [];
   const createProductMutation = useCreateProductMutation();
   const updateProductMutation = useUpdateProduct();
   const deleteProductMutation = useDeleteProduct();
@@ -198,7 +207,7 @@ const GestionProductos = () => {
       {/* Tabla de productos */}
       {isLoading ? (
         <SkeletonTable columns={8} rows={5} />
-      ) : products?.data && products.data.length > 0 ? (
+      ) : products.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -217,7 +226,7 @@ const GestionProductos = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.data.map((product) => (
+                  {products.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-muted/10">
                       <td className="p-4 align-middle font-mono text-sm font-medium">{product.codigo_cupo}</td>
                       <td className="p-4 align-middle text-sm">{product.tipo_producto || '—'}</td>
