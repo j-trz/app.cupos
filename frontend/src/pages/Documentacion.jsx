@@ -1,327 +1,689 @@
 import { useState } from 'react';
-import { BookOpen, FileText, Code, Shield, Users, Package, Building2, BarChart3, Mail, Bell, ArrowRightLeft, Calendar, Settings, FileSearch, MessageSquare, User, Download, Database, Palette, Globe, Search, Keyboard, HelpCircle } from 'lucide-react';
+import { ChevronDown, BookOpen, Calendar, Package, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Mail, Bell, Palette, FileSearch, Download, Database, HelpCircle, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, Settings, Building2, FileText, User } from 'lucide-react';
+import PageHeader from '../components/ui/PageHeader.jsx';
 
-const Documentacion = () => {
-    const [activeSection, setActiveSection] = useState('reservas');
-
-    const sections = [
-        { id: 'descripcion', title: 'Descripción General', icon: FileText, description: 'Introducción al sistema de gestión de cupos aéreos' },
-        { id: 'instalacion', title: 'Instalación y Setup', icon: Code, description: 'Guía de instalación para desarrollo y producción' },
-        { id: 'reservas', title: 'Gestión de Reservas', icon: Calendar, description: 'Sistema completo para la gestión de reservas de vuelos' },
-        { id: 'productos', title: 'Gestión de Productos', icon: Package, description: 'Administración de productos turísticos' },
-        { id: 'agencias', title: 'Gestión de Agencias', icon: Building2, description: 'Administración de agencias de turismo' },
-        { id: 'usuarios', title: 'Gestión de Usuarios', icon: Users, description: 'Administración de usuarios del sistema' },
-        { id: 'roles', title: 'Roles y Permisos', icon: Shield, description: 'Control de acceso basado en roles (RBAC)' },
-        { id: 'seguridad', title: 'Seguridad', icon: Shield, description: 'Arquitectura de seguridad y protección de datos' },
-        { id: 'whitelabel', title: 'White Label', icon: Palette, description: 'Personalización de marca para agencias' },
-        { id: 'email', title: 'Configuración de Email', icon: Mail, description: 'Configuración SMTP y plantillas de email' },
-        { id: 'reportes', title: 'Reportes Avanzados', icon: BarChart3, description: 'Dashboard ejecutivo con métricas y análisis' },
-        { id: 'notificaciones', title: 'Notificaciones', icon: Bell, description: 'Sistema de notificaciones en tiempo real' },
-        { id: 'transferencias', title: 'Transferencias', icon: ArrowRightLeft, description: 'Transferencia de cupos entre agencias' },
-        { id: 'disponibilidad', title: 'Disponibilidad y Cupos', icon: Calendar, description: 'Gestión de disponibilidad de productos' },
-        { id: 'panel', title: 'Panel de Control', icon: Settings, description: 'Configuración general del sistema' },
-        { id: 'logs', title: 'Logs del Sitio', icon: FileSearch, description: 'Visualización y gestión de logs' },
-        { id: 'ia', title: 'Chat IA', icon: MessageSquare, description: 'Asistente de inteligencia artificial' },
-        { id: 'perfil', title: 'Perfil de Usuario', icon: User, description: 'Gestión del perfil personal' },
-        { id: 'export', title: 'Exportación de Datos', icon: Download, description: 'Exportación en CSV, Excel y PDF' },
-        { id: 'auditoria', title: 'Auditoría', icon: Database, description: 'Sistema de auditoría de acciones' },
-        { id: 'backup', title: 'Backup y Restauración', icon: Database, description: 'Respaldo y restauración del sistema' },
-        { id: 'temas', title: 'Modo Oscuro/Claro', icon: Palette, description: 'Sistema de temas con cambio dinámico' },
-        { id: 'i18n', title: 'Internacionalización', icon: Globe, description: 'Soporte multi-idioma' },
-        { id: 'busqueda', title: 'Búsqueda Global', icon: Search, description: 'Búsqueda y filtros avanzados' },
-        { id: 'atajos', title: 'Atajos de Teclado', icon: Keyboard, description: 'Atajos para mejorar productividad' },
-        { id: 'onboarding', title: 'Onboarding', icon: HelpCircle, description: 'Guía interactiva para nuevos usuarios' },
-    ];
-
-    const sectionContent = {
-        descripcion: {
-            title: 'Descripción General',
-            content: [
-                { type: 'text', subtitle: 'El Sistema', content: 'El Sistema de Gestión de Cupos Aéreos es una plataforma integral diseñada específicamente para agencias de viajes mayoristas y minoristas. Su objetivo principal es facilitar la administración, control y comercialización de bloqueos aéreos (cupos) de manera eficiente y segura.' },
-                { type: 'text', subtitle: 'Arquitectura B2B2C', content: 'La plataforma opera en un modelo B2B2C, permitiendo al Operador Mayorista gestionar su inventario, distribuirlo a Agencias Minoristas, y permitir que estas últimas realicen reservas para sus clientes finales.' },
-                { type: 'alert', subtitle: 'Novedad', content: 'Ahora todo el backend se ejecuta sobre Go para un mejor rendimiento.' }
-            ]
-        },
-        instalacion: {
-            title: 'Instalación y Configuración',
-            content: [
-                { type: 'text', subtitle: 'Requisitos', content: 'Node.js (v18+), Go (v1.21+), PostgreSQL, Redis.' },
-                { type: 'list', subtitle: 'Pasos Backend Go', items: ['Clonar repositorio', 'cd backend-go', 'Configurar .env', 'go run cmd/api/main.go'] },
-                { type: 'list', subtitle: 'Pasos Frontend', items: ['cd frontend', 'npm install', 'Configurar .env', 'npm run dev'] },
-            ]
-        },
-        seguridad: {
-            title: 'Seguridad',
-            content: [
-                { type: 'text', subtitle: 'Protección de Datos', content: 'Todas las contraseñas se hashean utilizando bcrypt. La comunicación está cifrada mediante HTTPS/TLS, y los tokens JWT tienen una expiración configurada y firma fuerte.' },
-                { type: 'list', subtitle: 'Prácticas de Seguridad', items: ['Autenticación basada en JWT', 'Autorización por roles y permisos granulares', 'Validación estricta de inputs (Zod/Gin Bindings)', 'Prevención de inyección SQL (GORM)'] }
-            ]
-        },
-        reservas: {
-            title: 'Gestión de Reservas',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Reserva: Formulario completo con datos de pasajeros, productos y fechas', 'Editar Reserva: Modificación de reservas existentes con validaciones', 'Confirmar Reserva: Proceso de confirmación con validación de disponibilidad', 'Eliminar Pasajero: Eliminación individual de pasajeros de una reserva', 'Solicitar Cancelación: Flujo de cancelación con documento contable', 'Reenviar Email: Reenvío de confirmación por email', 'Actualizar Ticket: Modificación de datos de ticket por pasajero', 'Agregar Documento Contable: Adjuntar ficha de venta y documentos'] },
-                { subtitle: 'Endpoints API', items: ['POST /api/reservations - Crear nueva reserva', 'GET /api/reservations - Listar todas las reservas', 'GET /api/reservations/:id - Obtener reserva por ID', 'PUT /api/reservations/:id - Actualizar reserva', 'DELETE /api/reservations/:id - Eliminar reserva', 'POST /api/reservations/:id/confirm - Confirmar reserva'] },
-            ]
-        },
-        productos: {
-            title: 'Gestión de Productos',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Producto: Formulario con datos de destino, fechas, precios y cupos', 'Editar Producto: Modificación de productos existentes', 'Eliminar Producto: Eliminación con confirmación', 'Carga Masiva: Importación de productos desde archivo Excel/CSV', 'Transferencia de Cupos: Transferir cupos entre agencias'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/products - Listar productos con filtros', 'GET /api/products/:id - Obtener producto por ID', 'POST /api/products - Crear producto', 'PUT /api/products/:id - Actualizar producto', 'DELETE /api/products/:id - Eliminar producto', 'POST /api/products/bulk - Carga masiva de productos'] },
-            ]
-        },
-        agencias: {
-            title: 'Gestión de Agencias',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Agencia: Registro de nuevas agencias con datos completos', 'Editar Agencia: Modificación de datos de agencia', 'Eliminar Agencia: Eliminación con validación de dependencias', 'Listar Agencias: Vista con filtros y búsqueda'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/agencies - Listar agencias', 'GET /api/agencies/:id - Obtener agencia por ID', 'POST /api/agencies - Crear agencia', 'PUT /api/agencies/:id - Actualizar agencia', 'DELETE /api/agencies/:id - Eliminar agencia'] },
-            ]
-        },
-        usuarios: {
-            title: 'Gestión de Usuarios',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Usuario: Registro de nuevos usuarios con rol y permisos', 'Editar Usuario: Modificación de datos y permisos', 'Eliminar Usuario: Eliminación con confirmación', 'Toggle Estado: Activar/desactivar usuario', 'Asignar Permisos: Configuración granular de permisos'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/users - Listar usuarios', 'GET /api/users/:id - Obtener usuario por ID', 'POST /api/users - Crear usuario', 'PUT /api/users/:id - Actualizar usuario', 'DELETE /api/users/:id - Eliminar usuario', 'PATCH /api/users/:id/toggle-status - Toggle estado activo/inactivo'] },
-            ]
-        },
-        roles: {
-            title: 'Gestión de Roles y Permisos',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Rol: Definición de nuevos roles con permisos', 'Editar Rol: Modificación de roles y permisos asociados', 'Eliminar Rol: Eliminación con validación', 'Asignar Permisos: Configuración granular de permisos por rol'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/roles - Listar roles', 'POST /api/roles - Crear rol', 'PUT /api/roles/:id - Actualizar rol', 'DELETE /api/roles/:id - Eliminar rol', 'GET /api/permissions - Listar permisos', 'POST /api/permissions - Crear permiso'] },
-            ]
-        },
-        whitelabel: {
-            title: 'Sistema de White Label',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Configuración de Identidad: Logo, nombre de agencia, favicon', 'Configuración de Colores: Paleta de colores personalizable', 'Configuración de Fuentes: Selección de tipografías', 'Configuración de Botones: Estilos, bordes, sombras', 'Vista Previa: Preview en tiempo real de los cambios', 'Presets: Plantillas predefinidas de configuración', 'Exportar/Importar: Guardar y cargar configuraciones'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/white-label - Obtener configuración', 'POST /api/white-label - Crear configuración', 'PUT /api/white-label/:id - Actualizar configuración', 'DELETE /api/white-label/:id - Eliminar configuración', 'GET /api/white-label/presets - Obtener presets'] },
-            ]
-        },
-        email: {
-            title: 'Configuración de Email',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Configuración SMTP: Host, puerto, usuario, contraseña, encriptación', 'Prueba de Conexión: Verificar configuración SMTP', 'Email de Prueba: Envío de email de prueba', 'Plantillas de Email: Personalización de templates HTML', 'Preview de Plantillas: Vista previa de emails'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/email-config - Obtener configuración', 'POST /api/email-config - Crear configuración', 'PUT /api/email-config/:id - Actualizar configuración', 'POST /api/email-config/test-connection - Probar conexión SMTP', 'POST /api/email-config/send-test - Enviar email de prueba'] },
-            ]
-        },
-        reportes: {
-            title: 'Sistema de Reportes Avanzados',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['KPIs Principales: Ventas totales, reservas, pasajeros, ingresos', 'Ventas por Agencia: Distribución de ventas entre agencias', 'Evolución de Pasajeros: Tendencia histórica de pasajeros', 'Destinos Detallados: Análisis por destino con métricas', 'Evolución de Ingresos: Tendencia de ingresos en el tiempo', 'Ocupación: Heatmap de ocupación por producto/fecha', 'Top Productos: Ranking de productos más vendidos', 'Alertas de Riesgo: Productos con bajo rendimiento', 'Cancelaciones: Análisis de cancelaciones'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/reports/stats - Estadísticas generales', 'GET /api/reports/evolution-passengers - Evolución de pasajeros', 'GET /api/reports/agency-share - Participación por agencia', 'GET /api/reports/destinations-detail - Detalle por destino', 'GET /api/reports/evolution-revenue - Evolución de ingresos', 'GET /api/reports/occupancy - Ocupación', 'GET /api/reports/top-products - Top productos', 'GET /api/reports/risk-alerts - Alertas de riesgo', 'GET /api/reports/cancellations - Cancelaciones'] },
-            ]
-        },
-        notificaciones: {
-            title: 'Sistema de Notificaciones',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Notificaciones SSE: Notificaciones en tiempo real vía Server-Sent Events', 'Marcar como Leída: Gestión de estado de notificaciones', 'Eliminar Notificaciones: Limpieza de notificaciones antiguas', 'Contador de No Leídas: Badge con cantidad de notificaciones pendientes'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/notifications - Listar notificaciones', 'POST /api/notifications - Crear notificación', 'PUT /api/notifications/:id/read - Marcar como leída', 'DELETE /api/notifications/:id - Eliminar notificación', 'GET /api/notifications/unread-count - Contador de no leídas'] },
-            ]
-        },
-        transferencias: {
-            title: 'Sistema de Transferencias',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Transferencia: Solicitud de transferencia de cupos', 'Listar Transferencias: Vista de transferencias propias y recibidas', 'Aceptar/Rechazar: Flujo de aprobación de transferencias'] },
-                { subtitle: 'Endpoints API', items: ['POST /api/transfers - Crear transferencia', 'GET /api/transfers - Listar transferencias', 'GET /api/transfers/user - Transferencias del usuario'] },
-            ]
-        },
-        disponibilidad: {
-            title: 'Disponibilidad y Cupos',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Consultar Disponibilidad: Búsqueda de disponibilidad por producto y fecha', 'Reservar desde Disponibilidad: Creación directa de reserva desde vista de disponibilidad', 'Cálculo de Tipos de Pasajero: Cálculo automático según edad y fecha de salida'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/availability - Consultar disponibilidad'] },
-            ]
-        },
-        panel: {
-            title: 'Panel de Control',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Configuración General: Parámetros globales del sistema', 'Gestión de Temas: Administración de temas visuales', 'Logs del Sistema: Visualización de logs'] },
-            ]
-        },
-        logs: {
-            title: 'Logs del Sitio',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Listar Logs: Vista de logs con filtros', 'Filtros Avanzados: Por fecha, usuario, tipo de acción', 'Exportar Logs: Descarga de logs en diferentes formatos'] },
-            ]
-        },
-        ia: {
-            title: 'Chat IA',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Chat Flotante: Widget de chat flotante en todas las páginas', 'Consultas Naturales: Preguntas en lenguaje natural', 'Acciones Automatizadas: Ejecución de acciones desde el chat', 'Historial de Conversaciones: Registro de chats anteriores'] },
-                { subtitle: 'Endpoints API', items: ['POST /api/ai/chat - Enviar mensaje al chat IA', 'GET /api/ai/history - Obtener historial'] },
-            ]
-        },
-        perfil: {
-            title: 'Perfil de Usuario',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Ver Perfil: Visualización de datos del usuario', 'Editar Perfil: Modificación de datos personales', 'Cambiar Contraseña: Actualización de contraseña', 'Preferencias: Configuración de preferencias personales'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/auth/profile - Obtener perfil', 'PUT /api/auth/profile - Actualizar perfil'] },
-            ]
-        },
-        export: {
-            title: 'Exportación Masiva de Datos',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Formatos Soportados: CSV, Excel y PDF', 'Filtrado Previo: Exportación de datos filtrados', 'Entidades Soportadas: Reservas, productos, agencias, usuarios, logs'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/export/csv/:entityType - Exportar a CSV', 'GET /api/export/excel/:entityType - Exportar a Excel', 'GET /api/export/pdf/:entityType - Exportar a PDF'] },
-            ]
-        },
-        auditoria: {
-            title: 'Auditoría y Logs',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Registro Automático: Todas las acciones de usuarios se registran', 'Filtros Avanzados: Por fecha, usuario, tipo de acción', 'Paginación: Navegación por registros', 'Limpieza: Eliminación de logs antiguos'] },
-                { subtitle: 'Endpoints API', items: ['GET /api/audit - Obtener logs de auditoría', 'DELETE /api/audit/cleanup - Limpiar logs antiguos'] },
-            ]
-        },
-        backup: {
-            title: 'Backup y Restauración',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Crear Backup: Generación de backup completo', 'Listar Backups: Vista de backups disponibles', 'Restaurar: Restauración desde backup', 'Descargar: Descarga de archivos de backup', 'Eliminar: Eliminación de backups antiguos'] },
-                { subtitle: 'Endpoints API', items: ['POST /api/backup - Crear backup', 'GET /api/backup - Listar backups', 'POST /api/backup/restore - Restaurar desde backup', 'DELETE /api/backup/:filename - Eliminar backup', 'GET /api/backup/download/:filename - Descargar backup'] },
-            ]
-        },
-        temas: {
-            title: 'Modo Oscuro/Claro',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Toggle Global: Cambio entre modo claro y oscuro', 'Persistencia: Preferencia guardada en localStorage', 'Detección Automática: Detección de preferencia del sistema', 'Transiciones Suaves: Animaciones entre modos'] },
-            ]
-        },
-        i18n: {
-            title: 'Internacionalización (i18n)',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Soporte Multilenguaje: Español e inglés', 'Persistencia: Preferencia guardada en localStorage', 'Detección Automática: Detección de idioma del navegador', 'Más de 100 Términos: Traducciones completas'] },
-            ]
-        },
-        busqueda: {
-            title: 'Búsqueda Global y Filtros',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Búsqueda Global: Búsqueda en toda la aplicación', 'Atajo de Teclado: Ctrl+K para abrir búsqueda', 'Filtros Avanzados: Múltiples tipos de filtros', 'Visualización de Filtros: Filtros activos visibles'] },
-            ]
-        },
-        atajos: {
-            title: 'Atajos de Teclado',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Atajos Comunes: Ctrl+K (buscar), Ctrl+N (crear), Ctrl+S (guardar)', 'Ventana de Ayuda: Lista de atajos disponibles', 'Combinaciones Complejas: Soporte para atajos personalizados'] },
-            ]
-        },
-        onboarding: {
-            title: 'Onboarding Guiado',
-            content: [
-                { subtitle: 'Funcionalidades', items: ['Tutorial Paso a Paso: 6 pasos explicativos', 'Indicador de Progreso: Barra de progreso visual', 'Control de Flujo: Navegación anterior/siguiente', 'Opción de Cancelar: Salir del onboarding en cualquier momento'] },
-            ]
-        },
-    };
-
-    const currentSection = sectionContent[activeSection];
-
-    return (
-        <div className="flex h-full">
-            {/* Sidebar de navegación */}
-            <aside className="w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-y-auto">
-                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-                    <div className="flex items-center gap-3">
-                        <BookOpen className="w-6 h-6 text-blue-600" />
-                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Documentación</h2>
-                    </div>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                        Guía completa del sistema
-                    </p>
-                </div>
-                <nav className="p-2">
-                    {sections.map((section) => {
-                        const Icon = section.icon;
-                        return (
-                            <button
-                                key={section.id}
-                                onClick={() => setActiveSection(section.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors ${activeSection === section.id
-                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
-                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                    }`}
-                            >
-                                <Icon className="w-4 h-4 flex-shrink-0" />
-                                <span className="truncate">{section.title}</span>
-                            </button>
-                        );
-                    })}
-                </nav>
-            </aside>
-
-            {/* Contenido principal */}
-            <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950">
-                <div className="max-w-4xl mx-auto p-8">
-                    {/* Header de sección */}
-                    <div className="mb-8">
-                        <div className="flex items-center gap-3 mb-2">
-                            {currentSection && (() => {
-                                const Icon = sections.find(s => s.id === activeSection)?.icon || FileText;
-                                return <Icon className="w-8 h-8 text-blue-600" />;
-                            })()}
-                            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
-                                {currentSection?.title}
-                            </h1>
-                        </div>
-                        <p className="text-zinc-600 dark:text-zinc-400">
-                            {sections.find(s => s.id === activeSection)?.description}
-                        </p>
-                    </div>
-
-                    {/* Contenido de sección */}
-                    {currentSection && (
-                        <div className="space-y-8">
-                            {currentSection.content.map((block, idx) => (
-                                <div key={idx} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
-                                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
-                                        <Code className="w-5 h-5 text-blue-600" />
-                                        {block.subtitle}
-                                    </h3>
-                                    {block.type === 'text' && (
-                                        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">
-                                            {block.content}
-                                        </p>
-                                    )}
-                                    {block.type === 'alert' && (
-                                        <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 p-4 rounded-lg text-sm">
-                                            {block.content}
-                                        </div>
-                                    )}
-                                    {(!block.type || block.type === 'list') && (
-                                        <ul className="space-y-2">
-                                            {block.items.map((item, itemIdx) => {
-                                                const [bold, ...rest] = item.includes(':') ? item.split(':') : [item];
-                                                return (
-                                                    <li key={itemIdx} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-2 flex-shrink-0"></span>
-                                                        <span>
-                                                            {rest.length > 0 ? (
-                                                                <>
-                                                                    <strong className="text-zinc-900 dark:text-zinc-100">{bold}:</strong>
-                                                                    {rest.join(':')}
-                                                                </>
-                                                            ) : (
-                                                                item
-                                                            )}
-                                                        </span>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Footer */}
-                    <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-zinc-800 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                        <p>Sistema de Gestión de Cupos de Viajes Aéreos</p>
-                        <p className="mt-1">© 2026 Sistema de Gestión de Cupos - Todos los derechos reservados</p>
-                    </div>
-                </div>
-            </main>
+// ─── Accordion primitivo (sin deps externas) ────────────────────────────────
+function AccordionSection({ icon: Icon, title, badge, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-4 text-left group"
+      >
+        <div className="flex items-center gap-3">
+          {Icon && <span className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
+            <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </span>}
+          <div>
+            <span className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</span>
+            {badge && <span className="ml-2 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">{badge}</span>}
+          </div>
         </div>
-    );
-};
+        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 dark:border-slate-800 px-6 py-5">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
-export default Documentacion;
+// ─── Componentes de contenido ─────────────────────────────────────────────────
+function DocParagraph({ children }) {
+  return <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-sm">{children}</p>;
+}
+
+function DocSubsection({ title, children, icon: Icon, color = 'blue' }) {
+  const colors = {
+    blue: 'border-blue-500 bg-blue-50 dark:bg-blue-900/10',
+    green: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10',
+    orange: 'border-orange-500 bg-orange-50 dark:bg-orange-900/10',
+    purple: 'border-purple-500 bg-purple-50 dark:bg-purple-900/10',
+    red: 'border-red-500 bg-red-50 dark:bg-red-900/10',
+  };
+  return (
+    <div className={`border-l-4 ${colors[color]} rounded-r-xl px-4 py-3 mb-4`}>
+      {title && <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4" />}
+        {title}
+      </h4>}
+      {children}
+    </div>
+  );
+}
+
+function DocSteps({ steps }) {
+  return (
+    <ol className="space-y-2 my-3">
+      {steps.map((step, i) => (
+        <li key={i} className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
+          <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5">{i + 1}</span>
+          <span dangerouslySetInnerHTML={{ __html: step }} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function DocList({ items, color = 'blue' }) {
+  const dotColors = { blue: 'bg-blue-500', green: 'bg-emerald-500', orange: 'bg-orange-500', red: 'bg-red-500' };
+  return (
+    <ul className="space-y-1.5 my-2">
+      {items.map((item, i) => (
+        <li key={i} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <span className={`w-1.5 h-1.5 rounded-full ${dotColors[color] || dotColors.blue} flex-shrink-0 mt-1.5`} />
+          <span dangerouslySetInnerHTML={{ __html: item }} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DocAlert({ type = 'info', children }) {
+  const styles = {
+    info: { bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700', text: 'text-blue-800 dark:text-blue-200', Icon: Info },
+    warning: { bg: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700', text: 'text-orange-800 dark:text-orange-200', Icon: AlertTriangle },
+    success: { bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700', text: 'text-emerald-800 dark:text-emerald-200', Icon: CheckCircle },
+    tip: { bg: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700', text: 'text-purple-800 dark:text-purple-200', Icon: Star },
+  };
+  const s = styles[type] || styles.info;
+  return (
+    <div className={`flex items-start gap-3 p-3 rounded-xl border ${s.bg} ${s.text} text-sm my-3`}>
+      <s.Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function DocCode({ children }) {
+  return <code className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>;
+}
+
+function DocBadge({ status }) {
+  const map = {
+    'bloqueo_temporal': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    'procesando': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    'confirmado': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+    'cancelado': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    'cedido': 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
+  };
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-700'}`}>{status}</span>;
+}
+
+// ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
+export default function Documentacion() {
+  return (
+    <div className="p-6 space-y-4 max-w-5xl mx-auto">
+      <PageHeader
+        title="Documentación"
+        description="El manual completo del sistema: todo lo que necesitás saber para trabajar sin capacitación previa."
+        icon={BookOpen}
+      />
+
+      {/* INTRO */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
+        <h2 className="text-xl font-bold mb-2">¿Qué es este sistema?</h2>
+        <p className="text-blue-100 text-sm leading-relaxed mb-4">
+          Es una plataforma integral para la gestión de <strong>cupos aéreos</strong> (bloqueos de asientos en vuelos).
+          Permite al operador mayorista cargar, distribuir y controlar sus cupos, y a las agencias minoristas hacer reservas
+          para sus clientes de forma simple y segura.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+          {[
+            { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo' },
+            { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas' },
+            { icon: '🤖', title: 'IA integrada', desc: 'Asistente que reserva leyendo DNI y hablando naturalmente' },
+          ].map(card => (
+            <div key={card.title} className="bg-white/10 rounded-xl p-3">
+              <div className="text-2xl mb-1">{card.icon}</div>
+              <div className="font-semibold text-sm">{card.title}</div>
+              <div className="text-xs text-blue-200">{card.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+
+        {/* ─── DISPONIBILIDAD / CUPOS ─── */}
+        <AccordionSection icon={Calendar} title="Disponibilidad y Cupos" badge="Inicio de todo" defaultOpen>
+          <div className="space-y-4">
+            <DocSubsection title="¿Qué es la pantalla de Disponibilidad?" color="blue" icon={Info}>
+              <DocParagraph>
+                Es el catálogo de vuelos disponibles para reservar. Cada fila es un <strong>producto</strong>: un bloqueo de asientos en un vuelo específico,
+                con destino, fechas, precio y cantidad de cupos restantes. Es el punto de partida para hacer cualquier reserva.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="¿Qué significan los íconos de equipaje?" color="green" icon={CheckCircle}>
+              <DocList items={[
+                '<strong>Cartera/Handbag</strong> — Equipaje de mano pequeño. Indicado con ícono verde si el producto lo incluye.',
+                '<strong>Carry On</strong> — Equipaje de cabina mediano. Verde si incluido.',
+                '<strong>Maleta/Checked Bag</strong> — Maleta en bodega. Verde si incluido. <span class="text-red-600 font-medium">Gris tachado = NO incluido.</span>',
+              ]} />
+              <DocAlert type="tip">
+                Si ves los íconos en <strong>gris con tachado</strong>, ese vuelo <u>no incluye</u> ese tipo de equipaje. El pasajero deberá pagarlo por separado con la aerolínea.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="¿Cómo buscar el vuelo que necesito?" color="purple" icon={Search}>
+              <DocList items={[
+                'Escribí el destino, código de vuelo, compañía o nombre en el buscador superior.',
+                'Filtrá por temporada con el selector de temporada.',
+                'La tabla muestra automáticamente los productos con cupos disponibles.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Botón 'Ver Ruta'" color="blue" icon={FileText}>
+              <DocParagraph>
+                Cada producto con vuelos cargados tiene un botón <strong>"Ruta"</strong> en la tabla. Al hacerle click abre un modal con el detalle completo del itinerario de vuelos:
+                aerolínea, número de vuelo, aeropuertos origen/destino, horarios y cabina. También podés copiar el itinerario como imagen para enviarlo por WhatsApp o correo.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="¿Cómo hacer una reserva desde acá?" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                'Encontrá el producto deseado en la tabla.',
+                'Hacé click en el botón del carrito <strong>(reservar)</strong> en la columna de acciones.',
+                'Se abre el formulario de reserva. Completá los datos de contacto y del pasajero.',
+                'Si hay más de un pasajero, el sistema los gestiona de forma individual por ticket.',
+                'Confirmá. El cupo queda en estado <strong>"bloqueo temporal"</strong> hasta que se confirme.',
+              ]} />
+              <DocAlert type="warning">
+                El <strong>bloqueo temporal</strong> tiene un tiempo límite. Si no se confirma antes de que venza, el cupo se libera automáticamente y queda disponible para otra agencia.
+              </DocAlert>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── RESERVAS ─── */}
+        <AccordionSection icon={Calendar} title="Gestión de Reservas">
+          <div className="space-y-4">
+
+            <DocSubsection title="Estados de una reserva" color="blue" icon={Info}>
+              <DocParagraph>Cada reserva tiene un estado que refleja su situación en el flujo de ventas:</DocParagraph>
+              <div className="mt-3 space-y-2">
+                {[
+                  { status: 'bloqueo_temporal', desc: 'Recién creada. El cupo está reservado temporalmente. Tiene fecha de vencimiento.' },
+                  { status: 'procesando', desc: 'El operador tomó la solicitud y está trabajando en la emisión del ticket.' },
+                  { status: 'confirmado', desc: 'Ticket emitido y todo listo. Reserva firme y válida.' },
+                  { status: 'cancelado', desc: 'Cancelada. El cupo fue liberado. No se puede revertir desde la UI.' },
+                  { status: 'cedido', desc: 'El cupo fue prestado por el operador a esta agencia. Aparece indicado especialmente.' },
+                ].map(r => (
+                  <div key={r.status} className="flex items-start gap-3">
+                    <DocBadge status={r.status} />
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </DocSubsection>
+
+            <DocSubsection title="Cómo agregar un documento contable (Ficha de Venta)" color="orange" icon={FileText}>
+              <DocSteps steps={[
+                'En la tabla de reservas, buscá la columna <strong>"Doc.Contable"</strong>.',
+                'Si aparece <span class="text-orange-500 font-semibold">Pendiente</span>, hacé click en ese texto.',
+                'Se abre un modal para ingresar el número de documento y la fecha de vencimiento.',
+                'Guardá. El documento queda asociado a esa reserva y el estado cambia.',
+              ]} />
+              <DocAlert type="info">
+                El sistema puede mostrar alertas automáticas cuando un documento está próximo a vencer (ej. 24 horas antes).
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Cómo asignar un Número de Ticket" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                'Buscá al pasajero en la tabla.',
+                'En la columna <strong>"Ticket"</strong>, si dice "Asignar", hacé click.',
+                'Ingresá el número de ticket (generado por el GDS de la aerolínea) y el precio de venta si corresponde.',
+                'Guardá. Una vez que el ticket tiene número, aparece el ícono <strong>azul de itinerario PDF</strong> en acciones.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Generar el Itinerario PDF (con marca de la agencia)" color="purple" icon={Download}>
+              <DocSteps steps={[
+                'Asegurate de que el pasajero tiene un Número de Ticket asignado.',
+                'En la columna de acciones, hacé click en el ícono azul de <strong>documento</strong>.',
+                'Se abre el modal de Itinerario con el diseño de tu agencia: logo, colores, nombre.',
+                'Hacé click en <strong>"Descargar PDF"</strong>. Se abre la ventana de impresión del navegador.',
+                'Elegí "Guardar como PDF" o envialo directamente a la impresora.',
+              ]} />
+              <DocAlert type="tip">
+                Los colores y el logo del itinerario se toman automáticamente del <strong>Diseño / White Label</strong> configurado por tu agencia. Para cambiarlos, ingresá a la sección de Diseño.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Cupos cedidos: ¿cómo los veo?" color="orange" icon={ArrowRightLeft}>
+              <DocParagraph>
+                Si el operador te prestó cupos de otra agencia, esas reservas aparecerán con el indicador <strong>"Cupo cedido de [Agencia]"</strong> en la columna Cesión.
+                Esto te permite saber de dónde viene el cupo sin tener que consultar con el operador.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="Solución de problemas frecuentes" color="red" icon={AlertTriangle}>
+              <DocList color="red" items={[
+                '<strong>La reserva vence y no puedo confirmarla:</strong> contactá al operador para que extienda el bloqueo o cree una nueva reserva.',
+                '<strong>No aparece el botón de PDF:</strong> verificá que el pasajero tenga un Número de Ticket asignado.',
+                '<strong>"Error al crear la reserva":</strong> verificá que el producto tenga cupos disponibles y que tu agencia tenga acceso.',
+                '<strong>No veo mis reservas:</strong> revisá el filtro de estado y el buscador — puede haber un filtro activo.',
+              ]} />
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── PRODUCTOS ─── */}
+        <AccordionSection icon={Package} title="Gestión de Productos (Cupos)">
+          <div className="space-y-4">
+            <DocSubsection title="¿Qué es un producto?" color="blue" icon={Info}>
+              <DocParagraph>
+                Un producto representa un <strong>bloqueo aéreo</strong>: un conjunto de asientos comprados al mayoreo en un vuelo específico.
+                Tiene destino, compañía, fechas de salida y regreso, precio, cupos totales y cupos disponibles.
+                También puede llevar información de equipaje, ruta detallada con escalas y número de PNR.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="Campos importantes" color="green" icon={CheckCircle}>
+              <DocList items={[
+                '<strong>Código de Cupo:</strong> identificador único del bloqueo (ej. CUN-2027-01).',
+                '<strong>Disponibilidad:</strong> cupos restantes (no reservados). Se reduce con cada reserva.',
+                '<strong>Cupo total:</strong> la cantidad original de asientos bloqueados.',
+                '<strong>Ruta:</strong> itinerario de vuelos con escalas. Se usa para mostrar el modal de "Ver Ruta" y en el PDF.',
+                '<strong>PNR:</strong> localizador del bloqueo en el GDS de la aerolínea.',
+                '<strong>Bloqueado para venta:</strong> si está activo, el producto no aparece en Disponibilidad.',
+                '<strong>Equipaje:</strong> Handbag, Carry On, Checked Bag — cada uno es independiente.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Cómo cargar productos masivamente" color="purple" icon={Zap}>
+              <DocSteps steps={[
+                'Descargá la plantilla Excel desde el botón "Plantilla" en Gestión de Productos.',
+                'Completá los datos de cada producto en las columnas correspondientes.',
+                'Usá el botón <strong>"Importar"</strong> y seleccioná tu archivo.',
+                'El sistema procesa fila por fila y muestra errores por fila si los hay.',
+              ]} />
+              <DocAlert type="info">
+                El campo <strong>ruta</strong> en la carga masiva acepta JSON estructurado. Ver documentación de la API para el formato exacto.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Visibilidad del producto" color="orange" icon={AlertTriangle}>
+              <DocParagraph>
+                El campo <strong>"Bloqueado para venta"</strong> (toggle en el formulario del producto) controla si ese producto aparece
+                en la pantalla de Disponibilidad. Si está bloqueado, las reservas que ya existen no se ven afectadas; solo deja de aparecer
+                en el catálogo para nuevas reservas.
+              </DocParagraph>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── TRANSFERENCIAS ─── */}
+        <AccordionSection icon={ArrowRightLeft} title="Cesión de Cupos entre Agencias" badge="Importante">
+          <div className="space-y-4">
+            <DocSubsection title="¿Qué es la cesión de cupos?" color="blue" icon={Info}>
+              <DocParagraph>
+                El operador mayorista (owner) puede <strong>ceder (prestar) cupos</strong> de sus productos a otras agencias. Esto crea
+                un producto "espejo" en la agencia destino, que puede usar esos cupos para hacer reservas con sus propios clientes.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="Flujo completo de cesión" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                '<strong>El owner cede cupos:</strong> desde Gestión de Productos, usa el botón de Transferencia e indica agencia destino y cantidad de cupos.',
+                'Se crea un producto espejo en la agencia destino con los cupos cedidos.',
+                'La agencia receptora puede hacer reservas con esos cupos normalmente.',
+                '<strong>El owner recupera cupos:</strong> desde Gestión de Productos puede hacer click en "Recuperar Cupo" para devolver el stock al producto original.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="¿Cómo lo ve cada agencia?" color="purple" icon={Users}>
+              <DocList items={[
+                '<strong>Owner (agencia que cede):</strong> ve la reserva con el badge "Cesión saliente" en la columna Cesión.',
+                '<strong>Agencia receptora:</strong> ve la reserva con el badge "Cupo cedido de [Agencia Original]".',
+                'Cada agencia ve SOLO sus propias reservas y productos.',
+              ]} />
+              <DocAlert type="tip">
+                Si en tus reservas aparece el badge "Cupo cedido", significa que ese lugar fue prestado por el operador. El resto del flujo de reserva y ticket es idéntico.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Recuperar cupos cedidos" color="orange" icon={ArrowRightLeft}>
+              <DocParagraph>
+                Como owner, podés recuperar los cupos que cediste en cualquier momento, <strong>siempre que la agencia receptora no los haya reservado</strong>.
+                Al recuperar, la disponibilidad del producto espejo vuelve al producto original para que puedas usarlos o cederlos a otra agencia.
+              </DocParagraph>
+              <DocAlert type="warning">
+                Los cupos ya reservados por la agencia receptora <u>no se pueden recuperar</u>. Solo se recuperan los cupos disponibles (sin reserva activa).
+              </DocAlert>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── CHAT IA ─── */}
+        <AccordionSection icon={MessageSquare} title="Asistente IA" badge="Nuevo">
+          <div className="space-y-4">
+            <DocSubsection title="¿Para qué sirve el Asistente IA?" color="blue" icon={Info}>
+              <DocParagraph>
+                El Asistente IA es un chat integrado que te permite <strong>consultar disponibilidad, crear reservas y gestionar tu trabajo
+                usando lenguaje natural</strong>, como si hablaras con un colega. No necesitás saber qué botón presionar: simplemente
+                describís lo que querés hacer.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="¿Cómo abrir el chat?" color="green" icon={MessageSquare}>
+              <DocList items={[
+                'Buscá el botón flotante <strong>azul</strong> en la esquina inferior derecha de la pantalla.',
+                'Hacé click para abrir el panel del chat.',
+                'Podés minimizarlo y seguirá escuchando en segundo plano durante tu sesión.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Cómo hacer una reserva con el IA" color="purple" icon={Zap}>
+              <DocSteps steps={[
+                'Decile al IA: <em>"Quiero reservar para Cancún"</em>.',
+                'El IA busca automáticamente los productos disponibles y te muestra una lista numerada.',
+                'Respondé con el número del vuelo que te interesa (ej: "1").',
+                'Si tenés el DNI a mano, adjuntá una foto con el clip de adjuntos: el IA extrae nombre, apellido y documento automáticamente.',
+                'Confirmá el resumen y el IA crea la reserva sin que tengas que llenar formularios.',
+              ]} />
+              <DocAlert type="tip">
+                El IA guarda el contexto de la conversación. No repitas información que ya le diste. Si ya diste el nombre del pasajero, no lo vuelvas a escribir.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Leer documentos de identidad con el IA" color="green" icon={User}>
+              <DocSteps steps={[
+                'Hacé click en el ícono de clip (<strong>adjuntar</strong>) en el chat.',
+                'Seleccioná una foto del DNI o pasaporte.',
+                'El IA extrae todos los datos del pasajero automáticamente (nombre, apellido, documento, fecha de nacimiento, nacionalidad).',
+                'Confirma los datos y los usa directamente para la reserva.',
+              ]} />
+              <DocAlert type="info">
+                También podés usar el botón <strong>"Leer DNI"</strong> en la barra inferior del chat como atajo rápido.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Acciones que puede hacer el IA" color="orange" icon={Star}>
+              <DocList items={[
+                'Buscar productos disponibles por destino, fecha o compañía.',
+                'Crear reservas con datos completos del pasajero.',
+                'Ver tus reservas existentes.',
+                '<strong>(Solo admins)</strong> Ver todas las reservas del sistema.',
+                '<strong>(Solo admins)</strong> Confirmar o cancelar reservas.',
+                'Buscar información de usuarios del sistema.',
+              ]} />
+              <DocAlert type="warning">
+                El IA respeta los permisos de tu rol. Si sos agente, solo verás tus propias reservas aunque le pidas todas. El IA no puede saltarse las restricciones de seguridad.
+              </DocAlert>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── DISEÑO / WHITELABEL ─── */}
+        <AccordionSection icon={Palette} title="Diseño y Marca (White Label)">
+          <div className="space-y-4">
+            <DocSubsection title="¿Qué es el White Label?" color="blue" icon={Info}>
+              <DocParagraph>
+                La sección de <strong>Diseño</strong> te permite personalizar completamente la apariencia del sistema con los colores,
+                logo y tipografías de tu agencia. Esto hace que los itinerarios PDF, los emails y la UI del sistema lleven tu marca propia.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="¿Qué se puede configurar?" color="green" icon={CheckCircle}>
+              <DocList items={[
+                '<strong>Logo:</strong> el logo de tu agencia aparece en el encabezado y en los itinerarios PDF.',
+                '<strong>Color primario:</strong> define el color de botones, encabezados y acentos en toda la app.',
+                '<strong>Color secundario:</strong> usado en gradientes y elementos secundarios.',
+                '<strong>Nombre de agencia:</strong> aparece en los itinerarios y en el encabezado del sistema.',
+                '<strong>Email y eslógan:</strong> aparecen en el pie de los itinerarios PDF.',
+                '<strong>Tipografías:</strong> elegí la fuente para títulos y textos del cuerpo.',
+                '<strong>Presets:</strong> plantillas predefinidas para arrancar rápido.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="¿Cómo se aplica en los itinerarios PDF?" color="purple" icon={Download}>
+              <DocParagraph>
+                Al generar un itinerario PDF desde Gestión de Reservas, el sistema toma automáticamente:
+              </DocParagraph>
+              <DocList items={[
+                'El <strong>logo</strong> de tu agencia para el encabezado.',
+                'El <strong>color primario</strong> para los títulos, bordes y badges.',
+                'El <strong>nombre, email y eslógan</strong> para el pie del itinerario.',
+              ]} />
+              <DocAlert type="tip">
+                Si cambiás tu logo o colores, los próximos PDF generados ya reflejarán los cambios automáticamente.
+              </DocAlert>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── EMAIL ─── */}
+        <AccordionSection icon={Mail} title="Configuración de Email y Notificaciones">
+          <div className="space-y-4">
+            <DocSubsection title="¿Para qué se usa el email?" color="blue" icon={Info}>
+              <DocList items={[
+                'Confirmación de nueva reserva (enviado al pasajero).',
+                'Aviso de bloqueo temporal próximo a vencer.',
+                'Reenvío manual de confirmación desde Gestión de Reservas.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Cómo configurar el servidor SMTP" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                'Ingresá a <strong>Configuración de Email</strong> en el menú lateral.',
+                'Completá: Host SMTP, Puerto, Usuario, Contraseña, Encriptación (TLS/SSL).',
+                'Usá el botón <strong>"Probar conexión"</strong> para verificar que los datos son correctos.',
+                'Luego usá <strong>"Enviar email de prueba"</strong> para recibir un email real.',
+                'Guardá la configuración.',
+              ]} />
+              <DocAlert type="info">
+                Para Gmail, el puerto es <DocCode>587</DocCode> con TLS. Necesitás generar una <strong>"Contraseña de aplicación"</strong> en tu cuenta de Google.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Notificaciones en el sistema" color="orange" icon={Bell}>
+              <DocParagraph>
+                El sistema genera notificaciones internas para eventos importantes (reservas por vencer, nuevos cupos cedidos, etc.).
+                Las notificaciones aparecen en el <strong>dropdown de la campana</strong> en el encabezado.
+                Un <strong>punto rojo</strong> en tu avatar indica que hay notificaciones sin leer.
+              </DocParagraph>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── REPORTES ─── */}
+        <AccordionSection icon={BarChart3} title="Reportes y Dashboard">
+          <div className="space-y-4">
+            <DocSubsection title="Dashboard principal" color="blue" icon={Info}>
+              <DocParagraph>
+                El Dashboard muestra un resumen ejecutivo en tiempo real: ventas totales, reservas activas, cupos disponibles y productos más vendidos.
+                Es el primer lugar donde mirás para entender qué está pasando en el negocio.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="Reportes avanzados" color="purple" icon={BarChart3}>
+              <DocList items={[
+                '<strong>Ventas por agencia:</strong> cuánto vendió cada agencia en el período.',
+                '<strong>Evolución de pasajeros:</strong> tendencia histórica de cantidad de pasajeros.',
+                '<strong>Destinos detallados:</strong> análisis por destino con métricas de ocupación.',
+                '<strong>Top productos:</strong> ranking de los vuelos más vendidos.',
+                '<strong>Alertas de riesgo:</strong> productos con baja ocupación que pueden perder rentabilidad.',
+                '<strong>Cancelaciones:</strong> análisis de cancelaciones por período.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Exportar datos" color="green" icon={Download}>
+              <DocList items={[
+                'Desde cada módulo podés exportar la vista actual en <strong>CSV o Excel</strong>.',
+                'Los reportes tienen su propio botón de exportación.',
+                'El archivo generado respeta los filtros activos (solo exporta lo que estás viendo).',
+              ]} />
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── USUARIOS Y ROLES ─── */}
+        <AccordionSection icon={Users} title="Usuarios, Roles y Permisos" badge="Solo admins">
+          <div className="space-y-4">
+            <DocSubsection title="Roles del sistema" color="blue" icon={Shield}>
+              <div className="space-y-2 mt-2">
+                {[
+                  { role: 'admin', color: 'bg-red-100 text-red-800', desc: 'Acceso total al sistema. Ve todo, puede hacer todo.' },
+                  { role: 'agency_admin', color: 'bg-purple-100 text-purple-800', desc: 'Administrador de su agencia. Ve todas las reservas de su agencia, puede confirmar y cancelar.' },
+                  { role: 'agency_user', color: 'bg-blue-100 text-blue-800', desc: 'Agente de viajes. Ve y gestiona sus propias reservas. No puede ver reservas de otros agentes.' },
+                ].map(r => (
+                  <div key={r.role} className="flex items-start gap-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.color} flex-shrink-0 mt-0.5`}>{r.role}</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </DocSubsection>
+
+            <DocSubsection title="Cómo crear un usuario" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                'Ingresá a <strong>Gestión de Usuarios</strong>.',
+                'Hacé click en <strong>"Nuevo Usuario"</strong>.',
+                'Completá nombre, email, contraseña y asigná el rol correspondiente.',
+                'Asigná la agencia a la que pertenece el usuario.',
+                'Guardá. El usuario podrá ingresar de inmediato con las credenciales elegidas.',
+              ]} />
+              <DocAlert type="warning">
+                El email del usuario es su nombre de usuario para ingresar. No puede cambiar su propio email sin ayuda del admin.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Permisos granulares" color="purple" icon={Shield}>
+              <DocParagraph>
+                Además de los roles base, podés asignar <strong>permisos granulares</strong> a cada usuario para habilitar o deshabilitar
+                acciones específicas (ej: permitir confirmar reservas a un agente sin darle rol de admin).
+                Esto se gestiona desde <strong>Gestión de Permisos</strong>.
+              </DocParagraph>
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── AGENCIAS ─── */}
+        <AccordionSection icon={Building2} title="Gestión de Agencias" badge="Solo admins">
+          <div className="space-y-4">
+            <DocSubsection title="¿Qué es una agencia?" color="blue" icon={Info}>
+              <DocParagraph>
+                Una agencia es la unidad organizativa que agrupa usuarios y reservas. Cada agencia tiene su propio código único
+                (ej: <DocCode>AG001</DocCode>), nombre, email y color de identificación en el sistema.
+                Los productos cedidos entre agencias se rastrean por código de agencia.
+              </DocParagraph>
+            </DocSubsection>
+
+            <DocSubsection title="Cómo crear una agencia" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                'Ingresá a <strong>Gestión de Agencias</strong>.',
+                'Hacé click en <strong>"Nueva Agencia"</strong>.',
+                'Ingresá el código único, nombre, email, teléfono y color.',
+                'Guardá. Luego podés asignarle usuarios desde Gestión de Usuarios.',
+              ]} />
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── LOGS Y AUDITORÍA ─── */}
+        <AccordionSection icon={FileSearch} title="Logs y Auditoría" badge="Solo admins">
+          <div className="space-y-4">
+            <DocSubsection title="¿Qué registra el sistema?" color="blue" icon={Info}>
+              <DocParagraph>
+                Cada acción importante queda registrada en el log de auditoría: quién hizo qué, cuándo y con qué datos.
+                Esto permite rastrear problemas, errores y acciones de usuarios en cualquier momento.
+              </DocParagraph>
+              <DocList items={[
+                'Creación, edición y eliminación de reservas.',
+                'Confirmaciones y cancelaciones.',
+                'Creación y modificación de productos.',
+                'Accesos al sistema y cambios de contraseña.',
+                'Cesiones y recuperaciones de cupos.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Filtros de logs" color="green" icon={Search}>
+              <DocList items={[
+                'Filtrá por <strong>usuario</strong> para ver todo lo que hizo un agente específico.',
+                'Filtrá por <strong>fecha</strong> para acotar el rango de búsqueda.',
+                'Filtrá por <strong>tipo de acción</strong> para ver solo creaciones, ediciones, etc.',
+                'Exportá los logs filtrados en CSV para reportes de compliance.',
+              ]} />
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── SISTEMA / TÉCNICO ─── */}
+        <AccordionSection icon={Settings} title="Panel de Control y Configuración del Sistema" badge="Solo admins">
+          <div className="space-y-4">
+            <DocSubsection title="Backup del sistema" color="blue" icon={Database}>
+              <DocSteps steps={[
+                'Ingresá a <strong>Panel de Control → Backup</strong>.',
+                'Hacé click en <strong>"Crear Backup"</strong> para generar un backup completo de la base de datos.',
+                'Los backups anteriores aparecen en la lista. Podés descargarlos o restaurar desde uno.',
+              ]} />
+              <DocAlert type="warning">
+                Restaurar desde un backup sobreescribe todos los datos actuales. Hacé siempre un backup nuevo antes de restaurar.
+              </DocAlert>
+            </DocSubsection>
+
+            <DocSubsection title="Cron y alertas automáticas" color="orange" icon={Clock}>
+              <DocParagraph>
+                El sistema tiene tareas automáticas (cron) que se ejecutan en segundo plano:
+              </DocParagraph>
+              <DocList items={[
+                '<strong>Vencimiento de bloqueos:</strong> libera automáticamente cupos de reservas expiradas.',
+                '<strong>Alertas de vencimiento:</strong> envía email de aviso 24 horas antes de que venza un documento contable.',
+                '<strong>Notificaciones internas:</strong> genera avisos en el sistema para eventos críticos.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Seguridad" color="red" icon={Shield}>
+              <DocList items={[
+                'Autenticación mediante <strong>JWT</strong> con expiración configurable.',
+                'Las contraseñas se guardan hasheadas con <strong>bcrypt</strong>, nunca en texto plano.',
+                'Cada endpoint valida el rol y permisos del usuario antes de ejecutar.',
+                'Los datos sensibles (neto 1, precios netos) no son visibles para agentes normales.',
+              ]} />
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+        {/* ─── ATAJOS RÁPIDOS ─── */}
+        <AccordionSection icon={Zap} title="Guía de inicio rápido: primeros 10 minutos">
+          <div className="space-y-4">
+            <DocSubsection title="Si sos agente de viajes y acabás de entrar" color="green" icon={CheckCircle}>
+              <DocSteps steps={[
+                'Ingresá con tu email y contraseña. Si no tenés credenciales, pedíselas al administrador.',
+                'En el <strong>Dashboard</strong> verás un resumen de tus reservas y cupos disponibles.',
+                'Andá a <strong>Disponibilidad</strong> para ver los vuelos disponibles.',
+                'Elegí un vuelo y hacé click en el carrito para reservar.',
+                'Si tenés dudas, abrí el <strong>Chat IA</strong> y preguntá en lenguaje natural.',
+              ]} />
+            </DocSubsection>
+
+            <DocSubsection title="Si sos administrador y acabás de instalar" color="purple" icon={Star}>
+              <DocSteps steps={[
+                'Configurá tu agencia en <strong>Gestión de Agencias</strong>.',
+                'Configurá el servidor de email en <strong>Configuración de Email</strong>.',
+                'Subí tu logo y colores en <strong>Diseño (White Label)</strong>.',
+                'Creá los usuarios de tu equipo en <strong>Gestión de Usuarios</strong>.',
+                'Cargá tus productos (cupos) en <strong>Gestión de Productos</strong>.',
+                '¡Listo! Ya podés empezar a recibir reservas.',
+              ]} />
+            </DocSubsection>
+          </div>
+        </AccordionSection>
+
+      </div>
+
+      {/* Footer */}
+      <div className="text-center text-xs text-slate-400 dark:text-slate-600 pt-4 pb-8">
+        <p>Sistema de Gestión de Cupos de Viajes Aéreos — Documentación v2.0</p>
+        <p className="mt-1">¿Algo no está claro? Usá el Chat IA para preguntar directamente al asistente.</p>
+      </div>
+    </div>
+  );
+}
