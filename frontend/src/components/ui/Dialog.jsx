@@ -29,7 +29,7 @@ export const DialogTrigger = ({ children, ...props }) => {
 };
 
 // Componente del contenido del diálogo
-export const DialogContent = ({ children, ...props }) => {
+export const DialogContent = ({ children, className, ...props }) => {
   const { open, setOpen } = useContext(DialogContext);
 
   const handleClose = () => {
@@ -41,6 +41,12 @@ export const DialogContent = ({ children, ...props }) => {
       handleClose();
     }
   };
+
+  // Si el caller pasa su propia clase max-w-*, respetarla en vez de que
+  // compita en la cascada con el ancho por defecto (dos utilidades max-w-*
+  // en el mismo elemento dependen del orden de la hoja de estilos generada,
+  // no del orden en className, así que "perdía" silenciosamente).
+  const hasCustomWidth = /(^|\s)max-w-/.test(className || '');
 
   return (
     <AnimatePresence>
@@ -57,8 +63,9 @@ export const DialogContent = ({ children, ...props }) => {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             className={clsx(
-              'relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl',
-              props.className
+              'relative w-full rounded-2xl bg-white p-6 shadow-xl',
+              !hasCustomWidth && 'max-w-md',
+              className
             )}
             onClick={(e) => e.stopPropagation()}
           >

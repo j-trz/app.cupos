@@ -8,6 +8,7 @@ export const Select = ({ children, value, onValueChange }) => {
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
   const triggerRef = useRef(null);
+  const contentRef = useRef(null);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -27,15 +28,22 @@ export const Select = ({ children, value, onValueChange }) => {
 
   useEffect(() => {
     if (!open) return;
+    // El contenido del dropdown se renderiza en un portal fuera del trigger
+    // (para no quedar recortado por el overflow del modal), así que un click
+    // dentro de una opción NO está contenido en triggerRef — hay que
+    // excluirlo también, o el mousedown lo cierra antes de que el click
+    // en la opción llegue a disparar onValueChange.
     const handleClickOutside = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target)) close();
+      const insideTrigger = triggerRef.current && triggerRef.current.contains(e.target);
+      const insideContent = contentRef.current && contentRef.current.contains(e.target);
+      if (!insideTrigger && !insideContent) close();
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open, close]);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, toggleOpen, close, triggerRef, dropdownStyle }}>
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, toggleOpen, close, triggerRef, contentRef, dropdownStyle }}>
       <div className="relative inline-block w-full">
         {children}
       </div>
@@ -76,11 +84,12 @@ export const SelectValue = ({ placeholder, children, ...props }) => {
 };
 
 export const SelectContent = ({ children, className, ...props }) => {
-  const { open, dropdownStyle } = useContext(SelectContext);
+  const { open, dropdownStyle, contentRef } = useContext(SelectContext);
   if (!open) return null;
 
   return createPortal(
     <div
+      ref={contentRef}
       style={dropdownStyle}
       className={clsx(
         'rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden',

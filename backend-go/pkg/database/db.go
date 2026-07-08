@@ -156,6 +156,8 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE white_label_configs ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}';`,
 		// Índice único por agencia (puede ya existir si AutoMigrate lo creó)
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_white_label_configs_agency_id ON white_label_configs(agency_id);`,
+		// Email config: agency_id nullable para permitir config global sin agencia
+		`ALTER TABLE email_smtp_configs ALTER COLUMN agency_id DROP NOT NULL;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

@@ -52,12 +52,17 @@ func GetEmailConfig(c *gin.Context) {
 		return
 	}
 
+	var cfg models.EmailSMTPConfig
+	var dbErr error
 	if agencyID != nil {
-		var cfg models.EmailSMTPConfig
-		if err := database.DB.Where("agency_id = ?", *agencyID).First(&cfg).Error; err == nil {
-			c.JSON(http.StatusOK, gin.H{"config": cfg, "isDefault": false})
-			return
-		}
+		dbErr = database.DB.Where("agency_id = ?", *agencyID).First(&cfg).Error
+	} else {
+		// Config global (sin agencia)
+		dbErr = database.DB.Where("agency_id IS NULL").First(&cfg).Error
+	}
+	if dbErr == nil {
+		c.JSON(http.StatusOK, gin.H{"config": cfg, "isDefault": false})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -72,8 +77,8 @@ func GetEmailConfig(c *gin.Context) {
 
 func CreateEmailConfig(c *gin.Context) {
 	agencyID, _, err := resolveAgencyForEmailConfig(c)
-	if err != nil || agencyID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No se pudo determinar la agencia del usuario"})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -83,7 +88,7 @@ func CreateEmailConfig(c *gin.Context) {
 		return
 	}
 	input.ID = uuid.New()
-	input.AgencyID = *agencyID
+	input.AgencyID = agencyID // puede ser nil (config global)
 
 	if err := database.DB.Create(&input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudo crear la configuración SMTP"})

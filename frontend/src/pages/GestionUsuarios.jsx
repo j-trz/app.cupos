@@ -254,6 +254,7 @@ const GestionUsuarios = () => {
         title={editingUser ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
         open={isModalOpen}
         onClose={() => { setIsModalOpen(false); resetForm(); }}
+        size="xl"
       >
         <UserForm
           onSubmit={editingUser ? handleUpdateUser : handleCreateUser}

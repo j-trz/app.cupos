@@ -228,8 +228,8 @@ type RolePermission struct {
 }
 
 type EmailSMTPConfig struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	AgencyID   uuid.UUID `gorm:"type:uuid" json:"agency_id"`
+	ID         uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AgencyID   *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
 	SMTPHost   string    `json:"smtp_host"`
 	SMTPPort   int       `json:"smtp_port"`
 	SMTPUser   string    `json:"smtp_user"`

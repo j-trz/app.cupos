@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from './ui/Card';
 
 // Tipos de producto soportados. El campo "ruta" se relabela según el tipo
 // (Cabina para Crucero, Habitación para Hotel) — la lógica de negocio
@@ -169,56 +168,25 @@ const ProductForm = ({
     </label>
   );
 
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>{isEditing ? 'Editar Producto' : 'Crear Producto'}</CardTitle>
-        <CardDescription>
-          {isEditing ? 'Actualizá la información del cupo' : 'Cargá un nuevo cupo al catálogo'}
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-5">
+  const sectionLabel = (text) => (
+    <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{text}</h4>
+  );
 
-          {/* Identificación */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+  return (
+    <form onSubmit={handleSubmit} className="w-full">
+      <p className="mb-5 text-sm text-slate-500">
+        {isEditing ? 'Actualizá la información del cupo.' : 'Cargá un nuevo cupo al catálogo.'}
+      </p>
+
+      <div className="space-y-6">
+
+        {/* Identificación */}
+        <div>
+          {sectionLabel('Identificación')}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {field('codigo_cupo', 'Código de Cupo', 'text', { required: true })}
             {field('destino', 'Destino', 'text', { required: true })}
             {field('compania', 'Compañía', 'text', { required: true })}
-          </div>
-
-          {/* Fechas */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {field('salida', 'Fecha de Salida', 'date')}
-            {field('regreso', 'Fecha de Regreso', 'date')}
-          </div>
-
-          {/* Cupo y disponibilidad */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
-            {field('cupo', 'Cupo Total', 'number', { min: '0' })}
-            {field('bloqueo_temporal_minutos', 'Bloqueo Temporal (min)', 'number', { min: '0', placeholder: '60' })}
-          </div>
-
-          {/* Precios */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-            {field('precio', 'Precio ADT', 'number', { step: '0.01', min: '0' })}
-            {field('inf_fare', 'Precio INF', 'number', { step: '0.01', min: '0' })}
-            {field('chd_fare', 'Precio CHD', 'number', { step: '0.01', min: '0' })}
-            {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
-          </div>
-
-          {/* OP y Ruta/Cabina/Habitación (según tipo de producto) */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {field('op', 'OP', 'number', { step: '0.01', min: '0' })}
-            {field('ruta', rutaLabel)}
-            {field('pnr', 'PNR')}
-          </div>
-
-          {/* Clasificación */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {field('ficha', 'Ficha')}
-            {field('temporada', 'Temporada')}
             <div className="space-y-1">
               <Label htmlFor="tipo_producto">Tipo de Producto *</Label>
               <select
@@ -233,34 +201,70 @@ const ProductForm = ({
               </select>
             </div>
           </div>
+        </div>
 
-          {/* Equipaje */}
-          <div>
-            <p className="mb-2 text-sm font-medium">Equipaje incluido</p>
-            <div className="flex flex-wrap gap-6">
-              {check('carryon', 'Carry-on')}
-              {check('handbag', 'Handbag')}
-              {check('checkedbag', 'Checked Bag')}
-            </div>
+        {/* Fechas y cupo */}
+        <div>
+          {sectionLabel('Fechas y cupo')}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {field('salida', 'Fecha de Salida', 'date')}
+            {field('regreso', 'Fecha de Regreso', 'date')}
+            {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
+            {field('cupo', 'Cupo Total', 'number', { min: '0' })}
+            {field('bloqueo_temporal_minutos', 'Bloqueo Temporal (min)', 'number', { min: '0', placeholder: '60' })}
           </div>
+        </div>
 
-          {/* Estado */}
-          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
-            {check('is_blocked_for_sale', 'Bloqueado para venta')}
-            <span className="text-xs text-amber-700 ml-1">(los usuarios no podrán ver ni reservar este cupo)</span>
+        {/* Precios */}
+        <div>
+          {sectionLabel('Precios')}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {field('precio', 'Precio ADT', 'number', { step: '0.01', min: '0' })}
+            {field('inf_fare', 'Precio INF', 'number', { step: '0.01', min: '0' })}
+            {field('chd_fare', 'Precio CHD', 'number', { step: '0.01', min: '0' })}
+            {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
+            {field('op', 'OP', 'number', { step: '0.01', min: '0' })}
           </div>
+        </div>
 
-        </CardContent>
-        <CardFooter className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear'}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+        {/* Clasificación */}
+        <div>
+          {sectionLabel('Clasificación')}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {field('ruta', rutaLabel)}
+            {field('pnr', 'PNR')}
+            {field('ficha', 'Ficha')}
+            {field('temporada', 'Temporada')}
+          </div>
+        </div>
+
+        {/* Equipaje */}
+        <div>
+          {sectionLabel('Equipaje incluido')}
+          <div className="flex flex-wrap gap-6">
+            {check('carryon', 'Carry-on')}
+            {check('handbag', 'Handbag')}
+            {check('checkedbag', 'Checked Bag')}
+          </div>
+        </div>
+
+        {/* Estado */}
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          {check('is_blocked_for_sale', 'Bloqueado para venta')}
+          <span className="text-xs text-amber-700 ml-1">(los usuarios no podrán ver ni reservar este cupo)</span>
+        </div>
+
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear'}
+        </Button>
+      </div>
+    </form>
   );
 };
 
