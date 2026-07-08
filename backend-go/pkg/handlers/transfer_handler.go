@@ -82,8 +82,6 @@ func CreateTransfer(c *gin.Context) {
 		Destino:                product.Destino,
 		Compania:               product.Compania,
 		Disponibilidad:         input.Quantity,
-		Salida:                 product.Salida,
-		Regreso:                product.Regreso,
 		FechaSalida:            product.FechaSalida,
 		FechaRegreso:           product.FechaRegreso,
 		Precio:                 product.Precio,

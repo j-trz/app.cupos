@@ -30,8 +30,6 @@ type Product struct {
 	Disponibilidad         int        `gorm:"not null" json:"disponibilidad"`
 	Cupo                   int        `json:"cupo"`
 	Vendidos               int        `json:"vendidos"`
-	Salida                 *time.Time `json:"salida"`
-	Regreso                *time.Time `json:"regreso"`
 	FechaSalida            *time.Time `json:"fecha_salida"`
 	FechaRegreso           *time.Time `json:"fecha_regreso"`
 	Precio                 float64    `json:"precio"`

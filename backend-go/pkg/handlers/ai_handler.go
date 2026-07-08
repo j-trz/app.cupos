@@ -12,6 +12,7 @@ import (
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
+	"backend-go/pkg/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -290,11 +291,11 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 					Disponibilidad: p.Disponibilidad,
 					CodigoCupo:     p.CodigoCupo,
 				}
-				if p.Salida != nil {
-					r.Salida = p.Salida.Format("02/01/2006")
+				if p.FechaSalida != nil {
+					r.Salida = p.FechaSalida.Format("02/01/2006")
 				}
-				if p.Regreso != nil {
-					r.Regreso = p.Regreso.Format("02/01/2006")
+				if p.FechaRegreso != nil {
+					r.Regreso = p.FechaRegreso.Format("02/01/2006")
 				}
 				lista = append(lista, r)
 			}
@@ -467,10 +468,17 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		database.DB.Model(&models.Product{}).Where("id = ?", productID).
 			UpdateColumn("disponibilidad", product.Disponibilidad-1)
 
+		// El neto es confidencial para usuarios no administradores — no debe
+		// filtrarse ni siquiera dentro del resultado de una tool call, porque
+		// termina en el contexto del modelo y puede terminar repetido en el chat.
+		if isRegularUser(u.Role) {
+			reserva.Neto1 = 0
+		}
+
 		b, _ := json.Marshal(map[string]interface{}{
-			"exito":    true,
-			"reserva":  reserva,
-			"mensaje":  fmt.Sprintf("Reserva creada con ID %d y pedido %s", reserva.ID, pedidoID),
+			"exito":   true,
+			"reserva": reserva,
+			"mensaje": fmt.Sprintf("Reserva creada con ID %d y pedido %s", reserva.ID, pedidoID),
 		})
 		return string(b)
 
@@ -1026,6 +1034,30 @@ func Chat(c *gin.Context) {
 			break
 		}
 
+		// Para OpenAI, el protocolo exige UN único mensaje "assistant" con el
+		// array completo de tool_calls de esta vuelta cuando el modelo pide
+		// varias tools en paralelo. Antes se armaba un mensaje "assistant"
+		// distinto por cada tool call individual, lo que deja un historial
+		// inválido y puede hacer que el modelo nunca cierre con una respuesta
+		// de texto (quedándose repitiendo tool calls hasta agotar el loop).
+		if provider.ProviderType != "anthropic" && provider.ProviderType != "google" {
+			var oaiToolCalls []map[string]interface{}
+			for _, tc := range pr.ToolCalls {
+				oaiToolCalls = append(oaiToolCalls, map[string]interface{}{
+					"id":   tc.ID,
+					"type": "function",
+					"function": map[string]interface{}{
+						"name":      tc.Name,
+						"arguments": mustJSON(tc.Input),
+					},
+				})
+			}
+			messages = append(messages, map[string]interface{}{
+				"role":       "assistant",
+				"tool_calls": oaiToolCalls,
+			})
+		}
+
 		// Ejecutar tool calls
 		for _, tc := range pr.ToolCalls {
 			result := executeTool(tc.Name, tc.Input, u)
@@ -1070,23 +1102,8 @@ func Chat(c *gin.Context) {
 						{"type": "tool_result", "tool_use_id": tc.ID, "content": result},
 					},
 				})
-			default: // OpenAI style
-				// Añadir respuesta del assistant con tool_calls
-				if i == 0 || messages[len(messages)-1]["role"] != "assistant" {
-					messages = append(messages, map[string]interface{}{
-						"role": "assistant",
-						"tool_calls": []map[string]interface{}{
-							{
-								"id":   tc.ID,
-								"type": "function",
-								"function": map[string]interface{}{
-									"name":      tc.Name,
-									"arguments": mustJSON(tc.Input),
-								},
-							},
-						},
-					})
-				}
+			default: // OpenAI style — el mensaje "assistant" con tool_calls ya
+				// se agregó una sola vez arriba, antes de este loop.
 				messages = append(messages, map[string]interface{}{
 					"role":         "tool",
 					"tool_call_id": tc.ID,
@@ -1096,9 +1113,53 @@ func Chat(c *gin.Context) {
 		}
 	}
 
-	// Si termina el loop sin respuesta final
+	// Si el loop terminó sin contenido de texto (el modelo dejó de pedir tools
+	// pero devolvió contenido vacío, o se agotaron las iteraciones) pero SÍ se
+	// ejecutó al menos una tool, forzamos una última llamada sin tools para
+	// que el modelo esté obligado a resumir en texto lo que ya se obtuvo —
+	// los resultados de las tools ya están en `messages`, solo falta que el
+	// modelo los redacte. Esto evita responder con un mensaje genérico cuando
+	// en realidad sí hay datos reales para mostrar (ej. "dime qué cupos
+	// tenemos" ejecuta buscar_productos correctamente pero el modelo no
+	// siempre cierra con texto en la misma vuelta).
+	if finalContent == "" && len(toolCallsSummary) > 0 {
+		nudge := "Con los datos ya obtenidos arriba, respondé ahora en texto (sin usar herramientas) resumiendo el resultado para el usuario."
+		if isGoogle {
+			messages = append(messages, map[string]interface{}{
+				"role":  "user",
+				"parts": []map[string]string{{"text": nudge}},
+			})
+		} else {
+			messages = append(messages, map[string]interface{}{
+				"role":    "user",
+				"content": nudge,
+			})
+		}
+
+		var pr *providerResponse
+		var err error
+		switch provider.ProviderType {
+		case "anthropic":
+			pr, err = callAnthropicFull(provider, systemPrompt, messages, nil)
+		case "google":
+			pr, err = callGoogleFull(provider, systemPrompt, messages, nil)
+		default:
+			pr, err = callOpenAIFull(provider, messages, nil, false)
+		}
+		if err == nil && pr != nil && pr.Content != "" {
+			finalContent = pr.Content
+		} else {
+			services.LogFailure("ai", fmt.Sprintf(
+				"Chat de IA terminó sin respuesta de texto tras %d tool call(s) (usuario %s, proveedor %s)",
+				len(toolCallsSummary), u.Email, provider.ProviderType))
+		}
+	}
+
+	// Si de verdad no se ejecutó ninguna tool y el modelo no dijo nada, algo
+	// falló en la conexión con el proveedor — evitamos un mensaje que insinúe
+	// que se hizo algo cuando no se hizo nada.
 	if finalContent == "" {
-		finalContent = "He completado las operaciones solicitadas."
+		finalContent = "No pude generar una respuesta en este momento. ¿Podés reformular tu pedido o intentar de nuevo?"
 	}
 
 	// Guardar mensajes de este intercambio
@@ -1408,10 +1469,120 @@ func DeleteAIAction(c *gin.Context) {
 // SESSIONS / STATS / LOGS
 // ─────────────────────────────────────────────
 
+// ListAISessions devuelve únicamente las sesiones de chat del usuario
+// autenticado — el historial de conversaciones es privado, no un listado
+// global (antes no filtraba por usuario y cualquiera podía ver los títulos
+// de las conversaciones de todos).
 func ListAISessions(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado"})
+		return
+	}
 	sessions := make([]models.AISession, 0)
-	database.DB.Find(&sessions)
+	database.DB.Where("user_id = ?", userID).Order("created_at desc").Find(&sessions)
 	c.JSON(http.StatusOK, gin.H{"sessions": sessions})
+}
+
+// GetSessionMessages devuelve los mensajes de una sesión, solo si pertenece
+// al usuario autenticado (o es admin).
+func GetSessionMessages(c *gin.Context) {
+	sessionID := c.Param("id")
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado"})
+		return
+	}
+
+	var session models.AISession
+	if err := database.DB.First(&session, "id = ?", sessionID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Sesión no encontrada"})
+		return
+	}
+	role, _ := c.Get("role")
+	if session.UserID != userID && role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a esta sesión"})
+		return
+	}
+
+	messages := make([]models.AIMessage, 0)
+	database.DB.Where("session_id = ?", sessionID).Order("created_at asc").Find(&messages)
+	c.JSON(http.StatusOK, gin.H{"messages": messages})
+}
+
+// DeleteSession elimina una sesión y sus mensajes, solo si pertenece al
+// usuario autenticado (o es admin).
+func DeleteSession(c *gin.Context) {
+	sessionID := c.Param("id")
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado"})
+		return
+	}
+
+	var session models.AISession
+	if err := database.DB.First(&session, "id = ?", sessionID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Sesión no encontrada"})
+		return
+	}
+	role, _ := c.Get("role")
+	if session.UserID != userID && role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a esta sesión"})
+		return
+	}
+
+	database.DB.Where("session_id = ?", sessionID).Delete(&models.AIMessage{})
+	database.DB.Delete(&session)
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// UpdateSessionTitle renombra una sesión, solo si pertenece al usuario
+// autenticado (o es admin).
+func UpdateSessionTitle(c *gin.Context) {
+	sessionID := c.Param("id")
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado"})
+		return
+	}
+
+	var session models.AISession
+	if err := database.DB.First(&session, "id = ?", sessionID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Sesión no encontrada"})
+		return
+	}
+	role, _ := c.Get("role")
+	if session.UserID != userID && role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a esta sesión"})
+		return
+	}
+
+	var input struct {
+		Title string `json:"title"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || input.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title es requerido"})
+		return
+	}
+	database.DB.Model(&session).Update("title", input.Title)
+	c.JSON(http.StatusOK, gin.H{"success": true, "title": input.Title})
+}
+
+// currentUserID resuelve el uuid del usuario autenticado desde el contexto Gin.
+func currentUserID(c *gin.Context) (uuid.UUID, bool) {
+	val, ok := c.Get("userID")
+	if !ok {
+		return uuid.Nil, false
+	}
+	s, ok := val.(string)
+	if !ok {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
 }
 
 func GetAIStats(c *gin.Context) {

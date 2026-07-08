@@ -85,8 +85,7 @@ func GetProfile(c *gin.Context) {
 }
 
 // UpdateMyProfile allows the authenticated user to update their own profile fields.
-// NOTE: The Profile model only has Nombre (Apellido and Telefono are not DB columns),
-// so only Nombre is persisted. The handler accepts all three fields for forward compatibility.
+// Persists Nombre, Apellido and Telefono (all three are DB columns in the Profile model).
 func UpdateMyProfile(c *gin.Context) {
 	userID, _ := c.Get("userID")
 

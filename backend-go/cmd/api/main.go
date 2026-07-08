@@ -151,7 +151,7 @@ func main() {
 			ai := protected.Group("/ai")
 			{
 				ai.POST("/chat", handlers.Chat)
-				ai.GET("/providers", handlers.ListAIProviders)
+				ai.GET("/providers", middleware.AdminOnly(), handlers.ListAIProviders)
 				ai.POST("/providers", middleware.AdminOnly(), handlers.CreateAIProvider)
 				ai.PUT("/providers/:id", middleware.AdminOnly(), handlers.UpdateAIProvider)
 				ai.DELETE("/providers/:id", middleware.AdminOnly(), handlers.DeleteAIProvider)
@@ -161,8 +161,11 @@ func main() {
 				ai.PUT("/actions/:id", middleware.AdminOnly(), handlers.UpdateAIAction)
 				ai.DELETE("/actions/:id", middleware.AdminOnly(), handlers.DeleteAIAction)
 				ai.GET("/sessions", handlers.ListAISessions)
-				ai.GET("/stats", handlers.GetAIStats)
-				ai.GET("/logs", handlers.GetAILogs)
+				ai.GET("/sessions/:id/messages", handlers.GetSessionMessages)
+				ai.DELETE("/sessions/:id", handlers.DeleteSession)
+				ai.PUT("/sessions/:id/title", handlers.UpdateSessionTitle)
+				ai.GET("/stats", middleware.AdminOnly(), handlers.GetAIStats)
+				ai.GET("/logs", middleware.AdminOnly(), handlers.GetAILogs)
 			}
 
 			// CRUD Dinámico (Data)
