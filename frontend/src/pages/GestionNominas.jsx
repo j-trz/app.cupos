@@ -171,7 +171,7 @@ function ProductSection({ product, reservations }) {
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </span>
 
-        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-4 gap-1 sm:gap-4 items-center">
+        <div className="flex-1 min-w-0 grid grid-cols-4 sm:grid-cols-4 gap-1 sm:gap-4 items-center">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
               {product?.destino || 'Destino desconocido'}
@@ -296,14 +296,14 @@ export default function GestionNominas() {
       const orders = Array.isArray(ordersResult)
         ? ordersResult
         : Array.isArray(ordersResult?.data)
-        ? ordersResult.data
-        : [];
+          ? ordersResult.data
+          : [];
 
       const prods = Array.isArray(productsResult)
         ? productsResult
         : Array.isArray(productsResult?.data)
-        ? productsResult.data
-        : [];
+          ? productsResult.data
+          : [];
 
       setReservations(orders);
       setProducts(prods);
