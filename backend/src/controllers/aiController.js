@@ -5,6 +5,10 @@
 
 import { query } from '../db.js';
 import aiService from '../services/aiService.js';
+import { getSystemPrompt } from '../config/aiInstructions.js';
+import { productToolDefinitions, executeProductTool } from '../tools/productTools.js';
+import { reservationToolDefinitions, executeReservationTool } from '../tools/reservationTools.js';
+import { userToolDefinitions, executeUserTool } from '../tools/userTools.js';
 
 // Usar directamente la instancia importada
 const aiServiceInstance = aiService;
@@ -15,7 +19,7 @@ const aiServiceInstance = aiService;
  */
 export const chat = async (req, res) => {
   try {
-    const { message, sessionId, providerId, tools } = req.body;
+    const { message, sessionId, providerId, imageBase64, imageMime } = req.body;
     const userId = req.user.id;
 
     if (!message) {
@@ -29,36 +33,184 @@ export const chat = async (req, res) => {
       currentSessionId = session.id;
     }
 
-    // Guardar mensaje del usuario
+    // Guardar mensaje del usuario en la base de datos (texto plano para no romper la estructura de la base de datos)
     await aiServiceInstance.saveMessage(currentSessionId, userId, 'user', message);
 
     // Obtener historial de la sesión para contexto
     const history = await aiServiceInstance.getSessionHistory(currentSessionId);
-    const messages = history.map(row => ({
-      role: row.role,
-      content: row.content
-    }));
 
-    // Enviar al proveedor de IA
-    const response = await aiServiceInstance.sendMessage(messages, {
-      providerId,
-      tools: tools || []
+    // Inyectar el SYSTEM_PROMPT parametrizado según el rol y la agencia del usuario
+    const systemPrompt = getSystemPrompt({
+      id: req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+      agencia: req.user.agencia
     });
 
-    // Guardar respuesta del asistente
-    await aiServiceInstance.saveMessage(
-      currentSessionId,
-      null,
-      'assistant',
-      response.content,
-      response.toolCalls
-    );
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.map((row, idx) => {
+        const msg = {
+          role: row.role,
+          content: row.content
+        };
+
+        // Si es el último mensaje del usuario en el historial y se envió una imagen,
+        // lo convertimos a formato multimodal para que la IA (como OpenAI/GPT-4o) la procese.
+        if (row.role === 'user' && idx === history.length - 1 && imageBase64 && imageMime) {
+          msg.content = [
+            { type: 'text', text: row.content },
+            { type: 'image_url', image_url: { url: `data:${imageMime};base64,${imageBase64}` } }
+          ];
+        }
+
+        if (row.role === 'assistant' && row.tool_calls) {
+          msg.tool_calls = typeof row.tool_calls === 'string' ? JSON.parse(row.tool_calls) : row.tool_calls;
+        }
+
+        if (row.role === 'tool') {
+          // Reconstruir tool_call_id y name desde el campo tool_result guardado
+          const toolResult = typeof row.tool_result === 'string' ? JSON.parse(row.tool_result) : row.tool_result;
+          if (toolResult) {
+            msg.tool_call_id = toolResult.tool_call_id;
+            msg.name = toolResult.name;
+            // Para mensajes de tipo tool, el content debe ser la respuesta en string
+            msg.content = typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result);
+          }
+        }
+
+        return msg;
+      })
+    ];
+
+    // Configurar herramientas según el rol de usuario para no darle acceso a herramientas restringidas
+    const tools = [
+      ...productToolDefinitions,
+      ...reservationToolDefinitions
+    ];
+
+    if (req.user.role === 'admin') {
+      tools.push(...userToolDefinitions);
+    }
+
+    const userContext = {
+      id: req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+      agencia: req.user.agencia
+    };
+
+    let loopCount = 0;
+    const maxLoops = 5;
+    let currentAIResponse = null;
+    const executedToolsLog = [];
+
+    // Loop de Function Calling (Bucle de Ejecución de Tools)
+    while (loopCount < maxLoops) {
+      loopCount++;
+
+      console.log(`[Agente IA] Llamando a modelo IA (Iteración ${loopCount}). Cantidad de mensajes: ${messages.length}`);
+
+      currentAIResponse = await aiServiceInstance.sendMessage(messages, {
+        providerId,
+        tools: tools
+      });
+
+      // Si la IA requiere llamar a una o más herramientas
+      if (currentAIResponse.toolCalls && currentAIResponse.toolCalls.length > 0) {
+        console.log(`[Agente IA] La IA solicitó ejecutar ${currentAIResponse.toolCalls.length} tool(s).`);
+
+        // 1. Guardar mensaje del asistente que contiene las toolCalls en la base de datos
+        await aiServiceInstance.saveMessage(
+          currentSessionId,
+          null,
+          'assistant',
+          currentAIResponse.content || '',
+          currentAIResponse.toolCalls
+        );
+
+        // 2. Agregar al array en memoria para continuar la conversación con el proveedor de IA
+        messages.push({
+          role: 'assistant',
+          content: currentAIResponse.content || '',
+          tool_calls: currentAIResponse.toolCalls
+        });
+
+        // 3. Ejecutar cada una de las tools solicitadas
+        for (const toolCall of currentAIResponse.toolCalls) {
+          const toolName = toolCall.function.name;
+          let args = {};
+          try {
+            args = typeof toolCall.function.arguments === 'string'
+              ? JSON.parse(toolCall.function.arguments)
+              : toolCall.function.arguments;
+          } catch (e) {
+            console.error('[Agente IA] Error parseando argumentos:', e);
+          }
+
+          console.log(`[Agente IA] Ejecutando tool: ${toolName} con args:`, args);
+          let result;
+
+          try {
+            // Ejecutar la herramienta en base a su categoría
+            if (toolName.startsWith('search_products') || toolName.startsWith('get_product') || toolName.startsWith('create_product') || toolName.startsWith('update_product') || toolName.startsWith('search_availability')) {
+              result = await executeProductTool(toolName, args, userContext);
+            } else if (toolName.startsWith('search_reservations') || toolName.startsWith('get_reservation') || toolName.startsWith('create_reservation') || toolName.startsWith('update_reservation') || toolName.startsWith('confirm_reservation') || toolName.startsWith('cancel_reservation') || toolName.startsWith('check_availability')) {
+              result = await executeReservationTool(toolName, args, userContext);
+            } else if (toolName.startsWith('search_users') || toolName.startsWith('get_user') || toolName.startsWith('create_user') || toolName.startsWith('update_user') || toolName.startsWith('unlock_user') || toolName.startsWith('reset_user') || toolName.startsWith('get_user_stats')) {
+              result = await executeUserTool(toolName, args, userContext);
+            } else {
+              result = { success: false, error: `Herramienta ${toolName} no implementada.` };
+            }
+          } catch (error) {
+            console.error(`[Agente IA] Error ejecutando tool ${toolName}:`, error);
+            result = { success: false, error: error.message };
+          }
+
+          // Registrar en el log que se ejecutó esta herramienta
+          executedToolsLog.push({
+            tool: toolName,
+            arguments: args
+          });
+
+          // 4. Guardar respuesta del mensaje 'tool' en la base de datos
+          // Mapeamos tool_call_id y name en tool_result para poder cargarlos adecuadamente
+          await aiServiceInstance.saveMessage(
+            currentSessionId,
+            null,
+            'tool',
+            typeof result === 'string' ? result : JSON.stringify(result),
+            null,
+            { tool_call_id: toolCall.id, name: toolName, result: result }
+          );
+
+          // 5. Agregar la respuesta al historial en memoria
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolName,
+            content: typeof result === 'string' ? result : JSON.stringify(result)
+          });
+        }
+      } else {
+        // Si no hay toolCalls, guardamos la respuesta de texto final en la base de datos y terminamos
+        console.log('[Agente IA] Respuesta final de texto generada por la IA.');
+        await aiServiceInstance.saveMessage(
+          currentSessionId,
+          null,
+          'assistant',
+          currentAIResponse.content
+        );
+        break;
+      }
+    }
 
     res.status(200).json({
       sessionId: currentSessionId,
-      message: response.content,
-      toolCalls: response.toolCalls,
-      usage: response.usage
+      message: currentAIResponse.content,
+      // Retornamos el log de todas las tools ejecutadas en esta petición para el frontend
+      toolCalls: executedToolsLog,
+      usage: currentAIResponse.usage
     });
   } catch (error) {
     console.error('Error en chat IA:', error);

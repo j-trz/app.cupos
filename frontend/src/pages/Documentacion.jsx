@@ -5,11 +5,14 @@ const Documentacion = () => {
     const [activeSection, setActiveSection] = useState('reservas');
 
     const sections = [
+        { id: 'descripcion', title: 'Descripción General', icon: FileText, description: 'Introducción al sistema de gestión de cupos aéreos' },
+        { id: 'instalacion', title: 'Instalación y Setup', icon: Code, description: 'Guía de instalación para desarrollo y producción' },
         { id: 'reservas', title: 'Gestión de Reservas', icon: Calendar, description: 'Sistema completo para la gestión de reservas de vuelos' },
         { id: 'productos', title: 'Gestión de Productos', icon: Package, description: 'Administración de productos turísticos' },
         { id: 'agencias', title: 'Gestión de Agencias', icon: Building2, description: 'Administración de agencias de turismo' },
         { id: 'usuarios', title: 'Gestión de Usuarios', icon: Users, description: 'Administración de usuarios del sistema' },
         { id: 'roles', title: 'Roles y Permisos', icon: Shield, description: 'Control de acceso basado en roles (RBAC)' },
+        { id: 'seguridad', title: 'Seguridad', icon: Shield, description: 'Arquitectura de seguridad y protección de datos' },
         { id: 'whitelabel', title: 'White Label', icon: Palette, description: 'Personalización de marca para agencias' },
         { id: 'email', title: 'Configuración de Email', icon: Mail, description: 'Configuración SMTP y plantillas de email' },
         { id: 'reportes', title: 'Reportes Avanzados', icon: BarChart3, description: 'Dashboard ejecutivo con métricas y análisis' },
@@ -31,6 +34,29 @@ const Documentacion = () => {
     ];
 
     const sectionContent = {
+        descripcion: {
+            title: 'Descripción General',
+            content: [
+                { type: 'text', subtitle: 'El Sistema', content: 'El Sistema de Gestión de Cupos Aéreos es una plataforma integral diseñada específicamente para agencias de viajes mayoristas y minoristas. Su objetivo principal es facilitar la administración, control y comercialización de bloqueos aéreos (cupos) de manera eficiente y segura.' },
+                { type: 'text', subtitle: 'Arquitectura B2B2C', content: 'La plataforma opera en un modelo B2B2C, permitiendo al Operador Mayorista gestionar su inventario, distribuirlo a Agencias Minoristas, y permitir que estas últimas realicen reservas para sus clientes finales.' },
+                { type: 'alert', subtitle: 'Novedad', content: 'Ahora todo el backend se ejecuta sobre Go para un mejor rendimiento.' }
+            ]
+        },
+        instalacion: {
+            title: 'Instalación y Configuración',
+            content: [
+                { type: 'text', subtitle: 'Requisitos', content: 'Node.js (v18+), Go (v1.21+), PostgreSQL, Redis.' },
+                { type: 'list', subtitle: 'Pasos Backend Go', items: ['Clonar repositorio', 'cd backend-go', 'Configurar .env', 'go run cmd/api/main.go'] },
+                { type: 'list', subtitle: 'Pasos Frontend', items: ['cd frontend', 'npm install', 'Configurar .env', 'npm run dev'] },
+            ]
+        },
+        seguridad: {
+            title: 'Seguridad',
+            content: [
+                { type: 'text', subtitle: 'Protección de Datos', content: 'Todas las contraseñas se hashean utilizando bcrypt. La comunicación está cifrada mediante HTTPS/TLS, y los tokens JWT tienen una expiración configurada y firma fuerte.' },
+                { type: 'list', subtitle: 'Prácticas de Seguridad', items: ['Autenticación basada en JWT', 'Autorización por roles y permisos granulares', 'Validación estricta de inputs (Zod/Gin Bindings)', 'Prevención de inyección SQL (GORM)'] }
+            ]
+        },
         reservas: {
             title: 'Gestión de Reservas',
             content: [
@@ -250,14 +276,38 @@ const Documentacion = () => {
                                         <Code className="w-5 h-5 text-blue-600" />
                                         {block.subtitle}
                                     </h3>
-                                    <ul className="space-y-2">
-                                        {block.items.map((item, itemIdx) => (
-                                            <li key={itemIdx} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-2 flex-shrink-0"></span>
-                                                <span>{item}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    {block.type === 'text' && (
+                                        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">
+                                            {block.content}
+                                        </p>
+                                    )}
+                                    {block.type === 'alert' && (
+                                        <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 p-4 rounded-lg text-sm">
+                                            {block.content}
+                                        </div>
+                                    )}
+                                    {(!block.type || block.type === 'list') && (
+                                        <ul className="space-y-2">
+                                            {block.items.map((item, itemIdx) => {
+                                                const [bold, ...rest] = item.includes(':') ? item.split(':') : [item];
+                                                return (
+                                                    <li key={itemIdx} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-2 flex-shrink-0"></span>
+                                                        <span>
+                                                            {rest.length > 0 ? (
+                                                                <>
+                                                                    <strong className="text-zinc-900 dark:text-zinc-100">{bold}:</strong>
+                                                                    {rest.join(':')}
+                                                                </>
+                                                            ) : (
+                                                                item
+                                                            )}
+                                                        </span>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
                                 </div>
                             ))}
                         </div>

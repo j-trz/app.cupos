@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
+import { toDateOnlyString } from '../lib/dateOnly.js';
 
 // Tipos de producto soportados. El campo "ruta" se relabela según el tipo
 // (Cabina para Crucero, Habitación para Hotel) — la lógica de negocio
@@ -46,11 +47,7 @@ const EMPTY_FORM = {
 
 function toFormValues(product) {
   if (!product) return EMPTY_FORM;
-  const fmt = (d) => {
-    if (!d) return '';
-    const date = new Date(d);
-    return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-  };
+  const fmt = toDateOnlyString;
   return {
     codigo_cupo: product.codigo_cupo || '',
     destino: product.destino || '',

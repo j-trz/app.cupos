@@ -97,10 +97,22 @@ class AIService {
       },
       body: JSON.stringify({
         model: config.model,
-        messages: messages.map(m => ({
-          role: m.role,
-          content: m.content
-        })),
+        messages: messages.map(m => {
+          const msg = {
+            role: m.role,
+            content: m.content
+          };
+          if (m.tool_calls || m.toolCalls) {
+            msg.tool_calls = m.tool_calls || m.toolCalls;
+          }
+          if (m.tool_call_id) {
+            msg.tool_call_id = m.tool_call_id;
+          }
+          if (m.name) {
+            msg.name = m.name;
+          }
+          return msg;
+        }),
         temperature: config.temperature,
         max_tokens: config.maxTokens,
         tools: config.tools.length > 0 ? config.tools : undefined
@@ -222,10 +234,22 @@ class AIService {
           'api-key': provider.api_key_encrypted
         },
         body: JSON.stringify({
-          messages: messages.map(m => ({
-            role: m.role,
-            content: m.content
-          })),
+          messages: messages.map(m => {
+            const msg = {
+              role: m.role,
+              content: m.content
+            };
+            if (m.tool_calls || m.toolCalls) {
+              msg.tool_calls = m.tool_calls || m.toolCalls;
+            }
+            if (m.tool_call_id) {
+              msg.tool_call_id = m.tool_call_id;
+            }
+            if (m.name) {
+              msg.name = m.name;
+            }
+            return msg;
+          }),
           temperature: config.temperature,
           max_tokens: config.maxTokens
         })

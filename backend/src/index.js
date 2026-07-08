@@ -25,6 +25,7 @@ import * as exportController from './controllers/exportController.js';
 import * as rolesController from './controllers/rolesController.js';
 import * as permissionsController from './controllers/permissionsController.js';
 import * as reportController from './controllers/reportController.js';
+import backofficeRoutes from './routes/backofficeRoutes.js';
 
 // Importar middleware de auditoría
 import auditLogger from './middleware/auditLogger.js';
@@ -259,6 +260,9 @@ aiRouter.delete('/actions/:id', isAdmin, aiController.deleteAction);
 aiRouter.get('/stats', isAdmin, aiController.getStats);
 aiRouter.get('/logs', isAdmin, aiController.getLogs);
 app.use('/api/ai', aiRouter);
+
+// Rutas de Backoffice (Importar Pasajeros)
+app.use('/api/backoffice', backofficeRoutes);
 
 // Rutas de Notificaciones en Tiempo Real (SSE) (/api/sse)
 const sseRouter = express.Router();

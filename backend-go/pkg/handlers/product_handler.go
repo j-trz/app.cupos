@@ -68,17 +68,25 @@ func fixDates(data map[string]interface{}) {
 	}
 }
 
+// GetProducts lista productos. Por defecto (scope de "disponibilidad" /
+// reserva) un cupo cedido (restricted_agency) solo lo ve la agencia que lo
+// tiene hoy. Con ?scope=management (usado por las pantallas de gestión,
+// no por Disponibilidad) también lo ve la agencia que lo cedió
+// (source_agency) — para que la cedente pueda seguir viéndolo/gestionarlo
+// y, si hace falta, volver a cederlo hacia atrás.
 func GetProducts(c *gin.Context) {
 	var products []models.Product
 	role, _ := c.Get("role")
 	agencia, _ := c.Get("agencia")
+	managementScope := c.Query("scope") == "management"
 
 	query := database.DB
 	if role != "admin" {
-		// El catálogo compartido (restricted_agency vacío) lo ve cualquiera;
-		// un producto-espejo de cesión (restricted_agency seteado) solo lo ve
-		// la agencia a la que se cedió.
-		query = query.Where("restricted_agency = '' OR restricted_agency = ?", agencia)
+		if managementScope {
+			query = query.Where("restricted_agency = '' OR restricted_agency = ? OR source_agency = ?", agencia, agencia)
+		} else {
+			query = query.Where("restricted_agency = '' OR restricted_agency = ?", agencia)
+		}
 	}
 	query.Find(&products)
 
@@ -101,7 +109,9 @@ func GetProductByID(c *gin.Context) {
 	role, _ := c.Get("role")
 	agenciaVal, _ := c.Get("agencia")
 	agencia, _ := agenciaVal.(string)
-	if role != "admin" && product.RestrictedAgency != "" && product.RestrictedAgency != agencia {
+	isRestrictedToOther := product.RestrictedAgency != "" && product.RestrictedAgency != agencia
+	wasSourcedByMe := product.SourceAgency != "" && product.SourceAgency == agencia
+	if role != "admin" && isRestrictedToOther && !wasSourcedByMe {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
 		return
 	}

@@ -16,12 +16,10 @@ import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package } from 'luc
 import TransferModal from '../components/TransferModal';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useToast } from '../hooks/use-toast';
+import { useAgencies } from '../hooks/useAgencies';
+import { formatDateOnly } from '../lib/dateOnly.js';
 
-const formatDate = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-UY');
-};
+const formatDate = formatDateOnly;
 
 const formatMoney = (value) => {
   const n = Number(value);
@@ -38,7 +36,13 @@ const GestionProductos = () => {
   const [transferringProduct, setTransferringProduct] = useState(null);
 
   const { toast } = useToast();
-  const { data: productsResult, isLoading, isError } = useProducts({ search: searchTerm });
+  const { data: agencies = [] } = useAgencies();
+  const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
+  // scope=management: además del catálogo compartido y lo restringido a mi
+  // agencia, también trae lo que YO cedí a otra agencia (source_agency) —
+  // así la agencia cedente sigue viendo y gestionando lo que dio, aunque en
+  // Disponibilidad (reserva real) ya no le aparezca.
+  const { data: productsResult, isLoading, isError } = useProducts({ search: searchTerm, scope: 'management' });
   // El backend devuelve el array "pelado" (no { data: [...] }) — igual que
   // consumen /products el resto de las pantallas (Nóminas, Disponibilidad,
   // Reservas). Sin este fallback, products.data siempre daba undefined y la
@@ -232,6 +236,7 @@ const GestionProductos = () => {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Destino</TableHead>
                   <TableHead>Compañía</TableHead>
+                  <TableHead>Agencia</TableHead>
                   <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
                   <TableHead>PNR</TableHead>
                   <TableHead>Ficha</TableHead>
@@ -258,6 +263,24 @@ const GestionProductos = () => {
                     <TableCell>{product.tipo_producto || '—'}</TableCell>
                     <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
                     <TableCell>{product.compania}</TableCell>
+                    <TableCell>
+                      {product.restricted_agency || product.source_agency ? (
+                        <div className="flex flex-col gap-1">
+                          {product.restricted_agency && (
+                            <Badge variant="outline" className="w-fit text-[10px]">
+                              Prestado a {agencyName(product.restricted_agency)}
+                            </Badge>
+                          )}
+                          {product.source_agency && (
+                            <span className="text-[10px] text-slate-400">
+                              Cedido por {agencyName(product.source_agency)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">Catálogo general</span>
+                      )}
+                    </TableCell>
                     <TableCell>{product.ruta || '—'}</TableCell>
                     <TableCell>{product.pnr || '—'}</TableCell>
                     <TableCell>{product.ficha || '—'}</TableCell>
@@ -281,14 +304,9 @@ const GestionProductos = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge variant={product.is_blocked_for_sale ? 'danger' : 'success'}>
-                          {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
-                        </Badge>
-                        {product.restricted_agency && (
-                          <Badge variant="outline" className="w-fit text-[10px]">Cedido</Badge>
-                        )}
-                      </div>
+                      <Badge variant={product.is_blocked_for_sale ? 'danger' : 'success'}>
+                        {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">

@@ -50,10 +50,11 @@ export default function TransferModal({ open, onClose, product, onTransferComple
                 quantity: quantity,
             });
 
+            const targetAgencyName = agencies.find(a => a.code === targetAgency)?.name || targetAgency;
             Swal.fire({
                 icon: 'success',
                 title: 'Cesión exitosa',
-                text: `Se cedieron ${quantity} cupos a ${targetAgency}`,
+                text: `Se cedieron ${quantity} cupos a ${targetAgencyName}`,
                 timer: 2000,
                 showConfirmButton: false,
             });
@@ -96,7 +97,7 @@ export default function TransferModal({ open, onClose, product, onTransferComple
                     >
                         <option value="">Seleccionar agencia...</option>
                         {agencies.map(agency => (
-                            <option key={agency.id} value={agency.name}>
+                            <option key={agency.id} value={agency.code}>
                                 {agency.name}
                             </option>
                         ))}

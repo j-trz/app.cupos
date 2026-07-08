@@ -179,22 +179,32 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               </div>
               {/* Botón para colapsar sidebar */}
               {!collapsed && (
-                <button
-                  onClick={() => setCollapsed(true)}
-                  className="absolute -right-3 top-[30%] h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                  aria-label="Colapsar sidebar"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setCollapsed(true)}
+                      className="absolute -right-3 top-[30%] h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                      aria-label="Colapsar sidebar"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Colapsar menú</TooltipContent>
+                </Tooltip>
               )}
               {collapsed && (
-                <button
-                  onClick={() => setCollapsed(false)}
-                  className="absolute -right-3 top-[30%] h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                  aria-label="Expandir sidebar"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setCollapsed(false)}
+                      className="absolute -right-3 top-[30%] h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                      aria-label="Expandir sidebar"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Expandir menú</TooltipContent>
+                </Tooltip>
               )}
             </div>
 
@@ -512,13 +522,16 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               }}
             >
               <div
-                className="h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-semibold"
+                className="relative h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-semibold"
                 style={{
                   background: `linear-gradient(to bottom right, ${sbActiveBg}, ${sbHoverBg})`,
                   color: sbActiveText,
                 }}
               >
                 {(user.nombre || user.email || 'I')[0]?.toUpperCase()}
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-zinc-900 shadow-sm" />
+                )}
               </div>
               {!collapsed ? (
                 <div className="flex-1 min-w-0 ml-2">
@@ -532,17 +545,22 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               ) : null}
               {!collapsed && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      aria-label="Abrir opciones de perfil"
-                      className="ml-auto inline-flex items-center rounded-md p-1.5 transition-colors"
-                      style={{ color: sbText }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = sbHoverBg; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          aria-label="Abrir opciones de perfil"
+                          className="ml-auto inline-flex items-center rounded-md p-1.5 transition-colors"
+                          style={{ color: sbText }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = sbHoverBg; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Opciones de perfil</TooltipContent>
+                  </Tooltip>
                   <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg">
                     <DropdownMenuLabel className="px-3 py-2">
                       <div className="flex flex-col">

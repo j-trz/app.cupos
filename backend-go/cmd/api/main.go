@@ -245,6 +245,12 @@ func main() {
 			}
 			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
 
+			// Backoffice (Importar Pasajeros)
+			backoffice := protected.Group("/backoffice")
+			{
+				backoffice.GET("/importar-pasajeros", handlers.ImportarPasajeros)
+			}
+
 			// Logs del sitio (solo admin)
 			protected.GET("/logs", middleware.AdminOnly(), handlers.GetSystemLogs)
 

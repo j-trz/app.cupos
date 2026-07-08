@@ -10,6 +10,7 @@ import StatCard from '../components/ui/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import { formatDateOnly } from '../lib/dateOnly.js';
 
 const statusVariant = (status) => {
   if (!status) return 'default';
@@ -118,15 +119,7 @@ export default function Requests() {
     }
   };
 
-  const formatDate = (value) => {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
+  const formatDate = formatDateOnly;
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus } from 'lucide-react';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download } from 'lucide-react';
 import ReservationService from '../services/reservationService';
+import BackofficeService from '../services/backofficeService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
@@ -10,6 +11,7 @@ import StatCard from '../components/ui/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import { formatDateOnly } from '../lib/dateOnly.js';
 
 const EMPTY_FORM = {
   pedido_id: '',
@@ -22,6 +24,31 @@ const EMPTY_FORM = {
 };
 
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
+
+// Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
+function BaggageIcon({ icon: Icon, included, label }) {
+  return (
+    <span
+      className="relative inline-flex h-6 w-6 items-center justify-center"
+      title={`${label}: ${included ? 'Incluido' : 'No incluido'}`}
+    >
+      <Icon className={`h-4 w-4 ${included ? 'text-emerald-600' : 'text-slate-300'}`} />
+      {!included && (
+        <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />
+      )}
+    </span>
+  );
+}
+
+function BaggageFranchise({ item }) {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <BaggageIcon icon={Backpack} included={!!item.carryon} label="Carry-on" />
+      <BaggageIcon icon={ShoppingBag} included={!!item.handbag} label="Handbag" />
+      <BaggageIcon icon={Luggage} included={!!item.checkedbag} label="Valija despachada" />
+    </div>
+  );
+}
 
 export default function Availability() {
   const [data, setData] = useState([]);
@@ -115,6 +142,78 @@ export default function Availability() {
       ...prev,
       passengers: prev.passengers.filter((_, i) => i !== index),
     }));
+  };
+
+  const handleImportPassengers = async () => {
+    const { value: fichaVenta } = await Swal.fire({
+      title: 'Importar Pasajeros',
+      input: 'text',
+      inputLabel: 'Ingrese el número de Ficha de Venta',
+      inputPlaceholder: 'Ej: FV-123',
+      showCancelButton: true,
+      confirmButtonText: 'Importar',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        if (!value) {
+          return '¡Debes ingresar una ficha de venta!';
+        }
+      }
+    });
+
+    if (fichaVenta) {
+      try {
+        Swal.fire({
+          title: 'Importando...',
+          text: 'Conectando con el backoffice',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+
+        const response = await BackofficeService.importarPasajeros(fichaVenta);
+
+        if (response.success && response.pasajeros && response.pasajeros.length > 0) {
+          setForm((prev) => {
+            const importedPassengers = response.pasajeros.map(p => ({
+              nombre: p.nombre || '',
+              apellido: p.apellido || '',
+              documento: p.documento || '',
+              nacimiento: p.nacimiento || '',
+              nacionalidad: p.nacionalidad || '',
+              tipo_pasajero: p.tipo_pasajero || 'Adulto'
+            }));
+
+            return {
+              ...prev,
+              ficha_venta: fichaVenta,
+              passengers: importedPassengers
+            };
+          });
+
+          Swal.fire({
+            icon: 'success',
+            title: '¡Importación exitosa!',
+            text: `Se importaron ${response.pasajeros.length} pasajero(s) desde el backoffice.`,
+            timer: 2000,
+            showConfirmButton: false
+          });
+        } else {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Sin datos',
+            text: 'No se encontraron pasajeros para la ficha de venta ingresada.'
+          });
+        }
+      } catch (error) {
+        console.error('Error al importar pasajeros:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error de importación',
+          text: error.message || 'No se pudo conectar con el backoffice.'
+        });
+      }
+    }
   };
 
   const calcTipoPasajero = (nacimiento, fechaSalida) => {
@@ -212,15 +311,7 @@ export default function Availability() {
     }
   };
 
-  const formatDate = (value) => {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
+  const formatDate = formatDateOnly;
 
   return (
     <div className="space-y-6">
@@ -305,6 +396,7 @@ export default function Availability() {
               <TableHead>Regreso</TableHead>
               <TableHead>Temporada</TableHead>
               <TableHead>Ruta</TableHead>
+              <TableHead className="text-center">Equipaje</TableHead>
               <TableHead>Adulto</TableHead>
               <TableHead>Bebé</TableHead>
               <TableHead>Niño</TableHead>
@@ -314,13 +406,13 @@ export default function Availability() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={13}>
+                <TableCell className="text-center py-10" colSpan={14}>
                   Cargando disponibilidad...
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={13}>
+                <TableCell className="text-center py-10" colSpan={14}>
                   {temporadaFilter !== 'Todas'
                     ? `No hay cupos para la temporada "${temporadaFilter}".`
                     : 'No hay cupos disponibles.'}
@@ -342,6 +434,9 @@ export default function Availability() {
                   <TableCell className="text-center">{formatDate(item.fecha_regreso)}</TableCell>
                   <TableCell className="text-center">{item.temporada || '—'}</TableCell>
                   <TableCell className="text-center">{item.ruta || '—'}</TableCell>
+                  <TableCell className="text-center">
+                    <BaggageFranchise item={item} />
+                  </TableCell>
                   <TableCell className="text-center">
                     {item.precio ? `$${Number(item.precio).toLocaleString('es-AR')}` : '—'}
                   </TableCell>
@@ -450,9 +545,12 @@ export default function Availability() {
                   </fieldset>
                 ))}
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button variant="secondary" size="sm" onClick={() => handleAddPassenger()}>
                   <Plus className="h-4 w-4 mr-1" />Agregar Pasajero
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleImportPassengers} className="border-dashed">
+                  <Download className="h-4 w-4 mr-1" />Importar pasajeros
                 </Button>
               </div>
             </fieldset>

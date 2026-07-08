@@ -201,10 +201,7 @@ func CreateReservation(c *gin.Context) {
 	// pasajero corresponde a un cupo cedido por otra agencia.
 	if product.TransferID != nil {
 		input.Reservation.TransferID = product.TransferID
-		var transfer models.AvailabilityTransfer
-		if err := tx.First(&transfer, "id = ?", product.TransferID).Error; err == nil {
-			input.Reservation.OriginalAgency = transfer.SourceAgency
-		}
+		input.Reservation.OriginalAgency = product.SourceAgency
 	}
 
 	if err := tx.Create(&input.Reservation).Error; err != nil {

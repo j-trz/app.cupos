@@ -15,14 +15,10 @@ import StatCard from '../components/ui/StatCard.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
+import { formatDateOnly } from '../lib/dateOnly.js';
 
 /* ─── Helpers ─────────────────────────────────────────────── */
-const formatDate = (value) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-};
+const formatDate = formatDateOnly;
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'USD' }).format(value || 0);

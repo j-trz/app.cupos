@@ -12,6 +12,7 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
+import { formatDateOnly } from '../lib/dateOnly.js';
 
 const emptyForm = {
   product_id: '',
@@ -30,12 +31,7 @@ const emptyForm = {
   estado: 'bloqueo_temporal',
 };
 
-const formatDate = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-};
+const formatDate = formatDateOnly;
 
 const formatMoney = (value) => {
   const n = Number(value);

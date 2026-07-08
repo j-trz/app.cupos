@@ -56,11 +56,17 @@ type Product struct {
 	// RestrictedAgency, si está seteado, hace que este producto solo sea
 	// visible/reservable para esa agencia (+ admin) — se usa en los productos
 	// "espejo" que crea una cesión, para que el cupo cedido lo vea únicamente
-	// la agencia destino y no el resto del catálogo compartido.
-	RestrictedAgency string     `gorm:"column:restricted_agency" json:"restricted_agency,omitempty"`
+	// la agencia destino y no el resto del catálogo compartido (en Disponibilidad).
+	RestrictedAgency string `gorm:"column:restricted_agency" json:"restricted_agency,omitempty"`
+	// SourceAgency es quién cedió ESTE producto-espejo puntual (la agencia
+	// cedente inmediata de este hop). A diferencia de RestrictedAgency (quién
+	// lo tiene hoy), esto permite que la agencia cedente también vea el
+	// producto en pantallas de gestión (no en Disponibilidad) aunque ya no
+	// sea la dueña actual — necesario para poder volver a cederlo hacia atrás
+	// y para no perder trazabilidad de quién se lo dio a quién.
+	SourceAgency string `gorm:"column:source_agency" json:"source_agency,omitempty"`
 	// TransferID vincula un producto-espejo de cesión con su AvailabilityTransfer
-	// de origen, para poder resolver la agencia cedente cuando alguien reserva
-	// contra este producto.
+	// de origen, para poder auditar el movimiento completo.
 	TransferID *uuid.UUID `gorm:"type:uuid;column:transfer_id" json:"transfer_id,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at"`

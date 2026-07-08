@@ -20,7 +20,13 @@ type TransferInput struct {
 	Quantity     int    `json:"quantity" binding:"required,min=1"`
 }
 
-// CreateTransfer crea una cesión de disponibilidad entre agencias
+// CreateTransfer crea una cesión de disponibilidad entre agencias. También
+// permite "devolver"/re-ceder un cupo que ya es un producto-espejo de una
+// cesión anterior (a la misma agencia dueña original o a una tercera): en
+// ese caso la agencia cedente de ESTA cesión es quien hoy tiene restringido
+// ese producto (RestrictedAgency), no la agencia del usuario que ejecuta la
+// acción — así un admin puede operar la devolución en nombre de la agencia
+// sin que quede mal atribuida.
 func CreateTransfer(c *gin.Context) {
 	var input TransferInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -29,25 +35,38 @@ func CreateTransfer(c *gin.Context) {
 	}
 
 	userIDStr, _ := c.Get("userID")
-	agencia, _ := c.Get("agencia")
-
-	sourceAgency := agencia.(string)
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
 
 	var createdBy uuid.UUID
 	if s, ok := userIDStr.(string); ok {
 		createdBy, _ = uuid.Parse(s)
 	}
 
-	// Validar que origen y destino sean diferentes
-	if sourceAgency == input.TargetAgency {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "La agencia origen y destino no pueden ser la misma"})
-		return
-	}
-
 	// Obtener producto
 	var product models.Product
 	if err := database.DB.First(&product, input.ProductID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+
+	// La agencia cedente de ESTA cesión: si el producto ya es un espejo de
+	// otra cesión, es quien lo tiene hoy (RestrictedAgency) — no el catálogo
+	// general. Si es un producto del catálogo compartido (sin restricción),
+	// la agencia cedente es la del usuario que ejecuta la acción.
+	sourceAgency := callerAgencia
+	if product.RestrictedAgency != "" {
+		sourceAgency = product.RestrictedAgency
+		if role != "admin" && callerAgencia != product.RestrictedAgency {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No podés ceder un cupo que no te pertenece"})
+			return
+		}
+	}
+
+	// Validar que origen y destino sean diferentes
+	if sourceAgency == input.TargetAgency {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "La agencia origen y destino no pueden ser la misma"})
 		return
 	}
 
@@ -94,7 +113,13 @@ func CreateTransfer(c *gin.Context) {
 		Temporada:              product.Temporada,
 		TipoProducto:           product.TipoProducto,
 		BloqueoTemporalMinutos: product.BloqueoTemporalMinutos,
+		InfFare:                product.InfFare,
+		ChdFare:                product.ChdFare,
+		CarryOn:                product.CarryOn,
+		HandBag:                product.HandBag,
+		CheckedBag:             product.CheckedBag,
 		RestrictedAgency:       input.TargetAgency,
+		SourceAgency:           sourceAgency,
 		TransferID:             &transferID,
 	}
 	if err := tx.Create(&productTransfer).Error; err != nil {
