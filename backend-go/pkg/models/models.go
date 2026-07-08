@@ -107,6 +107,7 @@ type Reservation struct {
 	VueloCompania        string     `json:"vuelo_compania"`
 	VueloSalida          *time.Time `json:"vuelo_salida"`
 	VueloPrecio          float64    `json:"vuelo_precio"`
+	VueloRuta            string     `json:"vuelo_ruta"`
 	NombrePasajero       string     `json:"nombre_pasajero"`
 	ApellidoPasajero     string     `json:"apellido_pasajero"`
 	DocumentoPasajero    string     `json:"documento_pasajero"`

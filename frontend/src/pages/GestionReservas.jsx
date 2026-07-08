@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
@@ -14,6 +14,7 @@ import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../compo
 import { useAgencies } from '../hooks/useAgencies';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import ItineraryPDF from '../components/ItineraryPDF.jsx';
+import ItineraryTable from '../components/ItineraryTable.jsx';
 
 const emptyForm = {
   product_id: '',
@@ -146,6 +147,7 @@ export default function GestionReservas() {
   const [ticketModal, setTicketModal] = useState(null); // { reservationId, passengerId, pedidoId, nombre }
   const [ticketValue, setTicketValue] = useState('');
   const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
+  const [routeModalProduct, setRouteModalProduct] = useState(null); // { codigo_cupo, destino, ruta }
 
   const { data: agencies = [] } = useAgencies();
 
@@ -175,12 +177,13 @@ export default function GestionReservas() {
   };
 
   const estados = useMemo(() => {
-    const set = new Set(reservations.map(r => r.estado).filter(Boolean));
+    const set = new Set(reservations.map(r => r.estado).filter(e => e && e !== 'cedido'));
     return ['Todas', ...Array.from(set).sort()];
   }, [reservations]);
 
   const filtered = useMemo(() => {
-    let r = reservations;
+    // Excluir registros de cesión de stock (auditoría) de la lista de reservas
+    let r = reservations.filter(x => x.estado !== 'cedido');
     if (estadoFilter !== 'Todas') r = r.filter(x => x.estado === estadoFilter);
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -451,6 +454,7 @@ export default function GestionReservas() {
               <TableHead>Documento</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Destino</TableHead>
+              <TableHead className="text-center">Ruta</TableHead>
               <TableHead>Salida</TableHead>
               <TableHead>Vencimiento</TableHead>
               <TableHead>Cesión</TableHead>
@@ -466,9 +470,9 @@ export default function GestionReservas() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={19} className="text-center py-10">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={20} className="text-center py-10">Cargando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={19} className="text-center py-10 text-slate-400">
+              <TableRow><TableCell colSpan={20} className="text-center py-10 text-slate-400">
                 {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
               </TableCell></TableRow>
             ) : filtered.flatMap(r => {
@@ -486,6 +490,28 @@ export default function GestionReservas() {
                   <TableCell>{row.documento}</TableCell>
                   <TableCell>{row.tipoPasajero}</TableCell>
                   <TableCell>{r.vuelo_destino || '—'}</TableCell>
+                  <TableCell className="text-center">
+                    {r.vuelo_ruta || (products.find(p => p.id === r.product_id)?.ruta) ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const associatedProduct = products.find(p => p.id === r.product_id);
+                          setRouteModalProduct({
+                            codigo_cupo: r.vuelo_codigo,
+                            destino: r.vuelo_destino,
+                            ruta: r.vuelo_ruta || associatedProduct?.ruta
+                          });
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver detalle de la ruta"
+                      >
+                        <MapPin className="h-3 w-3" />
+                        Ruta
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
                   <TableCell>
                     {expiry ? (
@@ -760,6 +786,41 @@ export default function GestionReservas() {
           />
         )}
       </Modal>
+
+      {/* ─── Modal Ver Ruta ─── */}
+      {routeModalProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Detalle de Ruta
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    {routeModalProduct.codigo_cupo} — {routeModalProduct.destino}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRouteModalProduct(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {/* Contenido */}
+            <div className="p-5">
+              <ItineraryTable ruta={routeModalProduct.ruta} showCopyButton={true} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

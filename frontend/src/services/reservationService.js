@@ -20,6 +20,9 @@ const adaptProduct = (producto) => ({
   inf_fare: producto.inf_fare || 0,
   chd_fare: producto.chd_fare || 0,
   op: producto.op || 0,
+  carryon: !!producto.carryon,
+  handbag: !!producto.handbag,
+  checkedbag: !!producto.checkedbag,
 });
 
 const adaptRequest = (item) => ({

@@ -101,16 +101,12 @@ function extractSegmentLines(text) {
   const norm = normalizeText(text);
   const SEG = /^\s*(\d+\s+)?[A-Z]{2}[\d\s]/;
 
-  // Estrategia 1: multilínea real
   const byLine = norm.split('\n').filter(l => SEG.test(l));
   if (byLine.length > 0) return byLine;
 
-  // Estrategia 2: una línea con números de segmento ("1 UX... 2 UX...")
   const bySegNo = norm.split(/(?=\s+\d+\s+[A-Z]{2})/).map(s => s.trim()).filter(s => SEG.test(s));
   if (bySegNo.length > 1) return bySegNo;
 
-  // Estrategia 3: una línea sin número — partir antes de cada código IATA+vuelo
-  // Ej: "LA2421 MVD LIM ... LA2440 LIM AUA ..."
   const byFlight = norm
     .split(/(?=[A-Z]{2}\d{3,4}\b)/)
     .map(s => s.trim())
@@ -143,56 +139,46 @@ function parseSegmentLine(line) {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
 
-    // Nro de segmento — dígitos al inicio, antes de encontrar aerolínea
     if (!result.compania && isSegNo(t)) { result.segmento = t; continue; }
 
-    // Vuelo combinado "LA2421"
     if (!result.compania && isFlight(t)) {
       const m = t.match(/^([A-Z]{2})(\d{3,4})$/);
       result.compania = m[1]; result.vuelo = m[2];
       continue;
     }
 
-    // Aerolínea separada "UX" + "046"
     if (!result.compania && isAirline(t) && isFlightNo(tokens[i + 1])) {
       result.compania = t; result.vuelo = tokens[++i];
       continue;
     }
 
-    // Letra sola (clase/cabina) — ignorar
     if (/^[A-Z]$/.test(t)) continue;
 
-    // Fecha ("15SEP", "02JAN")
     if (isDate(t)) {
       if (!result.fechaSalida) result.fechaSalida = t;
       else if (!result.fechaLlegada) result.fechaLlegada = t;
       continue;
     }
 
-    // O&D combinado "MVDMAD" o "2*MVDMAD"
     if (isOD(t)) {
       const m = t.match(/([A-Z]{6})/);
       result.origen = m[1].slice(0, 3); result.destino = m[1].slice(3);
       continue;
     }
 
-    // Aeropuertos separados "MVD", "LIM" — solo después de encontrar aerolínea
     if (result.compania && isAirport(t)) {
       if (!result.origen) result.origen = t;
       else if (!result.destino) result.destino = t;
       continue;
     }
 
-    // Hora — "1220" o "07:35"
     if (isTime(t)) {
       if (!result.salida) result.salida = normTime(t);
       else if (!result.llegada) result.llegada = normTime(t);
       continue;
     }
-    // Todo lo demás (DK1, E, 789, 0, etc.) — ignorar
   }
 
-  // Lógica +1 día
   if (result.fechaSalida && result.fechaLlegada) {
     result.nextDay = result.fechaSalida !== result.fechaLlegada;
   } else if (result.salida && result.llegada) {
@@ -227,6 +213,7 @@ function parseRuta(ruta) {
     .map(parseSegmentLine)
     .filter((v) => v.compania && v.vuelo);
 }
+
 async function loadImgBitmap(url) {
   try {
     if (!url) return null;
@@ -262,6 +249,7 @@ async function segmentsToPngBlob(segments, primaryColor = '#2c4b8b') {
     c.closePath();
   };
 
+  // Sombra + fondo blanco
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.20)';
   ctx.shadowBlur = 18;
@@ -275,6 +263,7 @@ async function segmentsToPngBlob(segments, primaryColor = '#2c4b8b') {
   rr(ctx, 0, 0, width, innerHeight, radius);
   ctx.clip();
 
+  // Header
   ctx.fillStyle = primaryColor;
   ctx.fillRect(0, 0, width, headerH);
   ctx.fillStyle = '#ffffff';
@@ -287,6 +276,7 @@ async function segmentsToPngBlob(segments, primaryColor = '#2c4b8b') {
     x += colWidths[i];
   }
 
+  // Separadores de fila
   ctx.strokeStyle = '#e5e7eb';
   ctx.lineWidth = 1;
   for (let r = 1; r <= segments.length; r++) {
@@ -294,10 +284,9 @@ async function segmentsToPngBlob(segments, primaryColor = '#2c4b8b') {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
   }
 
-  const bitmaps = await Promise.all(segments.map(async (s) => {
-    const code = (s.compania || '').toUpperCase().trim();
-    return await loadImgBitmap(AIRLINE_LOGOS[code] || FALLBACK_LOGO);
-  }));
+  const bitmaps = await Promise.all(
+    segments.map(s => loadImgBitmap(AIRLINE_LOGOS[(s.compania || '').toUpperCase().trim()] || FALLBACK_LOGO))
+  );
 
   ctx.fillStyle = '#111827';
   ctx.font = '14px Arial';
@@ -306,23 +295,30 @@ async function segmentsToPngBlob(segments, primaryColor = '#2c4b8b') {
   for (let r = 0; r < segments.length; r++) {
     const seg = segments[r];
     const yTop = headerH + r * rowH;
-    let colX = 0;
-    const logo = bitmaps[r];
     const midY = yTop + rowH / 2;
-    const cx0 = colX + colWidths[0] / 2;
-    if (logo) ctx.drawImage(logo, cx0 - 12, midY - 12, 24, 24);
+    let colX = 0;
+
+    // Logo aerolínea
+    const logo = bitmaps[r];
+    if (logo) ctx.drawImage(logo, colX + colWidths[0] / 2 - 12, midY - 12, 24, 24);
     colX += colWidths[0];
+
     const originName = AIRPORTS[(seg.origen || '').toUpperCase().trim()] || seg.origen || '';
     const destName = AIRPORTS[(seg.destino || '').toUpperCase().trim()] || seg.destino || '';
+
     ctx.fillText(seg.vuelo || '', colX + colWidths[1] / 2, midY); colX += colWidths[1];
-    ctx.fillText(seg.fecha || '', colX + colWidths[2] / 2, midY); colX += colWidths[2];
+    // ✅ fechaSalida (antes era seg.fecha)
+    ctx.fillText(seg.fechaSalida || '', colX + colWidths[2] / 2, midY); colX += colWidths[2];
     ctx.fillText(originName, colX + colWidths[3] / 2, midY); colX += colWidths[3];
     ctx.fillText(destName, colX + colWidths[4] / 2, midY); colX += colWidths[4];
     ctx.fillText(seg.salida || '', colX + colWidths[5] / 2, midY); colX += colWidths[5];
-    ctx.fillText(seg.llegada || '', colX + colWidths[6] / 2, midY);
+    // ✅ +1 en llegada si nextDay
+    const llegadaText = (seg.llegada || '') + (seg.nextDay ? ' +1' : '');
+    ctx.fillText(llegadaText, colX + colWidths[6] / 2, midY);
   }
+
   ctx.restore();
-  return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png', 0.92));
+  return await new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/png', 0.92));
 }
 
 export default function ItineraryTable({ ruta, segments: inputSegments, className = '', showCopyButton = true }) {
@@ -337,7 +333,7 @@ export default function ItineraryTable({ ruta, segments: inputSegments, classNam
   const handleCopy = async () => {
     try {
       const pngBlob = await segmentsToPngBlob(segments, primaryColor);
-      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      if (window.ClipboardItem && navigator.clipboard?.write) {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
         await Swal.fire({ icon: 'success', title: 'Itinerario copiado', text: 'Podés pegarlo en WhatsApp, email, etc.', timer: 1800, showConfirmButton: false });
       } else throw new Error('not supported');
@@ -347,7 +343,11 @@ export default function ItineraryTable({ ruta, segments: inputSegments, classNam
   };
 
   if (!segments || segments.length === 0) {
-    return <div className={className}><div className="text-slate-400 text-sm text-center py-4">No hay datos de ruta disponibles.</div></div>;
+    return (
+      <div className={className}>
+        <div className="text-slate-400 text-sm text-center py-4">No hay datos de ruta disponibles.</div>
+      </div>
+    );
   }
 
   return (
@@ -367,6 +367,7 @@ export default function ItineraryTable({ ruta, segments: inputSegments, classNam
           </button>
         </div>
       )}
+
       <div className="overflow-x-auto rounded-xl shadow-lg border border-slate-100">
         <table className="w-full bg-white text-sm">
           <thead>
@@ -389,16 +390,26 @@ export default function ItineraryTable({ ruta, segments: inputSegments, classNam
                 <tr key={i} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <img src={AIRLINE_LOGOS[code] || FALLBACK_LOGO} alt={AIRLINES[code] || code} className="h-6 w-6 object-contain flex-shrink-0" onError={(e) => { e.currentTarget.src = FALLBACK_LOGO; }} />
+                      <img
+                        src={AIRLINE_LOGOS[code] || FALLBACK_LOGO}
+                        alt={AIRLINES[code] || code}
+                        className="h-6 w-6 object-contain flex-shrink-0"
+                        onError={(e) => { e.currentTarget.src = FALLBACK_LOGO; }}
+                      />
                       <span className="text-slate-700 font-medium">{AIRLINES[code] || code}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center font-mono text-slate-800">{v.vuelo}</td>
-                  <td className="px-4 py-3 text-center text-slate-700">{v.fecha}</td>
+                  {/* ✅ fechaSalida (antes era v.fecha) */}
+                  <td className="px-4 py-3 text-center text-slate-700">{v.fechaSalida}</td>
                   <td className="px-4 py-3 text-center text-slate-700">{originName}</td>
                   <td className="px-4 py-3 text-center text-slate-700">{destName}</td>
                   <td className="px-4 py-3 text-center font-semibold" style={{ color: primaryColor }}>{v.salida}</td>
-                  <td className="px-4 py-3 text-center font-semibold" style={{ color: primaryColor }}>{v.llegada}</td>
+                  {/* ✅ +1 si llega al día siguiente */}
+                  <td className="px-4 py-3 text-center font-semibold" style={{ color: primaryColor }}>
+                    {v.llegada}
+                    {v.nextDay && <span className="ml-1 text-xs font-bold text-red-500">+1</span>}
+                  </td>
                 </tr>
               );
             })}

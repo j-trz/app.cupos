@@ -195,6 +195,9 @@ func CreateReservation(c *gin.Context) {
 	if input.Reservation.VueloSalida == nil {
 		input.Reservation.VueloSalida = product.FechaSalida
 	}
+	if input.Reservation.VueloRuta == "" {
+		input.Reservation.VueloRuta = product.Ruta
+	}
 
 	// Si el producto es un "espejo" de una cesión, la reserva hereda de qué
 	// agencia vino el cupo — así Nómina/Reservas pueden mostrar que este
