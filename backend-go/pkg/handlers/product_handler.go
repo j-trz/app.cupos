@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
@@ -111,6 +112,9 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
+	if product.CodigoCupo == "" {
+		product.CodigoCupo = generateCodigoCupo(product.TipoProducto, product.Destino, 0)
+	}
 	if product.TipoProducto == "" {
 		product.TipoProducto = categorizeProduct(product.CodigoCupo)
 	}
@@ -145,6 +149,9 @@ func BulkCreateProducts(c *gin.Context) {
 	}
 
 	for i := range input.Products {
+		if input.Products[i].CodigoCupo == "" {
+			input.Products[i].CodigoCupo = generateCodigoCupo(input.Products[i].TipoProducto, input.Products[i].Destino, i)
+		}
 		if input.Products[i].TipoProducto == "" {
 			input.Products[i].TipoProducto = categorizeProduct(input.Products[i].CodigoCupo)
 		}
@@ -176,6 +183,36 @@ func BulkCreateProducts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Bulk creation successful", "count": len(input.Products)})
+}
+
+// generateCodigoCupo arma un código legible y prácticamente único a partir
+// del tipo de producto y el destino (ej. "AER-BUE-04821"), para que el
+// código de cupo deje de ser un campo manual — se completa solo si no vino
+// en el request (así la carga masiva que ya trae sus propios códigos no se
+// ve afectada).
+func generateCodigoCupo(tipoProducto, destino string, salt int) string {
+	tipoPrefix := letterPrefix(tipoProducto, 3, "GEN")
+	destPrefix := letterPrefix(destino, 3, "XXX")
+	unique := (time.Now().UnixNano()/1000 + int64(salt)) % 100000
+	return fmt.Sprintf("%s-%s-%05d", tipoPrefix, destPrefix, unique)
+}
+
+// letterPrefix devuelve las primeras n letras (sin espacios/acentos/símbolos)
+// de s en mayúsculas, o fallback si no queda ninguna letra.
+func letterPrefix(s string, n int, fallback string) string {
+	var b strings.Builder
+	for _, r := range strings.ToUpper(s) {
+		if r >= 'A' && r <= 'Z' {
+			b.WriteRune(r)
+			if b.Len() >= n {
+				break
+			}
+		}
+	}
+	if b.Len() == 0 {
+		return fallback
+	}
+	return b.String()
 }
 
 func categorizeProduct(codigo string) string {

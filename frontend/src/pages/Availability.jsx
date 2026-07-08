@@ -305,9 +305,9 @@ export default function Availability() {
               <TableHead>Regreso</TableHead>
               <TableHead>Temporada</TableHead>
               <TableHead>Ruta</TableHead>
-              <TableHead>Precio</TableHead>
-              <TableHead>INF</TableHead>
-              <TableHead>CHD</TableHead>
+              <TableHead>Adulto</TableHead>
+              <TableHead>Bebé</TableHead>
+              <TableHead>Niño</TableHead>
               <TableHead>Reservar</TableHead>
             </TableRow>
           </TableHeader>

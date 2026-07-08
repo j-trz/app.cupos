@@ -25,8 +25,8 @@ const EMPTY_FORM = {
   compania: '',
   disponibilidad: '',
   cupo: '',
-  salida: '',
-  regreso: '',
+  fecha_salida: '',
+  fecha_regreso: '',
   precio: '',
   neto_1: '',
   op: '',
@@ -57,8 +57,8 @@ function toFormValues(product) {
     compania: product.compania || '',
     disponibilidad: product.disponibilidad ?? '',
     cupo: product.cupo ?? '',
-    salida: fmt(product.salida || product.fecha_salida),
-    regreso: fmt(product.regreso || product.fecha_regreso),
+    fecha_salida: fmt(product.fecha_salida),
+    fecha_regreso: fmt(product.fecha_regreso),
     precio: product.precio ?? '',
     neto_1: product.neto_1 ?? '',
     op: product.op ?? '',
@@ -85,8 +85,8 @@ function toPayload(form) {
     compania: form.compania,
     disponibilidad: num(form.disponibilidad),
     cupo: num(form.cupo),
-    salida: form.salida || null,
-    regreso: form.regreso || null,
+    fecha_salida: form.fecha_salida || null,
+    fecha_regreso: form.fecha_regreso || null,
     precio: num(form.precio),
     neto_1: num(form.neto_1),
     op: num(form.op),
@@ -122,7 +122,6 @@ const ProductForm = ({
 
   const validate = () => {
     const e = {};
-    if (!form.codigo_cupo.trim()) e.codigo_cupo = 'Requerido';
     if (!form.destino.trim()) e.destino = 'Requerido';
     if (!form.compania.trim()) e.compania = 'Requerido';
     if (form.disponibilidad === '' || isNaN(Number(form.disponibilidad))) e.disponibilidad = 'Número requerido';
@@ -184,7 +183,19 @@ const ProductForm = ({
         <div>
           {sectionLabel('Identificación')}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {field('codigo_cupo', 'Código de Cupo', 'text', { required: true })}
+            {isEditing ? (
+              <div className="space-y-1">
+                <Label htmlFor="codigo_cupo">Código de Cupo</Label>
+                <Input id="codigo_cupo" type="text" value={form.codigo_cupo} disabled className="bg-slate-50 text-slate-500" />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label>Código de Cupo</Label>
+                <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm text-slate-400">
+                  Se genera automáticamente
+                </div>
+              </div>
+            )}
             {field('destino', 'Destino', 'text', { required: true })}
             {field('compania', 'Compañía', 'text', { required: true })}
             <div className="space-y-1">
@@ -207,8 +218,8 @@ const ProductForm = ({
         <div>
           {sectionLabel('Fechas y cupo')}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {field('salida', 'Fecha de Salida', 'date')}
-            {field('regreso', 'Fecha de Regreso', 'date')}
+            {field('fecha_salida', 'Fecha de Salida', 'date')}
+            {field('fecha_regreso', 'Fecha de Regreso', 'date')}
             {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
             {field('bloqueo_temporal_minutos', 'Bloqueo Temporal (min)', 'number', { min: '0', placeholder: '60' })}
