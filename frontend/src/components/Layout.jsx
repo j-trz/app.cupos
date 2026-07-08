@@ -97,7 +97,7 @@ export default function Layout({ children }) {
           <div className={
             location.pathname === '/reportes'
               ? 'min-h-full w-full px-4 py-4'
-              : 'min-h-full max-w-8xl mx-4 px-8 py-8'
+              : 'min-h-full w-full max-w-[1800px] mx-auto px-6 py-6'
           }>
             {children || <Outlet context={{ user }} />}
           </div>

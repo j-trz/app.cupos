@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
@@ -9,8 +9,9 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, Download, ArrowRightLeft } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
+import PageHeader from '../components/ui/PageHeader.jsx';
 import { useToast } from '../hooks/use-toast';
 
 const GestionProductos = () => {
@@ -118,73 +119,68 @@ const GestionProductos = () => {
 
   if (isError) {
     return (
-      <div className="container mx-auto py-10">
+      <div className="space-y-6">
+        <PageHeader title="Gestión de Productos" description="Administra los productos y servicios del sistema" icon={Package} />
         <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-destructive">Error al cargar los productos</p>
-          </CardContent>
+          <div className="p-10 text-center text-red-600">Error al cargar los productos</div>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestión de Productos</h1>
-          <p className="text-muted-foreground">
-            Administra los productos y servicios del sistema
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Carga Masiva
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Carga Masiva de Productos</DialogTitle>
-              </DialogHeader>
-              <ProductBulkUpload
-                onUpload={handleBulkUpload}
-                onCancel={() => setIsBulkUploadOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+    <div className="space-y-6">
+      <PageHeader
+        title="Gestión de Productos"
+        description="Administra los productos y servicios del sistema"
+        icon={Package}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Carga Masiva
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Carga Masiva de Productos</DialogTitle>
+                </DialogHeader>
+                <ProductBulkUpload
+                  onUpload={handleBulkUpload}
+                  onCancel={() => setIsBulkUploadOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
 
-          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setEditingProduct(null)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Producto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
-                </DialogTitle>
-              </DialogHeader>
-              <ProductForm
-                onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-                onCancel={() => {
-                  setIsModalOpen(false);
-                  setEditingProduct(null);
-                }}
-                defaultValues={editingProduct || {}}
-                isEditing={!!editingProduct}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" onClick={() => setEditingProduct(null)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Producto
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
+                  </DialogTitle>
+                </DialogHeader>
+                <ProductForm
+                  onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
+                  onCancel={() => {
+                    setIsModalOpen(false);
+                    setEditingProduct(null);
+                  }}
+                  defaultValues={editingProduct || {}}
+                  isEditing={!!editingProduct}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        }
+      />
 
       {/* Barra de búsqueda */}
       <div className="flex items-center gap-4 mb-6">
@@ -240,11 +236,10 @@ const GestionProductos = () => {
                           : '—'}
                       </td>
                       <td className="p-4 align-middle">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          product.is_blocked_for_sale
+                        <span className={`px-2 py-1 rounded-full text-xs ${product.is_blocked_for_sale
                             ? 'bg-red-100 text-red-800'
                             : 'bg-green-100 text-green-800'
-                        }`}>
+                          }`}>
                           {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
                         </span>
                       </td>
