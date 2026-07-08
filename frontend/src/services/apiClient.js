@@ -1,6 +1,11 @@
 class ApiClient {
   static getBaseUrl() {
-    return import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+    // Sacar cualquier barra final: si VITE_API_URL se configuró con "/" al
+    // final (error común en las variables de entorno de Vercel), concatenar
+    // el endpoint (que ya arranca con "/") genera "//auth/login" — eso
+    // dispara un redirect que el navegador rechaza en un preflight CORS.
+    return base.replace(/\/+$/, '');
   }
 
   static getToken() {
@@ -38,7 +43,8 @@ class ApiClient {
   }
 
   static async request(endpoint, options = {}) {
-    const url = `${this.getBaseUrl()}${endpoint}`;
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${this.getBaseUrl()}${path}`;
 
     const isFormData = options.body instanceof FormData;
 
