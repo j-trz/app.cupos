@@ -10,6 +10,21 @@ import {
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 
+const DEFAULT_CONFIG = {
+    identity: { agency_name: '', contact_email: '', slogan: '', logoUrl: '', faviconUrl: '' },
+    colors: {
+        primary: '#3b82f6', secondary: '#64748b', background: '#ffffff',
+        surface: '#f8fafc', text_primary: '#0f172a', text_secondary: '#64748b',
+        accent: '#f59e0b', border: '#e2e8f0',
+    },
+    fonts: { heading: 'Inter, system-ui, sans-serif', body: 'Inter, system-ui, sans-serif' },
+    buttons: { borderRadius: 'lg', paddingX: '4', paddingY: '2' },
+    sidebar: { width: '280px', backgroundColor: '#0f172a', textColor: '#f8fafc', hoverColor: '#1e293b' },
+    layout: { maxWidth: '1400px', padding: '24px' },
+    emails: { headerColor: '#3b82f6', logoUrl: '', footerText: '' },
+    legal: { termsUrl: '', privacyUrl: '' },
+};
+
 const tabs = [
     { id: 'identity', label: 'Identidad', icon: Building2 },
     { id: 'colors', label: 'Colores', icon: Palette },
@@ -47,16 +62,34 @@ export default function WhiteLabelConfig() {
         try {
             setLoading(true);
             const response = await WhiteLabelService.getConfig();
-            if (response.config) {
-                setConfig(response.config);
-                setIsDefault(response.isDefault || false);
+            if (response?.config) {
+                // Mezclar defaults con lo que viene del backend (por si faltan secciones)
+                const merged = {
+                    ...DEFAULT_CONFIG,
+                    ...response.config,
+                    identity: { ...DEFAULT_CONFIG.identity, ...(response.config.identity || {}) },
+                    colors: { ...DEFAULT_CONFIG.colors, ...(response.config.colors || {}) },
+                    fonts: { ...DEFAULT_CONFIG.fonts, ...(response.config.fonts || {}) },
+                    buttons: { ...DEFAULT_CONFIG.buttons, ...(response.config.buttons || {}) },
+                    sidebar: { ...DEFAULT_CONFIG.sidebar, ...(response.config.sidebar || {}) },
+                    layout: { ...DEFAULT_CONFIG.layout, ...(response.config.layout || {}) },
+                    emails: { ...DEFAULT_CONFIG.emails, ...(response.config.emails || {}) },
+                    legal: { ...DEFAULT_CONFIG.legal, ...(response.config.legal || {}) },
+                };
+                setConfig(merged);
+                setIsDefault(response.isDefault ?? true);
                 if (!response.isDefault && response.config.id) {
                     setConfigId(response.config.id);
                 }
+            } else {
+                // Sin config guardada → mostrar defaults
+                setConfig({ ...DEFAULT_CONFIG });
+                setIsDefault(true);
             }
         } catch (error) {
             console.error('Error al cargar configuración:', error);
-            Swal.fire('Error', 'No se pudo cargar la configuración', 'error');
+            setConfig({ ...DEFAULT_CONFIG });
+            setIsDefault(true);
         } finally {
             setLoading(false);
         }

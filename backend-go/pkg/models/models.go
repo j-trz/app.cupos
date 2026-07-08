@@ -113,15 +113,12 @@ type Agency struct {
 }
 
 type WhiteLabelConfig struct {
-	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	AgencyID       string    `gorm:"not null" json:"agency_id"`
-	CompanyName    string    `json:"company_name"`
-	PrimaryColor   string    `gorm:"default:'#3b82f6'" json:"primary_color"`
-	SecondaryColor string    `gorm:"default:'#64748b'" json:"secondary_color"`
-	LogoURL        string    `json:"logo_url"`
-	IsActive       bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AgencyID  string         `gorm:"not null;uniqueIndex" json:"agency_id"`
+	Config    datatypes.JSON `gorm:"type:jsonb;default:'{}'" json:"config"`
+	IsActive  bool           `gorm:"default:true" json:"is_active"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 type SystemSetting struct {

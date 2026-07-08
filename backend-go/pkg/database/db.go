@@ -96,6 +96,10 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS transfer_id UUID REFERENCES availability_transfers(id) ON DELETE SET NULL;`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS original_agency VARCHAR(255);`,
 		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS color VARCHAR(7) DEFAULT '#3b82f6';`,
+		// White-label: columna config JSONB para almacenar toda la configuración anidada
+		`ALTER TABLE white_label_configs ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}';`,
+		// Índice único por agencia (puede ya existir si AutoMigrate lo creó)
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_white_label_configs_agency_id ON white_label_configs(agency_id);`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

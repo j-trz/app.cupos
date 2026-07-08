@@ -8,10 +8,14 @@ class WhiteLabelService {
   static async getConfig() {
     try {
       const response = await ApiClient.request('/white-label/config');
-      return response;
+      // El backend siempre retorna { config, isDefault } — nunca null
+      if (response && typeof response === 'object' && 'config' in response) {
+        return response;
+      }
+      return { config: null, isDefault: true };
     } catch (error) {
-      // 404 = no hay config aún, se usará la por defecto. No es un error real.
-      return null;
+      // 404 u otro error: no hay config guardada aún
+      return { config: null, isDefault: true };
     }
   }
 

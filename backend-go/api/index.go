@@ -179,12 +179,13 @@ func init() {
 				agencies.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteAgency)
 			}
 
-			// White Label
+			// White Label — agency_admin puede gestionar su propia agencia
 			whiteLabel := protected.Group("/white-label")
 			{
 				whiteLabel.GET("/config", handlers.GetWhiteLabelConfig)
-				whiteLabel.POST("/config", middleware.AdminOnly(), handlers.CreateWhiteLabelConfig)
-				whiteLabel.PUT("/config/:id", middleware.AdminOnly(), handlers.UpdateWhiteLabelConfig)
+				whiteLabel.POST("/config", middleware.AgencyAdminOrAdmin(), handlers.CreateWhiteLabelConfig)
+				whiteLabel.PUT("/config/:id", middleware.AgencyAdminOrAdmin(), handlers.UpdateWhiteLabelConfig)
+				whiteLabel.DELETE("/config/:id", middleware.AgencyAdminOrAdmin(), handlers.DeleteWhiteLabelConfig)
 			}
 
 			// RBAC - Roles
