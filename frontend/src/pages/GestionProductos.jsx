@@ -209,11 +209,12 @@ const GestionProductos = () => {
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Categoría</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Precio</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Stock</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Fechas</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Código</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Destino</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Compañía</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Precio / Neto</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Disp.</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Salida</th>
                     <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Estado</th>
                     <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acciones</th>
                   </tr>
@@ -221,20 +222,28 @@ const GestionProductos = () => {
                 <tbody>
                   {products.data.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-muted/10">
-                      <td className="p-4 align-middle font-medium">{product.nombre_producto}</td>
-                      <td className="p-4 align-middle">{product.categoria}</td>
-                      <td className="p-4 align-middle">${product.precio_venta}</td>
-                      <td className="p-4 align-middle">{product.stock_disponible}</td>
+                      <td className="p-4 align-middle font-mono text-sm font-medium">{product.codigo_cupo}</td>
+                      <td className="p-4 align-middle font-medium">{product.destino}</td>
+                      <td className="p-4 align-middle">{product.compania}</td>
                       <td className="p-4 align-middle">
                         <div className="text-sm">
-                          <div>{new Date(product.fecha_inicio).toLocaleDateString()}</div>
-                          <div className="text-muted-foreground">{new Date(product.fecha_fin).toLocaleDateString()}</div>
+                          <div>${product.precio ?? 0}</div>
+                          <div className="text-muted-foreground text-xs">neto ${product.neto_1 ?? 0}</div>
                         </div>
                       </td>
+                      <td className="p-4 align-middle">{product.disponibilidad}</td>
+                      <td className="p-4 align-middle text-sm">
+                        {product.salida || product.fecha_salida
+                          ? new Date(product.salida || product.fecha_salida).toLocaleDateString('es-UY')
+                          : '—'}
+                      </td>
                       <td className="p-4 align-middle">
-                        <span className={`px-2 py-1 rounded-full text-xs ${product.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                          {product.activo ? 'Activo' : 'Inactivo'}
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          product.is_blocked_for_sale
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
                         </span>
                       </td>
                       <td className="p-4 align-middle text-right">

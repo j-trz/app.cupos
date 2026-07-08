@@ -27,6 +27,7 @@ import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import AIConfig from './pages/AIConfig';
 import Reportes from './pages/Reportes';
+import GestionNominas from './pages/GestionNominas';
 import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -92,15 +93,25 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                <Route 
-                  path="/agencias" 
+                <Route
+                  path="/nominas"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <GestionNominas />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agencias"
                   element={
                     <ProtectedRoute>
                       <Layout>
                         <GestionAgencias />
                       </Layout>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
                 <Route 
                   path="/temas" 

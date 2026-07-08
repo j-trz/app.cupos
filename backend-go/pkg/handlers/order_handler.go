@@ -327,6 +327,42 @@ func AddDocContable(c *gin.Context) {
 	c.JSON(http.StatusOK, reservation)
 }
 
+func RequestCancellation(c *gin.Context) {
+	id := c.Param("id")
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	// Verify ownership or admin
+	role, _ := c.Get("role")
+	userIDStr, _ := c.Get("userID")
+	if role != "admin" && role != "agency_admin" {
+		var uid uuid.UUID
+		if s, ok := userIDStr.(string); ok {
+			uid, _ = uuid.Parse(s)
+		}
+		if reservation.CreatedBy != uid {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Sin permiso."})
+			return
+		}
+	}
+
+	if reservation.Estado == "cancelada" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "La reserva ya está cancelada."})
+		return
+	}
+
+	if err := database.DB.Model(&reservation).Update("estado", "solicitud_cancelacion").Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al procesar solicitud."})
+		return
+	}
+
+	database.DB.First(&reservation, id)
+	c.JSON(http.StatusOK, reservation)
+}
+
 func GetReservationByID(c *gin.Context) {
 	id := c.Param("id")
 	var reservation models.Reservation

@@ -1,47 +1,126 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Mail, MapPin, UserCircle2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Mail, UserCircle2, Shield } from 'lucide-react';
+import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button.jsx';
+import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import Input from '../components/ui/Input.jsx';
+
+function normalizeRole(role) {
+  if (!role) return 'Usuario';
+  if (role === 'admin') return 'Administrador';
+  if (role === 'agency_admin') return 'Admin de Agencia';
+  if (role === 'agency_user') return 'Usuario de Agencia';
+  // Capitalize and return as-is for unknown roles
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function getRoleBadgeVariant(role) {
+  if (role === 'admin') return 'danger';
+  if (role === 'agency_admin') return 'warning';
+  return 'info';
+}
+
+function getInitials(nombre, email) {
+  if (nombre && nombre.trim()) {
+    const parts = nombre.trim().split(' ');
+    return parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }
+  if (email) return email[0].toUpperCase();
+  return '?';
+}
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [permissions, setPermissions] = useState([]);
+
+  // Editable field state — only Nombre is persisted (Apellido & Telefono are UI-only
+  // until the Profile DB model gains those columns).
+  const [form, setForm] = useState({ nombre: '', apellido: '', telefono: '' });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
       try {
         const result = await ApiClient.get('/auth/profile');
-        setProfile((result && result.profile) || null);
+        const p = (result && result.profile) || null;
+        setProfile(p);
+        if (p) {
+          setForm({
+            nombre: p.nombre || '',
+            apellido: p.apellido || '',
+            telefono: p.telefono || '',
+          });
+        }
       } catch (error) {
-        console.error(error);
+        console.error('Error loading profile:', error);
       } finally {
         setLoading(false);
       }
     }
+
+    async function loadPermissions() {
+      try {
+        const result = await ApiClient.get('/permissions');
+        // Handle both array and { permissions: [] } shapes
+        const list = Array.isArray(result)
+          ? result
+          : (result && Array.isArray(result.permissions))
+            ? result.permissions
+            : [];
+        setPermissions(list);
+      } catch {
+        // Endpoint may be admin-only; silently skip
+      }
+    }
+
     loadProfile();
+    loadPermissions();
   }, []);
 
-  // Define stats useMemo before any early returns to maintain hook order
-  const stats = useMemo(
-    () => profile ? [
-      {
-        label: 'Acceso',
-        value: profile.role || 'Usuario',
-        icon: UserCircle2,
-        description: 'Nivel de permisos asignado al usuario.',
-      },
-      {
-        label: 'Ubicación',
-        value: profile.location || 'Desconocida',
-        icon: MapPin,
-        description: 'Ciudad desde donde opera el usuario.',
-      },
-    ] : [],
-    [profile],
-  );
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const result = await ApiClient.put('/auth/profile', {
+        nombre: form.nombre,
+        apellido: form.apellido,
+        telefono: form.telefono,
+      });
+      const updated = result && result.profile;
+      if (updated) {
+        setProfile(updated);
+        setForm({
+          nombre: updated.nombre || form.nombre,
+          apellido: updated.apellido || form.apellido,
+          telefono: updated.telefono || form.telefono,
+        });
+      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Perfil actualizado',
+        text: 'Tus datos han sido guardados correctamente.',
+        confirmButtonColor: '#0f172a',
+        timer: 2500,
+        timerProgressBar: true,
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al guardar',
+        text: 'No se pudo actualizar el perfil. Intenta de nuevo.',
+        confirmButtonColor: '#0f172a',
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return <div className="text-slate-500">Cargando perfil...</div>;
@@ -51,6 +130,10 @@ export default function Profile() {
     return <div className="text-slate-500">No se encontró información de usuario.</div>;
   }
 
+  const initials = getInitials(profile.nombre, profile.email);
+  const roleLabel = normalizeRole(profile.role);
+  const roleBadgeVariant = getRoleBadgeVariant(profile.role);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -59,63 +142,126 @@ export default function Profile() {
         icon={UserCircle2}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="space-y-6 p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-full bg-slate-100 p-3 text-slate-900">
-              <UserCircle2 className="h-8 w-8" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-semibold text-slate-900">{profile.nombre || profile.full_name || 'Mi Perfil'}</h2>
-              <p className="text-sm text-slate-500">Revisa tus datos de usuario y rol.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Correo</p>
-              <p className="mt-3 text-lg font-semibold text-slate-900">{profile.email || '-'}</p>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Agencia</p>
-              <p className="mt-3 text-lg font-semibold text-slate-900">{profile.agencia || '-'}</p>
-            </div>
-          </div>
-        </Card>
-
-        <div className="space-y-4">
-          {stats.map((item) => (
-            <StatCard
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              value={item.value}
-              description={item.description}
-            />
-          ))}
-        </div>
-      </div>
-
+      {/* Top card: avatar, read-only info, role badge */}
       <Card className="p-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <p className="text-sm text-slate-500">Nombre</p>
-            <p className="mt-2 text-base font-medium text-slate-900">{profile.nombre || profile.full_name || '-'}</p>
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+          {/* Avatar */}
+          <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 text-2xl font-bold text-white">
+            {initials}
           </div>
-          <div>
-            <p className="text-sm text-slate-500">Apellido</p>
-            <p className="mt-2 text-base font-medium text-slate-900">{profile.apellido || '-'}</p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">Rol</p>
-            <p className="mt-2 text-base font-medium text-slate-900">{profile.role || 'Usuario'}</p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">Teléfono</p>
-            <p className="mt-2 text-base font-medium text-slate-900">{profile.telefono || 'No disponible'}</p>
+
+          {/* Info */}
+          <div className="flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-semibold text-slate-900">
+                {profile.nombre || 'Mi Perfil'}
+              </h2>
+              <Badge variant={roleBadgeVariant}>{roleLabel}</Badge>
+            </div>
+
+            <div className="flex flex-wrap gap-6">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Mail className="h-4 w-4 text-slate-400" />
+                <span>{profile.email || '-'}</span>
+              </div>
+              {profile.agencia && (
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Shield className="h-4 w-4 text-slate-400" />
+                  <span>{profile.agencia}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Card>
+
+      {/* Edit card */}
+      <Card className="p-6">
+        <h3 className="mb-4 text-base font-semibold text-slate-900">Editar información</h3>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700" htmlFor="nombre">
+                Nombre
+              </label>
+              <Input
+                id="nombre"
+                placeholder="Tu nombre"
+                value={form.nombre}
+                onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700" htmlFor="apellido">
+                Apellido
+              </label>
+              <Input
+                id="apellido"
+                placeholder="Tu apellido"
+                value={form.apellido}
+                onChange={(e) => setForm((f) => ({ ...f, apellido: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700" htmlFor="telefono">
+                Teléfono
+              </label>
+              <Input
+                id="telefono"
+                placeholder="Tu teléfono"
+                value={form.telefono}
+                onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
+              />
+            </div>
+
+            {/* Read-only: email */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Correo electrónico</label>
+              <Input value={profile.email || ''} disabled readOnly />
+            </div>
+
+            {/* Read-only: agencia */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Agencia</label>
+              <Input value={profile.agencia || '-'} disabled readOnly />
+            </div>
+
+            {/* Read-only: rol */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Rol</label>
+              <Input value={roleLabel} disabled readOnly />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Permissions card — only rendered when the user has visible permissions */}
+      {permissions.length > 0 && (
+        <Card className="p-6">
+          <h3 className="mb-4 text-base font-semibold text-slate-900">Permisos asignados</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {permissions.map((perm) => (
+              <div
+                key={perm.id || perm.code || perm.name}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-900">{perm.name}</p>
+                {perm.description && (
+                  <p className="mt-1 text-xs text-slate-500">{perm.description}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, X, Palette, Globe } from 'lucide-react';
+import { Settings as SettingsIcon, Save, X, Palette, Globe, Clock } from 'lucide-react';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
@@ -70,7 +70,7 @@ export default function Settings() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {/* General Settings */}
         <Card>
           <CardHeader>
@@ -110,6 +110,35 @@ export default function Settings() {
                 onChange={(e) => handleChange('support_phone', e.target.value)}
                 placeholder="Teléfono de soporte"
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Reservations Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Configuración de Reservas
+            </CardTitle>
+            <CardDescription>
+              Parámetros para el flujo de reservas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="bloqueo_minutos_default">Tiempo de bloqueo por defecto (minutos)</Label>
+              <Input
+                id="bloqueo_minutos_default"
+                type="number"
+                min="1"
+                value={settings.bloqueo_minutos_default || '60'}
+                onChange={(e) => handleChange('bloqueo_minutos_default', e.target.value)}
+                placeholder="60"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tiempo que una reserva permanece bloqueada antes de expirar si no se confirma
+              </p>
             </div>
           </CardContent>
         </Card>

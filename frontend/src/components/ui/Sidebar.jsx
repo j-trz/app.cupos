@@ -7,6 +7,7 @@ import { useSidebar } from './SidebarProvider.jsx';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shadcn-tooltip';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
 import NotificationService from '../../services/notificationService.js';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext.jsx';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: Home },
@@ -21,6 +22,7 @@ const adminNavItems = [
   { label: 'Productos', path: '/products', icon: Package },
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
+  { label: 'Nóminas', path: '/nominas', icon: Users },
 ];
 
 // Settings items (grouped under Ajustes)
@@ -39,6 +41,7 @@ const userManagementItems = [
 
 export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }) {
   const ctx = useSidebar();
+  const { config } = useWhiteLabel();
   const [localCollapsed, setLocalCollapsed] = useState(false);
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
@@ -47,6 +50,12 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const location = useLocation();
 
   const isAdmin = user?.role === 'admin';
+
+  // White-label sidebar colors
+  const sbBg = config?.sidebar?.bg_color || '#0f172a';
+  const sbText = config?.sidebar?.text_color || '#f8fafc';
+  const sbActiveBg = config?.sidebar?.active_bg || config?.colors?.primary || '#3b82f6';
+  const sbHoverBg = config?.sidebar?.hover_bg || '#1e293b';
 
   // Polling de notificaciones no leídas cada 60s
   useEffect(() => {
@@ -82,13 +91,36 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
+  // Helper para estilos de items del sidebar
+  const itemStyle = (active) => {
+    const base = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.625rem',
+      borderRadius: '0.5rem',
+      padding: '0.5rem 0.75rem',
+      fontSize: '0.875rem',
+      fontWeight: '500',
+      transition: 'all 0.2s ease',
+      cursor: 'pointer',
+      textDecoration: 'none',
+      color: active ? '#fff' : sbText,
+      backgroundColor: active ? sbActiveBg : 'transparent',
+    };
+    if (!active) {
+      base._hover = { backgroundColor: sbHoverBg, color: '#fff' };
+    }
+    return base;
+  };
+
   return (
     <TooltipProvider>
       <aside
         data-sidebar
         dir={dir}
+        style={{ backgroundColor: sbBg, color: sbText }}
         className={clsx(
-          'relative h-screen shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-all duration-300 ease-in-out',
+          'relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out',
           collapsed ? 'w-16' : 'w-72'
         )}
       >
@@ -148,21 +180,49 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                 <NavLink
                   key={path}
                   to={path}
-                  className={({ isActive }) =>
-                    clsx(
+                  className={({ isActive }) => {
+                    const active = isActive || location.pathname.startsWith(path + '/');
+                    return clsx(
                       'group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                      isActive
-                        ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100',
                       collapsed ? 'justify-center px-2 py-2' : ''
-                    )
-                  }
+                    );
+                  }}
+                  style={({ isActive }) => {
+                    const active = isActive || location.pathname.startsWith(path + '/');
+                    return {
+                      color: active ? '#fff' : sbText,
+                      backgroundColor: active ? sbActiveBg : 'transparent',
+                    };
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget;
+                    const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                    if (!isActive) {
+                      el.style.backgroundColor = sbHoverBg;
+                      el.style.color = '#fff';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget;
+                    const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                    if (!isActive) {
+                      el.style.backgroundColor = 'transparent';
+                      el.style.color = sbText;
+                    }
+                  }}
                 >
-                  <Icon className={clsx(collapsed ? 'h-4 w-4' : 'h-4 w-4', isActive && 'text-zinc-900 dark:text-zinc-100')} />
-                  {!collapsed && <span className="truncate">{label}</span>}
-                  {!collapsed && isActive && (
-                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100" />
-                  )}
+                  {({ isActive }) => {
+                    const active = isActive || location.pathname.startsWith(path + '/');
+                    return (
+                      <>
+                        <Icon className={clsx(collapsed ? 'h-4 w-4' : 'h-4 w-4')} style={{ color: active ? '#fff' : sbText }} />
+                        {!collapsed && <span className="truncate">{label}</span>}
+                        {!collapsed && active && (
+                          <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />
+                        )}
+                      </>
+                    );
+                  }}
                 </NavLink>
               ))}
 
@@ -171,28 +231,56 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                 <>
                   {!collapsed && (
                     <div className="my-2 px-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Administración</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Administración</p>
                     </div>
                   )}
                   {adminNavItems.map(({ label, path, icon: Icon }) => (
                     <NavLink
                       key={path}
                       to={path}
-                      className={({ isActive }) =>
-                        clsx(
+                      className={({ isActive }) => {
+                        const active = isActive || location.pathname.startsWith(path + '/');
+                        return clsx(
                           'group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                          isActive
-                            ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
-                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100',
                           collapsed ? 'justify-center px-2 py-2' : ''
-                        )
-                      }
+                        );
+                      }}
+                      style={({ isActive }) => {
+                        const active = isActive || location.pathname.startsWith(path + '/');
+                        return {
+                          color: active ? '#fff' : sbText,
+                          backgroundColor: active ? sbActiveBg : 'transparent',
+                        };
+                      }}
+                      onMouseEnter={(e) => {
+                        const el = e.currentTarget;
+                        const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                        if (!isActive) {
+                          el.style.backgroundColor = sbHoverBg;
+                          el.style.color = '#fff';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        const el = e.currentTarget;
+                        const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                        if (!isActive) {
+                          el.style.backgroundColor = 'transparent';
+                          el.style.color = sbText;
+                        }
+                      }}
                     >
-                      <Icon className={clsx(collapsed ? 'h-4 w-4' : 'h-4 w-4', isActive && 'text-zinc-900 dark:text-zinc-100')} />
-                      {!collapsed && <span className="truncate">{label}</span>}
-                      {!collapsed && isActive && (
-                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100" />
-                      )}
+                      {({ isActive }) => {
+                        const active = isActive || location.pathname.startsWith(path + '/');
+                        return (
+                          <>
+                            <Icon className={clsx(collapsed ? 'h-4 w-4' : 'h-4 w-4')} style={{ color: active ? '#fff' : sbText }} />
+                            {!collapsed && <span className="truncate">{label}</span>}
+                            {!collapsed && active && (
+                              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                   ))}
                 </>
@@ -202,7 +290,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               {isAdmin && !collapsed && (
                 <>
                   <div className="my-2 px-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gestión</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Gestión</p>
                   </div>
                 </>
               )}
@@ -214,22 +302,35 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     onClick={() => toggleSubmenu('settings')}
                     className={clsx(
                       'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                      isSubmenuActive(settingsItems)
-                        ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100',
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
+                    style={{
+                      color: isSubmenuActive(settingsItems) ? '#fff' : sbText,
+                      backgroundColor: isSubmenuActive(settingsItems) ? sbActiveBg : 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSubmenuActive(settingsItems)) {
+                        e.currentTarget.style.backgroundColor = sbHoverBg;
+                        e.currentTarget.style.color = '#fff';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSubmenuActive(settingsItems)) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = sbText;
+                      }
+                    }}
                   >
-                    <Settings className="h-4 w-4" />
+                    <Settings className="h-4 w-4" style={{ color: isSubmenuActive(settingsItems) ? '#fff' : sbText }} />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">Ajustes</span>
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.settings ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.settings ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(settingsItems) ? '#fff' : sbText }} />
                       </>
                     )}
                   </button>
                   {!collapsed && openSubmenus.settings && (
-                    <div className="mt-1 ml-2 space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-2">
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
                       {settingsItems.map(({ label, path, icon: Icon }) => (
                         <NavLink
                           key={path}
@@ -237,15 +338,42 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                           className={({ isActive }) =>
                             clsx(
                               'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                              isActive
-                                ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
-                                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'
                             )
                           }
+                          style={({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return {
+                              color: active ? '#fff' : sbText,
+                              backgroundColor: active ? sbActiveBg : 'transparent',
+                            };
+                          }}
+                          onMouseEnter={(e) => {
+                            const el = e.currentTarget;
+                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                            if (!isActive) {
+                              el.style.backgroundColor = sbHoverBg;
+                              el.style.color = '#fff';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const el = e.currentTarget;
+                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                            if (!isActive) {
+                              el.style.backgroundColor = 'transparent';
+                              el.style.color = sbText;
+                            }
+                          }}
                         >
-                          <Icon className="h-4 w-4" />
-                          <span className="truncate">{label}</span>
-                          {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100" />}
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
                         </NavLink>
                       ))}
                     </div>
@@ -260,22 +388,35 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     onClick={() => toggleSubmenu('userManagement')}
                     className={clsx(
                       'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                      isSubmenuActive(userManagementItems)
-                        ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100',
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
+                    style={{
+                      color: isSubmenuActive(userManagementItems) ? '#fff' : sbText,
+                      backgroundColor: isSubmenuActive(userManagementItems) ? sbActiveBg : 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSubmenuActive(userManagementItems)) {
+                        e.currentTarget.style.backgroundColor = sbHoverBg;
+                        e.currentTarget.style.color = '#fff';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSubmenuActive(userManagementItems)) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = sbText;
+                      }
+                    }}
                   >
-                    <Users className="h-4 w-4" />
+                    <Users className="h-4 w-4" style={{ color: isSubmenuActive(userManagementItems) ? '#fff' : sbText }} />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">Usuarios</span>
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.userManagement ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.userManagement ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(userManagementItems) ? '#fff' : sbText }} />
                       </>
                     )}
                   </button>
                   {!collapsed && openSubmenus.userManagement && (
-                    <div className="mt-1 ml-2 space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-2">
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
                       {userManagementItems.map(({ label, path, icon: Icon }) => (
                         <NavLink
                           key={path}
@@ -283,15 +424,42 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                           className={({ isActive }) =>
                             clsx(
                               'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                              isActive
-                                ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
-                                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'
                             )
                           }
+                          style={({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return {
+                              color: active ? '#fff' : sbText,
+                              backgroundColor: active ? sbActiveBg : 'transparent',
+                            };
+                          }}
+                          onMouseEnter={(e) => {
+                            const el = e.currentTarget;
+                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                            if (!isActive) {
+                              el.style.backgroundColor = sbHoverBg;
+                              el.style.color = '#fff';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const el = e.currentTarget;
+                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                            if (!isActive) {
+                              el.style.backgroundColor = 'transparent';
+                              el.style.color = sbText;
+                            }
+                          }}
                         >
-                          <Icon className="h-4 w-4" />
-                          <span className="truncate">{label}</span>
-                          {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100" />}
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
                         </NavLink>
                       ))}
                     </div>

@@ -117,13 +117,36 @@ export default function Availability() {
     }));
   };
 
+  const calcTipoPasajero = (nacimiento, fechaSalida) => {
+    if (!nacimiento || !fechaSalida) return 'Adulto';
+    const birth = new Date(nacimiento);
+    const departure = new Date(fechaSalida);
+    if (isNaN(birth.getTime()) || isNaN(departure.getTime())) return 'Adulto';
+    let age = departure.getFullYear() - birth.getFullYear();
+    const monthDiff = departure.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && departure.getDate() < birth.getDate())) {
+      age--;
+    }
+    const birthThisYear = new Date(departure.getFullYear(), birth.getMonth(), birth.getDate());
+    const msInYear = 365.25 * 24 * 60 * 60 * 1000;
+    const decimalAge = age + (departure - birthThisYear) / msInYear;
+    if (decimalAge < 2) return 'Infante';
+    if (decimalAge < 12) return 'Menor';
+    return 'Adulto';
+  };
+
   const handlePassengerChange = (index, field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      passengers: prev.passengers.map((passenger, i) =>
-        i === index ? { ...passenger, [field]: value } : passenger
-      ),
-    }));
+    setForm((prev) => {
+      const updated = prev.passengers.map((p, i) => {
+        if (i !== index) return p;
+        const newP = { ...p, [field]: value };
+        if (field === 'nacimiento') {
+          newP.tipo_pasajero = calcTipoPasajero(value, selectedProduct?.fecha_salida);
+        }
+        return newP;
+      });
+      return { ...prev, passengers: updated };
+    });
   };
 
   const handleSubmitReservation = async (e) => {
@@ -282,19 +305,21 @@ export default function Availability() {
               <TableHead>Temporada</TableHead>
               <TableHead>Ruta</TableHead>
               <TableHead>Precio</TableHead>
+              <TableHead>INF</TableHead>
+              <TableHead>CHD</TableHead>
               <TableHead>Reservar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={10}>
+                <TableCell className="text-center py-10" colSpan={12}>
                   Cargando disponibilidad...
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={10}>
+                <TableCell className="text-center py-10" colSpan={12}>
                   {temporadaFilter !== 'Todas'
                     ? `No hay cupos para la temporada "${temporadaFilter}".`
                     : 'No hay cupos disponibles.'}
@@ -317,6 +342,12 @@ export default function Availability() {
                   <TableCell className="text-center">{item.ruta || '—'}</TableCell>
                   <TableCell className="text-center">
                     {item.precio ? `$${Number(item.precio).toLocaleString('es-AR')}` : '—'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {item.inf_fare ? `$${Number(item.inf_fare).toLocaleString('es-AR')}` : '—'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {item.chd_fare ? `$${Number(item.chd_fare).toLocaleString('es-AR')}` : '—'}
                   </TableCell>
                   <TableCell className="text-center">
                     <Button

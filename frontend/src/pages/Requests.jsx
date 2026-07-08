@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Clock3, RefreshCw, FileText } from 'lucide-react';
+import { ClipboardList, Clock3, RefreshCw, FileText, XCircle } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -80,6 +80,25 @@ export default function Requests() {
     setDocValue(item.Doc_Contable || '');
   };
 
+  const handleRequestCancellation = async (item) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: '¿Solicitar cancelación?',
+      text: '¿Solicitás la cancelación de esta reserva? El administrador decidirá si se cancela.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, solicitar',
+      cancelButtonText: 'No',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await ReservationService.requestCancellation(item.id);
+      Swal.fire({ icon: 'success', title: 'Solicitud enviada', text: 'El administrador revisará tu pedido.', timer: 2000, showConfirmButton: false });
+      fetchRequests();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo enviar la solicitud.' });
+    }
+  };
+
   const saveDocContable = async () => {
     if (!docValue.trim()) {
       Swal.fire({ icon: 'warning', title: 'Campo vacío', text: 'Ingresá el número de documento contable.' });
@@ -157,18 +176,19 @@ export default function Requests() {
               <TableHead className="text-center">Salida</TableHead>
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="text-center">Doc. Contable</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={6}>
+                <TableCell className="text-center py-10" colSpan={7}>
                   Cargando solicitudes...
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={6}>
+                <TableCell className="text-center py-10" colSpan={7}>
                   No hay solicitudes registradas.
                 </TableCell>
               </TableRow>
@@ -197,6 +217,23 @@ export default function Requests() {
                       >
                         <FileText className="h-3 w-3 mr-1" />
                         Agregar
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {item.Estado?.toLowerCase() === 'solicitud_cancelacion' ? (
+                      <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                        Cancelación solicitada
+                      </span>
+                    ) : item.Estado?.toLowerCase() === 'cancelada' ? null : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleRequestCancellation(item)}
+                        title="Solicitar cancelación de esta reserva"
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Solicitar cancelación
                       </Button>
                     )}
                   </TableCell>

@@ -83,6 +83,7 @@ func init() {
 		protected.Use(middleware.AuthMiddleware())
 		{
 			protected.GET("/auth/profile", handlers.GetProfile)
+			protected.PUT("/auth/profile", handlers.UpdateMyProfile)
 
 			// Productos
 			products := protected.Group("/products")
@@ -101,6 +102,7 @@ func init() {
 				orders.GET("/:id", handlers.GetReservationByID)
 				orders.PUT("/:id", handlers.UpdateReservation)
 				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
+				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
 				orders.POST("/:id/confirm", handlers.ConfirmReservation)
 				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)
 			}

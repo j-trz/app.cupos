@@ -15,7 +15,10 @@ const adaptProduct = (producto) => ({
   ficha: producto.ficha || '',
   salida: producto.salida || '',
   regreso: producto.regreso || '',
-  neto_1: producto.neto_1 || '',
+  neto_1: producto.neto_1 || 0,
+  inf_fare: producto.inf_fare || 0,
+  chd_fare: producto.chd_fare || 0,
+  op: producto.op || 0,
 });
 
 const adaptRequest = (item) => ({
@@ -181,6 +184,17 @@ class ReservationService {
       return Array.isArray(result) ? result : Array.isArray(result.data) ? result.data : [];
     } catch (error) {
       console.error('Error fetching blocked reservations:', error);
+      throw error;
+    }
+  }
+
+  // Request cancellation of a reservation
+  static async requestCancellation(id) {
+    try {
+      const result = await ApiClient.put(`/orders/${id}/cancel-request`);
+      return result;
+    } catch (error) {
+      console.error(`Error requesting cancellation for ${id}:`, error);
       throw error;
     }
   }

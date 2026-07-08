@@ -37,6 +37,7 @@ const DEFAULT_CONFIG = {
         text_color: '#e2e8f0',
         active_bg: '#ffffff',
         active_text: '#0f172a',
+        hover_bg: '#1e293b',
         width: '320px',
         collapsed_width: '80px'
     },
@@ -95,6 +96,7 @@ function applyCSSVariables(config) {
         root.style.setProperty('--sidebar-text-color', config.sidebar.text_color || '#e2e8f0');
         root.style.setProperty('--sidebar-active-bg', config.sidebar.active_bg || '#ffffff');
         root.style.setProperty('--sidebar-active-text', config.sidebar.active_text || '#0f172a');
+        root.style.setProperty('--sidebar-hover-bg', config.sidebar.hover_bg || '#1e293b');
         root.style.setProperty('--sidebar-width', config.sidebar.width || '320px');
         root.style.setProperty('--sidebar-collapsed-width', config.sidebar.collapsed_width || '80px');
     }

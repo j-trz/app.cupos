@@ -82,6 +82,45 @@ func GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
 }
 
+// UpdateMyProfile allows the authenticated user to update their own profile fields.
+// NOTE: The Profile model only has Nombre (Apellido and Telefono are not DB columns),
+// so only Nombre is persisted. The handler accepts all three fields for forward compatibility.
+func UpdateMyProfile(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	var profile models.Profile
+	if err := database.DB.First(&profile, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Perfil no encontrado."})
+		return
+	}
+
+	var input struct {
+		Nombre   string `json:"nombre"`
+		Apellido string `json:"apellido"` // not a DB column yet; ignored in updates
+		Telefono string `json:"telefono"` // not a DB column yet; ignored in updates
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if input.Nombre != "" {
+		updates["nombre"] = input.Nombre
+	}
+	// Apellido and Telefono are not present in the Profile model; add them to the
+	// model and database schema before uncommenting the lines below.
+	// if input.Apellido != "" { updates["apellido"] = input.Apellido }
+	// if input.Telefono != "" { updates["telefono"] = input.Telefono }
+
+	if len(updates) > 0 {
+		database.DB.Model(&profile).Updates(updates)
+	}
+
+	database.DB.First(&profile, "id = ?", userID)
+	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
+}
+
 func ListUsers(c *gin.Context) {
 	var users []models.Profile
 	database.DB.Find(&users)
