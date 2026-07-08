@@ -4,7 +4,10 @@ import { useCreateProduct as useCreateProductMutation } from '../hooks/useProduc
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/Dialog';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
+import Badge from '../components/ui/Badge.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
@@ -13,6 +16,18 @@ import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package } from 'luc
 import TransferModal from '../components/TransferModal';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useToast } from '../hooks/use-toast';
+
+const formatDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-UY');
+};
+
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!value || Number.isNaN(n)) return '—';
+  return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 const GestionProductos = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -209,83 +224,90 @@ const GestionProductos = () => {
         <SkeletonTable columns={8} rows={5} />
       ) : products.length > 0 ? (
         <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Código</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tipo</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Destino</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Compañía</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Precio / Neto</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Disp.</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Salida</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Estado</th>
-                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-muted/10">
-                      <td className="p-4 align-middle font-mono text-sm font-medium">{product.codigo_cupo}</td>
-                      <td className="p-4 align-middle text-sm">{product.tipo_producto || '—'}</td>
-                      <td className="p-4 align-middle font-medium">{product.destino}</td>
-                      <td className="p-4 align-middle">{product.compania}</td>
-                      <td className="p-4 align-middle">
-                        <div className="text-sm">
-                          <div>${product.precio ?? 0}</div>
-                          <div className="text-muted-foreground text-xs">neto ${product.neto_1 ?? 0}</div>
-                        </div>
-                      </td>
-                      <td className="p-4 align-middle">{product.disponibilidad}</td>
-                      <td className="p-4 align-middle text-sm">
-                        {product.salida || product.fecha_salida
-                          ? new Date(product.salida || product.fecha_salida).toLocaleDateString('es-UY')
-                          : '—'}
-                      </td>
-                      <td className="p-4 align-middle">
-                        <span className={`px-2 py-1 rounded-full text-xs ${product.is_blocked_for_sale
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-green-100 text-green-800'
-                          }`}>
+          <div className="overflow-x-auto">
+            <TableComponent>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Destino</TableHead>
+                  <TableHead>Compañía</TableHead>
+                  <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
+                  <TableHead>PNR</TableHead>
+                  <TableHead>Ficha</TableHead>
+                  <TableHead>Temporada</TableHead>
+                  <TableHead>Disp.</TableHead>
+                  <TableHead>Cupo</TableHead>
+                  <TableHead>Salida</TableHead>
+                  <TableHead>Regreso</TableHead>
+                  <TableHead>Bloqueo (min)</TableHead>
+                  <TableHead>Precio ADT</TableHead>
+                  <TableHead>Precio INF</TableHead>
+                  <TableHead>Precio CHD</TableHead>
+                  <TableHead>Neto 1</TableHead>
+                  <TableHead>OP</TableHead>
+                  <TableHead>Equipaje</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>
+                    <TableCell>{product.tipo_producto || '—'}</TableCell>
+                    <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
+                    <TableCell>{product.compania}</TableCell>
+                    <TableCell>{product.ruta || '—'}</TableCell>
+                    <TableCell>{product.pnr || '—'}</TableCell>
+                    <TableCell>{product.ficha || '—'}</TableCell>
+                    <TableCell>{product.temporada || '—'}</TableCell>
+                    <TableCell>{product.disponibilidad}</TableCell>
+                    <TableCell>{product.cupo || '—'}</TableCell>
+                    <TableCell>{formatDate(product.fecha_salida)}</TableCell>
+                    <TableCell>{formatDate(product.fecha_regreso)}</TableCell>
+                    <TableCell>{product.bloqueo_temporal_minutos || '—'}</TableCell>
+                    <TableCell>{formatMoney(product.precio)}</TableCell>
+                    <TableCell>{formatMoney(product.inf_fare)}</TableCell>
+                    <TableCell>{formatMoney(product.chd_fare)}</TableCell>
+                    <TableCell>{formatMoney(product.neto_1)}</TableCell>
+                    <TableCell>{formatMoney(product.op)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {product.carryon && <Badge variant="secondary" className="text-[10px]">Carry-on</Badge>}
+                        {product.handbag && <Badge variant="secondary" className="text-[10px]">Handbag</Badge>}
+                        {product.checkedbag && <Badge variant="secondary" className="text-[10px]">Checked</Badge>}
+                        {!product.carryon && !product.handbag && !product.checkedbag && '—'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant={product.is_blocked_for_sale ? 'danger' : 'success'}>
                           {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
-                        </span>
-                      </td>
-                      <td className="p-4 align-middle text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditProduct(product)}
-                            title="Editar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenTransfer(product)}
-                            title="Ceder Disponibilidad"
-                          >
-                            <ArrowRightLeft className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
+                        </Badge>
+                        {product.restricted_agency && (
+                          <Badge variant="outline" className="w-fit text-[10px]">Cedido</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)} title="Editar">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad">
+                          <ArrowRightLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </TableComponent>
+          </div>
         </Card>
       ) : (
         <EmptyState

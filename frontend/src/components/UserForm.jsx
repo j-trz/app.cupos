@@ -71,7 +71,8 @@ const UserForm = ({
           id="email"
           type="email"
           {...register('email')}
-          disabled={isEditing}
+          readOnly={isEditing}
+          className={isEditing ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}
         />
         {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
       </div>

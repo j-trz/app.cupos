@@ -143,8 +143,13 @@ func CreateProduct(c *gin.Context) {
 }
 
 // UpdateProduct actualiza un producto existente. No permite cambiar
-// codigo_cupo (es de solo lectura una vez creado, se generó automáticamente)
-// ni vendidos/id/timestamps vía este endpoint.
+// codigo_cupo (es de solo lectura una vez creado, se generó automáticamente),
+// vendidos, ni los campos internos de cesión (restricted_agency/transfer_id).
+//
+// Arma el producto actualizado igual que CreateProduct (map -> JSON -> struct
+// tipado) en vez de pasar un map crudo a GORM Updates(): con un map, GORM usa
+// las claves tal cual como nombres de columna sin la coerción de tipos que sí
+// aplica el unmarshal a un struct real (por eso el map crudo tiraba 500 acá).
 func UpdateProduct(c *gin.Context) {
 	id := c.Param("id")
 	var existing models.Product
@@ -166,14 +171,33 @@ func UpdateProduct(c *gin.Context) {
 	delete(rawData, "vendidos")
 	delete(rawData, "created_at")
 	delete(rawData, "updated_at")
+	delete(rawData, "restricted_agency")
+	delete(rawData, "transfer_id")
 
-	if err := database.DB.Model(&existing).Updates(rawData).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto"})
+	jsonBytes, err := json.Marshal(rawData)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	updated := existing
+	if err := json.Unmarshal(jsonBytes, &updated); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Reafirmar los campos que este endpoint no debe poder tocar.
+	updated.ID = existing.ID
+	updated.CodigoCupo = existing.CodigoCupo
+	updated.Vendidos = existing.Vendidos
+	updated.RestrictedAgency = existing.RestrictedAgency
+	updated.TransferID = existing.TransferID
+	updated.CreatedAt = existing.CreatedAt
+
+	if err := database.DB.Save(&updated).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto: " + err.Error()})
 		return
 	}
 
-	database.DB.First(&existing, id)
-	c.JSON(http.StatusOK, existing)
+	c.JSON(http.StatusOK, updated)
 }
 
 func BulkCreateProducts(c *gin.Context) {
