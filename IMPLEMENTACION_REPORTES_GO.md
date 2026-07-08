@@ -43,6 +43,7 @@ Se implementaron 3 nuevos endpoints:
    - Venta Real: `SUM(vendidos * precio)`
    - Riesgo: `SUM(disponibilidad * neto_1)`
 
+
 ## 3. Frontend (React)
 
 ### Nueva Sección: Reportes
