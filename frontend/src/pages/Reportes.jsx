@@ -21,7 +21,7 @@ const Reportes = () => {
 
   if (!isAdmin) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
