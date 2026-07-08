@@ -244,12 +244,20 @@ func isVentaValida(pax *models.Passenger, fechaRegreso *time.Time) bool {
 	return false
 }
 
+// reservationWithVendor decora una Reservation con el email del vendedor
+// (Profile.Email resuelto a partir de CreatedBy), para que Nóminas y demás
+// pantallas no tengan que resolverlo aparte.
+type reservationWithVendor struct {
+	models.Reservation
+	VendedorEmail string `json:"vendedor_email"`
+}
+
 func GetAllReservations(c *gin.Context) {
 	var reservations []models.Reservation
 	role, _ := c.Get("role")
 	agencia, _ := c.Get("agencia")
 
-	query := database.DB
+	query := database.DB.Preload("Passengers")
 	if role == "agency_admin" {
 		query = query.Where("agencia = ?", agencia)
 	} else if role != "admin" {
@@ -258,7 +266,31 @@ func GetAllReservations(c *gin.Context) {
 	}
 
 	query.Order("created_at desc").Find(&reservations)
-	c.JSON(http.StatusOK, reservations)
+
+	vendorIDSet := make(map[uuid.UUID]struct{}, len(reservations))
+	for _, r := range reservations {
+		vendorIDSet[r.CreatedBy] = struct{}{}
+	}
+	vendorIDs := make([]uuid.UUID, 0, len(vendorIDSet))
+	for id := range vendorIDSet {
+		vendorIDs = append(vendorIDs, id)
+	}
+
+	emailByID := make(map[uuid.UUID]string, len(vendorIDs))
+	if len(vendorIDs) > 0 {
+		var profiles []models.Profile
+		database.DB.Where("id IN ?", vendorIDs).Find(&profiles)
+		for _, p := range profiles {
+			emailByID[p.ID] = p.Email
+		}
+	}
+
+	response := make([]reservationWithVendor, len(reservations))
+	for i, r := range reservations {
+		response[i] = reservationWithVendor{Reservation: r, VendedorEmail: emailByID[r.CreatedBy]}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func ConfirmReservation(c *gin.Context) {

@@ -60,6 +60,58 @@ export class ReportService {
   static async getUserMetrics() {
     return await ApiClient.get('/reports/user-metrics');
   }
+
+  static async getEvolutionRevenue(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '' && value !== 'all') {
+        params.append(key, value);
+      }
+    });
+    const queryString = params.toString();
+    const endpoint = queryString ? `/reports/evolution-revenue?${queryString}` : '/reports/evolution-revenue';
+    return await ApiClient.get(endpoint);
+  }
+
+  static async getOccupancy(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '' && value !== 'all') {
+        params.append(key, value);
+      }
+    });
+    const queryString = params.toString();
+    const endpoint = queryString ? `/reports/occupancy?${queryString}` : '/reports/occupancy';
+    return await ApiClient.get(endpoint);
+  }
+
+  static async getTopProducts(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    const queryString = params.toString();
+    const endpoint = queryString ? `/reports/top-products?${queryString}` : '/reports/top-products';
+    return await ApiClient.get(endpoint);
+  }
+
+  static async getRiskAlerts() {
+    return await ApiClient.get('/reports/risk-alerts');
+  }
+
+  static async getCancellations(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    const queryString = params.toString();
+    const endpoint = queryString ? `/reports/cancellations?${queryString}` : '/reports/cancellations';
+    return await ApiClient.get(endpoint);
+  }
 }
 
 export default ReportService;

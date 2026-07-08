@@ -40,3 +40,43 @@ export const useUserMetrics = () => {
     staleTime: 1000 * 60 * 5,
   });
 };
+
+export const useEvolutionRevenue = (filters = {}) => {
+  return useQuery({
+    queryKey: ['evolution-revenue', filters],
+    queryFn: () => ReportService.getEvolutionRevenue(filters),
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+export const useOccupancy = (filters = {}) => {
+  return useQuery({
+    queryKey: ['occupancy', filters],
+    queryFn: () => ReportService.getOccupancy(filters),
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+export const useTopProducts = (filters = {}) => {
+  return useQuery({
+    queryKey: ['top-products', filters],
+    queryFn: () => ReportService.getTopProducts(filters),
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+export const useRiskAlerts = () => {
+  return useQuery({
+    queryKey: ['risk-alerts'],
+    queryFn: () => ReportService.getRiskAlerts(),
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+export const useCancellations = (filters = {}) => {
+  return useQuery({
+    queryKey: ['cancellations', filters],
+    queryFn: () => ReportService.getCancellations(filters),
+    staleTime: 1000 * 60 * 5,
+  });
+};

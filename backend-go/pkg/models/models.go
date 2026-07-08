@@ -95,6 +95,10 @@ type Reservation struct {
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
+	// Passengers son los pasajeros desglosados de la reserva (puede haber más de
+	// uno). Si viene vacío, la UI debe usar los campos *Pasajero de arriba como
+	// fallback (reservas creadas sin desglose de pasajeros).
+	Passengers []Passenger `gorm:"foreignKey:ReservationID" json:"passengers,omitempty"`
 }
 
 type Passenger struct {

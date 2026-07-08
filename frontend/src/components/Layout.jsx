@@ -96,7 +96,7 @@ export default function Layout({ children }) {
           className="flex-1 overflow-y-auto"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
-          <div className="min-h-full max-w-7xl mx-auto px-6 py-8">
+          <div className="min-h-full max-w-8xl mx-4 px-8 py-8">
             {children || <Outlet context={{ user }} />}
           </div>
         </main>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Download, RefreshCw, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ApiClient from '../services/apiClient';
 import { Card } from '../components/ui/Card.jsx';
@@ -17,6 +17,57 @@ const formatDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+};
+
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!value || Number.isNaN(n)) return '—';
+  return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Combina los campos de la reserva con los del pasajero (si viene desglosado
+// vía Passengers) o cae a los campos *Pasajero de la reserva (reservas
+// creadas sin desglose de pasajeros, un único pasajero "principal").
+const buildPassengerRows = (r) => {
+  const base = {
+    reservaId: r.id,
+    pedidoId: r.pedido_id || r.id || '—',
+    estado: r.estado || '',
+    contactoNombre: r.contacto_nombre || '—',
+    contactoEmail: r.contacto_email || '—',
+    contactoTelefono: r.contacto_telefono || '—',
+    docContable: r.doc_contable || '—',
+    fichaVenta: r.ficha_venta || '—',
+    vendedorEmail: r.vendedor_email || '—',
+    precioVenta: r.precio_venta,
+    neto1: r.neto_1,
+  };
+
+  if (Array.isArray(r.passengers) && r.passengers.length > 0) {
+    return r.passengers.map((p, idx) => ({
+      ...base,
+      key: `${r.id}-${p.id ?? idx}`,
+      nombre: p.nombre || '—',
+      apellido: p.apellido || '—',
+      documento: p.documento || '—',
+      nacimiento: p.nacimiento,
+      nacionalidad: p.nacionalidad || '—',
+      tipoPasajero: p.tipo_pasajero || '—',
+      esVentaPrincipal: p.nro === 1,
+    }));
+  }
+
+  return [{
+    ...base,
+    key: `${r.id}-principal`,
+    nombre: r.nombre_pasajero || '—',
+    apellido: r.apellido_pasajero || '—',
+    documento: r.documento_pasajero || '—',
+    nacimiento: r.nacimiento_pasajero,
+    nacionalidad: r.nacionalidad_pasajero || '—',
+    tipoPasajero: r.tipo_pasajero || '—',
+    esVentaPrincipal: null,
+  }];
 };
 
 const getBadgeVariant = (estado) => {
@@ -37,72 +88,52 @@ const getEstadoLabel = (estado) => ({
 }[estado] || estado || '—');
 
 // ─── Excel export ────────────────────────────────────────────────────────────
+// Una fila por pasajero (no por reserva), con absolutamente todos los datos.
 
 const buildRow = (r, products) => {
   const product = products.find((p) => String(p.id) === String(r.product_id));
-  return {
-    'Pedido ID': r.Pedido_ID || r.pedido_id || r.id || '',
-    'Agencia': r.Agencia || r.agencia || '',
-    'Destino': r.Vuelo_Destino || r.vuelo_destino || r.destino || product?.destino || '',
-    'Pasajero': r.Nombre_Pasajero || r.nombre_pasajero || '',
-    'Apellido': r.Apellido_Pasajero || r.apellido_pasajero || '',
-    'Documento': r.documento_pasajero || r.Documento_Pasajero || '',
-    'Tipo Pasajero': r.tipo_pasajero || r.Tipo_Pasajero || '',
-    'Contacto': r.Contacto_Nombre || r.contacto_nombre || '',
-    'Email Contacto': r.Contacto_Email || r.contacto_email || '',
-    'Estado': getEstadoLabel(r.Estado || r.estado),
-    'Doc Contable': r.Doc_Contable || r.doc_contable || '',
-    'Salida': formatDate(r.Vuelo_Salida || r.vuelo_salida || product?.fecha_salida || product?.salida),
-    'Precio Venta': r.Vuelo_Precio || r.vuelo_precio || r.precio_venta || '',
-  };
+  return buildPassengerRows(r).map((row) => ({
+    'Pedido ID': row.pedidoId,
+    'Agencia': r.agencia || '',
+    'Destino': r.vuelo_destino || product?.destino || '',
+    'Nombre': row.nombre,
+    'Apellido': row.apellido,
+    'Documento': row.documento,
+    'Fecha Nacimiento': formatDate(row.nacimiento),
+    'Nacionalidad': row.nacionalidad,
+    'Tipo Pasajero': row.tipoPasajero,
+    'Estado': getEstadoLabel(row.estado),
+    'Contacto': row.contactoNombre,
+    'Email Contacto': row.contactoEmail,
+    'Teléfono Contacto': row.contactoTelefono,
+    'Doc Contable': row.docContable,
+    'Ficha': row.fichaVenta,
+    'Vendedor': row.vendedorEmail,
+    'Precio Venta': row.precioVenta ?? '',
+    'Neto 1': row.neto1 ?? '',
+    'OP': product?.op ?? '',
+    'Salida': formatDate(r.vuelo_salida || product?.fecha_salida || product?.salida),
+  }));
 };
 
 const exportToExcel = (reservations, products) => {
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1 — All reservations
-  const allRows = reservations.map((r) => buildRow(r, products));
-  const ws1 = XLSX.utils.json_to_sheet(allRows);
+  const allRows = reservations.flatMap((r) => buildRow(r, products));
+  const ws1 = XLSX.utils.json_to_sheet(allRows.length ? allRows : [{}]);
   XLSX.utils.book_append_sheet(wb, ws1, 'Reservas');
 
-  // Sheet 2 — Confirmed only
   const confirmedRows = reservations
-    .filter((r) => {
-      const e = r.Estado || r.estado || '';
-      return e === 'confirmada' || e === 'confirmado';
-    })
-    .map((r) => buildRow(r, products));
+    .filter((r) => r.estado === 'confirmada' || r.estado === 'confirmado')
+    .flatMap((r) => buildRow(r, products));
   const ws2 = XLSX.utils.json_to_sheet(confirmedRows.length ? confirmedRows : [{}]);
   XLSX.utils.book_append_sheet(wb, ws2, 'Confirmadas');
 
-  // Sheet 3 — Solicitudes
   const solicitudRows = reservations
-    .filter((r) => {
-      const e = r.Estado || r.estado || '';
-      return e === 'bloqueo_temporal' || e === 'solicitud_cancelacion';
-    })
-    .map((r) => buildRow(r, products));
+    .filter((r) => r.estado === 'bloqueo_temporal' || r.estado === 'solicitud_cancelacion')
+    .flatMap((r) => buildRow(r, products));
   const ws3 = XLSX.utils.json_to_sheet(solicitudRows.length ? solicitudRows : [{}]);
   XLSX.utils.book_append_sheet(wb, ws3, 'Solicitudes');
-
-  // Sheet 4 — Nomina (product-centric)
-  const nominaRows = reservations.map((r) => {
-    const product = products.find((p) => String(p.id) === String(r.product_id));
-    return {
-      'Product': r.product_id || '',
-      'Destino': r.Vuelo_Destino || r.vuelo_destino || product?.destino || '',
-      'Salida': formatDate(r.Vuelo_Salida || r.vuelo_salida || product?.fecha_salida || product?.salida),
-      'Código': product?.codigo_cupo || r.Vuelo_Codigo || r.vuelo_codigo || '',
-      'Pedido ID': r.Pedido_ID || r.pedido_id || r.id || '',
-      'Nombre': r.Nombre_Pasajero || r.nombre_pasajero || '',
-      'Apellido': r.Apellido_Pasajero || r.apellido_pasajero || '',
-      'Documento': r.documento_pasajero || r.Documento_Pasajero || '',
-      'Tipo': r.tipo_pasajero || r.Tipo_Pasajero || '',
-      'Estado': getEstadoLabel(r.Estado || r.estado),
-    };
-  });
-  const ws4 = XLSX.utils.json_to_sheet(nominaRows.length ? nominaRows : [{}]);
-  XLSX.utils.book_append_sheet(wb, ws4, 'Nómina');
 
   XLSX.writeFile(wb, `nominas-${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
@@ -112,7 +143,12 @@ const exportToExcel = (reservations, products) => {
 function ProductSection({ product, reservations }) {
   const [expanded, setExpanded] = useState(false);
 
-  const estado = (r) => r.Estado || r.estado || '';
+  const estado = (r) => r.estado || '';
+
+  const passengerRows = useMemo(
+    () => reservations.flatMap((r) => buildPassengerRows(r)),
+    [reservations]
+  );
 
   return (
     <Card className="overflow-hidden">
@@ -142,7 +178,7 @@ function ProductSection({ product, reservations }) {
           </div>
           <div className="hidden sm:block">
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Pasajeros</p>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{reservations.length}</p>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{passengerRows.length}</p>
           </div>
           <div className="hidden sm:flex gap-2 flex-wrap">
             <Badge variant="success" className="text-xs">
@@ -160,54 +196,64 @@ function ProductSection({ product, reservations }) {
         </Badge>
       </button>
 
-      {/* Expandable table */}
+      {/* Expandable table — una fila por pasajero, con todos los datos */}
       {expanded && (
         <div className="border-t border-zinc-100 dark:border-zinc-800 overflow-x-auto">
           <TableComponent>
             <TableHeader>
               <TableRow>
                 <TableHead>Pedido ID</TableHead>
-                <TableHead>Pasajero</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Apellido</TableHead>
                 <TableHead>Documento</TableHead>
+                <TableHead>Nacimiento</TableHead>
+                <TableHead>Nacionalidad</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Doc. Contable</TableHead>
                 <TableHead>Contacto</TableHead>
+                <TableHead>Email Contacto</TableHead>
+                <TableHead>Tel. Contacto</TableHead>
+                <TableHead>Doc. Contable</TableHead>
+                <TableHead>Ficha</TableHead>
+                <TableHead>Vendedor</TableHead>
+                <TableHead>Precio Venta</TableHead>
+                <TableHead>Neto 1</TableHead>
+                <TableHead>OP</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reservations.map((r, idx) => {
-                const pedidoId = r.Pedido_ID || r.pedido_id || r.id || '—';
-                const nombre = r.Nombre_Pasajero || r.nombre_pasajero || '';
-                const apellido = r.Apellido_Pasajero || r.apellido_pasajero || '';
-                const documento = r.documento_pasajero || r.Documento_Pasajero || '—';
-                const tipo = r.tipo_pasajero || r.Tipo_Pasajero || '—';
-                const estadoVal = r.Estado || r.estado || '';
-                const docContable = r.Doc_Contable || r.doc_contable || '—';
-                const contacto = r.Contacto_Nombre || r.contacto_nombre || '—';
-
-                return (
-                  <TableRow key={r.id || idx}>
-                    <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
-                      {pedidoId}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {nombre} {apellido}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">{documento}</TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">{tipo}</TableCell>
-                    <TableCell>
-                      <Badge variant={getBadgeVariant(estadoVal)}>
-                        {getEstadoLabel(estadoVal)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">{docContable}</TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">{contacto}</TableCell>
-                  </TableRow>
-                );
-              })}
+              {passengerRows.map((row) => (
+                <TableRow key={row.key}>
+                  <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                    {row.pedidoId}
+                  </TableCell>
+                  <TableCell className="text-zinc-900 dark:text-zinc-100 font-medium">
+                    {row.nombre}
+                    {row.esVentaPrincipal === false && (
+                      <Badge variant="secondary" className="ml-2 text-xs">Acompañante</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.apellido}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.documento}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatDate(row.nacimiento)}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.nacionalidad}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.tipoPasajero}</TableCell>
+                  <TableCell>
+                    <Badge variant={getBadgeVariant(row.estado)}>
+                      {getEstadoLabel(row.estado)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoEmail}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoTelefono}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.docContable}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.vendedorEmail}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.neto1)}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{product?.op ?? '—'}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </TableComponent>
         </div>
@@ -287,9 +333,13 @@ export default function GestionNominas() {
   const totalProducts = Object.keys(grouped).length;
   const totalReservations = reservations.length;
   const totalConfirmed = reservations.filter((r) => {
-    const e = r.Estado || r.estado || '';
+    const e = r.estado || '';
     return e === 'confirmada' || e === 'confirmado';
   }).length;
+  const totalPassengers = useMemo(
+    () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
+    [reservations]
+  );
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -325,21 +375,30 @@ export default function GestionNominas() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard
-          title="Productos con reservas"
+          label="Productos con reservas"
           value={loading ? '—' : totalProducts}
-          icon={Users}
+          icon={Package}
+          description="Productos que tienen al menos una reserva."
         />
         <StatCard
-          title="Total reservas"
+          label="Total reservas"
           value={loading ? '—' : totalReservations}
-          icon={Users}
+          icon={ClipboardList}
+          description="Cantidad total de reservas registradas."
         />
         <StatCard
-          title="Confirmadas"
-          value={loading ? '—' : totalConfirmed}
+          label="Pasajeros"
+          value={loading ? '—' : totalPassengers}
           icon={Users}
+          description="Pasajeros desglosados (incluye acompañantes)."
+        />
+        <StatCard
+          label="Confirmadas"
+          value={loading ? '—' : totalConfirmed}
+          icon={CheckCircle2}
+          description="Reservas en estado confirmado."
         />
       </div>
 

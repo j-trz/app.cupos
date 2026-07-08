@@ -131,6 +131,12 @@ func init() {
 				reports.GET("/evolution", handlers.GetEvolutionPassengers)
 				reports.GET("/agency-share", handlers.GetAgencyShare)
 				reports.GET("/destinations-detail", handlers.GetDestinationsDetail)
+				// Nuevos endpoints del dashboard profesional
+				reports.GET("/evolution-revenue", handlers.GetEvolutionRevenue)
+				reports.GET("/occupancy", handlers.GetOccupancy)
+				reports.GET("/top-products", handlers.GetTopProducts)
+				reports.GET("/risk-alerts", handlers.GetRiskAlerts)
+				reports.GET("/cancellations", handlers.GetCancellations)
 			}
 			// Métricas personales para usuarios regulares
 			protected.GET("/reports/user-metrics", handlers.GetUserMetrics)
