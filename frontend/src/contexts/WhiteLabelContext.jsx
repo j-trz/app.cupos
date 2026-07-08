@@ -62,7 +62,7 @@ function hexToRgb(hex) {
 }
 
 // Función para aplicar CSS variables al document
-function applyCSSVariables(config) {
+export function applyCSSVariables(config) {
     const root = document.documentElement;
 
     // Colors
