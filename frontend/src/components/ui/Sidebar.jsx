@@ -147,7 +147,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
         style={{ backgroundColor: sbBg, color: sbText }}
         className={clsx(
           'relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out',
-          collapsed ? 'w-16' : 'w-68'
+          collapsed ? 'w-16' : 'w-58'
         )}
       >
         <div className="flex h-full flex-col justify-between">
