@@ -303,16 +303,33 @@ export default function GestionReservas() {
     }
   };
 
-  const handleDelete = async (r) => {
+  // Elimina el pasajero de ESA fila únicamente — un pedido puede tener varios
+  // pasajeros y cada uno es su propio ticket individual una vez reservado,
+  // aunque se hayan creado juntos. Solo si es el último pasajero del pedido
+  // se elimina también la reserva (queda vacía, no tiene sentido dejarla).
+  const handleDeletePassenger = async (row) => {
+    const r = row.reservation;
+    const totalPassengers = Array.isArray(r.passengers) && r.passengers.length > 0 ? r.passengers.length : 1;
+    const isLastPassenger = !row.passengerId || totalPassengers <= 1;
+
     const res = await Swal.fire({
-      title: `¿Eliminar ${r.pedido_id}?`, icon: 'warning',
-      text: 'Se eliminarán también todos los pasajeros de esta reserva.',
+      title: `¿Eliminar a ${row.nombre} ${row.apellido}?`,
+      icon: 'warning',
+      text: isLastPassenger
+        ? 'Es el único pasajero de este pedido: se eliminará también la reserva.'
+        : 'Se libera su lugar. El resto de los pasajeros de este mismo pedido no se ven afectados.',
       showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
       confirmButtonColor: '#d33',
     });
     if (!res.isConfirmed) return;
     try {
-      await ReservationService.deleteReservation(r.id);
+      if (row.passengerId) {
+        await ReservationService.deletePassenger(r.id, row.passengerId);
+      } else {
+        // Reserva histórica sin pasajeros desglosados: no hay un ticket
+        // individual que borrar, se elimina el pedido completo.
+        await ReservationService.deleteReservation(r.id);
+      }
       fetchReservations();
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Error', text: err.message });
@@ -532,7 +549,7 @@ export default function GestionReservas() {
                       <Button variant="ghost" size="sm" onClick={() => openEdit(r)} title="Editar reserva">
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} title="Eliminar reserva (y sus pasajeros)" className="text-red-500 hover:text-red-700">
+                      <Button variant="ghost" size="sm" onClick={() => handleDeletePassenger(row)} title="Eliminar este pasajero" className="text-red-500 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

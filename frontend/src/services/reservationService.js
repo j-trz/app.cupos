@@ -103,13 +103,24 @@ class ReservationService {
     }
   }
 
-  // Delete reservation
+  // Delete reservation (todo el pedido, incluye todos sus pasajeros)
   static async deleteReservation(id) {
     try {
       const result = await ApiClient.delete(`/orders/${id}`);
       return result;
     } catch (error) {
       console.error(`Error deleting reservation with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Elimina UN pasajero puntual del pedido, sin afectar al resto
+  static async deletePassenger(reservationId, passengerId) {
+    try {
+      const result = await ApiClient.delete(`/orders/${reservationId}/passengers/${passengerId}`);
+      return result;
+    } catch (error) {
+      console.error(`Error deleting passenger ${passengerId} from reservation ${reservationId}:`, error);
       throw error;
     }
   }

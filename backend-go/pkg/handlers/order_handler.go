@@ -400,6 +400,54 @@ func DeleteReservation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Reserva eliminada."})
 }
 
+// DeletePassenger elimina UN pasajero puntual de un pedido, liberando su
+// lugar en el producto, sin tocar al resto de los pasajeros de la misma
+// Reservation — cada pasajero es su propio ticket individual aunque
+// comparta pedido_id. Si era el único pasajero, el pedido queda vacío y se
+// elimina también (para no dejar una reserva fantasma sin pasajeros).
+func DeletePassenger(c *gin.Context) {
+	reservationID := c.Param("id")
+	passengerID := c.Param("passengerId")
+
+	var passenger models.Passenger
+	if err := database.DB.Where("id = ? AND reservation_id = ?", passengerID, reservationID).First(&passenger).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pasajero no encontrado en esta reserva."})
+		return
+	}
+
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, reservationID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	// Liberar únicamente el lugar de este pasajero (no el pedido completo).
+	database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
+		Updates(map[string]interface{}{
+			"disponibilidad": gorm.Expr("disponibilidad + 1"),
+			"vendidos":       gorm.Expr("vendidos - 1"),
+		})
+
+	if err := database.DB.Delete(&passenger).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar el pasajero."})
+		return
+	}
+
+	var remaining int64
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservationID).Count(&remaining)
+
+	pedidoEliminado := false
+	if remaining == 0 {
+		database.DB.Delete(&models.Reservation{}, reservationID)
+		pedidoEliminado = true
+	}
+
+	services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Pasajero eliminado",
+		fmt.Sprintf("Se eliminó a %s %s del pedido %s y se liberó su lugar", passenger.Nombre, passenger.Apellido, reservation.PedidoID))
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "pedido_eliminado": pedidoEliminado, "pasajeros_restantes": remaining})
+}
+
 func UpdateReservation(c *gin.Context) {
 	id := c.Param("id")
 	var reservation models.Reservation
