@@ -356,7 +356,10 @@ export default function GestionNominas() {
     try {
       const [ordersResult, productsResult] = await Promise.all([
         ApiClient.get('/orders'),
-        ApiClient.get('/products'),
+        // scope=management: sin esto, un producto ya agotado (disponibilidad
+        // 0, ej. porque se cedió todo) queda afuera del listado y la nómina
+        // muestra "Destino desconocido" para pasajeros que sí existen.
+        ApiClient.get('/products?scope=management'),
       ]);
 
       const orders = Array.isArray(ordersResult)
@@ -473,7 +476,11 @@ export default function GestionNominas() {
   const grouped = useMemo(() => {
     const map = {};
     reservations.forEach((r) => {
-      const pid = String(r.product_id || 'sin_producto');
+      // roster_product_id agrupa por el producto DUEÑO real: si esta venta se
+      // hizo sobre un cupo cedido, cae junto con el resto de los pasajeros de
+      // la agencia que originalmente tiene el vuelo, no en un grupo aparte
+      // por cada cesión.
+      const pid = String(r.roster_product_id || r.product_id || 'sin_producto');
       if (!map[pid]) map[pid] = [];
       map[pid].push(r);
     });

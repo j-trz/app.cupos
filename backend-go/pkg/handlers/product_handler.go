@@ -81,19 +81,26 @@ func GetProducts(c *gin.Context) {
 	// (ej. agencias que solo ven cupos cedidos y no tienen catálogo propio).
 	products := []models.Product{}
 	role, _ := c.Get("role")
-	agencia, _ := c.Get("agencia")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	// El valor de agencia del usuario puede venir guardado como código o como
+	// nombre según qué pantalla lo haya cargado — se normaliza al código
+	// canónico antes de comparar contra restricted_agency/source_agency, que
+	// desde la cesión siempre se guardan como código.
+	agencia := services.ResolveAgencyCode(agenciaRaw)
 	managementScope := c.Query("scope") == "management"
 
 	query := database.DB
-	if role != "admin" {
-		if managementScope {
-			query = query.Where("restricted_agency = '' OR restricted_agency = ? OR source_agency = ?", agencia, agencia)
-		} else {
-			query = query.Where("(restricted_agency = '' OR restricted_agency = ?) AND is_blocked_for_sale = false", agencia, agencia)
+	if managementScope {
+		if role != "admin" {
+			query = query.Where("LOWER(restricted_agency) = '' OR LOWER(restricted_agency) = LOWER(?) OR LOWER(source_agency) = LOWER(?)", agencia, agencia)
 		}
 	} else {
-		if !managementScope {
-			query = query.Where("is_blocked_for_sale = false")
+		// Vista de reserva (Disponibilidad): nunca mostrar cupos agotados, ni
+		// bloqueados para venta, ni cedidos a otra agencia que no sea la mía.
+		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false")
+		if role != "admin" {
+			query = query.Where("LOWER(restricted_agency) = '' OR LOWER(restricted_agency) = LOWER(?)", agencia)
 		}
 	}
 	query.Find(&products)
@@ -116,9 +123,10 @@ func GetProductByID(c *gin.Context) {
 	}
 	role, _ := c.Get("role")
 	agenciaVal, _ := c.Get("agencia")
-	agencia, _ := agenciaVal.(string)
-	isRestrictedToOther := product.RestrictedAgency != "" && product.RestrictedAgency != agencia
-	wasSourcedByMe := product.SourceAgency != "" && product.SourceAgency == agencia
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
+	isRestrictedToOther := product.RestrictedAgency != "" && !strings.EqualFold(product.RestrictedAgency, agencia)
+	wasSourcedByMe := product.SourceAgency != "" && strings.EqualFold(product.SourceAgency, agencia)
 	if role != "admin" && isRestrictedToOther && !wasSourcedByMe {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
 		return

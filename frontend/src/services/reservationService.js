@@ -180,9 +180,11 @@ class ReservationService {
 
   static async getRequests() {
     const result = await ApiClient.get('/orders');
+    // "cedido" es la línea interna que deja una cesión de stock entre
+    // agencias — no es una solicitud de pasajero, no debe listarse acá.
     return {
       success: true,
-      data: toArray(result).map(adaptRequest),
+      data: toArray(result).filter(r => r.estado !== 'cedido').map(adaptRequest),
     };
   }
 

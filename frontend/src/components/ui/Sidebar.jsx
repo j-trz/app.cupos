@@ -15,7 +15,7 @@ const navItems = [
   { label: 'Disponibilidad', path: '/availability', icon: Plane },
   { label: 'Solicitudes', path: '/requests', icon: ClipboardList },
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
-  { label: 'Reportes', path: '/reportes', icon: BarChart3 },
+  { label: 'Documentación', path: '/documentacion', icon: BookOpen },
 ];
 
 // Admin-only items
@@ -24,8 +24,8 @@ const adminNavItems = [
   { label: 'Agencias', path: '/agencias', icon: Building2 },
   { label: 'Reservas', path: '/reservas', icon: CreditCard },
   { label: 'Nóminas', path: '/nominas', icon: Users },
+  { label: 'Reportes', path: '/reportes', icon: BarChart3 },
   { label: 'Logs del sitio', path: '/logs', icon: ScrollText },
-  { label: 'Documentación', path: '/documentacion', icon: BookOpen },
 ];
 
 // Settings items (grouped under Ajustes)

@@ -243,8 +243,11 @@ func main() {
 			transfers := protected.Group("/transfers")
 			{
 				transfers.GET("", handlers.GetUserTransfers)
-				transfers.POST("", handlers.CreateTransfer)
-				transfers.POST("/:id/reclaim", handlers.ReclaimTransfer)
+				// Ceder y recuperar cupos es una operación exclusiva de administración:
+				// no requiere autorización de la agencia afectada ni pasa por
+				// solicitudes, así que solo el admin puede ejecutarla.
+				transfers.POST("", middleware.AdminOnly(), handlers.CreateTransfer)
+				transfers.POST("/:id/reclaim", middleware.AdminOnly(), handlers.ReclaimTransfer)
 			}
 			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
 

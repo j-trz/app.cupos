@@ -25,9 +25,11 @@ type resolvedSMTPConfig struct {
 // nombre — el campo "agencia" de Profile/JWT históricamente guardó una u
 // otra cosa según la pantalla que lo haya cargado, así que buscar solo por
 // código deja afuera a cualquier cuenta cuyo valor sea en realidad el nombre.
+// La comparación es case-insensitive porque también se vieron mismatches de
+// mayúsculas/minúsculas entre lo cargado en el perfil y el código real.
 func FindAgencyByCodeOrName(value string) (*models.Agency, error) {
 	var agency models.Agency
-	if err := database.DB.Where("code = ? OR name = ?", value, value).First(&agency).Error; err != nil {
+	if err := database.DB.Where("LOWER(code) = LOWER(?) OR LOWER(name) = LOWER(?)", value, value).First(&agency).Error; err != nil {
 		return nil, err
 	}
 	return &agency, nil

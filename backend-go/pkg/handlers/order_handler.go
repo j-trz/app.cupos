@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"backend-go/pkg/database"
@@ -70,7 +71,12 @@ func CreateReservation(c *gin.Context) {
 
 	userIDStr, _ := c.Get("userID")
 	role, _ := c.Get("role")
-	userAgencia, _ := c.Get("agencia")
+	userAgenciaVal, _ := c.Get("agencia")
+	userAgenciaRaw, _ := userAgenciaVal.(string)
+	// Normalizado al código canónico de Agency para que coincida con
+	// RestrictedAgency (guardado como código) sin importar si el perfil del
+	// usuario tiene cargado el código o el nombre de su agencia.
+	userAgencia := services.ResolveAgencyCode(userAgenciaRaw)
 
 	if userIDStr != nil {
 		if uid, err := uuid.Parse(userIDStr.(string)); err == nil {
@@ -79,8 +85,8 @@ func CreateReservation(c *gin.Context) {
 	}
 
 	// Forzar la agencia del usuario si no es admin
-	if role != "admin" && userAgencia != nil {
-		input.Reservation.Agencia = userAgencia.(string)
+	if role != "admin" && userAgencia != "" {
+		input.Reservation.Agencia = userAgencia
 	}
 
 	tx := database.DB.Begin()
@@ -101,8 +107,7 @@ func CreateReservation(c *gin.Context) {
 	// Un cupo cedido a una agencia puntual (RestrictedAgency) solo puede
 	// reservarlo esa agencia (el admin puede reservar cualquiera).
 	if role != "admin" && product.RestrictedAgency != "" {
-		agenciaStr, _ := userAgencia.(string)
-		if product.RestrictedAgency != agenciaStr {
+		if !strings.EqualFold(product.RestrictedAgency, userAgencia) {
 			tx.Rollback()
 			c.JSON(http.StatusForbidden, gin.H{"error": "Este cupo fue cedido a otra agencia"})
 			return
@@ -316,16 +321,26 @@ type reservationWithVendor struct {
 	// Requests, Confirmations) puedan mostrar temporada/equipaje/ruta/tarifas
 	// del producto aunque la reserva sea vieja y no tenga esos datos copiados.
 	Product *models.Product `json:"product,omitempty"`
+	// RosterProductID es el producto al que pertenece el PASAJERO para
+	// efectos de nómina: si la venta se hizo sobre un producto-espejo cedido
+	// por otra agencia, la nómina real es la de esa agencia dueña (quien
+	// gestiona el vuelo/inventario real), no la del espejo — así el roster no
+	// queda fragmentado por cada cesión y el dueño ve TODOS sus pasajeros
+	// juntos (los propios y los vendidos por agencias a las que les cedió).
+	// Para una reserva normal (no cedida) es simplemente el mismo ProductID.
+	RosterProductID uint `json:"roster_product_id"`
 }
 
 func GetAllReservations(c *gin.Context) {
 	reservations := []models.Reservation{}
 	role, _ := c.Get("role")
-	agencia, _ := c.Get("agencia")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
 
 	query := database.DB.Preload("Passengers")
 	if role == "agency_admin" {
-		query = query.Where("agencia = ?", agencia)
+		query = query.Where("LOWER(agencia) = LOWER(?)", agencia)
 	} else if role != "admin" {
 		userID, _ := c.Get("userID")
 		query = query.Where("created_by = ?", userID)
@@ -366,12 +381,40 @@ func GetAllReservations(c *gin.Context) {
 		}
 	}
 
+	// Resolver, para cada producto-espejo involucrado, cuál es el producto
+	// ORIGINAL (dueño real) al que pertenece — un solo salto de la cadena de
+	// cesión alcanza para el caso normal (ceder y, como mucho, re-ceder una
+	// vez); no se camina la cadena completa para no complicar la consulta.
+	transferIDSet := make(map[uuid.UUID]struct{})
+	for _, p := range productByID {
+		if p.TransferID != nil {
+			transferIDSet[*p.TransferID] = struct{}{}
+		}
+	}
+	originalProductIDByTransferID := make(map[uuid.UUID]uint, len(transferIDSet))
+	if len(transferIDSet) > 0 {
+		transferIDs := make([]uuid.UUID, 0, len(transferIDSet))
+		for id := range transferIDSet {
+			transferIDs = append(transferIDs, id)
+		}
+		var transfers []models.AvailabilityTransfer
+		database.DB.Where("id IN ?", transferIDs).Find(&transfers)
+		for _, t := range transfers {
+			originalProductIDByTransferID[t.ID] = t.ProductID
+		}
+	}
+
 	response := make([]reservationWithVendor, len(reservations))
 	for i, r := range reservations {
-		item := reservationWithVendor{Reservation: r, VendedorEmail: emailByID[r.CreatedBy]}
+		item := reservationWithVendor{Reservation: r, VendedorEmail: emailByID[r.CreatedBy], RosterProductID: r.ProductID}
 		if p, ok := productByID[r.ProductID]; ok {
 			pCopy := p
 			item.Product = &pCopy
+			if p.TransferID != nil {
+				if originalID, ok := originalProductIDByTransferID[*p.TransferID]; ok {
+					item.RosterProductID = originalID
+				}
+			}
 			// Reservas viejas creadas antes de copiar estos datos del producto
 			// quedaron con estos campos vacíos: se completan al vuelo desde el
 			// producto para que las tablas no muestren celdas en blanco.

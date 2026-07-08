@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
@@ -37,7 +38,12 @@ func CreateTransfer(c *gin.Context) {
 	userIDStr, _ := c.Get("userID")
 	role, _ := c.Get("role")
 	agenciaVal, _ := c.Get("agencia")
-	callerAgencia, _ := agenciaVal.(string)
+	agenciaRaw, _ := agenciaVal.(string)
+	// Normalizado al código canónico de Agency: el valor de sesión puede venir
+	// guardado como nombre según qué pantalla haya cargado el perfil, y
+	// RestrictedAgency/SourceAgency siempre se guardan como código.
+	callerAgencia := services.ResolveAgencyCode(agenciaRaw)
+	targetAgency := services.ResolveAgencyCode(input.TargetAgency)
 
 	var createdBy uuid.UUID
 	if s, ok := userIDStr.(string); ok {
@@ -58,14 +64,14 @@ func CreateTransfer(c *gin.Context) {
 	sourceAgency := callerAgencia
 	if product.RestrictedAgency != "" {
 		sourceAgency = product.RestrictedAgency
-		if role != "admin" && callerAgencia != product.RestrictedAgency {
+		if role != "admin" && !strings.EqualFold(callerAgencia, product.RestrictedAgency) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "No podés ceder un cupo que no te pertenece"})
 			return
 		}
 	}
 
 	// Validar que origen y destino sean diferentes
-	if sourceAgency == input.TargetAgency {
+	if strings.EqualFold(sourceAgency, targetAgency) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "La agencia origen y destino no pueden ser la misma"})
 		return
 	}
@@ -118,7 +124,7 @@ func CreateTransfer(c *gin.Context) {
 		CarryOn:                product.CarryOn,
 		HandBag:                product.HandBag,
 		CheckedBag:             product.CheckedBag,
-		RestrictedAgency:       input.TargetAgency,
+		RestrictedAgency:       targetAgency,
 		SourceAgency:           sourceAgency,
 		TransferID:             &transferID,
 	}
@@ -133,7 +139,7 @@ func CreateTransfer(c *gin.Context) {
 		ID:           transferID,
 		ProductID:    input.ProductID,
 		SourceAgency: sourceAgency,
-		TargetAgency: input.TargetAgency,
+		TargetAgency: targetAgency,
 		Quantity:     input.Quantity,
 		CreatedBy:    createdBy,
 	}
@@ -143,33 +149,22 @@ func CreateTransfer(c *gin.Context) {
 		return
 	}
 
-	// 4. Línea de auditoría en Reservas para la agencia cedente: no es un
-	// pasajero real, solo deja registro de que ese stock salió de su pool.
-	cesionReservation := models.Reservation{
-		ProductID:      input.ProductID,
-		CreatedBy:      createdBy,
-		Estado:         models.EstadoCedida,
-		PedidoID:       fmt.Sprintf("CESION-%s", transferID.String()[:8]),
-		Agencia:        sourceAgency,
-		TransferID:     &transferID,
-		ContactoNombre: fmt.Sprintf("Cesión de %d cupos a %s", input.Quantity, input.TargetAgency),
-	}
-	if err := tx.Create(&cesionReservation).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al registrar la cesión en reservas"})
-		return
-	}
-
+	// Ceder disponibilidad NO es una reserva ni una solicitud — es stock que
+	// pasa a poder venderse desde otra agencia. La trazabilidad completa
+	// (quién cedió, a quién, cuánto y cuándo) queda en el registro de
+	// AvailabilityTransfer creado arriba; no se crea ninguna Reservation de
+	// auditoría para no ensuciar Solicitudes/Reservas/Nóminas con líneas que
+	// no corresponden a ningún pasajero real.
 	tx.Commit()
 
 	// Recargar producto para devolver estado actualizado
 	database.DB.First(&product, input.ProductID)
 
 	createdByPtr := &createdBy
-	services.NotifyAgency(input.TargetAgency, createdByPtr, "info", "Recibiste una cesión de disponibilidad",
+	services.NotifyAgency(targetAgency, createdByPtr, "info", "Recibiste una cesión de disponibilidad",
 		fmt.Sprintf("La agencia %s te cedió %d cupos del producto %s hacia %s", sourceAgency, input.Quantity, product.CodigoCupo, product.Destino))
 	services.NotifyRole("admin", createdByPtr, "info", "Nueva cesión entre agencias",
-		fmt.Sprintf("%s cedió %d cupos de %s a %s", sourceAgency, input.Quantity, product.CodigoCupo, input.TargetAgency))
+		fmt.Sprintf("%s cedió %d cupos de %s a %s", sourceAgency, input.Quantity, product.CodigoCupo, targetAgency))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"transfer":     transfer,
@@ -214,7 +209,8 @@ func GetUserTransfers(c *gin.Context) {
 func ReclaimTransfer(c *gin.Context) {
 	productID := c.Param("id")
 	agenciaVal, _ := c.Get("agencia")
-	callerAgencia, _ := agenciaVal.(string)
+	agenciaRaw, _ := agenciaVal.(string)
+	callerAgencia := services.ResolveAgencyCode(agenciaRaw)
 	role, _ := c.Get("role")
 
 	var input struct {
@@ -233,7 +229,7 @@ func ReclaimTransfer(c *gin.Context) {
 		return
 	}
 
-	if role != "admin" && callerAgencia != mirrorProduct.SourceAgency {
+	if role != "admin" && !strings.EqualFold(callerAgencia, mirrorProduct.SourceAgency) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "No tienes permiso para recuperar este cupo"})
 		return
 	}
@@ -295,28 +291,9 @@ func ReclaimTransfer(c *gin.Context) {
 		return
 	}
 
-	// Registrar reserva de devolución
-	var createdBy uuid.UUID
-	if s, ok := c.Get("userID"); ok {
-		if sStr, ok := s.(string); ok {
-			createdBy, _ = uuid.Parse(sStr)
-		}
-	}
-	cesionReservation := models.Reservation{
-		ProductID:      originalProduct.ID,
-		CreatedBy:      createdBy,
-		Estado:         models.EstadoCedida,
-		PedidoID:       fmt.Sprintf("RECUP-%s", transfer.ID.String()[:8]),
-		Agencia:        mirrorProduct.SourceAgency,
-		TransferID:     mirrorProduct.TransferID,
-		ContactoNombre: fmt.Sprintf("Recuperación de %d cupos de %s", qtyToReclaim, mirrorProduct.RestrictedAgency),
-	}
-	if err := tx.Create(&cesionReservation).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al registrar recuperación"})
-		return
-	}
-
+	// La recuperación tampoco es una reserva — el AvailabilityTransfer
+	// original ya deja trazabilidad de cuánto se cedió; no hace falta una
+	// segunda Reservation de auditoría (ver comentario en CreateTransfer).
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"message": "Cupos recuperados", "quantity": qtyToReclaim})
 }

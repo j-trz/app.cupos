@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Swal from 'sweetalert2';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
@@ -41,6 +42,7 @@ const GestionProductos = () => {
   const [routeModalProduct, setRouteModalProduct] = useState(null);
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: agencies = [] } = useAgencies();
   const { user } = useAuth();
   const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
@@ -130,8 +132,11 @@ const GestionProductos = () => {
   const handleTransferComplete = () => {
     setIsTransferOpen(false);
     setTransferringProduct(null);
-    // Recargar productos después de una cesión exitosa
-    setSearchTerm(prev => prev);
+    // Invalida la cache de React Query para que la tabla refleje la cesión al
+    // instante — `setSearchTerm(prev => prev)` no servía porque con el mismo
+    // valor React ni siquiera re-renderiza, y la queryKey (['products', filters])
+    // nunca cambiaba, dejando la tabla con datos viejos hasta 5 minutos (staleTime).
+    queryClient.invalidateQueries({ queryKey: ['products'] });
   };
 
   const handleReclaimTransfer = async (product) => {
@@ -162,8 +167,8 @@ const GestionProductos = () => {
         timer: 2000,
         showConfirmButton: false,
       });
-      // Recargar productos
-      setSearchTerm(prev => prev);
+      // Recargar productos al instante (ver comentario en handleTransferComplete)
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al recuperar el cupo' });
     }
