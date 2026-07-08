@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download, MapPin } from 'lucide-react';
+import clsx from 'clsx';
 import ItineraryTable from '../components/ItineraryTable';
 import ReservationService from '../services/reservationService';
 import BackofficeService from '../services/backofficeService';
