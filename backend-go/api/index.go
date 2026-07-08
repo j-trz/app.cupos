@@ -28,7 +28,7 @@ func init() {
 	// Configuración CORS dinámica desde variable de entorno
 	frontendURL := os.Getenv("URL_FRONTEND")
 	if frontendURL == "" {
-		frontendURL = "https://app-cupos-frontend.vercel.app"
+		frontendURL = "https://app-cupos-8uxo.vercel.app/"
 	}
 
 	router.Use(func(c *gin.Context) {
