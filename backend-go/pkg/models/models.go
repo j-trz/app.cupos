@@ -19,6 +19,10 @@ type Profile struct {
 	Telefono          string    `json:"telefono"`
 	Agencia           string    `json:"agencia"`
 	Admin             bool      `gorm:"default:false" json:"admin"`
+	// IsActive es un campo propio, distinto de Admin (antes ToggleUserStatus
+	// reusaba la columna "admin" como proxy de "activo", lo cual mezclaba
+	// privilegio de administrador con habilitación de la cuenta).
+	IsActive          bool      `gorm:"default:true" json:"activo"`
 	Role              string    `gorm:"default:'agency_user'" json:"role"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`

@@ -43,6 +43,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	if !profile.IsActive {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tu cuenta está inactiva. Contactá a un administrador."})
+		return
+	}
+
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		secret = "fallback_secret_key"
@@ -254,20 +259,37 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var input models.Profile
+	// Struct dedicado (sin Password): models.Profile tiene Password con
+	// binding:"required" pensado para el alta — bindear la edición directo
+	// contra ese struct hacía fallar CADA actualización porque el formulario
+	// de edición nunca manda password.
+	var input struct {
+		Nombre   string `json:"nombre"`
+		Apellido string `json:"apellido"`
+		Telefono string `json:"telefono"`
+		Agencia  string `json:"agencia"`
+		Role     string `json:"role"`
+		Admin    bool   `json:"admin"`
+		IsActive bool   `json:"activo"`
+	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Actualizar campos
+	// Actualizar campos (map, no struct, para que los booleans en false se
+	// graben igual — GORM's Updates con struct ignora campos en su zero value).
 	database.DB.Model(&profile).Updates(map[string]interface{}{
-		"nombre":  input.Nombre,
-		"agencia": input.Agencia,
-		"role":    input.Role,
-		"admin":   input.Admin,
+		"nombre":    input.Nombre,
+		"apellido":  input.Apellido,
+		"telefono":  input.Telefono,
+		"agencia":   input.Agencia,
+		"role":      input.Role,
+		"admin":     input.Admin,
+		"is_active": input.IsActive,
 	})
 
+	database.DB.First(&profile, "id = ?", id)
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile})
 }
 
@@ -303,8 +325,7 @@ func ToggleUserStatus(c *gin.Context) {
 		return
 	}
 
-	// Actualizar el estado del usuario (usamos admin como proxy por ahora)
-	database.DB.Model(&profile).Update("admin", input.Active)
+	database.DB.Model(&profile).Update("is_active", input.Active)
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Estado actualizado."})
 }
