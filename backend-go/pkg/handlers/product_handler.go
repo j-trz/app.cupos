@@ -70,9 +70,18 @@ func fixDates(data map[string]interface{}) {
 
 func GetProducts(c *gin.Context) {
 	var products []models.Product
-	database.DB.Find(&products)
-
 	role, _ := c.Get("role")
+	agencia, _ := c.Get("agencia")
+
+	query := database.DB
+	if role != "admin" {
+		// El catálogo compartido (restricted_agency vacío) lo ve cualquiera;
+		// un producto-espejo de cesión (restricted_agency seteado) solo lo ve
+		// la agencia a la que se cedió.
+		query = query.Where("restricted_agency = '' OR restricted_agency = ?", agencia)
+	}
+	query.Find(&products)
+
 	if role != "admin" {
 		for i := range products {
 			products[i].Neto1 = 0
@@ -90,6 +99,12 @@ func GetProductByID(c *gin.Context) {
 		return
 	}
 	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agencia, _ := agenciaVal.(string)
+	if role != "admin" && product.RestrictedAgency != "" && product.RestrictedAgency != agencia {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
 	if role != "admin" {
 		product.Neto1 = 0
 	}
@@ -125,6 +140,40 @@ func CreateProduct(c *gin.Context) {
 		fmt.Sprintf("Se agregó el producto %s hacia %s (%s)", product.CodigoCupo, product.Destino, product.Compania))
 
 	c.JSON(http.StatusCreated, product)
+}
+
+// UpdateProduct actualiza un producto existente. No permite cambiar
+// codigo_cupo (es de solo lectura una vez creado, se generó automáticamente)
+// ni vendidos/id/timestamps vía este endpoint.
+func UpdateProduct(c *gin.Context) {
+	id := c.Param("id")
+	var existing models.Product
+	if err := database.DB.First(&existing, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+
+	var rawData map[string]interface{}
+	if err := c.ShouldBindJSON(&rawData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	fixDates(rawData)
+	fixNumbers(rawData)
+
+	delete(rawData, "id")
+	delete(rawData, "codigo_cupo")
+	delete(rawData, "vendidos")
+	delete(rawData, "created_at")
+	delete(rawData, "updated_at")
+
+	if err := database.DB.Model(&existing).Updates(rawData).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto"})
+		return
+	}
+
+	database.DB.First(&existing, id)
+	c.JSON(http.StatusOK, existing)
 }
 
 func BulkCreateProducts(c *gin.Context) {

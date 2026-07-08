@@ -53,8 +53,17 @@ type Product struct {
 	InfFare                float64    `json:"inf_fare"`
 	ChdFare                float64    `json:"chd_fare"`
 	IsBlockedForSale       bool       `gorm:"default:false" json:"is_blocked_for_sale"`
-	CreatedAt              time.Time  `json:"created_at"`
-	UpdatedAt              time.Time  `json:"updated_at"`
+	// RestrictedAgency, si está seteado, hace que este producto solo sea
+	// visible/reservable para esa agencia (+ admin) — se usa en los productos
+	// "espejo" que crea una cesión, para que el cupo cedido lo vea únicamente
+	// la agencia destino y no el resto del catálogo compartido.
+	RestrictedAgency string     `gorm:"column:restricted_agency" json:"restricted_agency,omitempty"`
+	// TransferID vincula un producto-espejo de cesión con su AvailabilityTransfer
+	// de origen, para poder resolver la agencia cedente cuando alguien reserva
+	// contra este producto.
+	TransferID *uuid.UUID `gorm:"type:uuid;column:transfer_id" json:"transfer_id,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 // Estados posibles de Reservation.Estado (antes convivían "confirmado"/"confirmada" como
@@ -66,6 +75,10 @@ const (
 	EstadoSolicitudCancelacion = "solicitud_cancelacion"
 	EstadoCancelada            = "cancelada"
 	EstadoExpirada             = "expirada"
+	// EstadoCedida marca la línea que queda en la agencia cedente cuando cede
+	// disponibilidad a otra agencia — es un registro de auditoría del stock
+	// que salió de su pool, no una reserva de pasajero real.
+	EstadoCedida = "cedido"
 )
 
 type Reservation struct {

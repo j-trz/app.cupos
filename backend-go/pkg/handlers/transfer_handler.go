@@ -76,7 +76,10 @@ func CreateTransfer(c *gin.Context) {
 		return
 	}
 
-	// 2. Crear producto espejo para la agencia destino
+	// 2. Crear producto espejo para la agencia destino — restringido a esa
+	// agencia (RestrictedAgency) para que el resto del catálogo no lo vea ni
+	// lo pueda reservar.
+	transferID := uuid.New()
 	productTransfer := models.Product{
 		CodigoCupo:             product.CodigoCupo,
 		Destino:                product.Destino,
@@ -91,6 +94,8 @@ func CreateTransfer(c *gin.Context) {
 		Temporada:              product.Temporada,
 		TipoProducto:           product.TipoProducto,
 		BloqueoTemporalMinutos: product.BloqueoTemporalMinutos,
+		RestrictedAgency:       input.TargetAgency,
+		TransferID:             &transferID,
 	}
 	if err := tx.Create(&productTransfer).Error; err != nil {
 		tx.Rollback()
@@ -99,7 +104,6 @@ func CreateTransfer(c *gin.Context) {
 	}
 
 	// 3. Crear registro de cesión
-	transferID := uuid.New()
 	transfer := models.AvailabilityTransfer{
 		ID:           transferID,
 		ProductID:    input.ProductID,
@@ -111,6 +115,23 @@ func CreateTransfer(c *gin.Context) {
 	if err := tx.Create(&transfer).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear cesión"})
+		return
+	}
+
+	// 4. Línea de auditoría en Reservas para la agencia cedente: no es un
+	// pasajero real, solo deja registro de que ese stock salió de su pool.
+	cesionReservation := models.Reservation{
+		ProductID:      input.ProductID,
+		CreatedBy:      createdBy,
+		Estado:         models.EstadoCedida,
+		PedidoID:       fmt.Sprintf("CESION-%s", transferID.String()[:8]),
+		Agencia:        sourceAgency,
+		TransferID:     &transferID,
+		ContactoNombre: fmt.Sprintf("Cesión de %d cupos a %s", input.Quantity, input.TargetAgency),
+	}
+	if err := tx.Create(&cesionReservation).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al registrar la cesión en reservas"})
 		return
 	}
 

@@ -61,6 +61,7 @@ const getEstadoVariant = (estado) => {
   if (estado === 'procesando') return 'warning';
   if (estado === 'cancelado' || estado === 'cancelada' || estado === 'solicitud_cancelacion') return 'danger';
   if (estado === 'expirada') return 'danger';
+  if (estado === 'cedido') return 'outline';
   return 'default';
 };
 
@@ -74,6 +75,7 @@ const getEstadoLabel = (estado) => ({
   cancelada: 'Cancelado',
   solicitud_cancelacion: 'Sol. Cancelación',
   expirada: 'Expirada',
+  cedido: 'Cedido a otra agencia',
 }[estado] || estado || '—');
 
 // Explota una reserva (pedido) en filas — una por pasajero. Contacto y
@@ -494,16 +496,19 @@ export default function GestionReservas() {
                       </span>
                     ) : '—'}
                   </TableCell>
-                  {/* Cesión Badge */}
+                  {/* Cesión: en la agencia cedente muestra la salida de stock;
+                      en la reserva real hecha con ese cupo, de qué agencia vino */}
                   <TableCell>
-                    {r.transfer_id ? (
+                    {r.estado === 'cedido' ? (
+                      <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
+                        <ArrowRightLeft className="h-3 w-3" /> Cesión saliente
+                      </Badge>
+                    ) : r.original_agency ? (
                       <div className="flex flex-col gap-1">
                         <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
-                          <ArrowRightLeft className="h-3 w-3" /> Cesión
+                          <ArrowRightLeft className="h-3 w-3" /> Cupo cedido
                         </Badge>
-                        <span className="text-[10px] text-slate-400 font-mono truncate max-w-[100px]" title={r.transfer_id}>
-                          {r.transfer_id.slice(0, 8)}...
-                        </span>
+                        <span className="text-[10px] text-slate-500">de {agencyName(r.original_agency)}</span>
                       </div>
                     ) : '—'}
                   </TableCell>

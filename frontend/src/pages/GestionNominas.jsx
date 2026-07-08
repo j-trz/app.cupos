@@ -9,6 +9,7 @@ import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import { useAgencies } from '../hooks/useAgencies';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,11 @@ const buildPassengerRows = (r) => {
     contactoTelefono: r.contacto_telefono || '—',
     fichaVenta: r.ficha_venta || '—',
     vendedorEmail: r.vendedor_email || '—',
+    agencia: r.agencia || '',
+    // Si el pedido se armó con un cupo cedido por otra agencia, acá queda de
+    // qué agencia vino — para que en la nómina se note que ese pasajero no es
+    // "propio" del catálogo, sino de un cupo cedido.
+    originalAgency: r.original_agency || null,
   };
 
   if (Array.isArray(r.passengers) && r.passengers.length > 0) {
@@ -104,6 +110,7 @@ const buildRow = (r, products) => {
   return buildPassengerRows(r).map((row) => ({
     'Pedido ID': row.pedidoId,
     'Agencia': r.agencia || '',
+    'Cupo cedido por': row.originalAgency || '',
     'Destino': r.vuelo_destino || product?.destino || '',
     'Nombre': row.nombre,
     'Apellido': row.apellido,
@@ -150,7 +157,7 @@ const exportToExcel = (reservations, products) => {
 
 // ─── Product section (collapsible) ───────────────────────────────────────────
 
-function ProductSection({ product, reservations }) {
+function ProductSection({ product, reservations, agencyName }) {
   const [expanded, setExpanded] = useState(false);
 
   const estado = (r) => r.estado || '';
@@ -221,6 +228,7 @@ function ProductSection({ product, reservations }) {
                 <TableHead>Nacionalidad</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Agencia</TableHead>
                 <TableHead>Contacto</TableHead>
                 <TableHead>Email Contacto</TableHead>
                 <TableHead>Tel. Contacto</TableHead>
@@ -255,6 +263,18 @@ function ProductSection({ product, reservations }) {
                       {getEstadoLabel(row.estado)}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                    {row.originalAgency ? (
+                      <div className="flex flex-col gap-1">
+                        <span>{agencyName(row.agencia)}</span>
+                        <Badge variant="outline" className="w-fit text-[10px]">
+                          Cupo de {agencyName(row.originalAgency)}
+                        </Badge>
+                      </div>
+                    ) : (
+                      agencyName(row.agencia)
+                    )}
+                  </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoEmail}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoTelefono}</TableCell>
@@ -284,6 +304,9 @@ export default function GestionNominas() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
+  const { data: agencies = [] } = useAgencies();
+  const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -305,7 +328,9 @@ export default function GestionNominas() {
           ? productsResult.data
           : [];
 
-      setReservations(orders);
+      // "cedido" es una línea de auditoría de la agencia cedente (stock que
+      // salió de su pool), no un pasajero real — no corresponde en la nómina.
+      setReservations(orders.filter((r) => r.estado !== 'cedido'));
       setProducts(prods);
     } catch (err) {
       console.error('Error loading nominas data:', err);
@@ -462,6 +487,7 @@ export default function GestionNominas() {
                 key={pid}
                 product={product}
                 reservations={grouped[pid]}
+                agencyName={agencyName}
               />
             );
           })}

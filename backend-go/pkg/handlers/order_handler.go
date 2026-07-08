@@ -98,6 +98,17 @@ func CreateReservation(c *gin.Context) {
 		return
 	}
 
+	// Un cupo cedido a una agencia puntual (RestrictedAgency) solo puede
+	// reservarlo esa agencia (el admin puede reservar cualquiera).
+	if role != "admin" && product.RestrictedAgency != "" {
+		agenciaStr, _ := userAgencia.(string)
+		if product.RestrictedAgency != agenciaStr {
+			tx.Rollback()
+			c.JSON(http.StatusForbidden, gin.H{"error": "Este cupo fue cedido a otra agencia"})
+			return
+		}
+	}
+
 	numPassengers := len(input.Passengers)
 	if numPassengers == 0 {
 		numPassengers = 1
@@ -183,6 +194,17 @@ func CreateReservation(c *gin.Context) {
 	}
 	if input.Reservation.VueloSalida == nil {
 		input.Reservation.VueloSalida = product.FechaSalida
+	}
+
+	// Si el producto es un "espejo" de una cesión, la reserva hereda de qué
+	// agencia vino el cupo — así Nómina/Reservas pueden mostrar que este
+	// pasajero corresponde a un cupo cedido por otra agencia.
+	if product.TransferID != nil {
+		input.Reservation.TransferID = product.TransferID
+		var transfer models.AvailabilityTransfer
+		if err := tx.First(&transfer, "id = ?", product.TransferID).Error; err == nil {
+			input.Reservation.OriginalAgency = transfer.SourceAgency
+		}
 	}
 
 	if err := tx.Create(&input.Reservation).Error; err != nil {
