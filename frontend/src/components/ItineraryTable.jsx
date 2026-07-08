@@ -90,68 +90,109 @@ const FALLBACK_LOGO = 'https://documents.sabre.com/static/images/tc/mail/icon-ai
  * Parsea una línea de segmento GDS/PNR.
  * Identifica cada campo por su PATRÓN, no por posición fija.
  */
+function normalizeText(text) {
+  return String(text)
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+}
+
+function extractSegmentLines(text) {
+  const norm = normalizeText(text);
+  const SEG = /^\s*(\d+\s+)?[A-Z]{2}[\d\s]/;
+
+  // Estrategia 1: multilínea real
+  const byLine = norm.split('\n').filter(l => SEG.test(l));
+  if (byLine.length > 0) return byLine;
+
+  // Estrategia 2: una línea con números de segmento ("1 UX... 2 UX...")
+  const bySegNo = norm.split(/(?=\s+\d+\s+[A-Z]{2})/).map(s => s.trim()).filter(s => SEG.test(s));
+  if (bySegNo.length > 1) return bySegNo;
+
+  // Estrategia 3: una línea sin número — partir antes de cada código IATA+vuelo
+  // Ej: "LA2421 MVD LIM ... LA2440 LIM AUA ..."
+  const byFlight = norm
+    .split(/(?=[A-Z]{2}\d{3,4}\b)/)
+    .map(s => s.trim())
+    .filter(s => /^[A-Z]{2}\d{3,4}/.test(s));
+  if (byFlight.length > 0) return byFlight;
+
+  return [norm.trim()].filter(s => SEG.test(s));
+}
+
 function parseSegmentLine(line) {
   const tokens = line.trim().split(/\s+/);
   const result = {
-    segmento: '',
-    compania: '',
-    vuelo: '',
-    origen: '',
-    destino: '',
-    fechaSalida: '',
-    salida: '',
-    llegada: '',
-    fechaLlegada: '',
+    segmento: '', compania: '', vuelo: '',
+    origen: '', destino: '',
+    fechaSalida: '', salida: '',
+    llegada: '', fechaLlegada: '',
     nextDay: false,
   };
 
-  let i = 0;
+  const isTime = t => /^\d{4}$/.test(t) || /^\d{2}:\d{2}$/.test(t);
+  const normTime = t => t.replace(':', '');
+  const isDate = t => /^\d{1,2}[A-Z]{3}$/.test(t);
+  const isAirport = t => /^[A-Z]{3}$/.test(t);
+  const isOD = t => /[A-Z]{6}/.test(t);
+  const isFlight = t => /^[A-Z]{2}\d{3,4}$/.test(t);
+  const isAirline = t => /^[A-Z]{2}$/.test(t);
+  const isFlightNo = t => /^\d{3,4}$/.test(t);
+  const isSegNo = t => /^\d{1,2}$/.test(t);
 
-  // 1. Nro de segmento — primer token numérico
-  if (/^\d+$/.test(tokens[i])) result.segmento = tokens[i++];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
 
-  // 2. Aerolínea + vuelo — combinado "UX1301" o separado "UX" "046"
-  const combinedRe = /^([A-Z]{2})(\d{3,4})$/;
-  if (combinedRe.test(tokens[i])) {
-    [, result.compania, result.vuelo] = tokens[i++].match(combinedRe);
-  } else if (/^[A-Z]{2}$/.test(tokens[i])) {
-    result.compania = tokens[i++];
-    if (/^\d{3,4}$/.test(tokens[i])) result.vuelo = tokens[i++];
-  }
+    // Nro de segmento — dígitos al inicio, antes de encontrar aerolínea
+    if (!result.compania && isSegNo(t)) { result.segmento = t; continue; }
 
-  // 3. Clase de reserva — letra única (ignorar)
-  if (/^[A-Z]$/.test(tokens[i])) i++;
-
-  // 4. Fecha de salida — DDMON / DMON (ej: "15SEP", "1OCT")
-  if (/^\d{1,2}[A-Z]{3}$/.test(tokens[i])) result.fechaSalida = tokens[i++];
-
-  // 5. O&D — 6 letras mayúsculas consecutivas
-  //    Puede venir suelto "MVDMAD", prefijado "2*MVDMAD", o separado "5 TLVFCO"
-  while (i < tokens.length && !result.origen) {
-    const m = tokens[i].match(/([A-Z]{6})/);
-    if (m) {
-      result.origen = m[1].slice(0, 3);
-      result.destino = m[1].slice(3);
+    // Vuelo combinado "LA2421"
+    if (!result.compania && isFlight(t)) {
+      const m = t.match(/^([A-Z]{2})(\d{3,4})$/);
+      result.compania = m[1]; result.vuelo = m[2];
+      continue;
     }
-    i++;
-  }
 
-  // 6. Horarios — dos tokens de exactamente 4 dígitos (HHMM)
-  //    Tokens como "DK1", "E", "789" no matchean y se saltan solos
-  for (; i < tokens.length; i++) {
-    if (/^\d{4}$/.test(tokens[i])) {
-      if (!result.salida) { result.salida = tokens[i]; }
-      else { result.llegada = tokens[i]; i++; break; }
+    // Aerolínea separada "UX" + "046"
+    if (!result.compania && isAirline(t) && isFlightNo(tokens[i + 1])) {
+      result.compania = t; result.vuelo = tokens[++i];
+      continue;
     }
+
+    // Letra sola (clase/cabina) — ignorar
+    if (/^[A-Z]$/.test(t)) continue;
+
+    // Fecha ("15SEP", "02JAN")
+    if (isDate(t)) {
+      if (!result.fechaSalida) result.fechaSalida = t;
+      else if (!result.fechaLlegada) result.fechaLlegada = t;
+      continue;
+    }
+
+    // O&D combinado "MVDMAD" o "2*MVDMAD"
+    if (isOD(t)) {
+      const m = t.match(/([A-Z]{6})/);
+      result.origen = m[1].slice(0, 3); result.destino = m[1].slice(3);
+      continue;
+    }
+
+    // Aeropuertos separados "MVD", "LIM" — solo después de encontrar aerolínea
+    if (result.compania && isAirport(t)) {
+      if (!result.origen) result.origen = t;
+      else if (!result.destino) result.destino = t;
+      continue;
+    }
+
+    // Hora — "1220" o "07:35"
+    if (isTime(t)) {
+      if (!result.salida) result.salida = normTime(t);
+      else if (!result.llegada) result.llegada = normTime(t);
+      continue;
+    }
+    // Todo lo demás (DK1, E, 789, 0, etc.) — ignorar
   }
 
-  // 7. Fecha de llegada — primer token fecha tras los horarios
-  if (i < tokens.length && /^\d{1,2}[A-Z]{3}$/.test(tokens[i])) {
-    result.fechaLlegada = tokens[i];
-  }
-
-  // 8. Lógica +1 día
-  //    Primero compara fechas explícitas; si no hay, cruza medianoche por horarios
+  // Lógica +1 día
   if (result.fechaSalida && result.fechaLlegada) {
     result.nextDay = result.fechaSalida !== result.fechaLlegada;
   } else if (result.salida && result.llegada) {
@@ -161,13 +202,9 @@ function parseSegmentLine(line) {
   return result;
 }
 
-/**
- * Entry point: acepta JSON (objeto o string) o texto GDS/PNR crudo.
- */
 function parseRuta(ruta) {
   if (!ruta) return [];
 
-  // Intentar datos estructurados primero (backward compat)
   try {
     const parsed = typeof ruta === 'string' ? JSON.parse(ruta) : ruta;
     if (parsed?.vuelos && Array.isArray(parsed.vuelos)) {
@@ -184,16 +221,12 @@ function parseRuta(ruta) {
         nextDay: v.nextDay || false,
       }));
     }
-  } catch { /* no es JSON, continuar con parser de texto */ }
+  } catch { /* no es JSON */ }
 
-  // Parsear texto GDS/PNR línea por línea
-  return String(ruta)
-    .split('\n')
-    .filter((line) => /^\s*\d+\s+[A-Z]/.test(line)) // solo líneas de segmento
+  return extractSegmentLines(String(ruta))
     .map(parseSegmentLine)
     .filter((v) => v.compania && v.vuelo);
 }
-
 async function loadImgBitmap(url) {
   try {
     if (!url) return null;
