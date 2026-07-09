@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
+import { HeaderProvider } from './contexts/HeaderContext';
+import { SidebarProvider } from './components/ui/SidebarProvider';
 import { QueryClientProvider } from './lib/react-query';
 import { queryClient } from './lib/react-query';
 import ToastNotification from './components/ToastNotification';
@@ -40,8 +42,10 @@ function App() {
       <ThemeProvider>
         <I18nProvider>
           <Router>
-            <div className="App">
-              <Routes>
+            <SidebarProvider>
+              <HeaderProvider>
+                <div className="App">
+                  <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route
                   path="/"
@@ -292,9 +296,11 @@ function App() {
                     </Layout>
                   }
                 />
-              </Routes>
-              <ToastNotification />
-            </div>
+                  </Routes>
+                  <ToastNotification />
+                </div>
+              </HeaderProvider>
+            </SidebarProvider>
           </Router>
         </I18nProvider>
       </ThemeProvider>

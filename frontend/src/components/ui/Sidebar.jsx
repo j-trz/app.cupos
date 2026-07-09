@@ -145,11 +145,14 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
       <aside
         data-sidebar
         dir={dir}
-        style={{ backgroundColor: sbBg, color: sbText }}
-        className={clsx(
-          'relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out',
-          collapsed ? 'w-16' : 'w-58'
-        )}
+        style={{
+          backgroundColor: sbBg,
+          color: sbText,
+          width: collapsed
+            ? (config?.sidebar?.collapsed_width || '64px')
+            : (config?.sidebar?.width || '240px')
+        }}
+        className="relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out"
       >
         <div className="flex h-full flex-col justify-between">
           <div className="space-y-2">

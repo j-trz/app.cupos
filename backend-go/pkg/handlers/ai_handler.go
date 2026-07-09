@@ -23,12 +23,19 @@ import (
 // TYPES
 // ─────────────────────────────────────────────
 
+type ImageAttachment struct {
+	Base64 string `json:"base64"`
+	Mime   string `json:"mime"`
+	Name   string `json:"name"`
+}
+
 type ChatRequest struct {
-	Message     string `json:"message"`
-	SessionID   string `json:"sessionId"`
-	ProviderID  string `json:"providerId"`
-	ImageBase64 string `json:"imageBase64"` // base64 sin prefijo data:...
-	ImageMime   string `json:"imageMime"`   // "image/jpeg", "image/png", etc.
+	Message     string            `json:"message"`
+	SessionID   string            `json:"sessionId"`
+	ProviderID  string            `json:"providerId"`
+	ImageBase64 string            `json:"imageBase64"` // base64 sin prefijo data:... (retrocompatibilidad)
+	ImageMime   string            `json:"imageMime"`   // "image/jpeg", "image/png", etc. (retrocompatibilidad)
+	Images      []ImageAttachment `json:"images"`      // Soporte para múltiples adjuntos
 }
 
 type userCtx struct {
@@ -58,7 +65,7 @@ func buildSystemPrompt(u userCtx) string {
 - Buscar productos/cupos disponibles y verificar disponibilidad
 - Ver tus propias reservas
 - Crear nuevas reservas
-- Leer documentos de identidad (DNI, pasaportes) para extraer datos de pasajeros`
+- Leer múltiples documentos de identidad (DNI, pasaportes) simultáneamente para extraer datos de pasajeros y realizar reservas masivas`
 
 	if u.Role == "admin" || u.Role == "agency_admin" {
 		permisos += `
@@ -95,10 +102,16 @@ FLUJO PARA CREAR RESERVA (IMPORTANTE - seguir exactamente):
 2. Presenta los productos como lista numerada: número, destino, compañía, salida/regreso, precio, cupos. Ej: "1. Cancún - Aerolíneas - $850 - 5 cupos"
 3. Pide al usuario que elija por número. NUNCA le pidas al usuario el ID interno del producto (product_id).
 4. Una vez que el usuario elija el número de la lista, tú internamente DEBES mapear ese número al "id" real del producto que obtuviste de buscar_productos.
-5. Pide SOLO lo que falte para reservar: nombre del pasajero principal (y email si lo necesitas).
+5. Pide SOLO lo que falte para reservar: datos del o los pasajeros.
 6. El precio se toma automáticamente del producto — NUNCA pidas precio al usuario.
-7. Si el usuario adjuntó un documento (DNI/pasaporte), extrae los datos y úsalos sin volver a preguntar.
-8. Confirma con un resumen breve y luego llama a crear_reserva. IMPORTANTE: En crear_reserva DEBES enviar el "id" interno real del producto (ej: 42, 105), NO el número "1" o "2" de la lista que mostraste.
+7. SOPORTE DE MÚLTIPLES ADJUNTOS (RESERVAS MASIVAS): Si el usuario adjunta uno o múltiples documentos (DNI, pasaporte, etc.) o provee datos de varios pasajeros:
+   a. Extrae minuciosamente los datos de todos y cada uno de los pasajeros contenidos en las imágenes (nombre, apellido, documento, nacionalidad, fecha de nacimiento, etc.).
+   b. Presenta un listado consolidado, claro y ordenado de todos los pasajeros cuyos datos fueron sustraídos.
+   c. Pídele al usuario de manera explícita su aprobación, visto bueno o confirmación ("OK") de que los datos sustraídos son correctos.
+   d. Una vez y SOLO cuando el usuario confirme que todo está correcto (dando el "OK"), procede a realizar las reservas individuales consecutivamente llamando a la herramienta "crear_reserva" por cada uno de los pasajeros validados.
+   e. Recuerda estrictamente que cada pasajero es 1 ticket, consume 1 lugar y requiere su propia llamada a "crear_reserva".
+   f. Al finalizar, muestra un resumen consolidado de todas las reservas creadas junto con sus respectivos IDs y códigos de pedido.
+8. Si es una reserva individual y el usuario adjuntó un documento, sigue la misma lógica: extrae los datos, pide el visto bueno ("OK") al usuario con el resumen de la extracción, y tras la confirmación, llama a crear_reserva.
 
 BÚSQUEDA DE PRODUCTOS — REGLA CRÍTICA:
 - Llama a buscar_productos con el destino mencionado por el usuario.
@@ -915,30 +928,69 @@ func Chat(c *gin.Context) {
 	systemPrompt := buildSystemPrompt(u)
 	tools := getTools(role)
 
-	// Construir mensaje inicial del usuario (con o sin imagen)
+	// Construir mensaje inicial del usuario (con o sin imagen/es)
 	var userContent interface{}
-	if req.ImageBase64 != "" {
-		mime := req.ImageMime
-		if mime == "" {
-			mime = "image/jpeg"
-		}
+	hasImages := len(req.Images) > 0 || req.ImageBase64 != ""
+
+	if hasImages {
 		switch provider.ProviderType {
 		case "anthropic":
-			userContent = []map[string]interface{}{
-				{"type": "image", "source": map[string]interface{}{
-					"type":       "base64",
-					"media_type": mime,
-					"data":       req.ImageBase64,
-				}},
-				{"type": "text", "text": req.Message},
+			var parts []map[string]interface{}
+			// Agregar imágenes del arreglo
+			for _, img := range req.Images {
+				parts = append(parts, map[string]interface{}{
+					"type": "image",
+					"source": map[string]interface{}{
+						"type":       "base64",
+						"media_type": img.Mime,
+						"data":       img.Base64,
+					},
+				})
 			}
-		default: // openai style
-			userContent = []map[string]interface{}{
-				{"type": "image_url", "image_url": map[string]string{
-					"url": fmt.Sprintf("data:%s;base64,%s", mime, req.ImageBase64),
-				}},
-				{"type": "text", "text": req.Message},
+			// Retrocompatibilidad con imagen única
+			if req.ImageBase64 != "" && len(req.Images) == 0 {
+				mime := req.ImageMime
+				if mime == "" {
+					mime = "image/jpeg"
+				}
+				parts = append(parts, map[string]interface{}{
+					"type": "image",
+					"source": map[string]interface{}{
+						"type":       "base64",
+						"media_type": mime,
+						"data":       req.ImageBase64,
+					},
+				})
 			}
+			parts = append(parts, map[string]interface{}{"type": "text", "text": req.Message})
+			userContent = parts
+
+		default: // openai style (default)
+			var parts []map[string]interface{}
+			// Agregar imágenes del arreglo
+			for _, img := range req.Images {
+				parts = append(parts, map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]string{
+						"url": fmt.Sprintf("data:%s;base64,%s", img.Mime, img.Base64),
+					},
+				})
+			}
+			// Retrocompatibilidad con imagen única
+			if req.ImageBase64 != "" && len(req.Images) == 0 {
+				mime := req.ImageMime
+				if mime == "" {
+					mime = "image/jpeg"
+				}
+				parts = append(parts, map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]string{
+						"url": fmt.Sprintf("data:%s;base64,%s", mime, req.ImageBase64),
+					},
+				})
+			}
+			parts = append(parts, map[string]interface{}{"type": "text", "text": req.Message})
+			userContent = parts
 		}
 	} else {
 		userContent = req.Message
@@ -962,26 +1014,31 @@ func Chat(c *gin.Context) {
 				"parts": []map[string]string{{"text": h.Content}},
 			})
 		}
-		// Mensaje actual del usuario
+		// Mensaje actual del usuario (Gemini - con múltiples adjuntos)
 		var parts []interface{}
-		if req.ImageBase64 != "" {
-			parts = []interface{}{
-				map[string]interface{}{
-					"inlineData": map[string]string{
-						"mimeType": func() string {
-							if req.ImageMime != "" {
-								return req.ImageMime
-							}
-							return "image/jpeg"
-						}(),
-						"data": req.ImageBase64,
-					},
+		// Agregar todas las imágenes
+		for _, img := range req.Images {
+			parts = append(parts, map[string]interface{}{
+				"inlineData": map[string]string{
+					"mimeType": img.Mime,
+					"data":     img.Base64,
 				},
-				map[string]string{"text": req.Message},
-			}
-		} else {
-			parts = []interface{}{map[string]string{"text": req.Message}}
+			})
 		}
+		// Retrocompatibilidad con imagen única
+		if req.ImageBase64 != "" && len(req.Images) == 0 {
+			mime := req.ImageMime
+			if mime == "" {
+				mime = "image/jpeg"
+			}
+			parts = append(parts, map[string]interface{}{
+				"inlineData": map[string]string{
+					"mimeType": mime,
+					"data":     req.ImageBase64,
+				},
+			})
+		}
+		parts = append(parts, map[string]string{"text": req.Message})
 		messages = append(messages, map[string]interface{}{
 			"role":  "user",
 			"parts": parts,

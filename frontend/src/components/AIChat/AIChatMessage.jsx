@@ -13,7 +13,7 @@ const TOOL_LABELS = {
     buscar_usuarios:   '👤 Buscando usuarios',
 };
 
-export default function AIChatMessage({ message, isUser, timestamp, toolCalls, isError, imagePreview }) {
+export default function AIChatMessage({ message, isUser, timestamp, toolCalls, isError, imagePreview, imagePreviews }) {
     const [copied, setCopied] = useState(false);
     const [showTools, setShowTools] = useState(false);
 
@@ -46,14 +46,25 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
             {/* Burbuja */}
             <div className={`flex flex-col max-w-[78%] ${isUser ? 'items-end' : 'items-start'} gap-1`}>
 
-                {/* Imagen adjunta (si el usuario subió una) */}
-                {imagePreview && (
+                {/* Imágenes adjuntas (si el usuario subió varias) */}
+                {imagePreviews && imagePreviews.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 justify-end mb-1 max-w-[280px]">
+                        {imagePreviews.map((img, idx) => (
+                            <img
+                                key={idx}
+                                src={img}
+                                alt={`documento-${idx}`}
+                                className="rounded-lg w-16 h-16 object-cover border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                            />
+                        ))}
+                    </div>
+                ) : imagePreview ? (
                     <img
                         src={imagePreview}
                         alt="documento"
                         className="rounded-lg max-w-[180px] max-h-[120px] object-cover border border-zinc-200 dark:border-zinc-700 mb-1"
                     />
-                )}
+                ) : null}
 
                 <div className={`rounded-xl px-3 py-2 text-sm border
                     ${isUser

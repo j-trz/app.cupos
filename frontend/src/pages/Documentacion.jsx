@@ -1,30 +1,63 @@
 import { useState } from 'react';
-import { ChevronDown, BookOpen, Calendar, Package, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Mail, Bell, Palette, FileSearch, Download, Database, HelpCircle, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, Settings, Building2, FileText, User } from 'lucide-react';
+import {
+  ChevronDown, BookOpen, Calendar, Package, ArrowRightLeft, MessageSquare, Users, Shield,
+  BarChart3, Mail, Bell, Palette, FileSearch, Download, Database, HelpCircle, AlertTriangle,
+  CheckCircle, Info, Zap, Star, Clock, Search, Settings, Building2, FileText, User
+} from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { useWhiteLabel } from '../contexts/WhiteLabelContext.jsx';
 
-// ─── Accordion primitivo (sin deps externas) ────────────────────────────────
+// ─── Accordion Dinámico de Estilo Vercel ────────────────────────────────
 function AccordionSection({ icon: Icon, title, badge, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
+  const { config } = useWhiteLabel();
+  const primaryColor = config?.colors?.primary || '#3b82f6';
+
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm transition-all duration-200 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-6 py-4 text-left group"
+        className="w-full flex items-center justify-between px-6 py-4 text-left group transition-colors duration-150 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20"
       >
-        <div className="flex items-center gap-3">
-          {Icon && <span className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
-            <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          </span>}
-          <div>
-            <span className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</span>
-            {badge && <span className="ml-2 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">{badge}</span>}
+        <div className="flex items-center gap-3.5 min-w-0">
+          {Icon && (
+            <span
+              className="p-2 rounded-xl transition-all duration-200 border border-zinc-100 dark:border-zinc-800 shrink-0"
+              style={{
+                backgroundColor: open ? `${primaryColor}15` : undefined,
+                color: open ? primaryColor : '#71717a',
+              }}
+            >
+              <Icon className="w-4.5 h-4.5" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 block truncate sm:inline-block">
+              {title}
+            </span>
+            {badge && (
+              <span
+                className="inline-block ml-2 text-[10px] px-2 py-0.5 rounded-full font-semibold border select-none shrink-0"
+                style={{
+                  backgroundColor: `${primaryColor}10`,
+                  color: primaryColor,
+                  borderColor: `${primaryColor}20`,
+                }}
+              >
+                {badge}
+              </span>
+            )}
           </div>
         </div>
-        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 text-zinc-400 dark:text-zinc-500 transition-transform duration-300 shrink-0 ml-4 ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
       </button>
       {open && (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-6 py-5">
+        <div className="border-t border-zinc-100 dark:border-zinc-800 px-6 py-5 bg-white dark:bg-zinc-900/50">
           {children}
         </div>
       )}
@@ -32,37 +65,59 @@ function AccordionSection({ icon: Icon, title, badge, defaultOpen = false, child
   );
 }
 
-// ─── Componentes de contenido ─────────────────────────────────────────────────
+// ─── Componentes de contenido rediseñados ──────────────────────────────────────
 function DocParagraph({ children }) {
-  return <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-sm">{children}</p>;
+  return <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm">{children}</p>;
 }
 
 function DocSubsection({ title, children, icon: Icon, color = 'blue' }) {
-  const colors = {
-    blue: 'border-blue-500 bg-blue-50 dark:bg-blue-900/10',
-    green: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10',
-    orange: 'border-orange-500 bg-orange-50 dark:bg-orange-900/10',
-    purple: 'border-purple-500 bg-purple-50 dark:bg-purple-900/10',
-    red: 'border-red-500 bg-red-50 dark:bg-red-900/10',
+  const { config } = useWhiteLabel();
+  const primary = config?.colors?.primary || '#3b82f6';
+  const success = config?.colors?.success || '#10b981';
+  const warning = config?.colors?.warning || '#f59e0b';
+  const error = config?.colors?.error || '#ef4444';
+
+  const colorMap = {
+    blue: { border: primary, bg: `${primary}08` },
+    green: { border: success, bg: `${success}08` },
+    orange: { border: warning, bg: `${warning}08` },
+    purple: { border: primary, bg: `${primary}08` },
+    red: { border: error, bg: `${error}08` },
   };
+
+  const c = colorMap[color] || colorMap.blue;
+
   return (
-    <div className={`border-l-4 ${colors[color]} rounded-r-xl px-4 py-3 mb-4`}>
-      {title && <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">
-        {Icon && <Icon className="w-4 h-4" />}
-        {title}
-      </h4>}
+    <div
+      className="border-l-4 rounded-r-xl px-4 py-3 mb-4 shadow-sm border-opacity-70"
+      style={{ borderColor: c.border, backgroundColor: c.bg }}
+    >
+      {title && (
+        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 mb-2 flex items-center gap-2">
+          {Icon && <Icon className="w-3.5 h-3.5" style={{ color: c.border }} />}
+          {title}
+        </h4>
+      )}
       {children}
     </div>
   );
 }
 
 function DocSteps({ steps }) {
+  const { config } = useWhiteLabel();
+  const primaryColor = config?.colors?.primary || '#3b82f6';
+
   return (
-    <ol className="space-y-2 my-3">
+    <ol className="space-y-3 my-4">
       {steps.map((step, i) => (
-        <li key={i} className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5">{i + 1}</span>
-          <span dangerouslySetInnerHTML={{ __html: step }} />
+        <li key={i} className="flex items-start gap-3.5 text-sm text-zinc-600 dark:text-zinc-400">
+          <span
+            className="w-5.5 h-5.5 rounded-full text-white flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5 shadow-sm"
+            style={{ backgroundColor: primaryColor }}
+          >
+            {i + 1}
+          </span>
+          <span className="leading-relaxed pt-0.5" dangerouslySetInnerHTML={{ __html: step }} />
         </li>
       ))}
     </ol>
@@ -70,19 +125,30 @@ function DocSteps({ steps }) {
 }
 
 function DocList({ items, color = 'blue' }) {
+  const { config } = useWhiteLabel();
+  const primary = config?.colors?.primary || '#3b82f6';
+  const success = config?.colors?.success || '#10b981';
+  const warning = config?.colors?.warning || '#f59e0b';
+  const error = config?.colors?.error || '#ef4444';
+
   const dotColors = {
-    blue: 'bg-blue-500',
-    green: 'bg-emerald-500',
-    orange: 'bg-orange-500',
-    red: 'bg-red-500'
+    blue: primary,
+    green: success,
+    orange: warning,
+    red: error,
   };
 
+  const activeColor = dotColors[color] || primary;
+
   return (
-    <ul className="space-y-1.5 my-2">
+    <ul className="space-y-2 my-3">
       {items.map((item, i) => (
-        <li key={i} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-          <span className={`w-1.5 h-1.5 rounded-full ${dotColors[color] || dotColors.blue} flex-shrink-0 mt-1.5`} />
-          <span dangerouslySetInnerHTML={{ __html: item }} />
+        <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+          <span
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2 shadow-sm animate-pulse"
+            style={{ backgroundColor: activeColor }}
+          />
+          <span className="leading-relaxed" dangerouslySetInnerHTML={{ __html: item }} />
         </li>
       ))}
     </ul>
@@ -90,74 +156,111 @@ function DocList({ items, color = 'blue' }) {
 }
 
 function DocAlert({ type = 'info', children }) {
+  const { config } = useWhiteLabel();
+  const primary = config?.colors?.primary || '#3b82f6';
+  const success = config?.colors?.success || '#10b981';
+  const warning = config?.colors?.warning || '#f59e0b';
+  const error = config?.colors?.error || '#ef4444';
+
   const styles = {
-    info: { bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700', text: 'text-blue-800 dark:text-blue-200', Icon: Info },
-    warning: { bg: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700', text: 'text-orange-800 dark:text-orange-200', Icon: AlertTriangle },
-    success: { bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700', text: 'text-emerald-800 dark:text-emerald-200', Icon: CheckCircle },
-    tip: { bg: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700', text: 'text-purple-800 dark:text-purple-200', Icon: Star },
+    info: { border: primary, bg: `${primary}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: Info },
+    warning: { border: warning, bg: `${warning}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: AlertTriangle },
+    success: { border: success, bg: `${success}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: CheckCircle },
+    tip: { border: primary, bg: `${primary}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: Star },
   };
+
   const s = styles[type] || styles.info;
+
   return (
-    <div className={`flex items-start gap-3 p-3 rounded-xl border ${s.bg} ${s.text} text-sm my-3`}>
-      <s.Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-      <div>{children}</div>
+    <div
+      className={`flex items-start gap-3 p-3.5 rounded-xl border ${s.text} text-xs my-3 shadow-sm`}
+      style={{ borderColor: s.border, backgroundColor: s.bg }}
+    >
+      <s.Icon className="w-4 h-4 flex-shrink-0 mt-0.5 animate-bounce-slow" style={{ color: s.border }} />
+      <div className="leading-relaxed">{children}</div>
     </div>
   );
 }
 
 function DocCode({ children }) {
-  return <code className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>;
+  return (
+    <code className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-200 dark:border-zinc-700/50">
+      {children}
+    </code>
+  );
 }
 
 function DocBadge({ status }) {
   const map = {
-    'bloqueo_temporal': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    'procesando': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    'confirmado': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-    'cancelado': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-    'cedido': 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
+    bloqueo_temporal: 'bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-900',
+    procesando: 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900',
+    confirmado: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900',
+    cancelado: 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/20 dark:text-red-300 dark:border-red-900',
+    cedido: 'bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-700'}`}>{status}</span>;
+  return (
+    <span className={`px-2 py-0.5 border rounded-full text-[10px] font-semibold tracking-wide uppercase select-none shrink-0 ${
+      map[status] || 'bg-zinc-50 text-zinc-700 border-zinc-200'
+    }`}>
+      {status}
+    </span>
+  );
 }
 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export default function Documentacion() {
+  const { config } = useWhiteLabel();
+  const primaryColor = config?.colors?.primary || '#3b82f6';
+  const secondaryColor = config?.colors?.secondary || '#64748b';
+
   return (
-    <div className="p-6 space-y-4 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <PageHeader
         title="Documentación"
         description="El manual completo del sistema: todo lo que necesitás saber para trabajar sin capacitación previa."
         icon={BookOpen}
       />
 
-      {/* INTRO */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
-        <h2 className="text-xl font-bold mb-2">¿Qué es este sistema?</h2>
-        <p className="text-blue-100 text-sm leading-relaxed mb-4">
+      {/* INTRO HERO */}
+      <div
+        className="relative overflow-hidden rounded-2xl p-6 md:p-8 text-white shadow-md border border-zinc-200/10"
+        style={{
+          background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`
+        }}
+      >
+        {/* Decoración */}
+        <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/5 blur-xl" />
+        <div className="pointer-events-none absolute -bottom-10 right-16 h-28 w-28 rounded-full bg-white/5 blur-xl" />
+
+        <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 select-none">¿Qué es este sistema?</h2>
+        <p className="text-white/90 text-sm leading-relaxed mb-6 max-w-3xl">
           Es una plataforma integral para la gestión de <strong>cupos aéreos</strong> (bloqueos de asientos en vuelos).
           Permite al operador mayorista cargar, distribuir y controlar sus cupos, y a las agencias minoristas hacer reservas
-          para sus clientes de forma simple y segura.
+          para sus clientes de forma simple, automatizada y segura.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
           {[
-            { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo' },
-            { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas' },
-            { icon: '🤖', title: 'IA integrada', desc: 'Asistente que reserva leyendo DNI y hablando naturalmente' },
+            { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo.' },
+            { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas.' },
+            { icon: '🤖', title: 'IA integrada', desc: 'Asistente que procesa DNI y asiste en lenguaje natural.' },
           ].map(card => (
-            <div key={card.title} className="bg-white/10 rounded-xl p-3">
-              <div className="text-2xl mb-1">{card.icon}</div>
-              <div className="font-semibold text-sm">{card.title}</div>
-              <div className="text-xs text-blue-200">{card.desc}</div>
+            <div
+              key={card.title}
+              className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-all duration-200 hover:scale-[1.01] hover:shadow-sm"
+            >
+              <div className="text-2xl mb-1.5">{card.icon}</div>
+              <div className="font-semibold text-sm leading-tight">{card.title}</div>
+              <div className="text-xs text-white/80 mt-1">{card.desc}</div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
 
         {/* ─── DISPONIBILIDAD / CUPOS ─── */}
         <AccordionSection icon={Calendar} title="Disponibilidad y Cupos" badge="Inicio de todo" defaultOpen>
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Qué es la pantalla de Disponibilidad?" color="blue" icon={Info}>
               <DocParagraph>
                 Es el catálogo de vuelos disponibles para reservar. Cada fila es un <strong>producto</strong>: un bloqueo de asientos en un vuelo específico,
@@ -208,7 +311,7 @@ export default function Documentacion() {
 
         {/* ─── RESERVAS ─── */}
         <AccordionSection icon={Calendar} title="Gestión de Reservas">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
 
             <DocSubsection title="Estados de una reserva" color="blue" icon={Info}>
               <DocParagraph>Cada reserva tiene un estado que refleja su situación en el flujo de ventas:</DocParagraph>
@@ -222,7 +325,7 @@ export default function Documentacion() {
                 ].map(r => (
                   <div key={r.status} className="flex items-start gap-3">
                     <DocBadge status={r.status} />
-                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400">{r.desc}</span>
                   </div>
                 ))}
               </div>
@@ -282,7 +385,7 @@ export default function Documentacion() {
 
         {/* ─── PRODUCTOS ─── */}
         <AccordionSection icon={Package} title="Gestión de Productos (Cupos)">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Qué es un producto?" color="blue" icon={Info}>
               <DocParagraph>
                 Un producto representa un <strong>bloqueo aéreo</strong>: un conjunto de asientos comprados al mayoreo en un vuelo específico.
@@ -327,7 +430,7 @@ export default function Documentacion() {
 
         {/* ─── TRANSFERENCIAS ─── */}
         <AccordionSection icon={ArrowRightLeft} title="Cesión de Cupos entre Agencias" badge="Importante">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Qué es la cesión de cupos?" color="blue" icon={Info}>
               <DocParagraph>
                 El operador mayorista (owner) puede <strong>ceder (prestar) cupos</strong> de sus productos a otras agencias. Esto crea
@@ -369,7 +472,7 @@ export default function Documentacion() {
 
         {/* ─── CHAT IA ─── */}
         <AccordionSection icon={MessageSquare} title="Asistente IA" badge="Nuevo">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Para qué sirve el Asistente IA?" color="blue" icon={Info}>
               <DocParagraph>
                 El Asistente IA es un chat integrado que te permite <strong>consultar disponibilidad, crear reservas y gestionar tu trabajo
@@ -402,19 +505,19 @@ export default function Documentacion() {
             <DocSubsection title="Leer documentos de identidad con el IA" color="green" icon={User}>
               <DocSteps steps={[
                 'Hacé click en el ícono de clip (<strong>adjuntar</strong>) en el chat.',
-                'Seleccioná una foto del DNI o pasaporte.',
-                'El IA extrae todos los datos del pasajero automáticamente (nombre, apellido, documento, fecha de nacimiento, nacionalidad).',
-                'Confirma los datos y los usa directamente para la reserva.',
+                'Seleccioná una o varias fotos del DNI o pasaportes.',
+                'El IA extrae todos los datos de los pasajeros automáticamente (nombre, apellido, documento, fecha de nacimiento, nacionalidad).',
+                'Confirma el listado de datos extraídos dando tu "OK" y los usará directamente para procesar tus reservas individuales de forma masiva.',
               ]} />
               <DocAlert type="info">
-                También podés usar el botón <strong>"Leer DNI"</strong> en la barra inferior del chat como atajo rápido.
+                También podés usar el botón <strong>"Leer DNI"</strong> en la barra inferior del chat como atajo rápido para subir tus identificaciones.
               </DocAlert>
             </DocSubsection>
 
             <DocSubsection title="Acciones que puede hacer el IA" color="orange" icon={Star}>
               <DocList items={[
                 'Buscar productos disponibles por destino, fecha o compañía.',
-                'Crear reservas con datos completos del pasajero.',
+                'Crear reservas individuales o masivas con datos de pasajeros.',
                 'Ver tus reservas existentes.',
                 '<strong>(Solo admins)</strong> Ver todas las reservas del sistema.',
                 '<strong>(Solo admins)</strong> Confirmar o cancelar reservas.',
@@ -429,7 +532,7 @@ export default function Documentacion() {
 
         {/* ─── DISEÑO / WHITELABEL ─── */}
         <AccordionSection icon={Palette} title="Diseño y Marca (White Label)">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Qué es el White Label?" color="blue" icon={Info}>
               <DocParagraph>
                 La sección de <strong>Diseño</strong> te permite personalizar completamente la apariencia del sistema con los colores,
@@ -467,7 +570,7 @@ export default function Documentacion() {
 
         {/* ─── EMAIL ─── */}
         <AccordionSection icon={Mail} title="Configuración de Email y Notificaciones">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Para qué se usa el email?" color="blue" icon={Info}>
               <DocList items={[
                 'Confirmación de nueva reserva (enviado al pasajero).',
@@ -501,7 +604,7 @@ export default function Documentacion() {
 
         {/* ─── REPORTES ─── */}
         <AccordionSection icon={BarChart3} title="Reportes y Dashboard">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="Dashboard principal" color="blue" icon={Info}>
               <DocParagraph>
                 El Dashboard muestra un resumen ejecutivo en tiempo real: ventas totales, reservas activas, cupos disponibles y productos más vendidos.
@@ -532,17 +635,17 @@ export default function Documentacion() {
 
         {/* ─── USUARIOS Y ROLES ─── */}
         <AccordionSection icon={Users} title="Usuarios, Roles y Permisos" badge="Solo admins">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="Roles del sistema" color="blue" icon={Shield}>
               <div className="space-y-2 mt-2">
                 {[
-                  { role: 'admin', color: 'bg-red-100 text-red-800', desc: 'Acceso total al sistema. Ve todo, puede hacer todo.' },
-                  { role: 'agency_admin', color: 'bg-purple-100 text-purple-800', desc: 'Administrador de su agencia. Ve todas las reservas de su agencia, puede confirmar y cancelar.' },
-                  { role: 'agency_user', color: 'bg-blue-100 text-blue-800', desc: 'Agente de viajes. Ve y gestiona sus propias reservas. No puede ver reservas de otros agentes.' },
+                  { role: 'admin', color: 'border-red-200 text-red-800 bg-red-50 dark:bg-red-950/20 dark:text-red-300 dark:border-red-900', desc: 'Acceso total al sistema. Ve todo, puede hacer todo.' },
+                  { role: 'agency_admin', color: 'border-purple-200 text-purple-800 bg-purple-50 dark:bg-purple-950/20 dark:text-purple-300 dark:border-purple-900', desc: 'Administrador de su agencia. Ve todas las reservas de su agencia, puede confirmar y cancelar.' },
+                  { role: 'agency_user', color: 'border-blue-200 text-blue-800 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900', desc: 'Agente de viajes. Ve y gestiona sus propias reservas. No puede ver reservas de otros agentes.' },
                 ].map(r => (
                   <div key={r.role} className="flex items-start gap-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.color} flex-shrink-0 mt-0.5`}>{r.role}</span>
-                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                    <span className={`px-2 py-0.5 border rounded-full text-[10px] font-bold tracking-wide uppercase select-none shrink-0 ${r.color} mt-0.5`}>{r.role}</span>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{r.desc}</span>
                   </div>
                 ))}
               </div>
@@ -573,7 +676,7 @@ export default function Documentacion() {
 
         {/* ─── AGENCIAS ─── */}
         <AccordionSection icon={Building2} title="Gestión de Agencias" badge="Solo admins">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Qué es una agencia?" color="blue" icon={Info}>
               <DocParagraph>
                 Una agencia es la unidad organizativa que agrupa usuarios y reservas. Cada agencia tiene su propio código único
@@ -595,7 +698,7 @@ export default function Documentacion() {
 
         {/* ─── LOGS Y AUDITORÍA ─── */}
         <AccordionSection icon={FileSearch} title="Logs y Auditoría" badge="Solo admins">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="¿Qué registra el sistema?" color="blue" icon={Info}>
               <DocParagraph>
                 Cada acción importante queda registrada en el log de auditoría: quién hizo qué, cuándo y con qué datos.
@@ -623,7 +726,7 @@ export default function Documentacion() {
 
         {/* ─── SISTEMA / TÉCNICO ─── */}
         <AccordionSection icon={Settings} title="Panel de Control y Configuración del Sistema" badge="Solo admins">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="Backup del sistema" color="blue" icon={Database}>
               <DocSteps steps={[
                 'Ingresá a <strong>Panel de Control → Backup</strong>.',
@@ -659,7 +762,7 @@ export default function Documentacion() {
 
         {/* ─── ATAJOS RÁPIDOS ─── */}
         <AccordionSection icon={Zap} title="Guía de inicio rápido: primeros 10 minutos">
-          <div className="space-y-4">
+          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
             <DocSubsection title="Si sos agente de viajes y acabás de entrar" color="green" icon={CheckCircle}>
               <DocSteps steps={[
                 'Ingresá con tu email y contraseña. Si no tenés credenciales, pedíselas al administrador.',
@@ -686,9 +789,9 @@ export default function Documentacion() {
       </div>
 
       {/* Footer */}
-      <div className="text-center text-xs text-slate-400 dark:text-slate-600 pt-4 pb-8">
-        <p>Sistema de Gestión de Cupos de Viajes Aéreos — Documentación v2.0</p>
-        <p className="mt-1">¿Algo no está claro? Usá el Chat IA para preguntar directamente al asistente.</p>
+      <div className="text-center text-xs text-zinc-400 dark:text-zinc-600 pt-6 pb-10 select-none">
+        <p>Sistema de Gestión de Cupos de Viajes Aéreos — Documentación v2.1</p>
+        <p className="mt-1">¿Algo no está claro? Abrí el Chat de IA para preguntar directamente al asistente.</p>
       </div>
     </div>
   );

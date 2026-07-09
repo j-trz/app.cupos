@@ -88,13 +88,17 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
         setShowSessions(false);
     };
 
-    const handleSendMessage = async (content, imageData = null) => {
+    const handleSendMessage = async (content, attachments = []) => {
+        // Normalizar los adjuntos para asegurar que sea un arreglo
+        const activeAttachments = Array.isArray(attachments) ? attachments : (attachments ? [attachments] : []);
+
         // Agregar mensaje del usuario inmediatamente
         const userMessage = {
             id: `temp-${Date.now()}`,
             role: 'user',
             content,
-            imagePreview: imageData?.dataUrl || null,
+            imagePreview: activeAttachments[0]?.dataUrl || null, // Retrocompatibilidad
+            imagePreviews: activeAttachments.map(img => img.dataUrl), // Soporte para múltiples adjuntos
             created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, userMessage]);
@@ -105,8 +109,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
             const response = await AIService.sendMessage(
                 content,
                 currentSessionId,
-                imageData?.base64 || null,
-                imageData?.mime || null
+                activeAttachments
             );
 
             // Actualizar ID de sesión si es nueva
@@ -279,6 +282,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                                 toolCalls={msg.tool_calls || msg.toolCalls}
                                 isError={msg.isError}
                                 imagePreview={msg.imagePreview}
+                                imagePreviews={msg.imagePreviews}
                             />
                         ))}
 
