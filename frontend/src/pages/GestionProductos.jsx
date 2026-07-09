@@ -24,6 +24,7 @@ import { useAgencies } from '../hooks/useAgencies';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
+import BaggageFranchise from '../components/BaggageFranchise.jsx';
 
 const formatDate = formatDateOnly;
 
@@ -377,12 +378,7 @@ const GestionProductos = () => {
                     <TableCell>{formatMoney(product.neto_1)}</TableCell>
                     <TableCell>{formatMoney(product.op)}</TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {product.carryon && <Badge variant="secondary" className="text-[10px]">Carry-on</Badge>}
-                        {product.handbag && <Badge variant="secondary" className="text-[10px]">Handbag</Badge>}
-                        {product.checkedbag && <Badge variant="secondary" className="text-[10px]">Checked</Badge>}
-                        {!product.carryon && !product.handbag && !product.checkedbag && '—'}
-                      </div>
+                      <BaggageFranchise item={product} />
                     </TableCell>
                     <TableCell>
                       <Badge variant={product.is_blocked_for_sale ? 'danger' : 'success'}>

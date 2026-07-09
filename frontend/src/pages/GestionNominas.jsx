@@ -486,7 +486,7 @@ export default function GestionNominas() {
     if (!editingRow) return;
     setSavingPassenger(true);
     try {
-      await Promise.all([
+      const calls = [
         ReservationService.updatePassenger(editingRow.reservaId, editingRow.passengerId, {
           nombre: editForm.nombre,
           apellido: editForm.apellido,
@@ -497,10 +497,15 @@ export default function GestionNominas() {
           precio_venta: editForm.precio_venta === '' ? null : Number(editForm.precio_venta),
           neto_1: editForm.neto_1 === '' ? null : Number(editForm.neto_1),
         }),
-        ReservationService.updatePassengerTicket(editingRow.reservaId, editingRow.passengerId, {
+      ];
+      // El backend rechaza el update de ticket si no hay ningún campo con
+      // valor (numero_ticket vacío = nada que guardar).
+      if (editForm.numero_ticket && editForm.numero_ticket.trim()) {
+        calls.push(ReservationService.updatePassengerTicket(editingRow.reservaId, editingRow.passengerId, {
           numero_ticket: editForm.numero_ticket,
-        }),
-      ]);
+        }));
+      }
+      await Promise.all(calls);
       Swal.fire({ icon: 'success', title: 'Pasajero actualizado', timer: 1500, showConfirmButton: false });
       closeEditPassenger();
       await fetchData();

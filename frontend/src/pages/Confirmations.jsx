@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import clsx from 'clsx';
-import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, Backpack, ShoppingBag, Luggage } from 'lucide-react';
+import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, XCircle } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -12,6 +11,7 @@ import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
+import BaggageFranchise from '../components/BaggageFranchise.jsx';
 
 const statusLabel = (status) => status || 'Confirmado';
 
@@ -20,27 +20,6 @@ const formatMoney = (value) => {
   if (!value || Number.isNaN(n)) return '—';
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-
-// Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
-function BaggageIcon({ icon: Icon, included, label }) {
-  const isIncluded = !!included;
-  return (
-    <span role="img" aria-label={`${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`} className="relative inline-flex h-6 w-6 items-center justify-center">
-      <Icon className={clsx('h-4 w-4', isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
-      {!isIncluded && <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />}
-    </span>
-  );
-}
-
-function BaggageFranchise({ item }) {
-  return (
-    <div className="flex items-center justify-center gap-2">
-      <BaggageIcon icon={Backpack} included={item.CarryOn} label="Carry-on" />
-      <BaggageIcon icon={ShoppingBag} included={item.HandBag} label="Handbag" />
-      <BaggageIcon icon={Luggage} included={item.CheckedBag} label="Valija despachada" />
-    </div>
-  );
-}
 
 export default function Confirmations() {
   const [data, setData] = useState([]);
@@ -93,6 +72,25 @@ export default function Confirmations() {
       console.error(error);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleRequestCancellation = async (item) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: '¿Solicitar cancelación?',
+      text: '¿Solicitás la cancelación de esta reserva? El administrador decidirá si se cancela.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, solicitar',
+      cancelButtonText: 'No',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await ReservationService.requestCancellation(item.id);
+      Swal.fire({ icon: 'success', title: 'Solicitud enviada', text: 'El administrador revisará el pedido.', timer: 2000, showConfirmButton: false });
+      fetchConfirmations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo enviar la solicitud.' });
     }
   };
 
@@ -152,18 +150,19 @@ export default function Confirmations() {
               <TableHead className="text-center">Equipaje</TableHead>
               <TableHead className="text-center">Tarifa</TableHead>
               <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={12}>
+                <TableCell className="text-center py-10" colSpan={13}>
                   Cargando confirmaciones...
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={12}>
+                <TableCell className="text-center py-10" colSpan={13}>
                   No hay confirmaciones registradas.
                 </TableCell>
               </TableRow>
@@ -197,6 +196,17 @@ export default function Confirmations() {
                   <TableCell className="text-center">{formatMoney(item.Vuelo_Precio)}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="success">{statusLabel(item.Estado)}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleRequestCancellation(item)}
+                      title="Solicitar cancelación de esta reserva"
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Solicitar cancelación
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))

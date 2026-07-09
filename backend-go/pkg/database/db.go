@@ -175,6 +175,11 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS servicio TEXT DEFAULT '';`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS notas_externas TEXT DEFAULT '';`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS notas_internas TEXT DEFAULT '';`,
+		// passengers.neto_1/precio_venta: existen en el modelo hace tiempo pero
+		// nunca quedaron creadas en la tabla real (AutoMigrate no las agregó),
+		// causando "column neto_1 does not exist" al editar un pasajero.
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS neto_1 numeric DEFAULT 0;`,
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS precio_venta numeric DEFAULT 0;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

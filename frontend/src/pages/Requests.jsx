@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import clsx from 'clsx';
-import { ClipboardList, Clock3, RefreshCw, FileText, XCircle, MapPin, X, Backpack, ShoppingBag, Luggage } from 'lucide-react';
+import { ClipboardList, Clock3, RefreshCw, FileText, XCircle, MapPin, X } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -13,6 +12,7 @@ import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
+import BaggageFranchise from '../components/BaggageFranchise.jsx';
 
 const statusVariant = (status) => {
   if (!status) return 'default';
@@ -27,27 +27,6 @@ const formatMoney = (value) => {
   if (!value || Number.isNaN(n)) return '—';
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-
-// Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
-function BaggageIcon({ icon: Icon, included, label }) {
-  const isIncluded = !!included;
-  return (
-    <span role="img" aria-label={`${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`} className="relative inline-flex h-6 w-6 items-center justify-center">
-      <Icon className={clsx('h-4 w-4', isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
-      {!isIncluded && <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />}
-    </span>
-  );
-}
-
-function BaggageFranchise({ item }) {
-  return (
-    <div className="flex items-center justify-center gap-2">
-      <BaggageIcon icon={Backpack} included={item.CarryOn} label="Carry-on" />
-      <BaggageIcon icon={ShoppingBag} included={item.HandBag} label="Handbag" />
-      <BaggageIcon icon={Luggage} included={item.CheckedBag} label="Valija despachada" />
-    </div>
-  );
-}
 
 export default function Requests() {
   const [data, setData] = useState([]);

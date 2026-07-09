@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download, MapPin, StickyNote } from 'lucide-react';
-import clsx from 'clsx';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Download, MapPin, StickyNote } from 'lucide-react';
 import ItineraryTable from '../components/ItineraryTable';
+import BaggageFranchise from '../components/BaggageFranchise.jsx';
 import ReservationService from '../services/reservationService';
 import BackofficeService from '../services/backofficeService';
 import Swal from 'sweetalert2';
@@ -27,35 +27,6 @@ const EMPTY_FORM = {
 };
 
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
-
-// Ícono de franquicia de equipaje: verde si incluye, gris y tachado si no.
-function BaggageIcon({ icon: Icon, included, label }) {
-  const isIncluded = !!included;
-  const ariaLabel = `${label}: ${isIncluded ? 'Incluido' : 'No incluido'}`;
-
-  return (
-    <span
-      role="img"
-      aria-label={ariaLabel}
-      className="relative inline-flex h-6 w-6 items-center justify-center"
-    >
-      <Icon className={clsx('h-4 w-4', isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
-      {!isIncluded && (
-        <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />
-      )}
-    </span>
-  );
-}
-
-function BaggageFranchise({ item }) {
-  return (
-    <div className="flex items-center justify-center gap-2">
-      <BaggageIcon icon={Backpack} included={item.carryon} label="Carry-on" />
-      <BaggageIcon icon={ShoppingBag} included={item.handbag} label="Handbag" />
-      <BaggageIcon icon={Luggage} included={item.checkedbag} label="Valija despachada" />
-    </div>
-  );
-}
 
 export default function Availability() {
   const [data, setData] = useState([]);
@@ -695,7 +666,6 @@ export default function Availability() {
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Notas</h3>
                 <p className="whitespace-pre-wrap rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
                   {notesModalProduct.notas_externas || 'Sin notas.'}
                 </p>
