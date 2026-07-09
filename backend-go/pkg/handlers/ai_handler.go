@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ─────────────────────────────────────────────
@@ -434,57 +435,104 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		if err != nil {
 			return `{"error": "ID de producto inválido"}`
 		}
-		var product models.Product
-		if err := database.DB.First(&product, productID).Error; err != nil {
-			return `{"error": "Producto no encontrado"}`
-		}
-		if product.Disponibilidad <= 0 {
-			return `{"error": "El producto no tiene disponibilidad"}`
-		}
 
-		// Precio: siempre del producto, nunca pedido al usuario
-		precio := product.Precio
+		var reserva models.Reservation
 
-		pedidoID := fmt.Sprintf("AI-%d", time.Now().Unix())
-		agencia := u.Agencia
-		if agencia == "" {
-			agencia = "Sin agencia"
-		}
-
-		strArg := func(key string) string {
-			if v, ok := args[key]; ok && v != nil && fmt.Sprintf("%v", v) != "<nil>" {
-				return fmt.Sprintf("%v", v)
+		err = database.DB.Transaction(func(tx *gorm.DB) error {
+			var product models.Product
+			// SELECT ... FOR UPDATE para evitar condiciones de carrera y bloquear la fila del producto
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, productID).Error; err != nil {
+				return fmt.Errorf("Producto no encontrado")
 			}
-			return ""
-		}
+			if product.Disponibilidad <= 0 {
+				return fmt.Errorf("El producto no tiene disponibilidad")
+			}
 
-		reserva := models.Reservation{
-			ProductID:            uint(productID),
-			CreatedBy:            u.ID,
-			Estado:               models.EstadoBloqueoTemporal,
-			PrecioVenta:          precio,
-			Neto1:                product.Neto1,
-			PedidoID:             pedidoID,
-			Agencia:              agencia,
-			ContactoNombre:       strArg("contacto_nombre"),
-			ContactoEmail:        strArg("contacto_email"),
-			ContactoTelefono:     strArg("contacto_telefono"),
-			NombrePasajero:       strArg("pasajero_nombre"),
-			ApellidoPasajero:     strArg("pasajero_apellido"),
-			DocumentoPasajero:    strArg("pasajero_documento"),
-			NacionalidadPasajero: strArg("pasajero_nacionalidad"),
-		}
+			precio := product.Precio
+			pedidoID := fmt.Sprintf("AI-%d-%d", time.Now().Unix(), uint(productID))
+			agencia := u.Agencia
+			if agencia == "" {
+				agencia = "Sin agencia"
+			}
 
-		if err := database.DB.Create(&reserva).Error; err != nil {
-			return fmt.Sprintf(`{"error": "Error al crear reserva: %s"}`, err.Error())
+			strArg := func(key string) string {
+				if v, ok := args[key]; ok && v != nil && fmt.Sprintf("%v", v) != "<nil>" {
+					return fmt.Sprintf("%v", v)
+				}
+				return ""
+			}
+
+			reserva = models.Reservation{
+				ProductID:            uint(productID),
+				CreatedBy:            u.ID,
+				Estado:               models.EstadoBloqueoTemporal,
+				PrecioVenta:          precio,
+				Neto1:                product.Neto1,
+				PedidoID:             pedidoID,
+				Agencia:              agencia,
+				ContactoNombre:       strArg("contacto_nombre"),
+				ContactoEmail:        strArg("contacto_email"),
+				ContactoTelefono:     strArg("contacto_telefono"),
+				NombrePasajero:       strArg("pasajero_nombre"),
+				ApellidoPasajero:     strArg("pasajero_apellido"),
+				DocumentoPasajero:    strArg("pasajero_documento"),
+				NacionalidadPasajero: strArg("pasajero_nacionalidad"),
+			}
+
+			// Copiar datos de vuelo y ruta del producto
+			reserva.VueloCodigo = product.CodigoCupo
+			reserva.VueloDestino = product.Destino
+			reserva.VueloCompania = product.Compania
+			reserva.VueloSalida = product.FechaSalida
+			reserva.VueloRuta = product.Ruta
+
+			blockMinutes := product.BloqueoTemporalMinutos
+			if blockMinutes <= 0 {
+				blockMinutes = 60
+			}
+			expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
+			reserva.BloqueoExpiraAt = &expiresAt
+
+			if err := tx.Create(&reserva).Error; err != nil {
+				return err
+			}
+
+			// Descontar disponibilidad e incrementar vendidos de forma atómica y segura
+			if err := tx.Model(&models.Product{}).Where("id = ?", productID).
+				Updates(map[string]interface{}{
+					"disponibilidad": product.Disponibilidad - 1,
+					"vendidos":       product.Vendidos + 1,
+				}).Error; err != nil {
+				return err
+			}
+
+			// Crear también la fila en Passenger (esencial para que figure en la nómina)
+			pax := models.Passenger{
+				ReservationID:   reserva.ID,
+				PedidoID:        reserva.PedidoID,
+				Nombre:          reserva.NombrePasajero,
+				Apellido:        reserva.ApellidoPasajero,
+				Documento:       reserva.DocumentoPasajero,
+				Nacionalidad:    reserva.NacionalidadPasajero,
+				Estado:          reserva.Estado,
+				PrecioVenta:     reserva.PrecioVenta,
+				Neto1:           reserva.Neto1,
+				BloqueoExpiraAt: reserva.BloqueoExpiraAt,
+				NRO:             1,
+			}
+			if err := tx.Create(&pax).Error; err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Sprintf(`{"error": "Error al procesar reserva: %s"}`, err.Error())
 		}
-		// Descontar disponibilidad
-		database.DB.Model(&models.Product{}).Where("id = ?", productID).
-			UpdateColumn("disponibilidad", product.Disponibilidad-1)
 
 		// El neto es confidencial para usuarios no administradores — no debe
-		// filtrarse ni siquiera dentro del resultado de una tool call, porque
-		// termina en el contexto del modelo y puede terminar repetido en el chat.
+		// filtrarse ni siquiera dentro del resultado de una tool call.
 		if isRegularUser(u.Role) {
 			reserva.Neto1 = 0
 		}
@@ -492,7 +540,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		b, _ := json.Marshal(map[string]interface{}{
 			"exito":   true,
 			"reserva": reserva,
-			"mensaje": fmt.Sprintf("Reserva creada con ID %d y pedido %s", reserva.ID, pedidoID),
+			"mensaje": fmt.Sprintf("Reserva creada con ID %d y pedido %s", reserva.ID, reserva.PedidoID),
 		})
 		return string(b)
 
