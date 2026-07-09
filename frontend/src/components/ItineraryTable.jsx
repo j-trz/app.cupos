@@ -102,15 +102,25 @@ function extractSegmentLines(text) {
   const SEG = /^\s*(\d+\s+)?[A-Z]{2}[\d\s]/;
 
   const byLine = norm.split('\n').filter(l => SEG.test(l));
-  if (byLine.length > 0) return byLine;
-
   const bySegNo = norm.split(/(?=\s+\d+\s+[A-Z]{2})/).map(s => s.trim()).filter(s => SEG.test(s));
-  if (bySegNo.length > 1) return bySegNo;
-
   const byFlight = norm
     .split(/(?=[A-Z]{2}\d{3,4}\b)/)
     .map(s => s.trim())
     .filter(s => /^[A-Z]{2}\d{3,4}/.test(s));
+
+  // Cuando la ruta viene en una sola línea (ej. el campo "Ruta" del producto es
+  // un input de texto simple, sin saltos de línea reales), byLine matchea el
+  // string completo como "una sola línea" y devolvía SIEMPRE 1 solo segmento,
+  // aunque el texto tuviera varios vuelos concatenados. Elegimos la estrategia
+  // que efectivamente logre separar en más de un segmento; solo si ninguna lo
+  // logra asumimos que realmente es un único vuelo.
+  const candidates = [byLine, bySegNo, byFlight].filter(arr => arr.length > 1);
+  if (candidates.length > 0) {
+    return candidates.reduce((best, cur) => (cur.length > best.length ? cur : best));
+  }
+
+  if (byLine.length > 0) return byLine;
+  if (bySegNo.length > 0) return bySegNo;
   if (byFlight.length > 0) return byFlight;
 
   return [norm.trim()].filter(s => SEG.test(s));

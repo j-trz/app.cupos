@@ -26,6 +26,7 @@ const emptyForm = {
   nombre_pasajero: '',
   apellido_pasajero: '',
   documento_pasajero: '',
+  nacimiento_pasajero: '',
   nacionalidad_pasajero: '',
   tipo_pasajero: 'Adulto',
   numero_ticket: '',
@@ -257,6 +258,9 @@ export default function GestionReservas() {
       nombre_pasajero: primaryPassenger?.nombre || r.nombre_pasajero || '',
       apellido_pasajero: primaryPassenger?.apellido || r.apellido_pasajero || '',
       documento_pasajero: primaryPassenger?.documento || r.documento_pasajero || '',
+      nacimiento_pasajero: (primaryPassenger?.nacimiento || r.nacimiento_pasajero)
+        ? String(primaryPassenger?.nacimiento || r.nacimiento_pasajero).slice(0, 10)
+        : '',
       nacionalidad_pasajero: primaryPassenger?.nacionalidad || r.nacionalidad_pasajero || '',
       tipo_pasajero: primaryPassenger?.tipo_pasajero || r.tipo_pasajero || 'Adulto',
       numero_ticket: primaryPassenger?.numero_ticket || '',
@@ -307,19 +311,21 @@ export default function GestionReservas() {
     // Reservation (el backend los bloquea ahí) — se separan y se guardan
     // aparte contra el Passenger existente (ver más abajo).
     let passengerData = null;
-    let ticketData = null;
+    let ticketValue = null;
     if (editReservation) {
       passengerData = {
         nombre: payload.nombre_pasajero,
         apellido: payload.apellido_pasajero,
         documento: payload.documento_pasajero,
+        nacimiento: payload.nacimiento_pasajero || null,
         nacionalidad: payload.nacionalidad_pasajero,
         tipo_pasajero: payload.tipo_pasajero,
       };
-      ticketData = { numero_ticket: payload.numero_ticket };
+      ticketValue = payload.numero_ticket;
       delete payload.nombre_pasajero;
       delete payload.apellido_pasajero;
       delete payload.documento_pasajero;
+      delete payload.nacimiento_pasajero;
       delete payload.nacionalidad_pasajero;
       delete payload.tipo_pasajero;
     }
@@ -333,10 +339,14 @@ export default function GestionReservas() {
       if (editReservation) {
         await ReservationService.updateReservation(editReservation.id, payload);
         if (editPassengerId) {
-          await Promise.all([
-            ReservationService.updatePassenger(editReservation.id, editPassengerId, passengerData),
-            ReservationService.updatePassengerTicket(editReservation.id, editPassengerId, ticketData),
-          ]);
+          const calls = [ReservationService.updatePassenger(editReservation.id, editPassengerId, passengerData)];
+          // El backend rechaza el update de ticket si no hay ningún campo con
+          // valor (numero_ticket vacío = nada que guardar) — solo se llama si
+          // el usuario realmente cargó/cambió el ticket.
+          if (ticketValue && ticketValue.trim()) {
+            calls.push(ReservationService.updatePassengerTicket(editReservation.id, editPassengerId, { numero_ticket: ticketValue }));
+          }
+          await Promise.all(calls);
         }
         Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
       } else {
@@ -802,6 +812,11 @@ export default function GestionReservas() {
                 <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
                   disabled={editReservation && !editPassengerId}
                   className={inputCls} placeholder="CI / Pasaporte" />
+              </Field>
+              <Field label="Nacimiento">
+                <input type="date" value={form.nacimiento_pasajero} onChange={e => setField('nacimiento_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} />
               </Field>
               <Field label="Nacionalidad">
                 <input type="text" value={form.nacionalidad_pasajero} onChange={e => setField('nacionalidad_pasajero', e.target.value)}

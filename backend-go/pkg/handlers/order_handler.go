@@ -84,8 +84,15 @@ func CreateReservation(c *gin.Context) {
 		}
 	}
 
-	// Forzar la agencia del usuario si no es admin
+	// Forzar la agencia del usuario si no es admin (no puede reservar a
+	// nombre de otra agencia, ni aunque la mande en el body). Si es admin y
+	// no envió ninguna agencia explícita (ej. se olvidó de elegirla en el
+	// formulario), caemos a la propia del admin como último recurso — sin
+	// esto, la reserva quedaba con agencia vacía y no aparecía en las tablas
+	// filtradas/agrupadas por agencia.
 	if role != "admin" && userAgencia != "" {
+		input.Reservation.Agencia = userAgencia
+	} else if input.Reservation.Agencia == "" && userAgencia != "" {
 		input.Reservation.Agencia = userAgencia
 	}
 
