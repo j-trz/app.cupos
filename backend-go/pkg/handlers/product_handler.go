@@ -109,6 +109,7 @@ func GetProducts(c *gin.Context) {
 	if role != "admin" {
 		for i := range products {
 			products[i].Neto1 = 0
+			products[i].NotasInternas = ""
 		}
 	}
 
@@ -137,6 +138,7 @@ func GetProductByID(c *gin.Context) {
 	}
 	if role != "admin" {
 		product.Neto1 = 0
+		product.NotasInternas = ""
 	}
 	c.JSON(http.StatusOK, product)
 }
@@ -232,6 +234,7 @@ func UpdateProduct(c *gin.Context) {
 		"inf_fare", "chd_fare",
 		"is_blocked_for_sale",
 		"agencia", "source_agency",
+		"servicio", "notas_internas", "notas_externas",
 	).Save(&updated).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto: " + err.Error()})
 		return

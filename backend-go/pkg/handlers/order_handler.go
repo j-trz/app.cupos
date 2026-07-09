@@ -875,3 +875,94 @@ func DuplicatePassenger(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, newPassenger)
 }
+
+// AddPassenger crea un pasajero nuevo (en blanco, con los datos que mande el
+// caller) dentro de un pedido existente — a diferencia de DuplicatePassenger,
+// que copia los datos de un pasajero ya cargado. Ocupa 1 lugar más del
+// producto y respeta su disponibilidad igual que crear una reserva nueva.
+func AddPassenger(c *gin.Context) {
+	reservationID := c.Param("id")
+
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, reservationID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	var input struct {
+		Nombre       string   `json:"nombre"`
+		Apellido     string   `json:"apellido"`
+		Documento    string   `json:"documento"`
+		Nacimiento   string   `json:"nacimiento"`
+		Nacionalidad string   `json:"nacionalidad"`
+		TipoPasajero string   `json:"tipo_pasajero"`
+		PrecioVenta  *float64 `json:"precio_venta"`
+		Neto1        *float64 `json:"neto_1"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var product models.Product
+	if err := tx.First(&product, reservation.ProductID).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+	if product.Disponibilidad < 1 {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente para agregar un pasajero"})
+		return
+	}
+
+	product.Disponibilidad -= 1
+	product.Vendidos += 1
+	if err := tx.Save(&product).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+		return
+	}
+
+	var precioVenta, neto1 float64
+	if input.PrecioVenta != nil {
+		precioVenta = *input.PrecioVenta
+	}
+	if input.Neto1 != nil {
+		neto1 = *input.Neto1
+	}
+
+	newPassenger := models.Passenger{
+		ReservationID:   reservation.ID,
+		PedidoID:        reservation.PedidoID,
+		Nombre:          input.Nombre,
+		Apellido:        input.Apellido,
+		Documento:       input.Documento,
+		Nacimiento:      parseDateFlexible(input.Nacimiento),
+		Nacionalidad:    input.Nacionalidad,
+		TipoPasajero:    input.TipoPasajero,
+		Estado:          reservation.Estado,
+		PrecioVenta:     precioVenta,
+		Neto1:           neto1,
+		BloqueoExpiraAt: reservation.BloqueoExpiraAt,
+	}
+	if err := tx.Create(&newPassenger).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al agregar el pasajero"})
+		return
+	}
+
+	tx.Commit()
+
+	services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Pasajero agregado",
+		fmt.Sprintf("Se agregó un nuevo pasajero al pedido %s", reservation.PedidoID))
+
+	c.JSON(http.StatusCreated, newPassenger)
+}

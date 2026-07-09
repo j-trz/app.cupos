@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", "./cmd/api"],
+      "cwd": "backend-go",
+      "port": 5002
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "port": 4173
+    }
+  ]
+}

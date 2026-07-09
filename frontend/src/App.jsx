@@ -1,7 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { DEFAULT_DOCS_SECTION } from './lib/docsSections.js';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
+import { SidebarProvider } from './components/ui/SidebarProvider.jsx';
 import { QueryClientProvider } from './lib/react-query';
 import { queryClient } from './lib/react-query';
 import ToastNotification from './components/ToastNotification';
@@ -39,6 +41,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <I18nProvider>
+          <SidebarProvider>
           <Router>
             <div className="App">
               <Routes>
@@ -265,6 +268,10 @@ function App() {
                 />
                 <Route
                   path="/documentacion"
+                  element={<Navigate to={`/documentacion/${DEFAULT_DOCS_SECTION}`} replace />}
+                />
+                <Route
+                  path="/documentacion/:section"
                   element={
                     <ProtectedRoute>
                       <Layout>
@@ -296,6 +303,7 @@ function App() {
               <ToastNotification />
             </div>
           </Router>
+          </SidebarProvider>
         </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 
@@ -9,6 +9,25 @@ export const Select = ({ children, value, onValueChange }) => {
   const [dropdownStyle, setDropdownStyle] = useState({});
   const triggerRef = useRef(null);
   const contentRef = useRef(null);
+
+  // Mapa value -> label derivado del árbol de elementos hijos (no del DOM
+  // montado): SelectContent solo monta sus SelectItem cuando el dropdown está
+  // abierto, así que si SelectValue dependiera de eso, mostraría el value
+  // crudo hasta el primer click. Recorriendo `children` acá, el label está
+  // disponible desde el primer render.
+  const labelMap = useMemo(() => {
+    const map = {};
+    React.Children.forEach(children, (child) => {
+      if (child?.type === SelectContent) {
+        React.Children.forEach(child.props.children, (item) => {
+          if (item?.type === SelectItem) {
+            map[item.props.value] = item.props.children;
+          }
+        });
+      }
+    });
+    return map;
+  }, [children]);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -43,7 +62,7 @@ export const Select = ({ children, value, onValueChange }) => {
   }, [open, close]);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, toggleOpen, close, triggerRef, contentRef, dropdownStyle }}>
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, toggleOpen, close, triggerRef, contentRef, dropdownStyle, labelMap }}>
       <div className="relative inline-block w-full">
         {children}
       </div>
@@ -74,8 +93,8 @@ export const SelectTrigger = ({ children, className, ...props }) => {
 };
 
 export const SelectValue = ({ placeholder, children, ...props }) => {
-  const { value } = useContext(SelectContext);
-  const display = children ?? value;
+  const { value, labelMap } = useContext(SelectContext);
+  const display = children ?? labelMap?.[value] ?? value;
   return (
     <span className="truncate" {...props}>
       {display || <span className="text-slate-400">{placeholder}</span>}

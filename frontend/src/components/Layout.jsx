@@ -4,8 +4,6 @@ import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useI18n } from '../contexts/I18nContext.jsx';
 import Sidebar from './ui/Sidebar.jsx';
 import AIChatWidget from './AIChat/AIChatWidget.jsx';
-import ThemeToggle from './ThemeToggle.jsx';
-import LanguageSelector from './LanguageSelector.jsx';
 
 export default function Layout({ children }) {
   const { user, signOut } = useAuth();
@@ -77,20 +75,16 @@ export default function Layout({ children }) {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar user={user} onLogout={handleLogout} />
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="sticky top-0 z-10 flex justify-between items-center p-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
               {getTitleByPath()}
             </h1>
           </div>
-          <div className="flex items-center space-x-4">
-            <LanguageSelector />
-            <ThemeToggle />
-          </div>
         </header>
         <main
-          className="flex-1 overflow-y-auto bg-gray-50 p-6"
+          className="flex-1 min-w-0 overflow-y-auto bg-gray-50 p-6"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
           <div className="text-gray-900 min-h-full max-w-[95%] mx-auto">

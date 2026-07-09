@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useEvolutionRevenue, useSalesByAgency, useDestinationsDetail, useTopProducts, useRiskAlerts, useOccupancy } from '../hooks/useReports';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock } from 'lucide-react';
+import { Lock, BarChart3 } from 'lucide-react';
+import PageHeader from '../components/ui/PageHeader.jsx';
 import ReportFilters from '../components/reports/ReportFilters';
 import KPIsRow from '../components/reports/KPIsRow';
 import EvolutionChart from '../components/reports/EvolutionChart';
@@ -79,12 +80,11 @@ const Reportes = () => {
   return (
     <div className="w-full space-y-3">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard de Reportes</h1>
-          <p className="text-sm text-muted-foreground">Análisis ejecutivo de ventas, rentabilidad y riesgo</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard de Reportes"
+        description="Análisis ejecutivo de ventas, rentabilidad y riesgo"
+        icon={BarChart3}
+      />
 
       {/* Filtros */}
       <ReportFilters

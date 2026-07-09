@@ -53,6 +53,15 @@ type Product struct {
 	InfFare                float64    `json:"inf_fare"`
 	ChdFare                float64    `json:"chd_fare"`
 	IsBlockedForSale       bool       `gorm:"default:false" json:"is_blocked_for_sale"`
+	// Servicio es un texto libre que describe el servicio puntual del
+	// producto (ej. "Traslado", "Seguro de viaje", "Excursión"), distinto de
+	// TipoProducto (que categoriza Aéreo/Hotel/Crucero).
+	Servicio string `json:"servicio"`
+	// NotasExternas la ve cualquier agencia (se muestra desde Disponibilidad).
+	// NotasInternas es solo para uso del admin — GetProducts/GetProductByID la
+	// limpian antes de serializar la respuesta a usuarios no-admin.
+	NotasExternas string `gorm:"column:notas_externas" json:"notas_externas,omitempty"`
+	NotasInternas string `gorm:"column:notas_internas" json:"notas_internas,omitempty"`
 	// Agencia es la agencia DUEÑA de este cupo. Ya no existe un "catálogo
 	// general" visible para todas las agencias por defecto: sin cesión de por
 	// medio, un producto solo lo ve (y lo puede reservar) su propia agencia

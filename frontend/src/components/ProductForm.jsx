@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
+import { Textarea } from './ui/Textarea';
 import { toDateOnlyString } from '../lib/dateOnly.js';
 import { useAgencies } from '../hooks/useAgencies';
 
@@ -38,6 +39,7 @@ const EMPTY_FORM = {
   ficha: '',
   temporada: '',
   tipo_producto: 'Aereo',
+  servicio: '',
   bloqueo_temporal_minutos: '',
   carryon: false,
   handbag: false,
@@ -45,6 +47,8 @@ const EMPTY_FORM = {
   inf_fare: '',
   chd_fare: '',
   is_blocked_for_sale: false,
+  notas_internas: '',
+  notas_externas: '',
 };
 
 function toFormValues(product) {
@@ -67,6 +71,7 @@ function toFormValues(product) {
     ficha: product.ficha || '',
     temporada: product.temporada || '',
     tipo_producto: product.tipo_producto || 'Aereo',
+    servicio: product.servicio || '',
     bloqueo_temporal_minutos: product.bloqueo_temporal_minutos ?? '',
     carryon: product.carryon ?? false,
     handbag: product.handbag ?? false,
@@ -74,6 +79,8 @@ function toFormValues(product) {
     inf_fare: product.inf_fare ?? '',
     chd_fare: product.chd_fare ?? '',
     is_blocked_for_sale: product.is_blocked_for_sale ?? false,
+    notas_internas: product.notas_internas || '',
+    notas_externas: product.notas_externas || '',
   };
 }
 
@@ -96,6 +103,7 @@ function toPayload(form) {
     ficha: form.ficha,
     temporada: form.temporada,
     tipo_producto: form.tipo_producto,
+    servicio: form.servicio,
     bloqueo_temporal_minutos: num(form.bloqueo_temporal_minutos),
     carryon: form.carryon,
     handbag: form.handbag,
@@ -103,6 +111,8 @@ function toPayload(form) {
     inf_fare: num(form.inf_fare),
     chd_fare: num(form.chd_fare),
     is_blocked_for_sale: form.is_blocked_for_sale,
+    notas_internas: form.notas_internas,
+    notas_externas: form.notas_externas,
   };
 }
 
@@ -265,6 +275,32 @@ const ProductForm = ({
             {field('pnr', 'PNR')}
             {field('ficha', 'Ficha')}
             {field('temporada', 'Temporada')}
+            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje, Excursión...' })}
+          </div>
+        </div>
+
+        {/* Notas */}
+        <div>
+          {sectionLabel('Notas')}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="notas_externas">Notas externas</Label>
+              <Textarea
+                id="notas_externas"
+                value={form.notas_externas}
+                onChange={(e) => set('notas_externas', e.target.value)}
+                placeholder="Visible para todas las agencias desde Disponibilidad"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="notas_internas">Notas internas</Label>
+              <Textarea
+                id="notas_internas"
+                value={form.notas_internas}
+                onChange={(e) => set('notas_internas', e.target.value)}
+                placeholder="Solo visible para el admin"
+              />
+            </div>
           </div>
         </div>
 

@@ -28,6 +28,7 @@ const emptyForm = {
   documento_pasajero: '',
   nacionalidad_pasajero: '',
   tipo_pasajero: 'Adulto',
+  numero_ticket: '',
   precio_venta: '',
   doc_contable: '',
   estado: 'bloqueo_temporal',
@@ -141,6 +142,7 @@ export default function GestionReservas() {
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editReservation, setEditReservation] = useState(null);
+  const [editPassengerId, setEditPassengerId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('Todas');
@@ -230,13 +232,21 @@ export default function GestionReservas() {
   // ─── Dialog ──────────────────────────────────
   const openCreate = () => {
     setEditReservation(null);
+    setEditPassengerId(null);
     setForm(emptyForm);
     setProductInfo(null);
     setDialogOpen(true);
   };
 
   const openEdit = (r) => {
+    // El pasajero "principal" del pedido (nro=1, o el primero disponible) es
+    // el que se edita acá — un pedido con varios pasajeros sigue teniendo el
+    // resto editable desde Nóminas.
+    const primaryPassenger = Array.isArray(r.passengers) && r.passengers.length > 0
+      ? (r.passengers.find(p => p.nro === 1) || r.passengers[0])
+      : null;
     setEditReservation(r);
+    setEditPassengerId(primaryPassenger?.id || null);
     setForm({
       product_id: r.product_id || '',
       pedido_id: r.pedido_id || '',
@@ -244,11 +254,12 @@ export default function GestionReservas() {
       contacto_nombre: r.contacto_nombre || '',
       contacto_email: r.contacto_email || '',
       contacto_telefono: r.contacto_telefono || '',
-      nombre_pasajero: r.nombre_pasajero || '',
-      apellido_pasajero: r.apellido_pasajero || '',
-      documento_pasajero: r.documento_pasajero || '',
-      nacionalidad_pasajero: r.nacionalidad_pasajero || '',
-      tipo_pasajero: r.tipo_pasajero || 'Adulto',
+      nombre_pasajero: primaryPassenger?.nombre || r.nombre_pasajero || '',
+      apellido_pasajero: primaryPassenger?.apellido || r.apellido_pasajero || '',
+      documento_pasajero: primaryPassenger?.documento || r.documento_pasajero || '',
+      nacionalidad_pasajero: primaryPassenger?.nacionalidad || r.nacionalidad_pasajero || '',
+      tipo_pasajero: primaryPassenger?.tipo_pasajero || r.tipo_pasajero || 'Adulto',
+      numero_ticket: primaryPassenger?.numero_ticket || '',
       precio_venta: r.precio_venta || '',
       doc_contable: r.doc_contable || '',
       estado: r.estado || 'bloqueo_temporal',
@@ -264,6 +275,7 @@ export default function GestionReservas() {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditReservation(null);
+    setEditPassengerId(null);
     setForm(emptyForm);
     setProductInfo(null);
   };
@@ -289,17 +301,29 @@ export default function GestionReservas() {
     if (payload.bloqueo_expira_at && payload.bloqueo_expira_at.length === 16) {
       payload.bloqueo_expira_at = `${payload.bloqueo_expira_at}:00Z`;
     }
+    // Al crear, nombre/apellido/documento/nacionalidad/tipo_pasajero van en el
+    // payload tal cual (el backend los usa para crear el Passenger inicial).
+    // Al editar, en cambio, esos campos + el ticket NO son campos de la
+    // Reservation (el backend los bloquea ahí) — se separan y se guardan
+    // aparte contra el Passenger existente (ver más abajo).
+    let passengerData = null;
+    let ticketData = null;
     if (editReservation) {
-      // Los datos de pasajero (nombre/apellido/documento/nacionalidad/tipo)
-      // se editan desde Nóminas, no desde este formulario — el backend ya
-      // los bloquea, pero se limpian acá también para no mandar campos que
-      // el usuario no llegó a ver/tocar en modo edición.
+      passengerData = {
+        nombre: payload.nombre_pasajero,
+        apellido: payload.apellido_pasajero,
+        documento: payload.documento_pasajero,
+        nacionalidad: payload.nacionalidad_pasajero,
+        tipo_pasajero: payload.tipo_pasajero,
+      };
+      ticketData = { numero_ticket: payload.numero_ticket };
       delete payload.nombre_pasajero;
       delete payload.apellido_pasajero;
       delete payload.documento_pasajero;
       delete payload.nacionalidad_pasajero;
       delete payload.tipo_pasajero;
     }
+    delete payload.numero_ticket;
     // Quitar campos vacíos
     Object.keys(payload).forEach(k => {
       if (payload[k] === '' || payload[k] === undefined) delete payload[k];
@@ -308,6 +332,12 @@ export default function GestionReservas() {
     try {
       if (editReservation) {
         await ReservationService.updateReservation(editReservation.id, payload);
+        if (editPassengerId) {
+          await Promise.all([
+            ReservationService.updatePassenger(editReservation.id, editPassengerId, passengerData),
+            ReservationService.updatePassengerTicket(editReservation.id, editPassengerId, ticketData),
+          ]);
+        }
         Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
       } else {
         await ReservationService.createReservation(payload);
@@ -738,42 +768,61 @@ export default function GestionReservas() {
             </div>
           </section>
 
-          {/* PASAJERO — solo al crear. Una vez creada la reserva, los datos de
-              pasajero se editan por pasajero individual desde Nóminas. */}
-          {!editReservation && (
-            <section>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero</h3>
+          {/* PASAJERO — al crear, carga el primer pasajero del pedido. Al
+              editar, edita los datos propios del pasajero principal (nro=1);
+              el resto de los pasajeros del mismo pedido (si hay más de uno)
+              se maneja desde Nóminas. */}
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Pasajero</h3>
+            {editReservation ? (
+              editPassengerId ? (
+                <p className="mb-2 text-xs text-slate-400">
+                  Datos del pasajero principal de este pedido. Si hay más de un pasajero, el resto se edita desde <span className="font-medium text-slate-500">Gestión de Nóminas</span>.
+                </p>
+              ) : (
+                <p className="mb-2 text-xs text-amber-600">
+                  Esta reserva no tiene un pasajero desglosado (dato histórico) — para editarlo, usá <span className="font-medium">Gestión de Nóminas</span>.
+                </p>
+              )
+            ) : (
               <p className="mb-2 text-xs text-slate-400">Cada pasajero ocupa 1 lugar y se crea como su propio ticket. Para cargar varios pasajeros en el mismo pedido, usá la pantalla de Disponibilidad.</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Nombre">
-                  <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
-                    className={inputCls} placeholder="Nombre" />
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nombre">
+                <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} placeholder="Nombre" />
+              </Field>
+              <Field label="Apellido">
+                <input type="text" value={form.apellido_pasajero} onChange={e => setField('apellido_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} placeholder="Apellido" />
+              </Field>
+              <Field label="Documento">
+                <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} placeholder="CI / Pasaporte" />
+              </Field>
+              <Field label="Nacionalidad">
+                <input type="text" value={form.nacionalidad_pasajero} onChange={e => setField('nacionalidad_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} placeholder="Uruguayo/a" />
+              </Field>
+              <Field label="Tipo">
+                <select value={form.tipo_pasajero} onChange={e => setField('tipo_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls + ' bg-white'}>
+                  {['Adulto', 'Niño', 'Infante'].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+              {editReservation && editPassengerId && (
+                <Field label="Ticket">
+                  <input type="text" value={form.numero_ticket} onChange={e => setField('numero_ticket', e.target.value)}
+                    className={inputCls} placeholder="Ej: 075-1234567890" />
                 </Field>
-                <Field label="Apellido">
-                  <input type="text" value={form.apellido_pasajero} onChange={e => setField('apellido_pasajero', e.target.value)}
-                    className={inputCls} placeholder="Apellido" />
-                </Field>
-                <Field label="Documento">
-                  <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
-                    className={inputCls} placeholder="CI / Pasaporte" />
-                </Field>
-                <Field label="Nacionalidad">
-                  <input type="text" value={form.nacionalidad_pasajero} onChange={e => setField('nacionalidad_pasajero', e.target.value)}
-                    className={inputCls} placeholder="Uruguayo/a" />
-                </Field>
-                <Field label="Tipo">
-                  <select value={form.tipo_pasajero} onChange={e => setField('tipo_pasajero', e.target.value)} className={inputCls + ' bg-white'}>
-                    {['Adulto', 'Niño', 'Infante'].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </Field>
-              </div>
-            </section>
-          )}
-          {editReservation && (
-            <p className="text-xs text-slate-400 -mt-2">
-              Los datos de los pasajeros (nombre, documento, tipo, etc.) se editan individualmente desde <span className="font-medium text-slate-500">Gestión de Nóminas</span>.
-            </p>
-          )}
+              )}
+            </div>
+          </section>
 
           {/* DOC CONTABLE */}
           <section className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">

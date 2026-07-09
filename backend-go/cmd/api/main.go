@@ -112,6 +112,7 @@ func main() {
 				orders.POST("/:id/confirm", handlers.ConfirmReservation)
 				orders.PUT("/:id/passengers/:passengerId", handlers.UpdatePassengerTicket)
 				orders.PUT("/:id/passengers/:passengerId/full", handlers.UpdatePassenger)
+				orders.POST("/:id/passengers", handlers.AddPassenger)
 				orders.POST("/:id/passengers/:passengerId/duplicate", handlers.DuplicatePassenger)
 				orders.DELETE("/:id/passengers/:passengerId", handlers.DeletePassenger)
 				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)

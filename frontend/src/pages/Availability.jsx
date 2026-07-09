@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download, MapPin } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Backpack, ShoppingBag, Luggage, Download, MapPin, StickyNote } from 'lucide-react';
 import clsx from 'clsx';
 import ItineraryTable from '../components/ItineraryTable';
 import ReservationService from '../services/reservationService';
@@ -67,6 +68,7 @@ export default function Availability() {
   const [temporadaFilter, setTemporadaFilter] = useState('Todas');
   // Modal de ruta
   const [routeModalProduct, setRouteModalProduct] = useState(null);
+  const [notesModalProduct, setNotesModalProduct] = useState(null);
 
   useEffect(() => {
     fetchAvailability();
@@ -404,6 +406,7 @@ export default function Availability() {
               <TableHead>Regreso</TableHead>
               <TableHead>Temporada</TableHead>
               <TableHead>Ruta</TableHead>
+              <TableHead>Notas</TableHead>
               <TableHead className="text-center">Equipaje</TableHead>
               <TableHead>Adulto</TableHead>
               <TableHead>Bebé</TableHead>
@@ -414,13 +417,13 @@ export default function Availability() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={14}>
+                <TableCell className="text-center py-10" colSpan={15}>
                   Cargando disponibilidad...
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={14}>
+                <TableCell className="text-center py-10" colSpan={15}>
                   {temporadaFilter !== 'Todas'
                     ? `No hay cupos para la temporada "${temporadaFilter}".`
                     : 'No hay cupos disponibles.'}
@@ -451,6 +454,21 @@ export default function Availability() {
                       >
                         <MapPin className="h-3 w-3" />
                         Ruta
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(item.notas_externas || item.notas_internas) ? (
+                      <button
+                        type="button"
+                        onClick={() => setNotesModalProduct(item)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver notas"
+                      >
+                        <StickyNote className="h-3 w-3" />
+                        Notas
                       </button>
                     ) : (
                       <span className="text-slate-400">—</span>
@@ -619,7 +637,7 @@ export default function Availability() {
       </Modal>
 
       {/* ─── Modal Ver Ruta ─── */}
-      {routeModalProduct && (
+      {routeModalProduct && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto"
@@ -650,7 +668,52 @@ export default function Availability() {
               <ItineraryTable ruta={routeModalProduct.ruta} showCopyButton={true} />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ─── Modal Ver Notas ─── */}
+      {notesModalProduct && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setNotesModalProduct(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <StickyNote className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Notas del Producto</h2>
+                  <p className="text-sm text-slate-500">
+                    {notesModalProduct.codigo_cupo} — {notesModalProduct.destino}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setNotesModalProduct(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Notas</h3>
+                <p className="whitespace-pre-wrap rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
+                  {notesModalProduct.notas_externas || 'Sin notas.'}
+                </p>
+              </div>
+              {/* El backend ya no manda notas_internas a agencias no-admin —
+                  si llega vacía, esta sección simplemente no se muestra. */}
+              {notesModalProduct.notas_internas && (
+                <div>
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Notas internas (solo admin)</h3>
+                  <p className="whitespace-pre-wrap rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-slate-700">
+                    {notesModalProduct.notas_internas}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>

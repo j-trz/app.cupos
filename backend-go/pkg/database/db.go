@@ -171,6 +171,10 @@ func runSQLMigrations(db *gorm.DB) {
 		`UPDATE products SET carryon = false WHERE carryon IS NULL;`,
 		`UPDATE products SET handbag = false WHERE handbag IS NULL;`,
 		`UPDATE products SET checkedbag = false WHERE checkedbag IS NULL;`,
+		// Servicio (texto libre) y notas internas/externas de producto
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS servicio TEXT DEFAULT '';`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS notas_externas TEXT DEFAULT '';`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS notas_internas TEXT DEFAULT '';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

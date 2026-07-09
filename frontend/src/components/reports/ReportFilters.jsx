@@ -28,7 +28,7 @@ export default function ReportFilters({ filters, onFiltersChange, onExport, dest
             </div>
 
             {/* Filtros Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {/* Rango de fechas */}
                 <div className="space-y-1">
                     <label className="text-xs font-medium text-slate-600 flex items-center gap-1">

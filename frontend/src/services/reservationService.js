@@ -182,9 +182,13 @@ class ReservationService {
     const result = await ApiClient.get('/orders');
     // "cedido" es la línea interna que deja una cesión de stock entre
     // agencias — no es una solicitud de pasajero, no debe listarse acá.
+    // Las confirmadas tampoco: esas ya se ven en Confirmaciones, y acá solo
+    // debe quedar lo que se solicitó y todavía no se confirmó.
     return {
       success: true,
-      data: toArray(result).filter(r => r.estado !== 'cedido').map(adaptRequest),
+      data: toArray(result)
+        .filter(r => r.estado !== 'cedido' && r.estado !== 'confirmado' && r.estado !== 'confirmada')
+        .map(adaptRequest),
     };
   }
 
@@ -272,6 +276,18 @@ class ReservationService {
       return result;
     } catch (error) {
       console.error(`Error duplicating passenger ${passengerId}:`, error);
+      throw error;
+    }
+  }
+
+  // Agrega un pasajero nuevo (en blanco) a un pedido existente, ocupando 1
+  // lugar más del producto si hay disponibilidad.
+  static async addPassenger(reservationId, data) {
+    try {
+      const result = await ApiClient.post(`/orders/${reservationId}/passengers`, data);
+      return result;
+    } catch (error) {
+      console.error(`Error adding passenger to reservation ${reservationId}:`, error);
       throw error;
     }
   }

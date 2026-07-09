@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import Swal from 'sweetalert2';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/Dialog';
+import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge.jsx';
 import TableComponent from '../components/ui/Table.jsx';
@@ -14,7 +15,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import TransferService from '../services/transferService';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -40,6 +41,7 @@ const GestionProductos = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [transferringProduct, setTransferringProduct] = useState(null);
   const [routeModalProduct, setRouteModalProduct] = useState(null);
+  const [notesModalProduct, setNotesModalProduct] = useState(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -211,51 +213,46 @@ const GestionProductos = () => {
         icon={Package}
         action={
           <div className="flex flex-wrap gap-2">
-            <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Carga Masiva
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Carga Masiva de Productos</DialogTitle>
-                </DialogHeader>
-                <ProductBulkUpload
-                  onUpload={handleBulkUpload}
-                  onCancel={() => setIsBulkUploadOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" onClick={() => setEditingProduct(null)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Producto
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
-                  </DialogTitle>
-                </DialogHeader>
-                <ProductForm
-                  onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-                  onCancel={() => {
-                    setIsModalOpen(false);
-                    setEditingProduct(null);
-                  }}
-                  defaultValues={editingProduct || {}}
-                  isEditing={!!editingProduct}
-                />
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" size="sm" onClick={() => setIsBulkUploadOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Carga Masiva
+            </Button>
+            <Button size="sm" onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Producto
+            </Button>
           </div>
         }
       />
+
+      <Modal
+        title="Carga Masiva de Productos"
+        open={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        size="3xl"
+      >
+        <ProductBulkUpload
+          onUpload={handleBulkUpload}
+          onCancel={() => setIsBulkUploadOpen(false)}
+        />
+      </Modal>
+
+      <Modal
+        title={editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
+        open={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditingProduct(null); }}
+        size="xl"
+      >
+        <ProductForm
+          onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
+          onCancel={() => {
+            setIsModalOpen(false);
+            setEditingProduct(null);
+          }}
+          defaultValues={editingProduct || {}}
+          isEditing={!!editingProduct}
+        />
+      </Modal>
 
       {/* Barra de búsqueda */}
       <div className="flex items-center gap-4 mb-6">
@@ -287,6 +284,8 @@ const GestionProductos = () => {
                   <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
                   <TableHead>PNR</TableHead>
                   <TableHead>Ficha</TableHead>
+                  <TableHead>Servicio</TableHead>
+                  <TableHead>Notas</TableHead>
                   <TableHead>Temporada</TableHead>
                   <TableHead>Disp.</TableHead>
                   <TableHead>Cupo</TableHead>
@@ -350,6 +349,22 @@ const GestionProductos = () => {
                     </TableCell>
                     <TableCell>{product.pnr || '—'}</TableCell>
                     <TableCell>{product.ficha || '—'}</TableCell>
+                    <TableCell>{product.servicio || '—'}</TableCell>
+                    <TableCell>
+                      {(product.notas_externas || product.notas_internas) ? (
+                        <button
+                          type="button"
+                          onClick={() => setNotesModalProduct(product)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                          title="Ver notas"
+                        >
+                          <StickyNote className="h-3 w-3" />
+                          Notas
+                        </button>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>{product.temporada || '—'}</TableCell>
                     <TableCell>{product.disponibilidad}</TableCell>
                     <TableCell>{product.cupo || '—'}</TableCell>
@@ -425,7 +440,7 @@ const GestionProductos = () => {
       />
 
       {/* Modal Ver Ruta */}
-      {routeModalProduct && (
+      {routeModalProduct && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
@@ -444,7 +459,43 @@ const GestionProductos = () => {
               <ItineraryTable ruta={routeModalProduct.ruta} showCopyButton={true} />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Ver Notas */}
+      {notesModalProduct && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setNotesModalProduct(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <StickyNote className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Notas del Producto</h2>
+                  <p className="text-sm text-slate-500">{notesModalProduct.codigo_cupo} — {notesModalProduct.destino}</p>
+                </div>
+              </div>
+              <button onClick={() => setNotesModalProduct(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Notas externas (visibles para todas las agencias)</h3>
+                <p className="whitespace-pre-wrap rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
+                  {notesModalProduct.notas_externas || 'Sin notas externas.'}
+                </p>
+              </div>
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Notas internas (solo admin)</h3>
+                <p className="whitespace-pre-wrap rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-slate-700">
+                  {notesModalProduct.notas_internas || 'Sin notas internas.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

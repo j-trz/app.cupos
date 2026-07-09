@@ -9,14 +9,18 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shad
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
 import NotificationService from '../../services/notificationService.js';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext.jsx';
+import { DOCS_SECTIONS } from '../../lib/docsSections.js';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: Home },
   { label: 'Disponibilidad', path: '/availability', icon: Plane },
   { label: 'Solicitudes', path: '/requests', icon: ClipboardList },
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
-  { label: 'Documentación', path: '/documentacion', icon: BookOpen },
 ];
+
+// Secciones de Documentación (grouped bajo Documentación) — una ruta propia
+// por sección en vez de un acordeón largo dentro del main.
+const docsItems = DOCS_SECTIONS.map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon }));
 
 // Admin-only items
 const adminNavItems = [
@@ -148,7 +152,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
         style={{ backgroundColor: sbBg, color: sbText }}
         className={clsx(
           'relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out',
-          collapsed ? 'w-16' : 'w-58'
+          collapsed ? 'w-16' : 'w-64'
         )}
       >
         <div className="flex h-full flex-col justify-between">
@@ -266,6 +270,87 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   }}
                 </NavLink>
               ))}
+
+              {/* Documentación submenu — una sección por ruta, en vez de un
+                  acordeón largo dentro del main */}
+              <div className="mt-0.5">
+                <button
+                  onClick={() => toggleSubmenu('docs')}
+                  className={clsx(
+                    'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                    collapsed ? 'justify-center px-2 py-2' : ''
+                  )}
+                  style={{
+                    color: isSubmenuActive(docsItems) ? '#fff' : sbText,
+                    backgroundColor: isSubmenuActive(docsItems) ? sbActiveBg : 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSubmenuActive(docsItems)) {
+                      e.currentTarget.style.backgroundColor = sbHoverBg;
+                      e.currentTarget.style.color = sbHoverText;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSubmenuActive(docsItems)) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = sbText;
+                    }
+                  }}
+                >
+                  <BookOpen className="h-4 w-4" style={{ color: isSubmenuActive(docsItems) ? '#fff' : sbText }} />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 text-left truncate">Documentación</span>
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.docs ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(docsItems) ? '#fff' : sbText }} />
+                    </>
+                  )}
+                </button>
+                {!collapsed && openSubmenus.docs && (
+                  <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                    {docsItems.map(({ label, path, icon: Icon }) => (
+                      <NavLink
+                        key={path}
+                        to={path}
+                        className={() => 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200'}
+                        style={({ isActive }) => {
+                          const active = isActive || location.pathname.startsWith(path + '/');
+                          return {
+                            color: active ? '#fff' : sbText,
+                            backgroundColor: active ? sbActiveBg : 'transparent',
+                          };
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget;
+                          const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                          if (!isActive) {
+                            el.style.backgroundColor = sbHoverBg;
+                            el.style.color = sbHoverText;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget;
+                          const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
+                          if (!isActive) {
+                            el.style.backgroundColor = 'transparent';
+                            el.style.color = sbText;
+                          }
+                        }}
+                      >
+                        {({ isActive }) => {
+                          const active = isActive || location.pathname.startsWith(path + '/');
+                          return (
+                            <>
+                              <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                              <span className="truncate">{label}</span>
+                              {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                            </>
+                          );
+                        }}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Admin-only menu items */}
               {isAdmin && (
