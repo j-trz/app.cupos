@@ -2,6 +2,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useI18n } from '../contexts/I18nContext.jsx';
+import { useHeader } from '../contexts/HeaderContext.jsx';
+import { useSidebar } from './ui/SidebarProvider.jsx';
 import Sidebar from './ui/Sidebar.jsx';
 import AIChatWidget from './AIChat/AIChatWidget.jsx';
 
@@ -9,6 +11,8 @@ export default function Layout({ children }) {
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
   const { t } = useI18n();
+  const { headerData } = useHeader();
+  const sidebarCtx = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -73,21 +77,47 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
       <Sidebar user={user} onLogout={handleLogout} />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="sticky top-0 z-10 flex justify-between items-center p-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 truncate max-w-md">
-              {getTitleByPath()}
-            </h1>
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+        <header className="sticky top-0 z-10 flex justify-between items-center px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm">
+          <div className="flex items-center space-x-3.5 min-w-0">
+            {headerData.icon && (
+              <div className="flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 p-2 text-zinc-900 dark:text-zinc-100 shrink-0">
+                <headerData.icon className="h-4.5 w-4.5" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                  {headerData.title || getTitleByPath()}
+                </h1>
+                {headerData.badge && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                    {headerData.badge}
+                  </span>
+                )}
+              </div>
+              {headerData.description && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-xs sm:max-w-md md:max-w-xl lg:max-w-2xl mt-0.5">
+                  {headerData.description}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 shrink-0">
+            {headerData.action && (
+              <div className="flex items-center mr-2">
+                {headerData.action}
+              </div>
+            )}
           </div>
         </header>
         <main
-          className="flex-1 min-w-0 overflow-y-auto bg-gray-50 p-6"
+          className="flex-1 min-w-0 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 animate-fade-in"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
-          <div className="text-gray-900 min-h-full max-w-[95%] mx-auto">
+          <div className="text-zinc-900 dark:text-zinc-100 min-h-full max-w-[95%] mx-auto">
             {children || <Outlet context={{ user }} />}
           </div>
         </main>

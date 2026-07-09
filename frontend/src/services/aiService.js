@@ -7,15 +7,23 @@ import ApiClient from './apiClient';
 
 class AIService {
   /**
-   * Enviar mensaje al asistente IA
+   * Enviar mensaje al asistente IA con soporte para múltiples imágenes/adjuntos
    */
-  static async sendMessage(message, sessionId = null, imageBase64 = null, imageMime = null, providerId = null) {
+  static async sendMessage(message, sessionId = null, images = [], providerId = null) {
     const payload = { message };
     if (sessionId) payload.sessionId = sessionId;
     if (providerId) payload.providerId = providerId;
-    if (imageBase64) {
-      payload.imageBase64 = imageBase64;
-      payload.imageMime = imageMime || 'image/jpeg';
+
+    if (images && images.length > 0) {
+      // Envía todas las imágenes cargadas
+      payload.images = images.map(img => ({
+        base64: img.base64,
+        mime: img.mime,
+        name: img.name
+      }));
+      // Retrocompatibilidad por si se requiere un único campo
+      payload.imageBase64 = images[0].base64;
+      payload.imageMime = images[0].mime;
     }
     return ApiClient.post('/ai/chat', payload);
   }
