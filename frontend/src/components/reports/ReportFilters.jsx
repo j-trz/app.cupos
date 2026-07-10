@@ -5,7 +5,7 @@ import { ShadcnButton as Button } from '../ui/shadcn-button';
 const AIRLINES = ['Aerolíneas Argentinas', 'LATAM', 'Copa Airlines', 'Avianca', 'GOL'];
 const SEASONS = ['Verano 2025', 'Invierno 2025', 'Semana Santa 2025', 'Temporada Alta 2025'];
 
-export default function ReportFilters({ filters, onFiltersChange, onExport, destinations = [] }) {
+export default function ReportFilters({ filters, onFiltersChange, destinations = [] }) {
     const hasActiveFilters = filters.destino !== 'all' || filters.dateRange !== '6m' || filters.aerolinea !== 'all' || filters.temporada !== 'all';
 
     const handleReset = () => {
@@ -109,14 +109,6 @@ export default function ReportFilters({ filters, onFiltersChange, onExport, dest
                             ))}
                         </SelectContent>
                     </Select>
-                </div>
-
-                {/* Botón Exportar */}
-                <div className="space-y-1">
-                    <label className="text-xs font-medium text-transparent">Acción</label>
-                    <Button variant="outline" className="w-full h-9 gap-2 text-sm" onClick={onExport}>
-                        <Download className="h-4 w-4" /> Exportar CSV
-                    </Button>
                 </div>
             </div>
         </div>

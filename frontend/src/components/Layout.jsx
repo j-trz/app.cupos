@@ -79,7 +79,7 @@ export default function Layout({ children }) {
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
       <Sidebar user={user} onLogout={handleLogout} />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex flex-col flex-1 w-0 min-w-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950">
         <header className="sticky top-0 z-10 flex justify-between items-center px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center space-x-3.5 min-w-0">
             {headerData.icon && (
@@ -114,7 +114,7 @@ export default function Layout({ children }) {
           </div>
         </header>
         <main
-          className="flex-1 min-w-0 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 animate-fade-in"
+          className="flex-1 w-0 min-w-0 overflow-x-hidden overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 animate-fade-in"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
           <div className="text-zinc-900 dark:text-zinc-100 min-h-full max-w-[95%] mx-auto">

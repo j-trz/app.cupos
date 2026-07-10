@@ -60,6 +60,18 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
   const isAdmin = user?.role === 'admin';
 
+  // El ancho puede venir del white-label como número/string sin unidad (ej.
+  // guardado como "240" en vez de "240px") — CSS descarta silenciosamente un
+  // width sin unidad válida y el <aside> vuelve a dimensionarse por contenido,
+  // pudiendo quedar más ancho de lo esperado y cortar el main. Se normaliza
+  // acá para no depender de que el dato ya venga con "px".
+  const toCssLength = (value, fallback) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    return /^\d+(\.\d+)?$/.test(String(value)) ? `${value}px` : String(value);
+  };
+  const sidebarWidth = toCssLength(config?.sidebar?.width, '240px');
+  const sidebarCollapsedWidth = toCssLength(config?.sidebar?.collapsed_width, '64px');
+
   // White-label sidebar colors (match WhiteLabelContext.jsx property names)
   const sbBg = config?.sidebar?.bg_color || '#0f172a';
   const sbText = config?.sidebar?.text_color || '#f8fafc';
@@ -152,9 +164,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
         style={{
           backgroundColor: sbBg,
           color: sbText,
-          width: collapsed
-            ? (config?.sidebar?.collapsed_width || '64px')
-            : (config?.sidebar?.width || '240px')
+          width: collapsed ? sidebarCollapsedWidth : sidebarWidth,
+          minWidth: collapsed ? sidebarCollapsedWidth : sidebarWidth,
+          maxWidth: collapsed ? sidebarCollapsedWidth : sidebarWidth,
         }}
         className="relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out"
       >
@@ -606,7 +618,11 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                 padding: collapsed ? '0' : '0.5rem',
                 justifyContent: collapsed ? 'center' : undefined,
                 border: collapsed ? 'none' : `1px solid ${sbText}20`,
-                backgroundColor: `${sbText}10`,
+                // Colapsado: sin tinte de fondo — con padding/border en 0 el
+                // tinte quedaba como un halo rectangular pegado al avatar
+                // circular, en vez de leerse como una "card" (que sí funciona
+                // bien expandido, donde ocupa toda la fila).
+                backgroundColor: collapsed ? 'transparent' : `${sbText}10`,
               }}
             >
               <div
@@ -618,7 +634,13 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               >
                 {(user.nombre || user.email || 'I')[0]?.toUpperCase()}
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-zinc-900 shadow-sm" />
+                  // El anillo tiene que matchear el fondo real del sidebar
+                  // (dinámico por white-label) para que se vea como un
+                  // recorte prolijo, no un halo blanco fijo que no combina.
+                  <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full shadow-sm"
+                    style={{ boxShadow: `0 0 0 2px ${sbBg}` }}
+                  />
                 )}
               </div>
               {!collapsed ? (
