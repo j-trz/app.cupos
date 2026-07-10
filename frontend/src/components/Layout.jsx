@@ -114,7 +114,7 @@ export default function Layout({ children }) {
           </div>
         </header>
         <main
-          className="flex-1 w-0 min-w-0 overflow-x-hidden overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 animate-fade-in"
+          className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 animate-fade-in"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
           <div className="text-zinc-900 dark:text-zinc-100 min-h-full max-w-[95%] mx-auto">
