@@ -79,7 +79,7 @@ export default function Layout({ children }) {
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
       <Sidebar user={user} onLogout={handleLogout} />
-      <div className="flex flex-col flex-1 w-0 min-w-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex flex-col flex-1 w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950">
         <header className="sticky top-0 z-10 flex justify-between items-center px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center space-x-3.5 min-w-0">
             {headerData.icon && (
