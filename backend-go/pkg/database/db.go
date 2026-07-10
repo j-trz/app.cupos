@@ -49,6 +49,7 @@ func InitDB() {
 		&models.AIAction{},
 		&models.AISession{},
 		&models.AIMessage{},
+		&models.ProductSharedAgency{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -131,6 +132,24 @@ func runSQLMigrations(db *gorm.DB) {
 		log.Println("WARNING: Could not create availability_transfers table:", err)
 	} else {
 		fmt.Println("Migration applied: availability_transfers table ensured")
+	}
+
+	// Create product_shared_agencies table (red de seguridad — igual que
+	// availability_transfers arriba, AutoMigrate no siempre alcanza en prod)
+	createSharedAgenciesSQL := `
+	CREATE TABLE IF NOT EXISTS product_shared_agencies (
+		id SERIAL PRIMARY KEY,
+		product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+		agencia VARCHAR(255) NOT NULL,
+		created_by UUID,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		CONSTRAINT idx_product_shared_agency UNIQUE (product_id, agencia)
+	);
+	`
+	if err := db.Exec(createSharedAgenciesSQL).Error; err != nil {
+		log.Println("WARNING: Could not create product_shared_agencies table:", err)
+	} else {
+		fmt.Println("Migration applied: product_shared_agencies table ensured")
 	}
 
 	// Check if migration file exists and apply additional constraints

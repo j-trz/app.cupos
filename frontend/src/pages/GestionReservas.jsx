@@ -603,7 +603,17 @@ export default function GestionReservas() {
                         </Badge>
                         <span className="text-[10px] text-slate-500">de {agencyName(r.original_agency)}</span>
                       </div>
-                    ) : '—'}
+                    ) : (() => {
+                      // Producto compartido (visibilidad multi-agencia, mismo
+                      // stock, sin fila espejo): esta reserva la tomó otra
+                      // agencia distinta a la dueña del producto.
+                      const ownerAgencia = products.find(p => p.id === r.product_id)?.agencia;
+                      return ownerAgencia && r.agencia && r.agencia !== ownerAgencia ? (
+                        <Badge variant="outline" className="w-fit text-[10px]">
+                          Compartido — de {agencyName(ownerAgencia)}
+                        </Badge>
+                      ) : '—';
+                    })()}
                   </TableCell>
                   <TableCell>
                     {row.docContable ? (

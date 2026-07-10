@@ -98,6 +98,9 @@ func main() {
 				products.PUT("/:id", middleware.AdminOnly(), handlers.UpdateProduct)
 				products.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteProduct)
 				products.POST("/bulk", middleware.AdminOnly(), handlers.BulkCreateProducts)
+				products.GET("/:id/shared-agencies", handlers.ListSharedAgencies)
+				products.POST("/:id/shared-agencies", handlers.ShareProduct)
+				products.DELETE("/:id/shared-agencies/:agencia", handlers.UnshareProduct)
 			}
 
 			// Reservas (Ordenes)

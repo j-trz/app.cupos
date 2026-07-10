@@ -339,6 +339,15 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                           Cupo de {agencyName(row.originalAgency)}
                         </Badge>
                       </div>
+                    ) : product?.agencia && row.agencia && row.agencia !== product.agencia ? (
+                      // Producto compartido (visibilidad multi-agencia, mismo
+                      // stock): esta reserva la tomó otra agencia, no la dueña.
+                      <div className="flex flex-col gap-1">
+                        <span>{agencyName(row.agencia)}</span>
+                        <Badge variant="outline" className="w-fit text-[10px]">
+                          Compartido — reservado por otra agencia
+                        </Badge>
+                      </div>
                     ) : (
                       agencyName(row.agencia)
                     )}

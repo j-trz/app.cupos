@@ -111,12 +111,24 @@ func CreateReservation(c *gin.Context) {
 		return
 	}
 
-	// Un cupo cedido a una agencia puntual (RestrictedAgency) solo puede
-	// reservarlo esa agencia (el admin puede reservar cualquiera).
-	if role != "admin" && product.RestrictedAgency != "" {
-		if !strings.EqualFold(product.RestrictedAgency, userAgencia) {
+	// Verificar que la agencia pueda reservar este producto: dueña, cedido
+	// puntualmente (RestrictedAgency) o compartido (ProductSharedAgency —
+	// mismo Disponibilidad, sin fila espejo). El admin puede reservar
+	// cualquiera.
+	if role != "admin" {
+		isOwner := product.Agencia != "" && strings.EqualFold(product.Agencia, userAgencia)
+		isRestrictedToMe := product.RestrictedAgency != "" && strings.EqualFold(product.RestrictedAgency, userAgencia)
+		isSharedWithMe := false
+		if !isOwner && !isRestrictedToMe {
+			var count int64
+			tx.Model(&models.ProductSharedAgency{}).
+				Where("product_id = ? AND LOWER(agencia) = LOWER(?)", product.ID, userAgencia).
+				Count(&count)
+			isSharedWithMe = count > 0
+		}
+		if !isOwner && !isRestrictedToMe && !isSharedWithMe {
 			tx.Rollback()
-			c.JSON(http.StatusForbidden, gin.H{"error": "Este cupo fue cedido a otra agencia"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a este cupo"})
 			return
 		}
 	}
@@ -347,7 +359,14 @@ func GetAllReservations(c *gin.Context) {
 
 	query := database.DB.Preload("Passengers")
 	if role == "agency_admin" {
-		query = query.Where("LOWER(agencia) = LOWER(?)", agencia)
+		// Además de lo reservado por mi propia agencia, también lo que OTRA
+		// agencia reservó sobre un producto que yo poseo (visibilidad
+		// compartida vía ProductSharedAgency) — al owner le tiene que caer la
+		// nómina/reserva igual, aunque la haya tomado otra agencia.
+		query = query.Where(
+			"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?))",
+			agencia, agencia,
+		)
 	} else if role != "admin" {
 		userID, _ := c.Get("userID")
 		query = query.Where("created_by = ?", userID)

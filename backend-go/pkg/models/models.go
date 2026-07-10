@@ -358,5 +358,17 @@ type AvailabilityTransfer struct {
 	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
+// ProductSharedAgency habilita que un producto sea visible/reservable por
+// otra agencia SIN forkear una fila espejo (a diferencia de la cesión vía
+// AvailabilityTransfer): es la misma fila de Product, mismo Disponibilidad
+// compartido entre todas las agencias de esta lista + la dueña.
+type ProductSharedAgency struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	ProductID uint      `gorm:"not null;uniqueIndex:idx_product_shared_agency" json:"product_id"`
+	Agencia   string    `gorm:"not null;uniqueIndex:idx_product_shared_agency" json:"agencia"`
+	CreatedBy uuid.UUID `gorm:"type:uuid" json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // Agregar campos de cesión a Reservation
 // (Ya existen en el model, pero aseguramos compatibilidad)

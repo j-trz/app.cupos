@@ -9,7 +9,7 @@ const KPICard = ({ title, value, change, icon: Icon, color }) => {
     return (
         <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 pt-2">
                     <span className="text-xs font-medium text-slate-500 uppercase">{title}</span>
                     <Icon className={`h-5 w-5 ${color}`} />
                 </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
@@ -15,9 +16,11 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
+import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
+import ProductService from '../services/productService';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useToast } from '../hooks/use-toast';
 import { useAgencies } from '../hooks/useAgencies';
@@ -25,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
+import { PRODUCT_IMPORT_COLUMNS } from '../lib/productImportSchema.js';
 
 const formatDate = formatDateOnly;
 
@@ -39,8 +43,10 @@ const GestionProductos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [transferringProduct, setTransferringProduct] = useState(null);
+  const [sharingProduct, setSharingProduct] = useState(null);
   const [routeModalProduct, setRouteModalProduct] = useState(null);
   const [notesModalProduct, setNotesModalProduct] = useState(null);
 
@@ -142,6 +148,18 @@ const GestionProductos = () => {
     queryClient.invalidateQueries({ queryKey: ['products'] });
   };
 
+  const handleOpenShare = (product) => {
+    setSharingProduct(product);
+    setIsShareOpen(true);
+  };
+
+  const handleShareChange = () => {
+    // A diferencia de la cesión, compartir no cambia disponibilidad ni crea
+    // filas nuevas — igual invalidamos por si otra agencia ya está mirando
+    // el catálogo y necesita ver el producto aparecer/desaparecer.
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+  };
+
   const handleReclaimTransfer = async (product) => {
     const maxQty = product.disponibilidad;
     const { value: quantity, isConfirmed } = await Swal.fire({
@@ -177,22 +195,64 @@ const GestionProductos = () => {
     }
   };
 
-  const handleBulkUpload = async (file) => {
-    try {
-      // Aquí iría la lógica para subir el archivo
-      console.log('Archivo a subir:', file);
-      toast({
-        title: 'Éxito',
-        description: 'Productos subidos correctamente',
-      });
-      setIsBulkUploadOpen(false);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Error al subir los productos',
-        variant: 'destructive',
-      });
-    }
+  const handleDownloadTemplate = () => {
+    const headers = PRODUCT_IMPORT_COLUMNS.map((c) => c.key);
+    const exampleRow = {
+      codigo_cupo: '',
+      agencia: agencies[0]?.code || 'AG001',
+      destino: 'Cancún',
+      compania: 'Aerolíneas Argentinas',
+      disponibilidad: 10,
+      cupo: 10,
+      fecha_salida: '2026-12-01',
+      fecha_regreso: '2026-12-10',
+      precio: 1200,
+      neto_1: 950,
+      op: 50,
+      ruta: '',
+      pnr: '',
+      ficha: '',
+      temporada: 'Verano 2026',
+      tipo_producto: 'Aereo',
+      servicio: '',
+      notas_externas: '',
+      notas_internas: '',
+      bloqueo_temporal_minutos: 60,
+      carryon: 'TRUE',
+      handbag: 'TRUE',
+      checkedbag: 'FALSE',
+      inf_fare: 100,
+      chd_fare: 800,
+    };
+
+    const wb = XLSX.utils.book_new();
+    const wsProducts = XLSX.utils.json_to_sheet([exampleRow], { header: headers });
+    XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');
+
+    const instructions = [
+      { instruccion: 'Borrá la fila de ejemplo antes de importar (o dejala y se validará igual).' },
+      { instruccion: 'Formato de fecha: YYYY-MM-DD (ej: 2026-12-01).' },
+      { instruccion: 'Campos booleanos (carryon, handbag, checkedbag): TRUE o FALSE.' },
+      { instruccion: 'tipo_producto debe ser: Aereo, Hotel o Crucero.' },
+      { instruccion: `agencia debe ser el código de una agencia existente: ${agencies.map((a) => a.code).join(', ') || '(no hay agencias cargadas)'}` },
+      { instruccion: 'codigo_cupo se autogenera si se deja vacío.' },
+      { instruccion: 'Las filas con errores no se importan, pero no bloquean al resto del archivo.' },
+    ];
+    const wsInstructions = XLSX.utils.json_to_sheet(instructions);
+    XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
+
+    XLSX.writeFile(wb, 'plantilla-productos.xlsx');
+  };
+
+  // `rows` ya viene validado y normalizado por ProductBulkUpload (solo las
+  // filas que pasaron validateProductRow) — acá solo se manda al backend.
+  const handleBulkUpload = async (rows) => {
+    const result = await ProductService.bulkCreateProducts(rows);
+    // Refresca la tabla en segundo plano; el modal se queda abierto mostrando
+    // el resumen de la importación (lo arma ProductBulkUpload) hasta que el
+    // usuario lo cierra.
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    return result;
   };
 
   if (isError) {
@@ -214,6 +274,10 @@ const GestionProductos = () => {
         icon={Package}
         action={
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+              <Download className="h-4 w-4 mr-2" />
+              Descargar Plantilla
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setIsBulkUploadOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
               Carga Masiva
@@ -393,6 +457,12 @@ const GestionProductos = () => {
                         <Button variant="outline" size="sm" onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad">
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
+                        {/* Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra */}
+                        {(user.role === 'admin' || product.agencia === user.agencia) && (
+                          <Button variant="outline" size="sm" onClick={() => handleOpenShare(product)} title="Compartir con otras agencias">
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        )}
                         {/* Botón para recuperar cupo cedido (si soy el cedente) */}
                         {product.restricted_agency && product.source_agency === user.agencia && (
                           <Button variant="outline" size="sm" onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800">
@@ -433,6 +503,17 @@ const GestionProductos = () => {
         }}
         product={transferringProduct}
         onTransferComplete={handleTransferComplete}
+      />
+
+      {/* Modal de Compartir (visibilidad multi-agencia, mismo stock) */}
+      <ShareProductModal
+        open={isShareOpen}
+        onClose={() => {
+          setIsShareOpen(false);
+          setSharingProduct(null);
+        }}
+        product={sharingProduct}
+        onShareChange={handleShareChange}
       />
 
       {/* Modal Ver Ruta */}

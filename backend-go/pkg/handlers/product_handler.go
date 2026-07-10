@@ -91,17 +91,30 @@ func GetProducts(c *gin.Context) {
 	agencia := services.ResolveAgencyCode(agenciaRaw)
 	managementScope := c.Query("scope") == "management"
 
+	// Además de dueña/restringida/cedente, un producto también es visible si
+	// fue compartido explícitamente con mi agencia (ver ProductSharedAgency) —
+	// a diferencia de la cesión, comparte el mismo Disponibilidad, no crea
+	// una fila espejo con stock propio.
+	sharedSubquery := "id IN (SELECT product_id FROM product_shared_agencies WHERE LOWER(agencia) = LOWER(?))"
+
 	query := database.DB
 	if managementScope {
 		if role != "admin" {
-			query = query.Where("LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?) OR LOWER(source_agency) = LOWER(?)", agencia, agencia, agencia)
+			query = query.Where(
+				"LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?) OR LOWER(source_agency) = LOWER(?) OR "+sharedSubquery,
+				agencia, agencia, agencia, agencia,
+			)
 		}
 	} else {
 		// Vista de reserva (Disponibilidad): nunca mostrar cupos agotados, ni
-		// bloqueados para venta, ni de una agencia que no es la mía ni me cedió.
+		// bloqueados para venta, ni de una agencia que no es la mía, no me
+		// cedió, ni me comparte.
 		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false")
 		if role != "admin" {
-			query = query.Where("LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?)", agencia, agencia)
+			query = query.Where(
+				"LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?) OR "+sharedSubquery,
+				agencia, agencia, agencia,
+			)
 		}
 	}
 	query.Find(&products)

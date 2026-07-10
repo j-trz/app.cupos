@@ -1,56 +1,83 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import * as XLSX from 'xlsx';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/Table';
 import { Badge } from './ui/Badge';
-import Papa from 'papaparse';
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { PRODUCT_IMPORT_COLUMNS, validateProductRow } from '../lib/productImportSchema.js';
+import { useAgencies } from '../hooks/useAgencies';
 
 const ProductBulkUpload = ({ onUpload, onCancel }) => {
   const [file, setFile] = useState(null);
-  const [parsedData, setParsedData] = useState([]);
-  const [previewData, setPreviewData] = useState([]);
+  const [validRows, setValidRows] = useState([]);
+  const [invalidRows, setInvalidRows] = useState([]); // [{ rowNumber, errors, raw }]
   const [isParsing, setIsParsing] = useState(false);
-  const [parseErrors, setParseErrors] = useState([]);
-  const [uploadStatus, setUploadStatus] = useState(null); // idle, uploading, success, error
+  const [parseError, setParseError] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState(null); // null, uploading, success, error
+  const [uploadResult, setUploadResult] = useState(null); // { created, skipped }
+
+  const { data: agencies = [] } = useAgencies();
+  const validAgencyCodes = agencies.map((a) => a.code);
 
   const onDrop = useCallback((acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (file) {
-      setFile(file);
-      parseFile(file);
+    const picked = acceptedFiles[0];
+    if (picked) {
+      setFile(picked);
+      setUploadStatus(null);
+      setUploadResult(null);
+      parseFile(picked);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validAgencyCodes.join(',')]);
 
-  const parseFile = (file) => {
+  const parseFile = (picked) => {
     setIsParsing(true);
-    setParseErrors([]);
+    setParseError(null);
+    setValidRows([]);
+    setInvalidRows([]);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        setIsParsing(false);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        // XLSX.read entiende tanto binarios .xlsx/.xls reales como texto CSV
+        // (a diferencia de PapaParse, que solo puede leer CSV) — un solo
+        // parser para los tres formatos que la zona de drop dice aceptar.
+        const workbook = XLSX.read(e.target.result, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
-        if (results.errors && results.errors.length > 0) {
-          const errors = results.errors.map(error => ({
-            row: error.row,
-            message: error.message
-          }));
-          setParseErrors(errors);
+        if (rows.length === 0) {
+          setParseError('El archivo no tiene filas de datos.');
+          setIsParsing(false);
           return;
         }
 
-        setParsedData(results.data);
-        // Tomar solo las primeras 5 filas para la vista previa
-        setPreviewData(results.data.slice(0, 5));
-      },
-      error: (error) => {
+        const valid = [];
+        const invalid = [];
+        rows.forEach((row, idx) => {
+          const { valid: isValid, errors, normalized } = validateProductRow(row, validAgencyCodes);
+          if (isValid) {
+            valid.push(normalized);
+          } else {
+            invalid.push({ rowNumber: idx + 2, errors, raw: row }); // +2: fila 1 es el header
+          }
+        });
+
+        setValidRows(valid);
+        setInvalidRows(invalid);
+      } catch (err) {
+        setParseError(err.message || 'No se pudo leer el archivo. ¿Es un .xlsx, .xls o .csv válido?');
+      } finally {
         setIsParsing(false);
-        setParseErrors([{ message: error.message }]);
       }
-    });
+    };
+    reader.onerror = () => {
+      setIsParsing(false);
+      setParseError('No se pudo leer el archivo.');
+    };
+    reader.readAsArrayBuffer(picked);
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -64,29 +91,27 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
   });
 
   const handleUpload = async () => {
-    if (!file || parsedData.length === 0) return;
+    if (validRows.length === 0) return;
 
     setUploadStatus('uploading');
-
     try {
-      await onUpload(file);
+      const result = await onUpload(validRows);
       setUploadStatus('success');
+      setUploadResult({ created: result?.count ?? validRows.length, skipped: invalidRows.length });
     } catch (error) {
       setUploadStatus('error');
-      console.error('Error uploading file:', error);
+      setParseError(error.message || 'Error al subir los productos.');
     }
   };
 
-  const columns = previewData.length > 0
-    ? Object.keys(previewData[0]).filter(key => key.trim() !== '')
-    : [];
+  const previewColumns = PRODUCT_IMPORT_COLUMNS.map((c) => c.key);
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle>Carga Masiva de Productos</CardTitle>
         <CardDescription>
-          Sube un archivo CSV con la información de múltiples productos
+          Subí un archivo .xlsx, .xls o .csv con la información de múltiples productos. Descargá la plantilla desde el botón "Descargar Plantilla" si no sabés qué columnas usar.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -101,12 +126,12 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
           <input {...getInputProps()} />
           <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           {isDragActive ? (
-            <p className="text-lg font-medium">Suelta el archivo aquí</p>
+            <p className="text-lg font-medium">Soltá el archivo acá</p>
           ) : (
             <>
-              <p className="text-lg font-medium">Arrastra y suelta un archivo CSV aquí</p>
+              <p className="text-lg font-medium">Arrastrá y soltá un archivo .xlsx, .xls o .csv acá</p>
               <p className="text-sm text-muted-foreground mt-2">
-                o haz clic para seleccionar un archivo
+                o hacé clic para seleccionar un archivo
               </p>
             </>
           )}
@@ -128,41 +153,53 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
               </div>
             )}
 
-            {parseErrors.length > 0 && (
+            {parseError && (
               <div className="p-4 bg-destructive/10 rounded-lg border border-destructive">
                 <div className="flex items-center space-x-2 text-destructive">
                   <AlertCircle className="h-5 w-5" />
-                  <h3 className="font-medium">Errores de parsing</h3>
+                  <h3 className="font-medium">Error</h3>
                 </div>
-                <ul className="mt-2 space-y-1 text-sm">
-                  {parseErrors.map((error, index) => (
-                    <li key={index} className="flex items-start space-x-2">
-                      {error.row !== undefined && <span className="font-mono">Fila {error.row + 1}:</span>}
-                      <span>{error.message}</span>
+                <p className="mt-2 text-sm">{parseError}</p>
+              </div>
+            )}
+
+            {invalidRows.length > 0 && (
+              <div className="p-4 bg-destructive/10 rounded-lg border border-destructive">
+                <div className="flex items-center space-x-2 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <h3 className="font-medium">{invalidRows.length} fila(s) con errores — no se van a importar</h3>
+                </div>
+                <ul className="mt-2 space-y-1 text-sm max-h-40 overflow-y-auto">
+                  {invalidRows.map((item) => (
+                    <li key={item.rowNumber}>
+                      <span className="font-mono">Fila {item.rowNumber}:</span> {item.errors.join('; ')}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {previewData.length > 0 && (
+            {validRows.length > 0 && (
               <div>
-                <h3 className="font-medium mb-2">Vista previa de los datos</h3>
-                <div className="border rounded-lg overflow-hidden">
+                <h3 className="font-medium mb-2 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  {validRows.length} fila(s) válidas, listas para importar
+                </h3>
+                <div className="border rounded-lg overflow-x-auto max-h-72 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {columns.map((column, index) => (
-                          <TableHead key={index}>{column}</TableHead>
+                        {previewColumns.map((column) => (
+                          <TableHead key={column}>{column}</TableHead>
                         ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {previewData.map((row, rowIndex) => (
+                      {validRows.map((row, rowIndex) => (
                         <TableRow key={rowIndex}>
-                          {columns.map((column, colIndex) => (
-                            <TableCell key={colIndex} className="max-w-xs truncate">
-                              {row[column]}
+                          {previewColumns.map((column) => (
+                            <TableCell key={column} className="max-w-xs truncate">
+                              {String(row[column] ?? '')}
                             </TableCell>
                           ))}
                         </TableRow>
@@ -170,9 +207,6 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
                     </TableBody>
                   </Table>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Mostrando {previewData.length} de {parsedData.length} registros totales
-                </p>
               </div>
             )}
           </div>
@@ -182,20 +216,21 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
           <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30 flex items-center space-x-2">
             <CheckCircle className="h-5 w-5 text-green-500" />
             <p className="text-green-700 dark:text-green-300">
-              Archivo subido exitosamente
+              Se crearon {uploadResult?.created ?? validRows.length} productos.
+              {uploadResult?.skipped ? ` ${uploadResult.skipped} fila(s) no se importaron por errores.` : ''}
             </p>
           </div>
         )}
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
+          Cerrar
         </Button>
         <Button
           onClick={handleUpload}
-          disabled={!file || parsedData.length === 0 || uploadStatus === 'uploading'}
+          disabled={validRows.length === 0 || uploadStatus === 'uploading'}
         >
-          {uploadStatus === 'uploading' ? 'Subiendo...' : 'Subir Archivo'}
+          {uploadStatus === 'uploading' ? 'Subiendo...' : `Importar ${validRows.length || ''} producto(s)`}
         </Button>
       </CardFooter>
     </Card>
