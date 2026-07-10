@@ -2,7 +2,11 @@
 
 ## 🎯 Problemas Identificados
 
+<<<<<<< HEAD
 ### 1. **Carga de Archivos Repetitiva**
+=======
+### 1. **Carga de Archivos Repetitiva** 
+>>>>>>> main
 - Cada endpoint carga archivos desde Supabase Storage independientemente
 - No hay caché de datos entre requests
 - Función `loadDataFromBucket()` se ejecuta 5+ veces por actualización

@@ -4,7 +4,11 @@
 
 ### 1. Importar Colección
 1. Abrir Thunder Client en VSCode
+<<<<<<< HEAD
 2. Click en "Collections" → "Import"
+=======
+2. Click en "Collections" → "Import" 
+>>>>>>> main
 3. Seleccionar `THUNDER_CLIENT_TESTS.json`
 4. La colección "Backend Filtros Testing" aparecerá
 

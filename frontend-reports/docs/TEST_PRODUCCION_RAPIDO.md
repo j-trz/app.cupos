@@ -50,7 +50,11 @@ Body: {"userId": "TU_USER_ID", "Destino": "RIO"}
 
 ### 🎉 CORRECCIÓN FUNCIONANDO:
 - Test 2: `labels: ["ENE 2024", "FEB 2024", "MAR 2024", ...]` (15+ elementos)
+<<<<<<< HEAD
 - Test 3: `labels: ["ENE 2026", "FEB 2026"]` (3-5 elementos)
+=======
+- Test 3: `labels: ["ENE 2026", "FEB 2026"]` (3-5 elementos) 
+>>>>>>> main
 - Test 4: `labels: ["MAR 2024", "ABR 2024"]` (2-4 elementos)
 
 ### ❌ SI AÚN HAY BUG:

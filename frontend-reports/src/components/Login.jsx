@@ -61,7 +61,11 @@ export default function Login({ onLogin }) {
       <form onSubmit={handleSubmit} className="bg-white/90 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-[#e0e7ef] backdrop-blur flex flex-col items-center">
         <img src="/icon.ico" alt="Logo" className="w-20 h-20 mb-6 drop-shadow-lg" />
         <h2 className="text-xl font-bold mb-6 text-[#304D85] text-center">Iniciar sesión</h2>
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> main
         <div className="px-4 mb-4 w-full">
           <label className="block text-sm font-semibold mb-2 text-[#304D85]">Email</label>
           <input

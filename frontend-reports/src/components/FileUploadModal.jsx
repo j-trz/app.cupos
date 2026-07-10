@@ -75,7 +75,11 @@ export default function FileUploadModal({ open, onClose, onFilesSelected }) {
         },
         body: formData
       });
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> main
       // Verificar si la respuesta es válida
       if (!resp.ok) {
         // Intentar parsear como JSON, si falla usar texto
@@ -83,7 +87,11 @@ export default function FileUploadModal({ open, onClose, onFilesSelected }) {
         try {
           const result = await resp.json();
           errorMessage = result.error || errorMessage;
+<<<<<<< HEAD
 
+=======
+          
+>>>>>>> main
           // Si es error de token, activar modal de re-login
           if (resp.status === 401 && errorMessage.toLowerCase().includes('token')) {
             // Usar la función global para mostrar el modal de re-login
@@ -113,7 +121,11 @@ export default function FileUploadModal({ open, onClose, onFilesSelected }) {
         }
         throw new Error(errorMessage);
       }
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> main
       // Parsear respuesta exitosa
       const result = await resp.json();
       if (typeof onFilesSelected === 'function') {

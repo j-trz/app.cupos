@@ -4,7 +4,11 @@ import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { Tooltip } from 'react-tooltip';
 
 export default function FiltersPanel({ fields, filters, onFilterChange, onApplyFilters, temporadasValidas }) {
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> main
 
   // Mapear 'Compañia' a 'Aerolinea' para el filtro
   let mappedFields = fields;
