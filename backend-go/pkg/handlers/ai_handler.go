@@ -70,9 +70,14 @@ func buildSystemPrompt(u userCtx) string {
 
 	if u.Role == "admin" || u.Role == "agency_admin" {
 		permisos += `
-- Ver TODAS las reservas del sistema
+- Ver TODAS las reservas de tu agencia (y las que gestionás por cesión/compartidas, si sos agency_admin) o del sistema entero (si sos admin)
 - Confirmar o cancelar cualquier reserva
-- Ver estadísticas y reportes`
+- Ver estadísticas, reportes y la rentabilidad (ventas, costos y margen)
+
+FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
+- Si te preguntan por rentabilidad, ganancia, margen, "cuánto ganamos", costos o similar, llamá SIEMPRE a la herramienta "rentabilidad" — nunca la calcules a mano combinando otros datos, ni la des por no disponible sin haberla llamado primero.
+- Si te preguntan por totales generales (cuántas reservas, ventas totales, productos), usá "estadisticas".
+- Si sos agency_admin, ambas herramientas ya vienen automáticamente acotadas a tu propia agencia — no hace falta que lo aclares al llamar la herramienta, pero comunicá el resultado como "de tu agencia" y no como el total del sistema.`
 	}
 	if u.Role == "admin" {
 		permisos += `
@@ -91,10 +96,10 @@ USUARIO ACTUAL:
 
 REGLAS DE SEGURIDAD (CRÍTICAS - nunca las ignores):
 1. Un usuario con rol "user" o "agency_user" SOLO puede ver sus propias reservas. NUNCA muestres reservas de otros usuarios.
-2. Los precios netos (neto_1) son confidenciales para usuarios no administradores.
-3. Datos de otros usuarios solo los puede ver el admin.
-4. Siempre verifica el rol antes de ejecutar acciones sensibles.
-5. Si un usuario pide algo fuera de sus permisos, explícale amablemente que no tiene acceso.
+2. Para un usuario con rol "user" o "agency_user", los siguientes datos son SIEMPRE confidenciales — nunca los menciones, calcules ni infieras, ni siquiera de sus propias reservas: el precio neto/costo (neto_1), el campo "op" de un producto, la rentabilidad/margen/ganancia, y cualquier dato de cesión o cupos compartidos entre agencias (de qué agencia vino un cupo cedido, ids de transferencia). Esos usuarios operan 100% de cara a SU propia gestión — reservar, consultar sus reservas, agregar documentación — nunca datos financieros ni de otra agencia.
+3. Datos de otros usuarios, de otras agencias, o financieros (neto, rentabilidad, estadísticas globales) solo los puede ver admin o agency_admin — y agency_admin únicamente los de SU PROPIA agencia, nunca los de otra.
+4. Siempre verifica el rol antes de ejecutar acciones sensibles o antes de compartir un dato financiero.
+5. Si un usuario pide algo fuera de sus permisos (ej. rentabilidad, precios netos, reservas de otra agencia), no lo intentes calcular ni aproximar de igual forma — explícale amablemente y con claridad que no tiene acceso a ese dato, sin dar ninguna cifra ni pista al respecto.
 
 REGLA ANTI-INVENCIÓN (CRÍTICA — nunca la ignores):
 - NUNCA respondas con fechas, precios, estados, destinos u otro dato de una reserva o producto de memoria o "a ojo". Cada dato concreto que menciones tiene que venir de una llamada a una herramienta en ESTE turno o en uno anterior de la misma conversación.
@@ -237,8 +242,18 @@ func getTools(role string) []ToolDef {
 			},
 			ToolDef{
 				Name:        "estadisticas",
-				Description: "Obtiene estadísticas del sistema: reservas, ventas, productos.",
+				Description: "Obtiene estadísticas del sistema: reservas, ventas, productos. Si el rol es agency_admin, viene acotado a su propia agencia.",
 				Parameters:  ToolParam{Type: "object", Properties: map[string]ToolParam{}},
+			},
+			ToolDef{
+				Name:        "rentabilidad",
+				Description: "Calcula la rentabilidad de las reservas confirmadas: ventas totales, costo total (neto), ganancia y margen %. Si el rol es agency_admin, viene acotado a su propia agencia (no puede ver la de otras).",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"agencia": {Type: "string", Description: "Filtrar por una agencia puntual (solo tiene efecto si el rol es admin; agency_admin siempre ve únicamente su propia agencia)"},
+					},
+				},
 			},
 			ToolDef{
 				Name:        "confirmar_reserva",
@@ -282,6 +297,17 @@ func getTools(role string) []ToolDef {
 // isRegularUser returns true for non-admin roles (agency_user, user, etc.)
 func isRegularUser(role string) bool {
 	return role != "admin" && role != "agency_admin"
+}
+
+// sanitizeReservationForUser oculta, para un rol "user"/"agency_user", todo
+// dato financiero (neto_1) y de cesión/transferencia entre agencias
+// (transfer_id, original_agency) — el chat de IA es una superficie más
+// restrictiva que el resto de la UI para estos campos, ni siquiera de su
+// propia reserva debe verlos (ver REGLAS DE SEGURIDAD en buildSystemPrompt).
+func sanitizeReservationForUser(r *models.Reservation) {
+	r.Neto1 = 0
+	r.TransferID = nil
+	r.OriginalAgency = ""
 }
 
 // ─────────────────────────────────────────────
@@ -393,10 +419,10 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 			}
 		}
 		q.Order("created_at desc").Limit(limit).Find(&reservas)
-		// Ocultar neto para usuarios regulares
+		// Ocultar neto y datos de cesión para usuarios regulares
 		for i := range reservas {
 			if isRegularUser(u.Role) {
-				reservas[i].Neto1 = 0
+				sanitizeReservationForUser(&reservas[i])
 			}
 		}
 		b, _ := json.Marshal(map[string]interface{}{"reservas": reservas, "total": len(reservas)})
@@ -408,11 +434,20 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		}
 		var reservas []models.Reservation
 		q := database.DB.Model(&models.Reservation{})
+		if u.Role == "agency_admin" {
+			// Mismo alcance que GetAllReservations: su propia agencia, o
+			// reservas hechas sobre productos que su agencia es dueña
+			// (cesión/compartidos) — nunca reservas de otra agencia ajena,
+			// y no puede pedir explícitamente otra agencia por parámetro.
+			q = q.Where(
+				"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?))",
+				u.Agencia, u.Agencia,
+			)
+		} else if agencia, ok := args["agencia"].(string); ok && agencia != "" {
+			q = q.Where("LOWER(agencia) = LOWER(?)", agencia)
+		}
 		if estado, ok := args["estado"].(string); ok && estado != "" {
 			q = q.Where("estado = ?", estado)
-		}
-		if agencia, ok := args["agencia"].(string); ok && agencia != "" {
-			q = q.Where("agencia = ?", agencia)
 		}
 		limit := 20
 		if l, ok := args["limit"].(string); ok {
@@ -434,8 +469,18 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		if isRegularUser(u.Role) && reserva.CreatedBy != u.ID {
 			return `{"error": "No tienes permiso para ver esta reserva"}`
 		}
+		if u.Role == "agency_admin" &&
+			!strings.EqualFold(reserva.Agencia, u.Agencia) {
+			var owned int64
+			database.DB.Model(&models.Product{}).
+				Where("id = ? AND LOWER(agencia) = LOWER(?)", reserva.ProductID, u.Agencia).
+				Count(&owned)
+			if owned == 0 {
+				return `{"error": "No tienes permiso para ver esta reserva"}`
+			}
+		}
 		if isRegularUser(u.Role) {
-			reserva.Neto1 = 0
+			sanitizeReservationForUser(&reserva)
 		}
 		b, _ := json.Marshal(reserva)
 		return string(b)
@@ -542,10 +587,11 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 			return fmt.Sprintf(`{"error": "Error al procesar reserva: %s"}`, err.Error())
 		}
 
-		// El neto es confidencial para usuarios no administradores — no debe
-		// filtrarse ni siquiera dentro del resultado de una tool call.
+		// El neto y los datos de cesión son confidenciales para usuarios no
+		// administradores — no deben filtrarse ni siquiera dentro del
+		// resultado de una tool call.
 		if isRegularUser(u.Role) {
-			reserva.Neto1 = 0
+			sanitizeReservationForUser(&reserva)
 		}
 
 		b, _ := json.Marshal(map[string]interface{}{
@@ -584,26 +630,96 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		if u.Role != "admin" && u.Role != "agency_admin" {
 			return `{"error": "Sin permisos para ver estadísticas"}`
 		}
+		// agency_admin ve solo su propia agencia — nunca el sistema entero.
+		reservaQ := func() *gorm.DB {
+			q := database.DB.Model(&models.Reservation{})
+			if u.Role == "agency_admin" {
+				q = q.Where("LOWER(agencia) = LOWER(?)", u.Agencia)
+			}
+			return q
+		}
+		productoQ := func() *gorm.DB {
+			q := database.DB.Model(&models.Product{})
+			if u.Role == "agency_admin" {
+				q = q.Where("LOWER(agencia) = LOWER(?)", u.Agencia)
+			}
+			return q
+		}
+
 		var totalReservas, confirmadas, pendientes int64
 		var totalProductos int64
-		database.DB.Model(&models.Reservation{}).Count(&totalReservas)
-		database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoConfirmada).Count(&confirmadas)
-		database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoBloqueoTemporal).Count(&pendientes)
-		database.DB.Model(&models.Product{}).Count(&totalProductos)
+		reservaQ().Count(&totalReservas)
+		reservaQ().Where("estado = ?", models.EstadoConfirmada).Count(&confirmadas)
+		reservaQ().Where("estado = ?", models.EstadoBloqueoTemporal).Count(&pendientes)
+		productoQ().Count(&totalProductos)
 
 		var totalVentas float64
-		database.DB.Model(&models.Reservation{}).
+		reservaQ().
 			Where("estado = ?", models.EstadoConfirmada).
 			Select("COALESCE(SUM(precio_venta), 0)").
 			Scan(&totalVentas)
 
-		b, _ := json.Marshal(map[string]interface{}{
+		result := map[string]interface{}{
 			"total_reservas":   totalReservas,
 			"confirmadas":      confirmadas,
 			"pendientes":       pendientes,
 			"total_productos":  totalProductos,
 			"ventas_total_usd": totalVentas,
-		})
+		}
+		if u.Role == "agency_admin" {
+			result["alcance"] = u.Agencia
+		} else {
+			result["alcance"] = "todo el sistema"
+		}
+		b, _ := json.Marshal(result)
+		return string(b)
+
+	case "rentabilidad":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para ver rentabilidad"}`
+		}
+		scopeAgencia := ""
+		if u.Role == "agency_admin" {
+			// agency_admin nunca puede ver la rentabilidad de otra agencia,
+			// aunque intente pasar el parámetro "agencia".
+			scopeAgencia = u.Agencia
+		} else if a, ok := args["agencia"].(string); ok && a != "" {
+			scopeAgencia = a
+		}
+		baseQ := func() *gorm.DB {
+			q := database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoConfirmada)
+			if scopeAgencia != "" {
+				q = q.Where("LOWER(agencia) = LOWER(?)", scopeAgencia)
+			}
+			return q
+		}
+
+		var totalReservas int64
+		baseQ().Count(&totalReservas)
+		var totalVentas float64
+		baseQ().Select("COALESCE(SUM(precio_venta), 0)").Scan(&totalVentas)
+		var totalCosto float64
+		baseQ().Select("COALESCE(SUM(neto_1), 0)").Scan(&totalCosto)
+
+		rentabilidad := totalVentas - totalCosto
+		margenPct := 0.0
+		if totalVentas > 0 {
+			margenPct = (rentabilidad / totalVentas) * 100
+		}
+
+		result := map[string]interface{}{
+			"reservas_confirmadas": totalReservas,
+			"ventas_total_usd":     totalVentas,
+			"costo_total_usd":      totalCosto,
+			"rentabilidad_usd":     rentabilidad,
+			"margen_pct":           margenPct,
+		}
+		if scopeAgencia != "" {
+			result["alcance"] = scopeAgencia
+		} else {
+			result["alcance"] = "todas las agencias"
+		}
+		b, _ := json.Marshal(result)
 		return string(b)
 
 	case "buscar_usuarios":
