@@ -423,8 +423,8 @@ export default function DepartureTable({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-4 mb-4 border border-text-[#304D85] overflow-x-auto w-full relative">
-        <h3 className="text-lg font-bold text-[#304D85] mb-3 opacity-30">{title}</h3>
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm mb-4 overflow-x-auto w-full relative">
+        <h3 className="text-lg font-semibold text-slate-900 mb-3 opacity-30">{title}</h3>
         <div className="relative min-h-64">
           <div className="absolute inset-0 bg-gray-50 opacity-20 rounded" />
           <div className="absolute inset-0 bg-white bg-opacity-60 flex items-center justify-center z-10">
@@ -436,9 +436,9 @@ export default function DepartureTable({
   }
 
   return (
-    <div className="bg-white rounded-lg p-4 mb-4 overflow-x-auto w-full">
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm mb-4 overflow-x-auto w-full">
       <div className="w-full">
-        <h3 className="text-lg font-bold text-[#304D85] mb-3">{title}</h3>
+        <h3 className="text-lg font-semibold text-slate-900 mb-3">{title}</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -453,7 +453,7 @@ export default function DepartureTable({
                   return (
                     <th
                       key={col + '-' + idx}
-                      className={`py-1.5 px-2 font-semibold text-[#304D85] text-center border-b border-blue-100 text-xs ${sortable ? 'cursor-pointer select-none hover:bg-blue-50' : ''}`}
+                      className={`py-1.5 px-2 font-semibold text-slate-700 text-center border-b border-slate-200 text-xs ${sortable ? 'cursor-pointer select-none hover:bg-slate-50' : ''}`}
                       data-tooltip-id={tooltip ? `tt-${col}` : undefined}
                       data-tooltip-content={tooltip || undefined}
                       onClick={() => sortable && onSort(col)}
@@ -499,7 +499,7 @@ export default function DepartureTable({
             <tbody>
               {sortedData.map((row, idx) => {
                 const urgent = typeof urgentRule === 'function' ? (!!urgentRule(row) && (parseInt(row['Lugares disponibles']) || 0) > 0) : false;
-                const trBase = row._comparativo ? 'hover:bg-blue-50 border-t-2 border-blue-200' : 'hover:bg-blue-50';
+                const trBase = row._comparativo ? 'hover:bg-slate-50 border-t-2 border-slate-300' : 'hover:bg-slate-50';
                 const trClass = urgent ? `${trBase} bg-red-50` : trBase;
                 return (
                   <tr
@@ -512,8 +512,8 @@ export default function DepartureTable({
                       <td
                         key={col + '-' + cidx}
                         className={col === '_comparativo'
-                          ? 'py-1 px-2 border-b border-blue-50 text-[#304D85] text-center font-bold bg-blue-50 text-xs'
-                          : 'py-1 px-2 border-b border-blue-50 text-[#304D85] text-center text-xs'}
+                          ? 'py-1 px-2 border-b border-slate-100 text-slate-900 text-center font-bold bg-slate-50 text-xs'
+                          : 'py-1 px-2 border-b border-slate-100 text-slate-700 text-center text-xs'}
                       >
                         {col === '_comparativo'
                           ? row[col]
@@ -552,11 +552,11 @@ export default function DepartureTable({
                   </tr>
                 );
               })}
-              <tr className="bg-blue-100 font-bold">
+              <tr className="bg-slate-100 font-bold">
                 {allColumns.map((col, cidx) => (
                   <td
                     key={col + '-total-' + cidx}
-                    className="py-1 px-2 border-b border-blue-200 text-[#304D85] text-center text-xs"
+                    className="py-1 px-2 border-b border-slate-200 text-slate-900 text-center text-xs"
                   >
                     {['Rentabilidad', 'Costo', 'Costo total', 'Venta', 'Venta total', 'Riesgo'].includes(col)
                       ? `$${isNaN(Number(totalRow[col])) ? '0' : String(Math.round(Number(totalRow[col]) || 0))}`
@@ -593,8 +593,8 @@ export default function DepartureTable({
           </table>
         </div>
 
-        <div className="mt-12 pt-4 border-t border-blue-50">
-          <h4 className="text-sm font-semibold text-[#304D85] mb-2">Evolución ventas {selectedCodigo ? `- ${selectedCodigo}` : '(global)'}</h4>
+        <div className="mt-8 pt-4 border-t border-slate-200">
+          <h4 className="text-sm font-semibold text-slate-900 mb-2">Evolución ventas {selectedCodigo ? `- ${selectedCodigo}` : '(global)'}</h4>
           {chartLoading ? (
             <div className="flex items-center justify-center py-8">
               <LoadingSpinner message="Cargando evolución..." compact={true} />

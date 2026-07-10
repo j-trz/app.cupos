@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, BarChart3, Download, Info } from 'lucide-react';
-import Button from '../components/ui/Button.jsx';
+import { Lock, BarChart3, Info, DollarSign, TrendingUp, Wallet, AlertTriangle, Filter } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { Tooltip } from 'react-tooltip';
 
@@ -17,7 +16,6 @@ import PeriodSelector from '../components/reports/PeriodSelector';
 import KpiPanel from '../components/reports/KpiPanel';
 
 import { ReportService } from '../services/reportService.js';
-import { HiOutlineFunnel, HiMiniXMark, HiOutlineLockOpen, HiOutlineLockClosed } from "react-icons/hi2";
 
 const Reportes = () => {
   const { user } = useAuth();
@@ -69,8 +67,6 @@ const Reportes = () => {
   const [agenciaVendidos, setAgenciaVendidos] = useState(emptyChart);
   const [agenciaEvolucion, setAgenciaEvolucion] = useState(emptyChart);
   const [temporadasValidas, setTemporadasValidas] = useState([]);
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [filtrosAnclados, setFiltrosAnclados] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Cargando datos...');
   const [isFilterLoading, setIsFilterLoading] = useState(false);
@@ -79,10 +75,10 @@ const Reportes = () => {
 
   // KPIs del panel superior
   const [kpis, setKpis] = useState([
-    { label: 'Ventas Totales (USD)', value: '$0' },
-    { label: 'Rentabilidad (USD)', value: '$0' },
-    { label: 'Costo (USD)', value: '$0' },
-    { label: 'Riesgo (USD)', value: '$0' },
+    { label: 'Ventas Totales (USD)', value: '$0', icon: DollarSign },
+    { label: 'Rentabilidad (USD)', value: '$0', icon: TrendingUp },
+    { label: 'Costo (USD)', value: '$0', icon: Wallet },
+    { label: 'Riesgo (USD)', value: '$0', icon: AlertTriangle },
   ]);
 
   const buildFiltersRequest = (baseFilters) => {
@@ -294,10 +290,10 @@ const Reportes = () => {
       const totalRiesgo = rowsDet.reduce((sum, r) => sum + (parseFloat(r['Riesgo']) || 0), 0);
 
       setKpis([
-        { label: 'Ventas Totales (USD)', value: `$${Math.round(totalVentas).toLocaleString()}` },
-        { label: 'Rentabilidad (USD)', value: `$${Math.round(totalRentabilidad).toLocaleString()}` },
-        { label: 'Costo de lo Vendido (USD)', value: `$${Math.round(totalCosto).toLocaleString()}` },
-        { label: 'Riesgo Económico (USD)', value: `$${Math.round(totalRiesgo).toLocaleString()}` },
+        { label: 'Ventas Totales (USD)', value: `$${Math.round(totalVentas).toLocaleString()}`, icon: DollarSign },
+        { label: 'Rentabilidad (USD)', value: `$${Math.round(totalRentabilidad).toLocaleString()}`, icon: TrendingUp },
+        { label: 'Costo de lo Vendido (USD)', value: `$${Math.round(totalCosto).toLocaleString()}`, icon: Wallet },
+        { label: 'Riesgo Económico (USD)', value: `$${Math.round(totalRiesgo).toLocaleString()}`, icon: AlertTriangle },
       ]);
 
       setLoadingMessage('📈 Cargando gráficos adicionales en paralelo...');
@@ -379,7 +375,7 @@ const Reportes = () => {
   }, []);
 
   return (
-    <div className="w-full space-y-4 relative">
+    <div className="w-full space-y-6">
       {/* Page Header */}
       <PageHeader
         title="Dashboard de Reportes"
@@ -395,64 +391,29 @@ const Reportes = () => {
         />
       )}
 
-      {/* Botón flotante para mostrar filtros si no están anclados */}
-      {!filtrosAnclados && !mostrarFiltros && (
-        <button
-          className="fixed top-24 left-4 z-40 bg-[#2563eb] hover:bg-[#304D85] text-white rounded-full shadow-lg p-3 flex items-center justify-center transition-all duration-200 cursor-pointer"
-          style={{ boxShadow: '0 4px 24px 0 #2563eb44' }}
-          onClick={() => setMostrarFiltros(true)}
-          title="Mostrar filtros"
-        >
-          <HiOutlineFunnel size={20} />
-        </button>
-      )}
-
-      {/* Panel de filtros móvil/desplegable */}
-      {(mostrarFiltros || filtrosAnclados) && (
-        <div className={`fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-50 transition-transform duration-300 ${filtrosAnclados ? 'translate-x-0' : (mostrarFiltros ? 'translate-x-0' : '-translate-x-full')}`}
-             style={{ boxShadow: '0 4px 32px 0 #2563eb33' }}>
-          <div className="flex flex-row items-center justify-between px-4 py-4 border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <HiOutlineFunnel size={20} className="text-[#2563eb]" />
-              <span className="text-lg font-bold text-[#304D85]">Filtros de Reportes</span>
-            </div>
-            <div className="flex gap-1 items-center">
-              <button
-                className={`rounded-full p-1.5 transition cursor-pointer ${filtrosAnclados ? 'bg-[#2563eb] text-white' : 'bg-gray-200 text-[#304D85]'}`}
-                onClick={() => setFiltrosAnclados(!filtrosAnclados)}
-                data-tooltip-id="tt-anclar"
-                data-tooltip-content={filtrosAnclados ? 'Desanclar filtros' : 'Anclar filtros'}
-              >
-                {filtrosAnclados ? <HiOutlineLockOpen size={16} /> : <HiOutlineLockClosed size={16} />}
-                <Tooltip id="tt-anclar" place="top" />
-              </button>
-              {!filtrosAnclados && (
-                <button
-                  className="rounded-full p-1.5 bg-gray-200 text-[#304D85] transition cursor-pointer"
-                  onClick={() => setMostrarFiltros(false)}
-                >
-                  <HiMiniXMark size={16} />
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="p-4 overflow-y-auto h-[calc(100vh-60px)]">
-            <FiltersPanel
-              fields={fields}
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              onApplyFilters={handleUpdate}
-              temporadasValidas={temporadasValidas}
-            />
+      {/* Filtros — siempre visibles, en grilla */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Filter className="h-4 w-4 text-slate-500" />
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Filtros</h2>
+            <p className="text-sm text-slate-500">Ajustá los filtros y aplicá para actualizar todo el dashboard.</p>
           </div>
         </div>
-      )}
+        <FiltersPanel
+          fields={fields}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onApplyFilters={handleUpdate}
+          temporadasValidas={temporadasValidas}
+        />
+      </Card>
 
       {/* KPIs Row */}
       <KpiPanel kpis={kpis} />
 
       {/* Contenido principal del dashboard */}
-      <div className={`transition-all duration-300 ${filtrosAnclados ? 'pl-80' : ''}`}>
+      <div>
         <TabsCharts
           principalPanel={
             <div className="flex flex-col lg:flex-row w-full gap-4 items-start">
@@ -468,11 +429,11 @@ const Reportes = () => {
                 />
               </div>
               <div className="w-full lg:w-1/4">
-                <div className="flex flex-col h-full bg-white p-3 rounded-lg shadow-md border border-[#304D85]">
+                <div className="flex flex-col h-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                    <span className="text-sm font-semibold text-slate-900 flex items-center gap-1">
                       Evolución de pasajeros
-                      <Info size={14} className="text-blue-500 cursor-help" data-tooltip-id="pax-evol-info" data-tooltip-content="Suma de NRO (ventas válidas y bebés de regreso < 2 años) agrupados por período." />
+                      <Info size={14} className="text-slate-400 cursor-help" data-tooltip-id="pax-evol-info" data-tooltip-content="Suma de NRO (ventas válidas y bebés de regreso < 2 años) agrupados por período." />
                       <Tooltip id="pax-evol-info" place="top" />
                     </span>
                     <PeriodSelector
@@ -522,9 +483,9 @@ const Reportes = () => {
             { chartData: companiaVenta, chartType: 'bar', title: 'Venta por compañía' },
           ]}
           agenciaPanel={
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start bg-white p-4 rounded-lg shadow-md border border-[#304D85]">
+            <div className="grid grid-cols-2 lg:grid-cols-12 gap-4 items-start rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="lg:col-span-4 flex flex-col items-center">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Share de ventas por agencia (%)</h4>
+                <h4 className="text-sm font-semibold text-slate-900 mb-3">Share de ventas por agencia (%)</h4>
                 <div style={{ height: 260, width: '100%' }}>
                   <DashboardChart
                     chartData={{
@@ -546,7 +507,7 @@ const Reportes = () => {
 
               <div className="lg:col-span-8">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-semibold text-gray-700">Evolución de ventas por agencia</span>
+                  <span className="text-sm font-semibold text-slate-900">Evolución de ventas por agencia</span>
                   <PeriodSelector
                     value={agenciaEvolucionGranularidad}
                     onChange={setAgenciaEvolucionGranularidad}

@@ -18,22 +18,22 @@ export default function TabsCharts({ principalPanel, salidaPanel, destinoCharts 
   ];
 
   return (
-    <div className="w-full mt-12">
+    <div className="w-full">
       <TabGroup defaultIndex={0}>
-        <TabList className="flex space-x-1 rounded-lg bg-black/10 p-1 mb-3">
+        <TabList className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 mb-4">
           {tabs.map((tab) => (
             <Tab
               key={tab.key}
               className={({ selected }) =>
                 classNames(
-                  'w-full text-sm font-semibold leading-4 text-[#304D85] rounded-lg px-2 py-2 focus:not-data-focus:outline-none data-focus:outline data-focus:outline-white data-hover:bg-[#cc6200]/20 data-selected:bg-[#cc6200] data-selected:data-hover:bg-[#cc6200]/80 data-selected:text-white cursor-pointer',
+                  'flex-1 text-sm font-medium rounded-lg px-3 py-2 transition-colors cursor-pointer focus:outline-none',
                   selected
-                    ? 'bg-white shadow text-blue-700 font-bold'
-                    : 'text-[#304D85] hover:bg-white/70 hover:text-blue-800'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
                 )
               }
             >
-              <span className="flex items-center justify-center">{tab.icon}{tab.name}</span>
+              <span className="flex items-center justify-center gap-1.5">{tab.icon}{tab.name}</span>
             </Tab>
           ))}
         </TabList>

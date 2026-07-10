@@ -175,8 +175,8 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
         },
         radius: chartType === 'doughnut' ? '90%' : undefined,
         scales: chartType === 'bar' || chartType === 'line' ? {
-          x: { grid: { color: '#e0e7ef' }, ticks: { color: '#2563eb', font: { size: 9 }, maxRotation: 45, minRotation: 0 } },
-          y: { grid: { color: '#e0e7ef' }, ticks: { color: '#2563eb', font: { size: 9 } } },
+          x: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 9 }, maxRotation: 45, minRotation: 0 } },
+          y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 9 } } },
         } : {},
       },
     });
@@ -195,8 +195,8 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
 
   if (isLoading) {
     return (
-      <div className="w-full bg-white rounded-lg shadow-md p-4 mb-4 border border-[#304D85] relative">
-        {title && <h3 className="text-sm font-bold text-[#304D85] mb-3 opacity-30">{title}</h3>}
+      <div className="w-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm mb-4 relative">
+        {title && <h3 className="text-sm font-semibold text-slate-900 mb-3 opacity-30">{title}</h3>}
         <div className="relative" style={{ height: chartType === 'doughnut' ? '300px' : '280px' }}>
           <div className="absolute inset-0 bg-gray-50 opacity-20 rounded"></div>
           <div className="absolute inset-0 bg-white bg-opacity-60 flex items-center justify-center z-10">
@@ -208,12 +208,12 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
   }
 
   return (
-    <div className="w-full bg-white rounded-lg shadow-md p-4 mb-4 border border-[#304D85]">
-      {title && <h3 className="text-sm font-bold text-[#304D85] mb-3">{title}</h3>}
+    <div className="w-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      {title && <h3 className="text-sm font-semibold text-slate-900 mb-3">{title}</h3>}
       <div className="flex items-center justify-center" style={{ height: chartType === 'doughnut' ? '300px' : '280px' }}>
         {!isLoading && <canvas ref={chartRef}></canvas>}
         {!hasData && !isLoading && (
-          <div className="flex items-center justify-center text-[#009CDD] h-[150px]">
+          <div className="flex items-center justify-center text-slate-400 h-[150px]">
             <span className="text-sm"></span>
           </div>
         )}

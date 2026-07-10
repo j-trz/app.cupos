@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { Tooltip } from 'react-tooltip';
+import Button from '../ui/Button.jsx';
+
+const INPUT_CLASSES = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function FiltersPanel({ fields, filters, onFilterChange, onApplyFilters, temporadasValidas }) {
   let mappedFields = fields;
@@ -44,9 +47,13 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openDropdown]);
 
+  const activeFilters = Object.entries(filters).filter(
+    ([, v]) => v && ((Array.isArray(v) && v.length > 0) || (!Array.isArray(v) && v))
+  );
+
   return (
-    <div className="w-72 bg-white rounded-lg p-3 mb-4">
-      <div className="flex flex-col gap-2 mb-3">
+    <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {mappedFields.filter(f => allowed.includes(f.field)).map(f => (
           <div key={f.field} className="relative" ref={el => { if (el) dropdownRefs.current[f.field] = el; }}>
             {(() => {
@@ -62,31 +69,14 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
               return (
                 <>
                   <label
-                    className="block text-xs font-semibold mb-1 text-[#304D85]"
+                    className="mb-1 block text-xs font-medium text-slate-600"
                     data-tooltip-id={tooltipText ? `tt-${f.field}` : undefined}
                     data-tooltip-content={tooltipText || undefined}
                     style={{ cursor: tooltipText ? 'help' : undefined }}
                   >
                     {labelText}
                   </label>
-                  {tooltipText && (
-                    <Tooltip
-                      id={`tt-${f.field}`}
-                      place="top"
-                      style={{
-                        background: 'linear-gradient(135deg, #23272f 60%, #434a54 100%)',
-                        color: '#fff',
-                        borderRadius: '8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        boxShadow: '0 2px 12px 0 rgba(0,0,0,0.18)',
-                        padding: '6px 10px',
-                        zIndex: 2147483647,
-                        pointerEvents: 'auto'
-                      }}
-                      wrapperStyle={{ zIndex: 2147483647 }}
-                    />
-                  )}
+                  {tooltipText && <Tooltip id={`tt-${f.field}`} place="top" />}
                 </>
               );
             })()}
@@ -97,19 +87,19 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
                 multiple
               >
                 <div className="relative">
-                  <ListboxButton className="w-full border border-[#d1d5db] rounded-lg p-1.5 bg-white cursor-pointer min-h-8 flex items-center justify-between transition-all duration-150 shadow-sm text-xs">
-                    <span className="truncate">
+                  <ListboxButton className={`${INPUT_CLASSES} flex min-h-[38px] cursor-pointer items-center justify-between`}>
+                    <span className="truncate text-left">
                       {Array.isArray(filters[f.field]) && filters[f.field].length > 0
                         ? filters[f.field].join(', ')
                         : `Seleccionar ${f.field.toLowerCase()}...`}
                     </span>
-                    <ChevronUpDownIcon className="w-4 h-4 text-gray-400 ml-1" aria-hidden="true" />
+                    <ChevronUpDownIcon className="ml-1 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
                   </ListboxButton>
-                  <ListboxOptions className="absolute z-10 bg-white border border-[#d1d5db] rounded-lg shadow-lg w-full mt-1 max-h-36 overflow-y-auto text-xs">
+                  <ListboxOptions className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white text-sm shadow-lg">
                     {f.values.map((v, idx) => {
                       const value = typeof v === 'object' ? v.text : v;
                       return (
-                        <ListboxOption key={value + '-' + idx} value={value} className={({ active }) => `flex items-center px-2 py-1 cursor-pointer ${active ? 'bg-blue-50' : ''}`}>
+                        <ListboxOption key={value + '-' + idx} value={value} className={({ active }) => `flex items-center px-3 py-1.5 cursor-pointer ${active ? 'bg-slate-50' : ''}`}>
                           {() => (
                             <>
                               <input
@@ -130,15 +120,14 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
             ) : (f.field === 'Salida' || f.field === 'Regreso') ? (
               <input
                 type="date"
-                className="w-full border border-[#d1d5db] rounded-lg p-1.5 transition-all duration-150 shadow-sm text-xs"
+                className={INPUT_CLASSES}
                 value={filters[f.field] || ''}
                 onChange={e => onFilterChange(f.field, e.target.value)}
               />
             ) : (
               <div className="relative">
                 <select
-                  className="w-full border border-[#d1d5db] rounded-lg p-1.5 appearance-none pr-8 transition-all duration-150 shadow-sm focus:outline-none focus:ring-0 focus:border-[#d1d5db] text-xs"
-                  style={{ borderRadius: '0.5rem' }}
+                  className={`${INPUT_CLASSES} appearance-none pr-8`}
                   value={filters[f.field] || ''}
                   onChange={e => onFilterChange(f.field, e.target.value)}
                 >
@@ -164,34 +153,33 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
                     ))
                   )}
                 </select>
-                <ChevronUpDownIcon className="w-4 h-4 text-gray-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                <ChevronUpDownIcon className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
               </div>
             )}
           </div>
         ))}
       </div>
-      <div className="flex justify-end mb-3">
-        <button
-          className="px-4 py-1.5 bg-[#2563eb] text-white rounded-full shadow-md hover:bg-[#304D85] transition font-semibold text-sm flex items-center gap-2 cursor-pointer"
-          onClick={onApplyFilters}
-        >
-          Aplicar
-        </button>
-      </div>
-      <div className="mb-2 flex flex-wrap items-center">
-        <span className="font-semibold text-[#304D85] text-xs">Filtros activos:</span>
-        {Object.entries(filters).filter(([, v]) => v && ((Array.isArray(v) && v.length > 0) || (!Array.isArray(v) && v))).map(([k, v], idx) => (
-          <span key={k + '-' + idx} className="ml-1 px-2 py-0.5 bg-blue-100 text-[#304D85] rounded shadow flex items-center text-xs">
-            {k}: {Array.isArray(v) ? v.join(', ') : v}
-            <button
-              className="ml-2 text-red-500 font-bold hover:text-red-700 focus:outline-none"
-              title="Quitar filtro"
-              onClick={() => onFilterChange(k, Array.isArray(v) ? [] : '')}
-            >
-              ×
-            </button>
-          </span>
-        ))}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilters.length > 0 && (
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Filtros activos:</span>
+          )}
+          {activeFilters.map(([k, v], idx) => (
+            <span key={k + '-' + idx} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+              {k}: {Array.isArray(v) ? v.join(', ') : v}
+              <button
+                type="button"
+                className="text-slate-400 hover:text-slate-700"
+                title="Quitar filtro"
+                onClick={() => onFilterChange(k, Array.isArray(v) ? [] : '')}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <Button size="sm" onClick={onApplyFilters}>Aplicar filtros</Button>
       </div>
     </div>
   );
