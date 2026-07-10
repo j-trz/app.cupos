@@ -25,15 +25,19 @@ const PRESET_COLORS = {
 };
 
 // ─── Fonts disponibles ────────────────────────────────────────
+// Guardamos solo el nombre de la familia (sin fallbacks embebidos) — el
+// stack de fallback ("ui-sans-serif, system-ui, sans-serif") lo arma
+// applyCSSVariables al aplicarlo. Estas 8 familias están precargadas en
+// index.html (Google Fonts) para que cualquiera se vea de verdad al elegirla.
 const FONT_OPTIONS = [
-    { value: 'Inter, system-ui, sans-serif', label: 'Inter' },
-    { value: 'Roboto, system-ui, sans-serif', label: 'Roboto' },
-    { value: 'Poppins, system-ui, sans-serif', label: 'Poppins' },
-    { value: 'Montserrat, system-ui, sans-serif', label: 'Montserrat' },
-    { value: 'Open Sans, system-ui, sans-serif', label: 'Open Sans' },
-    { value: 'Lato, system-ui, sans-serif', label: 'Lato' },
-    { value: 'Nunito, system-ui, sans-serif', label: 'Nunito' },
-    { value: 'DM Sans, system-ui, sans-serif', label: 'DM Sans' },
+    { value: 'Inter', label: 'Inter' },
+    { value: 'Roboto', label: 'Roboto' },
+    { value: 'Poppins', label: 'Poppins' },
+    { value: 'Montserrat', label: 'Montserrat' },
+    { value: 'Open Sans', label: 'Open Sans' },
+    { value: 'Lato', label: 'Lato' },
+    { value: 'Nunito', label: 'Nunito' },
+    { value: 'DM Sans', label: 'DM Sans' },
 ];
 
 const INPUT_CLASSES = "w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
@@ -48,7 +52,7 @@ const DEFAULT_CONFIG = {
         surface: '#f8fafc', text_primary: '#0f172a', text_secondary: '#64748b',
         accent: '#f59e0b', border: '#e2e8f0', success: '#22c55e', error: '#ef4444',
     },
-    fonts: { heading: 'Inter, system-ui, sans-serif', body: 'Inter, system-ui, sans-serif' },
+    fonts: { heading: 'Inter', body: 'Inter' },
     buttons: { borderRadius: 'md', paddingX: '4', paddingY: '2', fontWeight: 'medium' },
     sidebar: { width: '280px', backgroundColor: '#0f172a', textColor: '#f8fafc', hoverColor: '#1e293b', hoverTextColor: '#ffffff', activeColor: '#3b82f6' },
     layout: { maxWidth: '100%', padding: '24px', borderRadius: 'lg' },
@@ -124,7 +128,11 @@ export default function WhiteLabelConfig() {
         if (!config) return;
         try {
             const flat = flattenForCSS(config);
-            applyCSSVariables(flat);
+            // flattenForCSS devuelve { config: {...} } — applyCSSVariables espera
+            // el objeto de config directo, no envuelto; pasarle `flat` a secas
+            // hacía que sus `if (config.fonts)`/`if (config.colors)` nunca
+            // entraran, y la vista previa en vivo de esta página no aplicaba nada.
+            applyCSSVariables(flat.config);
         } catch (e) { /* noop */ }
     }, [config]);
 
@@ -230,7 +238,7 @@ export default function WhiteLabelConfig() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Configuración de Marca Blanca"
+                title="Diseño del sitio"
                 description="Personaliza la identidad visual de tu agencia. Cada cambio se refleja en tiempo real."
                 icon={Palette}
                 action={
@@ -378,7 +386,7 @@ export default function WhiteLabelConfig() {
                                             <select value={f.heading || ''} onChange={e => up('fonts', 'heading', e.target.value)}
                                                 className={`${INPUT_CLASSES} bg-white`}>
                                                 {FONT_OPTIONS.map(opt => (
-                                                    <option key={opt.value} value={opt.value} style={{ fontFamily: opt.value.split(',')[0] }}>{opt.label}</option>
+                                                    <option key={opt.value} value={opt.value} style={{ fontFamily: opt.value }}>{opt.label}</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -387,7 +395,7 @@ export default function WhiteLabelConfig() {
                                             <select value={f.body || ''} onChange={e => up('fonts', 'body', e.target.value)}
                                                 className={`${INPUT_CLASSES} bg-white`}>
                                                 {FONT_OPTIONS.map(opt => (
-                                                    <option key={opt.value} value={opt.value} style={{ fontFamily: opt.value.split(',')[0] }}>{opt.label}</option>
+                                                    <option key={opt.value} value={opt.value} style={{ fontFamily: opt.value }}>{opt.label}</option>
                                                 ))}
                                             </select>
                                         </div>

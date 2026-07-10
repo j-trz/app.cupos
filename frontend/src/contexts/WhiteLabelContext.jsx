@@ -83,11 +83,24 @@ export function applyCSSVariables(config) {
         });
     }
 
-    // Fonts
+    // Fonts — el valor puede venir como nombre suelto ("Poppins") o como un
+    // stack ya armado con fallbacks ("Poppins, system-ui, sans-serif") según
+    // de dónde se haya guardado; si se envuelve el stack entero entre
+    // comillas, el navegador lo interpreta como UN solo nombre de familia con
+    // comas adentro (inválido) y cae directo al genérico, ignorando la
+    // tipografía elegida. Por eso siempre se extrae solo el primer nombre
+    // antes de citarlo.
+    const primaryFontName = (value, fallback) => {
+        const first = String(value || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
+        return first || fallback;
+    };
     if (config.fonts) {
-        root.style.setProperty('--font-heading', `"${config.fonts.heading}", ui-sans-serif, system-ui, sans-serif`);
-        root.style.setProperty('--font-body', `"${config.fonts.body}", ui-sans-serif, system-ui, sans-serif`);
-        root.style.setProperty('--font-mono', `"${config.fonts.mono}", ui-monospace, monospace`);
+        const heading = primaryFontName(config.fonts.heading, 'Inter');
+        const body = primaryFontName(config.fonts.body, 'Inter');
+        const mono = primaryFontName(config.fonts.mono, 'JetBrains Mono');
+        root.style.setProperty('--font-heading', `"${heading}", ui-sans-serif, system-ui, sans-serif`);
+        root.style.setProperty('--font-body', `"${body}", ui-sans-serif, system-ui, sans-serif`);
+        root.style.setProperty('--font-mono', `"${mono}", ui-monospace, monospace`);
     }
 
     // Buttons
@@ -144,26 +157,33 @@ export function WhiteLabelProvider({ children }) {
                         logoUrl: dbConfig.identity?.logoUrl || dbConfig.logoUrl || '',
                         faviconUrl: dbConfig.identity?.faviconUrl || dbConfig.faviconUrl || ''
                     },
+                    // colors/fonts: el backend (white_label_handler.go) guarda y devuelve
+                    // un único JSON anidado (dbConfig.colors.primary, dbConfig.fonts.heading),
+                    // nunca columnas planas tipo dbConfig.primary_color/font_heading — esas
+                    // claves planas no existían en la respuesta real, así que esta sección
+                    // siempre caía en el default hardcodeado sin importar lo que se guardara
+                    // desde Marca Blanca. Se lee primero la forma anidada real, y se deja el
+                    // nombre plano como fallback por si alguna vez se guardó así.
                     colors: {
-                        primary: dbConfig.primary_color || DEFAULT_CONFIG.colors.primary,
-                        primary_hover: dbConfig.primary_hover_color || DEFAULT_CONFIG.colors.primary_hover,
-                        secondary: dbConfig.secondary_color || DEFAULT_CONFIG.colors.secondary,
-                        secondary_hover: dbConfig.secondary_hover_color || DEFAULT_CONFIG.colors.secondary_hover,
-                        accent: dbConfig.accent_color || DEFAULT_CONFIG.colors.accent,
-                        background: dbConfig.background_color || DEFAULT_CONFIG.colors.background,
-                        surface: dbConfig.surface_color || DEFAULT_CONFIG.colors.surface,
-                        text_primary: dbConfig.text_primary_color || DEFAULT_CONFIG.colors.text_primary,
-                        text_secondary: dbConfig.text_secondary_color || DEFAULT_CONFIG.colors.text_secondary,
-                        border: dbConfig.border_color || DEFAULT_CONFIG.colors.border,
-                        success: dbConfig.success_color || DEFAULT_CONFIG.colors.success,
-                        warning: dbConfig.warning_color || DEFAULT_CONFIG.colors.warning,
-                        error: dbConfig.error_color || DEFAULT_CONFIG.colors.error,
-                        info: dbConfig.info_color || DEFAULT_CONFIG.colors.info
+                        primary: dbConfig.colors?.primary || dbConfig.primary_color || DEFAULT_CONFIG.colors.primary,
+                        primary_hover: dbConfig.colors?.primary_hover || dbConfig.primary_hover_color || DEFAULT_CONFIG.colors.primary_hover,
+                        secondary: dbConfig.colors?.secondary || dbConfig.secondary_color || DEFAULT_CONFIG.colors.secondary,
+                        secondary_hover: dbConfig.colors?.secondary_hover || dbConfig.secondary_hover_color || DEFAULT_CONFIG.colors.secondary_hover,
+                        accent: dbConfig.colors?.accent || dbConfig.accent_color || DEFAULT_CONFIG.colors.accent,
+                        background: dbConfig.colors?.background || dbConfig.background_color || DEFAULT_CONFIG.colors.background,
+                        surface: dbConfig.colors?.surface || dbConfig.surface_color || DEFAULT_CONFIG.colors.surface,
+                        text_primary: dbConfig.colors?.text_primary || dbConfig.text_primary_color || DEFAULT_CONFIG.colors.text_primary,
+                        text_secondary: dbConfig.colors?.text_secondary || dbConfig.text_secondary_color || DEFAULT_CONFIG.colors.text_secondary,
+                        border: dbConfig.colors?.border || dbConfig.border_color || DEFAULT_CONFIG.colors.border,
+                        success: dbConfig.colors?.success || dbConfig.success_color || DEFAULT_CONFIG.colors.success,
+                        warning: dbConfig.colors?.warning || dbConfig.warning_color || DEFAULT_CONFIG.colors.warning,
+                        error: dbConfig.colors?.error || dbConfig.error_color || DEFAULT_CONFIG.colors.error,
+                        info: dbConfig.colors?.info || dbConfig.info_color || DEFAULT_CONFIG.colors.info
                     },
                     fonts: {
-                        heading: dbConfig.font_heading || DEFAULT_CONFIG.fonts.heading,
-                        body: dbConfig.font_body || DEFAULT_CONFIG.fonts.body,
-                        mono: dbConfig.font_mono || DEFAULT_CONFIG.fonts.mono
+                        heading: dbConfig.fonts?.heading || dbConfig.font_heading || DEFAULT_CONFIG.fonts.heading,
+                        body: dbConfig.fonts?.body || dbConfig.font_body || DEFAULT_CONFIG.fonts.body,
+                        mono: dbConfig.fonts?.mono || dbConfig.font_mono || DEFAULT_CONFIG.fonts.mono
                     },
                     buttons: {
                         radius: dbConfig.button_radius || DEFAULT_CONFIG.buttons.radius,

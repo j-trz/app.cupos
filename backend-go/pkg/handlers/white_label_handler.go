@@ -31,8 +31,8 @@ func defaultWhiteLabelConfig() map[string]interface{} {
 			"border":         "#e2e8f0",
 		},
 		"fonts": map[string]interface{}{
-			"heading": "Inter, system-ui, sans-serif",
-			"body":    "Inter, system-ui, sans-serif",
+			"heading": "Inter",
+			"body":    "Inter",
 		},
 		"buttons": map[string]interface{}{
 			"borderRadius": "lg",
