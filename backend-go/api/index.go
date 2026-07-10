@@ -147,6 +147,21 @@ func init() {
 				reports.GET("/top-products", handlers.GetTopProducts)
 				reports.GET("/risk-alerts", handlers.GetRiskAlerts)
 				reports.GET("/cancellations", handlers.GetCancellations)
+
+				// Endpoints de backend-report (compatibilidad legacy)
+				reports.GET("/fields", handlers.GetFieldsHandler)
+				reports.POST("/dashboard-data", handlers.DashboardDataHandler)
+				reports.POST("/evolucion-agencias", handlers.EvolucionAgenciasHandler)
+				reports.POST("/agencias-data", handlers.AgenciasDataHandler)
+				reports.POST("/detalle-destinos", handlers.DetalleDestinosHandler)
+				reports.POST("/destinos-compania", handlers.DestinosCompaniaHandler)
+				reports.POST("/evolucion-pasajeros", handlers.EvolucionPasajerosHandler)
+				reports.POST("/evolucion-por-cupo", handlers.EvolucionPorCupoHandler)
+				reports.POST("/share-por-cupo", handlers.SharePorCupoHandler)
+				reports.POST("/por-salida", handlers.PorSalidaHandler)
+				reports.GET("/metrics-summary", handlers.MetricsSummaryHandler)
+				reports.GET("/metrics-by-destination", handlers.MetricsByDestinationHandler)
+				reports.GET("/forecast-sales", handlers.ForecastSalesHandler)
 			}
 			// Métricas personales para usuarios regulares
 			protected.GET("/reports/user-metrics", handlers.GetUserMetrics)

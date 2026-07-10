@@ -1,6 +1,7 @@
 import ApiClient from './apiClient';
 
 export class ReportService {
+  // Endpoints Originales GET
   static async getSalesByAgency(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -111,6 +112,47 @@ export class ReportService {
     const queryString = params.toString();
     const endpoint = queryString ? `/reports/cancellations?${queryString}` : '/reports/cancellations';
     return await ApiClient.get(endpoint);
+  }
+
+  // NUEVOS ENDPOINTS POST - Procedentes de backend-report (Compatibilidad con el dashboard cockpit)
+  static async getFields() {
+    return await ApiClient.get('/reports/fields');
+  }
+
+  static async getDashboardData(filters = {}) {
+    return await ApiClient.post('/reports/dashboard-data', { filters });
+  }
+
+  static async getEvolucionAgencias(filters = {}, granularidad = 'mes') {
+    return await ApiClient.post('/reports/evolucion-agencias', { filters, granularidad });
+  }
+
+  static async getAgenciasData(filters = {}) {
+    return await ApiClient.post('/reports/agencias-data', { filters });
+  }
+
+  static async getDetalleDestinosPost(filters = {}) {
+    return await ApiClient.post('/reports/detalle-destinos', { filters });
+  }
+
+  static async getEvolucionPasajerosPost(filters = {}, granularidad = 'mes') {
+    return await ApiClient.post('/reports/evolucion-pasajeros', { filters, granularidad });
+  }
+
+  static async getEvolucionPorCupo(codigoCupo, filters = {}) {
+    return await ApiClient.post('/reports/evolucion-por-cupo', { codigoCupo, filters });
+  }
+
+  static async getSharePorCupo(codigoCupo, filters = {}) {
+    return await ApiClient.post('/reports/share-por-cupo', { codigoCupo, filters });
+  }
+
+  static async getDestinosCompania(filters = {}) {
+    return await ApiClient.post('/reports/destinos-compania', { filters });
+  }
+
+  static async getPorSalida(filters = {}) {
+    return await ApiClient.post('/reports/por-salida', { filters });
   }
 }
 

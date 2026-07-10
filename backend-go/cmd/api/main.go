@@ -133,13 +133,35 @@ func main() {
 				users.PUT("/:id/status", handlers.ToggleUserStatus)
 			}
 
-			// Reportes
+			// Reportes (solo admin y agency_admin)
 			reports := protected.Group("/reports")
+			reports.Use(middleware.AgencyAdminOrAdmin())
 			{
 				reports.GET("/stats", handlers.GetStats)
 				reports.GET("/evolution", handlers.GetEvolutionPassengers)
 				reports.GET("/agency-share", handlers.GetAgencyShare)
 				reports.GET("/destinations-detail", handlers.GetDestinationsDetail)
+				// Nuevos endpoints del dashboard profesional
+				reports.GET("/evolution-revenue", handlers.GetEvolutionRevenue)
+				reports.GET("/occupancy", handlers.GetOccupancy)
+				reports.GET("/top-products", handlers.GetTopProducts)
+				reports.GET("/risk-alerts", handlers.GetRiskAlerts)
+				reports.GET("/cancellations", handlers.GetCancellations)
+
+				// Endpoints de backend-report (compatibilidad legacy)
+				reports.GET("/fields", handlers.GetFieldsHandler)
+				reports.POST("/dashboard-data", handlers.DashboardDataHandler)
+				reports.POST("/evolucion-agencias", handlers.EvolucionAgenciasHandler)
+				reports.POST("/agencias-data", handlers.AgenciasDataHandler)
+				reports.POST("/detalle-destinos", handlers.DetalleDestinosHandler)
+				reports.POST("/destinos-compania", handlers.DestinosCompaniaHandler)
+				reports.POST("/evolucion-pasajeros", handlers.EvolucionPasajerosHandler)
+				reports.POST("/evolucion-por-cupo", handlers.EvolucionPorCupoHandler)
+				reports.POST("/share-por-cupo", handlers.SharePorCupoHandler)
+				reports.POST("/por-salida", handlers.PorSalidaHandler)
+				reports.GET("/metrics-summary", handlers.MetricsSummaryHandler)
+				reports.GET("/metrics-by-destination", handlers.MetricsByDestinationHandler)
+				reports.GET("/forecast-sales", handlers.ForecastSalesHandler)
 			}
 
 			// Ajustes

@@ -140,6 +140,9 @@ type Reservation struct {
 	// uno). Si viene vacío, la UI debe usar los campos *Pasajero de arriba como
 	// fallback (reservas creadas sin desglose de pasajeros).
 	Passengers []Passenger `gorm:"foreignKey:ReservationID" json:"passengers,omitempty"`
+
+	// Associations
+	Product    Product     `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 // Passenger es la unidad real de "cupo aéreo": cada pasajero ocupa 1 lugar y
@@ -168,6 +171,9 @@ type Passenger struct {
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
+
+	// Associations
+	Reservation             Reservation `gorm:"foreignKey:ReservationID" json:"reservation,omitempty"`
 }
 
 type Agency struct {
