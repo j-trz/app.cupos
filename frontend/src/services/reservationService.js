@@ -51,6 +51,7 @@ const adaptRequest = (item) => ({
   Temporada: item.Temporada || item.temporada || item.product?.temporada || '',
   Vuelo_Salida: item.Vuelo_Salida || item.vuelo_salida || item.fecha_salida || item.product?.fecha_salida || '',
   Estado: item.Estado || item.estado || 'Solicitado',
+  Bloqueo_Expira_At: item.Bloqueo_Expira_At || item.bloqueo_expira_at || '',
   Doc_Contable: item.Doc_Contable || item.doc_contable || '',
   Ruta: item.Ruta || item.ruta || item.vuelo_ruta || item.product?.ruta || '',
   Fecha_Registro: item.Fecha_Registro || item.fecha_registro || item.created_at || '',

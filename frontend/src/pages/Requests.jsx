@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Clock3, RefreshCw, FileText, XCircle, MapPin, X } from 'lucide-react';
+import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -26,6 +26,21 @@ const formatMoney = (value) => {
   const n = Number(value);
   if (!value || Number.isNaN(n)) return '—';
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Cuenta regresiva del bloqueo temporal — mismo cálculo que ya se usa en
+// Gestión de Reservas, para que el usuario vea acá el mismo dato.
+const formatExpiry = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  const now = new Date();
+  const diffMs = date - now;
+  if (diffMs <= 0) return { label: 'Expirado', color: 'text-red-600' };
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffM = Math.floor((diffMs % 3600000) / 60000);
+  if (diffH < 1) return { label: `${diffM}m restantes`, color: 'text-orange-500' };
+  if (diffH < 24) return { label: `${diffH}h ${diffM}m restantes`, color: 'text-yellow-600' };
+  return { label: `${Math.floor(diffH / 24)}d restantes`, color: 'text-green-600' };
 };
 
 export default function Requests() {
@@ -183,6 +198,7 @@ export default function Requests() {
               <TableHead className="text-center">Equipaje</TableHead>
               <TableHead className="text-center">Tarifa</TableHead>
               <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Vencimiento</TableHead>
               <TableHead className="text-center">Doc. Contable</TableHead>
               <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
@@ -190,13 +206,13 @@ export default function Requests() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={13}>
+                <TableCell className="text-center py-10" colSpan={14}>
                   Cargando solicitudes...
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={13}>
+                <TableCell className="text-center py-10" colSpan={14}>
                   No hay solicitudes registradas.
                 </TableCell>
               </TableRow>
@@ -231,6 +247,21 @@ export default function Requests() {
                   <TableCell className="text-center">{formatMoney(item.Vuelo_Precio)}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant={statusVariant(item.Estado)}>{item.Estado || 'Desconocido'}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(() => {
+                      const expiry = item.Estado === 'bloqueo_temporal' ? formatExpiry(item.Bloqueo_Expira_At) : null;
+                      return expiry ? (
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-xs text-slate-500">{formatDate(item.Bloqueo_Expira_At)}</span>
+                          <span className={`flex items-center gap-1 text-xs font-medium ${expiry.color}`}>
+                            <Clock className="h-3 w-3" />{expiry.label}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-center">
                     {item.Doc_Contable ? (

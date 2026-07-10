@@ -10,6 +10,8 @@ import (
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
+
+	"github.com/google/uuid"
 )
 
 type resolvedSMTPConfig struct {
@@ -132,6 +134,20 @@ func RenderTemplate(tpl *models.EmailTemplate, data map[string]string) (subject,
 // que se acepta la latencia extra del SMTP en vez de perder envíos. El
 // caller decide si loguear el error (SystemLog); nunca debe hacer fallar la
 // operación de negocio principal.
+// ResolveReservationRecipientEmail devuelve el email del usuario que creó la
+// reserva (CreatedBy). Plataforma B2B: las notificaciones de una reserva
+// siempre van a la agencia que la gestiona, nunca a Reservation.ContactoEmail
+// (el pasajero/cliente final, que ni siquiera tiene acceso al sistema).
+// Devuelve "" si no se encuentra el perfil, para que el caller lo trate igual
+// que "no hay a quién avisar" sin necesidad de otro chequeo de error.
+func ResolveReservationRecipientEmail(createdBy uuid.UUID) string {
+	var profile models.Profile
+	if err := database.DB.First(&profile, "id = ?", createdBy).Error; err != nil {
+		return ""
+	}
+	return profile.Email
+}
+
 func SendTemplateEmail(agencyCode, templateCode, recipientEmail string, data map[string]string) error {
 	if recipientEmail == "" {
 		return fmt.Errorf("recipientEmail vacío")

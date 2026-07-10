@@ -51,8 +51,8 @@ func warnExpiringReservations(now time.Time) int {
 			fmt.Sprintf("La reserva del pedido %s vence en menos de %d minutos. Confirmala o el cupo se liberará automáticamente.",
 				r.PedidoID, int(warningWindow.Minutes())))
 
-		if r.ContactoEmail != "" {
-			if err := services.SendTemplateEmail(r.Agencia, "reservation_expiring_soon", r.ContactoEmail, map[string]string{
+		if recipient := services.ResolveReservationRecipientEmail(r.CreatedBy); recipient != "" {
+			if err := services.SendTemplateEmail(r.Agencia, "reservation_expiring_soon", recipient, map[string]string{
 				"pedido_id":       r.PedidoID,
 				"contacto_nombre": r.NombrePasajero,
 				"minutos":         fmt.Sprintf("%d", int(warningWindow.Minutes())),
@@ -97,8 +97,8 @@ func expireOverdueReservations(now time.Time) int {
 		services.NotifyRole("admin", nil, "warning", "Reserva expirada",
 			fmt.Sprintf("La reserva del pedido %s (agencia %s) expiró automáticamente por vencimiento de bloqueo", r.PedidoID, r.Agencia))
 
-		if r.ContactoEmail != "" {
-			if err := services.SendTemplateEmail(r.Agencia, "reservation_expired", r.ContactoEmail, map[string]string{
+		if recipient := services.ResolveReservationRecipientEmail(r.CreatedBy); recipient != "" {
+			if err := services.SendTemplateEmail(r.Agencia, "reservation_expired", recipient, map[string]string{
 				"pedido_id":       r.PedidoID,
 				"contacto_nombre": r.NombrePasajero,
 			}); err != nil {

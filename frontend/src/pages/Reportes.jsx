@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { useEvolutionRevenue, useSalesByAgency, useDestinationsDetail, useTopProducts, useRiskAlerts, useOccupancy } from '../hooks/useReports';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, BarChart3, Download } from 'lucide-react';
+import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import ReportFilters from '../components/reports/ReportFilters';
 import KPIsRow from '../components/reports/KPIsRow';
@@ -14,7 +15,7 @@ import RiskAlertsTable from '../components/reports/RiskAlertsTable';
 import DestinationDetailTable from '../components/reports/DestinationDetailTable';
 import ProductPerformanceTable from '../components/reports/ProductPerformanceTable';
 
-const Reportes = (onExport) => {
+const Reportes = () => {
   const [filters, setFilters] = useState({ dateRange: '6m', destino: 'all', aerolinea: 'all', temporada: 'all' });
   const { user } = useAuth();
 
@@ -85,8 +86,8 @@ const Reportes = (onExport) => {
         description="Análisis ejecutivo de ventas, rentabilidad y riesgo"
         icon={BarChart3}
         action={
-          <Button variant="outline" className="w-full h-9 gap-2 text-sm" onClick={onExport}>
-            <Download className="h-4 w-4" /> Exportar CSC
+          <Button variant="outline" className="w-full h-9 gap-2 text-sm" onClick={handleExport}>
+            <Download className="h-4 w-4" /> Exportar 
           </Button>
         }
       />

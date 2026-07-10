@@ -290,7 +290,9 @@ func CreateReservation(c *gin.Context) {
 			fmt.Sprintf("El producto %s hacia %s quedó con %d cupos disponibles", product.CodigoCupo, product.Destino, product.Disponibilidad))
 	}
 
-	if input.Reservation.ContactoEmail != "" {
+	// B2B: el email va a quien creó la reserva (la agencia), no al contacto
+	// del pasajero — ese no tiene acceso al sistema.
+	if recipient := services.ResolveReservationRecipientEmail(input.Reservation.CreatedBy); recipient != "" {
 		templateCode := "reservation_blocked"
 		if input.Reservation.Estado == models.EstadoConfirmada {
 			templateCode = "reservation_confirmed"
@@ -299,7 +301,7 @@ func CreateReservation(c *gin.Context) {
 		if input.Reservation.BloqueoExpiraAt != nil {
 			vence = input.Reservation.BloqueoExpiraAt.Format("02/01/2006 15:04")
 		}
-		if err := services.SendTemplateEmail(input.Reservation.Agencia, templateCode, input.Reservation.ContactoEmail, map[string]string{
+		if err := services.SendTemplateEmail(input.Reservation.Agencia, templateCode, recipient, map[string]string{
 			"pedido_id":       input.Reservation.PedidoID,
 			"contacto_nombre": input.Reservation.NombrePasajero,
 			"vence":           vence,
@@ -485,8 +487,8 @@ func ConfirmReservation(c *gin.Context) {
 	services.NotifyUser(reservation.CreatedBy, actor, "request_confirmed", "Tu reserva fue confirmada",
 		fmt.Sprintf("Tu reserva del pedido %s fue confirmada", reservation.PedidoID))
 
-	if reservation.ContactoEmail != "" {
-		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", reservation.ContactoEmail, map[string]string{
+	if recipient := services.ResolveReservationRecipientEmail(reservation.CreatedBy); recipient != "" {
+		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", recipient, map[string]string{
 			"pedido_id":       reservation.PedidoID,
 			"contacto_nombre": reservation.NombrePasajero,
 		}); err != nil {
