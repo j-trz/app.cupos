@@ -43,16 +43,18 @@ export default function TabsCharts({ principalPanel, salidaPanel, destinoCharts 
               {tab.content ? (
                 tab.content
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {tab.charts.map((chart, idx) => (
-                    <DashboardChart
-                      key={chart.title + idx}
-                      chartData={chart.chartData || {labels: [], datasets: []}}
-                      chartType={chart.chartType || 'bar'}
-                      title={chart.title}
-                      isLoading={isLoading}
-                    />
-                  ))}
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {tab.charts.map((chart, idx) => (
+                      <DashboardChart
+                        key={chart.title + idx}
+                        chartData={chart.chartData || {labels: [], datasets: []}}
+                        chartType={chart.chartType || 'bar'}
+                        title={chart.title}
+                        isLoading={isLoading}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </TabPanel>

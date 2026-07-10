@@ -106,8 +106,11 @@ func GetAgencyShare(c *gin.Context) {
 		filters["temporada"] = temp
 	}
 
-	var jetmarVentas, tiendaVentas int
-	var jetmarMonto, tiendaMonto float64
+	type agencyTotals struct {
+		total int64
+		venta float64
+	}
+	porAgencia := make(map[string]*agencyTotals)
 
 	for _, pax := range passengers {
 		if pax.Reservation.Product.ID == 0 {
@@ -127,13 +130,15 @@ func GetAgencyShare(c *gin.Context) {
 			monto = pax.Reservation.PrecioVenta
 		}
 
-		if isTienda(pax.Reservation.Agencia) {
-			tiendaVentas++
-			tiendaMonto += monto
-		} else {
-			jetmarVentas++
-			jetmarMonto += monto
+		agencia := strings.TrimSpace(pax.Reservation.Agencia)
+		if agencia == "" {
+			agencia = "Sin agencia"
 		}
+		if _, ok := porAgencia[agencia]; !ok {
+			porAgencia[agencia] = &agencyTotals{}
+		}
+		porAgencia[agencia].total++
+		porAgencia[agencia].venta += monto
 	}
 
 	type Result struct {
@@ -142,9 +147,19 @@ func GetAgencyShare(c *gin.Context) {
 		Venta   float64 `json:"venta"`
 	}
 
-	results := []Result{
-		{Agencia: "Jetmar", Total: int64(jetmarVentas), Venta: jetmarMonto},
-		{Agencia: "Tienda Viajes", Total: int64(tiendaVentas), Venta: tiendaMonto},
+	var agencyNames []string
+	for k := range porAgencia {
+		agencyNames = append(agencyNames, k)
+	}
+	sort.Strings(agencyNames)
+
+	results := make([]Result, 0, len(agencyNames))
+	for _, agencia := range agencyNames {
+		results = append(results, Result{
+			Agencia: agencia,
+			Total:   porAgencia[agencia].total,
+			Venta:   porAgencia[agencia].venta,
+		})
 	}
 
 	c.JSON(http.StatusOK, results)

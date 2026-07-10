@@ -9,6 +9,7 @@ import { useGeneralReport, useUserMetrics } from '../hooks/useReports';
 import { useAuth } from '../contexts/AuthContext';
 import ReservationService from '../services/reservationService';
 import NotificationService from '../services/notificationService';
+import { ReportService } from '../services/reportService.js';
 import DashboardCharts from '../components/DashboardCharts';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
@@ -299,9 +300,12 @@ const Dashboard = () => {
 
   const isAdmin = user?.role === 'admin' || user?.role === 'agency_admin';
 
-  const filters = { dateRange: 'month', agency: undefined };
-  const { data: reports, isLoading: isLoadingReports } = useGeneralReport(filters);
+  const { data: reports, isLoading: isLoadingReports } = useGeneralReport({});
   const { data: userMetrics, isLoading: isLoadingUserMetrics } = useUserMetrics();
+
+  const [destinoVentas, setDestinoVentas] = useState({ labels: [], data: [] });
+  const [evolucionPasajeros, setEvolucionPasajeros] = useState({ labels: [], data: [] });
+  const [loadingCharts, setLoadingCharts] = useState(false);
 
   const fetchReservations = useCallback(async () => {
     setLoading(true);
@@ -314,6 +318,45 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, []);
+
+  // Gráficos del panel admin: mismos datos que Reportes.jsx (destino/evolución
+  // de pasajeros), pero acotados exclusivamente a la agencia del usuario que
+  // ve el Dashboard — a diferencia de Reportes.jsx, acá nunca se agregan
+  // todas las agencias.
+  const fetchDashboardCharts = useCallback(async () => {
+    setLoadingCharts(true);
+    try {
+      const filtrosAgencia = user?.agencia ? { Agencia: user.agencia } : {};
+      const [detalle, evolucion] = await Promise.all([
+        ReportService.getDetalleDestinosPost(filtrosAgencia),
+        ReportService.getEvolucionPasajerosPost(filtrosAgencia, 'mes'),
+      ]);
+
+      const rows = Array.isArray(detalle?.data) ? detalle.data : [];
+      const ventaPorDestino = new Map();
+      rows.forEach((row) => {
+        const destino = row?.Destino || 'Sin destino';
+        const venta = parseFloat(row?.Venta) || 0;
+        ventaPorDestino.set(destino, (ventaPorDestino.get(destino) || 0) + venta);
+      });
+      const topDestinos = Array.from(ventaPorDestino.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+      setDestinoVentas({
+        labels: topDestinos.map(([destino]) => destino),
+        data: topDestinos.map(([, venta]) => Math.round(venta)),
+      });
+
+      setEvolucionPasajeros({
+        labels: Array.isArray(evolucion?.labels) ? evolucion.labels : [],
+        data: Array.isArray(evolucion?.values) ? evolucion.values : [],
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingCharts(false);
+    }
+  }, [user?.agencia]);
 
   const fetchNotifications = useCallback(async () => {
     setLoadingNotifs(true);
@@ -330,11 +373,16 @@ const Dashboard = () => {
   useEffect(() => {
     fetchReservations();
     if (!isAdmin) fetchNotifications();
+    if (isAdmin) fetchDashboardCharts();
   }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchReservations(), !isAdmin && fetchNotifications()].filter(Boolean));
+    await Promise.all([
+      fetchReservations(),
+      !isAdmin && fetchNotifications(),
+      isAdmin && fetchDashboardCharts(),
+    ].filter(Boolean));
     setRefreshing(false);
   };
 
@@ -358,6 +406,18 @@ const Dashboard = () => {
   const confirmed = reservations.filter((r) => r.estado === 'confirmada' || r.estado === 'confirmado').length;
   const blocked = reservations.filter((r) => r.estado === 'bloqueo_temporal').length;
   const pending = reservations.filter((r) => r.estado === 'pendiente').length;
+
+  // Reservas exclusivamente de la propia agencia del usuario (para el panel
+  // admin) — `listReservations` puede traer todo el sistema si el rol es
+  // admin puro, así que se filtra en el cliente para no mezclar agencias.
+  const ownAgencyReservations = user?.agencia
+    ? reservations.filter((r) => (r.agencia || '').toLowerCase() === user.agencia.toLowerCase())
+    : reservations;
+  const reservationStatus = [
+    { name: 'Confirmadas', value: ownAgencyReservations.filter((r) => r.estado === 'confirmada' || r.estado === 'confirmado').length },
+    { name: 'Pendientes', value: ownAgencyReservations.filter((r) => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length },
+    { name: 'Canceladas', value: ownAgencyReservations.filter((r) => r.estado === 'cancelada' || r.estado === 'cancelado').length },
+  ].filter((s) => s.value > 0);
 
   /* ── vista admin ── */
   if (isAdmin) {
@@ -388,11 +448,10 @@ const Dashboard = () => {
           </div>
         )}
         <DashboardCharts
-          reports={reports}
-          dateRange={filters.dateRange}
-          agencyFilter={filters.agency}
-          onDateRangeChange={() => { }}
-          onAgencyFilterChange={() => { }}
+          destinoVentas={destinoVentas}
+          evolucionPasajeros={evolucionPasajeros}
+          reservationStatus={reservationStatus}
+          isLoading={loadingCharts}
         />
       </div>
     );

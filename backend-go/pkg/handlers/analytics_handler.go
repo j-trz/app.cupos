@@ -195,10 +195,6 @@ func isPassengerSale(p models.Passenger, returnDate *time.Time) bool {
 	return false
 }
 
-func isTienda(agencia string) bool {
-	return strings.Contains(normalize(agencia), "tienda")
-}
-
 func loadDataFromDB() ([]models.Product, []models.Passenger, error) {
 	var products []models.Product
 	if err := database.DB.Find(&products).Error; err != nil {
@@ -258,6 +254,13 @@ func productMatches(c models.Product, filters map[string]interface{}) bool {
 		} else if keyNorm == "proveedor" || keyNorm == "compania" || keyNorm == "aerolinea" {
 			for _, v := range valsToCheck {
 				if normalize(c.Compania) == normalize(v) {
+					match = true
+					break
+				}
+			}
+		} else if keyNorm == "agencia" {
+			for _, v := range valsToCheck {
+				if normalize(c.Agencia) == normalize(v) {
 					match = true
 					break
 				}
@@ -358,6 +361,20 @@ func passengerMatches(p models.Passenger, filters map[string]interface{}) bool {
 }
 
 func mapToSlice(m map[string]bool) []string {
+	var s []string
+	for k := range m {
+		if k != "" {
+			s = append(s, k)
+		}
+	}
+	sort.Strings(s)
+	return s
+}
+
+// intMapKeys devuelve las claves (ordenadas) de un contador por-agencia — se
+// usa en vez de mapToSlice porque acá el valor es la cuenta de ventas, no un
+// simple flag de presencia.
+func intMapKeys(m map[string]int) []string {
 	var s []string
 	for k := range m {
 		if k != "" {
@@ -547,12 +564,24 @@ func GetFieldsHandler(c *gin.Context) {
 	c.JSON(200, gin.H{"fields": fields})
 }
 
+// agencyColorPalette asigna un color estable por índice de agencia — se
+// reemplaza el viejo esquema fijo Jetmar (azul) / Tienda Viajes (rojo), que
+// ya no tiene sentido ahora que el sistema soporta agencias dinámicas.
+var agencyColorPalette = []string{
+	"#2563eb", "#e11d48", "#16a34a", "#f59e0b",
+	"#7c3aed", "#0891b2", "#db2777", "#65a30d",
+}
+
 func EvolucionAgenciasHandler(c *gin.Context) {
 	var req GranularRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid request body"})
 		return
 	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
 
 	_, passengers, err := loadDataFromDB()
 	if err != nil {
@@ -568,15 +597,23 @@ func EvolucionAgenciasHandler(c *gin.Context) {
 	now := time.Now()
 	dateFilter := getDateFilter(granularity, now)
 
-	type SalesCount struct {
-		Jetmar int `json:"jetmar"`
-		Tienda int `json:"tienda"`
-	}
-	evol := make(map[string]*SalesCount)
+	evol := make(map[string]map[string]int) // periodo -> agencia -> ventas
 	var rawKeys []string
+	agencySet := make(map[string]bool)
 
 	for _, pax := range passengers {
 		if pax.Reservation.Product.ID == 0 {
+			continue
+		}
+
+		agenciaReal := strings.TrimSpace(pax.Reservation.Agencia)
+		if agenciaReal == "" {
+			agenciaReal = "Sin agencia"
+		}
+
+		// agency_admin solo puede ver su propia agencia — nunca la de otra,
+		// sin importar qué filtros mande el frontend.
+		if role == "agency_admin" && normalize(agenciaReal) != normalize(callerAgencia) {
 			continue
 		}
 
@@ -600,35 +637,34 @@ func EvolucionAgenciasHandler(c *gin.Context) {
 
 		clave := getGroupKey(bookingDate, granularity)
 		if _, ok := evol[clave]; !ok {
-			evol[clave] = &SalesCount{}
+			evol[clave] = make(map[string]int)
 			rawKeys = append(rawKeys, clave)
 		}
-
-		if isTienda(pax.Reservation.Agencia) {
-			evol[clave].Tienda++
-		} else {
-			evol[clave].Jetmar++
-		}
+		evol[clave][agenciaReal]++
+		agencySet[agenciaReal] = true
 	}
 
 	orderedKeys := getOrderedKeys(granularity, now, rawKeys)
+	agencyNames := mapToSlice(agencySet)
 
-	jetmarData := make([]int, len(orderedKeys))
-	tiendaData := make([]int, len(orderedKeys))
-
-	for i, k := range orderedKeys {
-		if val, ok := evol[k]; ok {
-			jetmarData[i] = val.Jetmar
-			tiendaData[i] = val.Tienda
+	datasets := make([]gin.H, len(agencyNames))
+	for i, agencia := range agencyNames {
+		data := make([]int, len(orderedKeys))
+		for j, k := range orderedKeys {
+			data[j] = evol[k][agencia]
+		}
+		color := agencyColorPalette[i%len(agencyColorPalette)]
+		datasets[i] = gin.H{
+			"label":           agencia,
+			"data":            data,
+			"borderColor":     color,
+			"backgroundColor": color + "26",
 		}
 	}
 
 	c.JSON(200, gin.H{
-		"labels": orderedKeys,
-		"datasets": []gin.H{
-			{"label": "Jetmar", "data": jetmarData, "borderColor": "#2563eb", "backgroundColor": "rgba(37,99,235,0.15)"},
-			{"label": "Tienda Viajes", "data": tiendaData, "borderColor": "#e11d48", "backgroundColor": "rgba(225,29,72,0.15)"},
-		},
+		"labels":   orderedKeys,
+		"datasets": datasets,
 	})
 }
 
@@ -639,13 +675,27 @@ func AgenciasDataHandler(c *gin.Context) {
 		return
 	}
 
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
+
 	products, passengers, err := loadDataFromDB()
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
 	}
 
-	var jetmarVentas, tiendaVentas int
+	ventasPorAgencia := make(map[string]int)
+	registrarVenta := func(agencia string) {
+		agenciaReal := strings.TrimSpace(agencia)
+		if agenciaReal == "" {
+			agenciaReal = "Sin agencia"
+		}
+		if role == "agency_admin" && normalize(agenciaReal) != normalize(callerAgencia) {
+			return
+		}
+		ventasPorAgencia[agenciaReal]++
+	}
 
 	destinoFilterRaw, hasDestinoFilter := req.Filters["Destino"]
 	if !hasDestinoFilter {
@@ -685,11 +735,7 @@ func AgenciasDataHandler(c *gin.Context) {
 					continue
 				}
 
-				if isTienda(pax.Reservation.Agencia) {
-					tiendaVentas++
-				} else {
-					jetmarVentas++
-				}
+				registrarVenta(pax.Reservation.Agencia)
 			}
 		}
 	} else {
@@ -707,26 +753,31 @@ func AgenciasDataHandler(c *gin.Context) {
 				continue
 			}
 
-			if isTienda(pax.Reservation.Agencia) {
-				tiendaVentas++
-			} else {
-				jetmarVentas++
-			}
+			registrarVenta(pax.Reservation.Agencia)
 		}
 	}
 
-	total := jetmarVentas + tiendaVentas
+	agencyNames := intMapKeys(ventasPorAgencia)
+	total := 0
+	for _, v := range ventasPorAgencia {
+		total += v
+	}
 	if total == 0 {
 		total = 1
 	}
 
-	shareJetmar := math.Round((float64(jetmarVentas)/float64(total))*1000) / 10
-	shareTienda := math.Round((float64(tiendaVentas)/float64(total))*1000) / 10
+	values := make([]int, len(agencyNames))
+	shares := make([]float64, len(agencyNames))
+	for i, agencia := range agencyNames {
+		v := ventasPorAgencia[agencia]
+		values[i] = v
+		shares[i] = math.Round((float64(v)/float64(total))*1000) / 10
+	}
 
 	c.JSON(200, gin.H{
-		"labels": []string{"Jetmar", "Tienda Viajes"},
-		"values": []int{jetmarVentas, tiendaVentas},
-		"share":  []float64{shareJetmar, shareTienda},
+		"labels": agencyNames,
+		"values": values,
+		"share":  shares,
 	})
 }
 
@@ -1195,6 +1246,10 @@ func SharePorCupoHandler(c *gin.Context) {
 		return
 	}
 
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
+
 	_, passengers, err := loadDataFromDB()
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
@@ -1203,7 +1258,7 @@ func SharePorCupoHandler(c *gin.Context) {
 
 	targetCupo := strings.ToUpper(strings.TrimSpace(req.CodigoCupo))
 
-	var jetmarVentas, tiendaVentas int
+	ventasPorAgencia := make(map[string]int)
 
 	for _, pax := range passengers {
 		if pax.Reservation.Product.ID == 0 {
@@ -1223,25 +1278,37 @@ func SharePorCupoHandler(c *gin.Context) {
 			continue
 		}
 
-		if isTienda(pax.Reservation.Agencia) {
-			tiendaVentas++
-		} else {
-			jetmarVentas++
+		agenciaReal := strings.TrimSpace(pax.Reservation.Agencia)
+		if agenciaReal == "" {
+			agenciaReal = "Sin agencia"
 		}
+		if role == "agency_admin" && normalize(agenciaReal) != normalize(callerAgencia) {
+			continue
+		}
+		ventasPorAgencia[agenciaReal]++
 	}
 
-	total := jetmarVentas + tiendaVentas
+	agencyNames := intMapKeys(ventasPorAgencia)
+	total := 0
+	for _, v := range ventasPorAgencia {
+		total += v
+	}
 	if total == 0 {
 		total = 1
 	}
 
-	shareJetmar := math.Round((float64(jetmarVentas)/float64(total))*1000) / 10
-	shareTienda := math.Round((float64(tiendaVentas)/float64(total))*1000) / 10
+	values := make([]int, len(agencyNames))
+	shares := make([]float64, len(agencyNames))
+	for i, agencia := range agencyNames {
+		v := ventasPorAgencia[agencia]
+		values[i] = v
+		shares[i] = math.Round((float64(v)/float64(total))*1000) / 10
+	}
 
 	c.JSON(200, gin.H{
-		"labels": []string{"Jetmar", "Tienda Viajes"},
-		"values": []int{jetmarVentas, tiendaVentas},
-		"share":  []float64{shareJetmar, shareTienda},
+		"labels": agencyNames,
+		"values": values,
+		"share":  shares,
 	})
 }
 

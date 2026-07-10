@@ -17,6 +17,10 @@ import KpiPanel from '../components/reports/KpiPanel';
 
 import { ReportService } from '../services/reportService.js';
 
+// Paleta genérica por agencia — cualquier cantidad de agencias reales, ya no
+// un esquema fijo de 2 competidores (Jetmar/Tienda).
+const AGENCY_PALETTE = ['#2563eb', '#e11d48', '#16a34a', '#f59e0b', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
+
 const Reportes = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'agency_admin';
@@ -406,6 +410,7 @@ const Reportes = () => {
           onFilterChange={handleFilterChange}
           onApplyFilters={handleUpdate}
           temporadasValidas={temporadasValidas}
+          showAgencyFilter={user?.role === 'admin'}
         />
       </Card>
 
@@ -494,7 +499,7 @@ const Reportes = () => {
                         {
                           label: 'Share',
                           data: agenciaVendidos.datasets?.[0]?.data || [],
-                          backgroundColor: ['#2563eb', '#e11d48']
+                          backgroundColor: (agenciaVendidos.labels || []).map((_, i) => AGENCY_PALETTE[i % AGENCY_PALETTE.length])
                         }
                       ]
                     }}

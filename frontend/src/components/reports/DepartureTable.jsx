@@ -424,7 +424,7 @@ export default function DepartureTable({
   if (isLoading) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm mb-4 overflow-x-auto w-full relative">
-        <h3 className="text-lg font-semibold text-slate-900 mb-3 opacity-30">{title}</h3>
+        <h4 className="text-lg font-semibold text-slate-900 mb-3 opacity-30">{title}</h4>
         <div className="relative min-h-64">
           <div className="absolute inset-0 bg-gray-50 opacity-20 rounded" />
           <div className="absolute inset-0 bg-white bg-opacity-60 flex items-center justify-center z-10">
@@ -438,7 +438,7 @@ export default function DepartureTable({
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm mb-4 overflow-x-auto w-full">
       <div className="w-full">
-        <h3 className="text-lg font-semibold text-slate-900 mb-3">{title}</h3>
+        <h4 className="text-lg font-semibold text-slate-900 mb-3">{title}</h4>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>

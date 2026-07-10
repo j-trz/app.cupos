@@ -6,7 +6,7 @@ import Button from '../ui/Button.jsx';
 
 const INPUT_CLASSES = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
-export default function FiltersPanel({ fields, filters, onFilterChange, onApplyFilters, temporadasValidas }) {
+export default function FiltersPanel({ fields, filters, onFilterChange, onApplyFilters, temporadasValidas, showAgencyFilter = false }) {
   let mappedFields = fields;
   const companiaField = fields.find(f => f.field === 'Compañía');
   if (companiaField && !fields.find(f => f.field === 'Proveedor')) {
@@ -22,7 +22,11 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
   );
   const allowed = [
     'Proveedor',
-    'Tipo de servicio', 'Tipo Servicio', 'Tipo de operación', 'Destino', 'Compañia', 'Salida', 'Regreso', 'Temporada'
+    'Tipo de servicio', 'Tipo Servicio', 'Tipo de operación', 'Destino', 'Compañia', 'Salida', 'Regreso', 'Temporada',
+    // Solo admin puede filtrar por agencia — agency_admin ya ve únicamente
+    // la suya (lo fuerza el backend), mostrarle este filtro sería un control
+    // muerto (elija lo que elija, el resultado no cambia).
+    ...(showAgencyFilter ? ['Agencia'] : []),
   ];
 
   React.useEffect(() => {
@@ -53,7 +57,7 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-5 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5">
         {mappedFields.filter(f => allowed.includes(f.field)).map(f => (
           <div key={f.field} className="relative" ref={el => { if (el) dropdownRefs.current[f.field] = el; }}>
             {(() => {
@@ -65,6 +69,7 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
               if (f.field === 'Salida') tooltipText = 'Fecha de salida del servicio (filtro por fecha).';
               if (f.field === 'Regreso') tooltipText = 'Fecha de regreso del servicio (filtro por fecha).';
               if (f.field === 'Temporada') tooltipText = 'Temporada comercial (ej.: Semana Santa 2025). Usado para agrupar y filtrar.';
+              if (f.field === 'Agencia') tooltipText = 'Acota todo el dashboard a una agencia puntual.';
               const labelText = f.field === 'Tipo de operación' ? 'Tipo producto' : f.field === 'Aerolinea' ? 'Aerolínea' : f.field;
               return (
                 <>

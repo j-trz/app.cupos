@@ -23,19 +23,20 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
     const safeChartData = chartData || { labels: [], datasets: [] };
     let labels = Array.isArray(safeChartData.labels) ? safeChartData.labels : [];
     let datasets = [];
-    const pastelPalette = ['#2563eb', '#e11d48'];
+    // Paleta genérica por agencia/serie — cualquier cantidad de agencias reales,
+    // ya no un esquema fijo de 2 competidores.
+    const pastelPalette = [
+      '#2563eb', '#e11d48', '#16a34a', '#f59e0b', '#7c3aed', '#0891b2', '#db2777', '#65a30d'
+    ];
     if (Array.isArray(safeChartData.datasets) && safeChartData.datasets.length > 0) {
       const palette = [
         '#2563eb', '#38bdf8', '#fbbf24', '#f87171', '#34d399', '#a78bfa', '#f472b6', '#facc15', '#4ade80', '#818cf8'
       ];
       if (chartType === 'line') {
         datasets = safeChartData.datasets.map((ds, idx) => {
-          let color = palette[idx % palette.length];
-          if (ds.label && ds.label.toLowerCase().includes('jetmar')) {
-            color = '#2563eb';
-          } else if (ds.label && ds.label.toLowerCase().includes('tienda')) {
-            color = '#e11d48';
-          }
+          // Si el backend ya mandó un color propio por serie (ej. uno por
+          // agencia real), se respeta en vez de recalcularlo acá.
+          const color = ds.borderColor || palette[idx % palette.length];
           return {
             label: ds.label,
             data: ds.data,
@@ -195,8 +196,8 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
 
   if (isLoading) {
     return (
-      <div className="w-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm mb-4 relative">
-        {title && <h3 className="text-sm font-semibold text-slate-900 mb-3 opacity-30">{title}</h3>}
+      <div className="w-full relative">
+        {title && <h4 className="text-sm font-semibold text-slate-900 mb-3 opacity-30">{title}</h4>}
         <div className="relative" style={{ height: chartType === 'doughnut' ? '300px' : '280px' }}>
           <div className="absolute inset-0 bg-gray-50 opacity-20 rounded"></div>
           <div className="absolute inset-0 bg-white bg-opacity-60 flex items-center justify-center z-10">
@@ -208,8 +209,8 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
   }
 
   return (
-    <div className="w-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      {title && <h3 className="text-sm font-semibold text-slate-900 mb-3">{title}</h3>}
+    <div className="w-full">
+      {title && <h4 className="text-sm font-semibold text-slate-900 mb-3">{title}</h4>}
       <div className="flex items-center justify-center" style={{ height: chartType === 'doughnut' ? '300px' : '280px' }}>
         {!isLoading && <canvas ref={chartRef}></canvas>}
         {!hasData && !isLoading && (
