@@ -1,8 +1,10 @@
-﻿import { useParams, useNavigate, Link } from 'react-router-dom';
+﻿import { useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { BookOpen, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Bell, Download, Database, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, FileText, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useWhiteLabel } from '../contexts/WhiteLabelContext.jsx';
-import { DOCS_SECTIONS, DEFAULT_DOCS_SECTION } from '../lib/docsSections.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { visibleDocsSections, DEFAULT_DOCS_SECTION } from '../lib/docsSections.js';
 
 // ─── Encabezado estático de sección (ya no es un acordeón: cada sección es su
 // propia ruta, así que no hace falta colapsar nada dentro del main) ─────────
@@ -226,7 +228,7 @@ function DisponibilidadSection() {
   );
 }
 
-function ReservasSection() {
+function ReservasSection({ isAdmin }) {
   return (
     <div className="space-y-4">
       <DocSubsection title="Estados de una reserva" color="blue" icon={Info}>
@@ -247,62 +249,104 @@ function ReservasSection() {
         </div>
       </DocSubsection>
 
-      <DocSubsection title="Cómo editar una reserva (incluye datos del pasajero y ticket)" color="orange" icon={FileText}>
-        <DocSteps steps={[
-          'En Gestión de Reservas, hacé click en el ícono de <strong>lápiz (Editar)</strong> de la fila.',
-          'Podés modificar los datos del pedido, del pasajero principal y su número de ticket, todo desde el mismo formulario.',
-          'Si el pedido tiene más de un pasajero, el resto se edita individualmente desde <strong>Gestión de Nóminas</strong>.',
-          'Guardá los cambios.',
-        ]} />
-      </DocSubsection>
+      {isAdmin ? (
+        <>
+          <DocSubsection title="Cómo editar una reserva (incluye datos del pasajero y ticket)" color="orange" icon={FileText}>
+            <DocSteps steps={[
+              'En Gestión de Reservas, hacé click en el ícono de <strong>lápiz (Editar)</strong> de la fila.',
+              'Podés modificar los datos del pedido, del pasajero principal y su número de ticket, todo desde el mismo formulario.',
+              'Si el pedido tiene más de un pasajero, el resto se edita individualmente desde <strong>Gestión de Nóminas</strong>.',
+              'Guardá los cambios.',
+            ]} />
+          </DocSubsection>
 
-      <DocSubsection title="Cómo agregar un documento contable (Ficha de Venta)" color="orange" icon={FileText}>
-        <DocSteps steps={[
-          'En la tabla de reservas, buscá la columna <strong>"Doc.Contable"</strong>.',
-          'Si aparece <span class="text-orange-500 font-semibold">Pendiente</span>, hacé click en ese texto.',
-          'Se abre un modal para ingresar el número de documento y la fecha de vencimiento.',
-          'Guardá. El documento queda asociado a esa reserva y el estado cambia.',
-        ]} />
-        <DocAlert type="info">
-          El sistema puede mostrar alertas automáticas cuando un documento está próximo a vencer (ej. 24 horas antes).
-        </DocAlert>
-      </DocSubsection>
+          <DocSubsection title="Cómo agregar un documento contable (Ficha de Venta)" color="orange" icon={FileText}>
+            <DocSteps steps={[
+              'En la tabla de reservas, buscá la columna <strong>"Doc.Contable"</strong>.',
+              'Si aparece <span class="text-orange-500 font-semibold">Pendiente</span>, hacé click en ese texto.',
+              'Se abre un modal para ingresar el número de documento y la fecha de vencimiento.',
+              'Guardá. El documento queda asociado a esa reserva y el estado cambia.',
+            ]} />
+            <DocAlert type="info">
+              El sistema puede mostrar alertas automáticas cuando un documento está próximo a vencer (ej. 24 horas antes).
+            </DocAlert>
+          </DocSubsection>
 
-      <DocSubsection title="Cómo asignar un Número de Ticket" color="green" icon={CheckCircle}>
-        <DocSteps steps={[
-          'Buscá al pasajero en la tabla.',
-          'En la columna <strong>"Ticket"</strong>, si dice "Asignar", hacé click.',
-          'Ingresá el número de ticket (generado por el GDS de la aerolínea) y el precio de venta si corresponde.',
-          'Guardá. Una vez que el ticket tiene número, aparece el ícono <strong>azul de itinerario PDF</strong> en acciones.',
-        ]} />
-      </DocSubsection>
+          <DocSubsection title="Cómo asignar un Número de Ticket" color="green" icon={CheckCircle}>
+            <DocSteps steps={[
+              'Buscá al pasajero en la tabla.',
+              'En la columna <strong>"Ticket"</strong>, si dice "Asignar", hacé click.',
+              'Ingresá el número de ticket (generado por el GDS de la aerolínea) y el precio de venta si corresponde.',
+              'Guardá. Una vez que el ticket tiene número, aparece el ícono <strong>azul de itinerario PDF</strong> en acciones.',
+            ]} />
+          </DocSubsection>
+        </>
+      ) : (
+        <>
+          <DocSubsection title="Cómo solicitar la cancelación de una reserva" color="orange" icon={AlertTriangle}>
+            <DocSteps steps={[
+              'Andá a <strong>Solicitudes</strong> (o <strong>Confirmaciones</strong> si ya está confirmada).',
+              'Buscá la reserva y hacé click en <strong>"Solicitar cancelación"</strong>.',
+              'El operador recibe el aviso y procesa la baja del cupo. No podés cancelarla vos mismo desde acá.',
+            ]} />
+          </DocSubsection>
+
+          <DocSubsection title="Cómo agregar un documento contable (Ficha de Venta)" color="orange" icon={FileText}>
+            <DocSteps steps={[
+              'En <strong>Solicitudes</strong>, buscá la columna <strong>"Doc.Contable"</strong> de tu reserva.',
+              'Si aparece <span class="text-orange-500 font-semibold">Pendiente</span>, hacé click en ese texto.',
+              'Se abre un modal para ingresar el número de documento y la fecha de vencimiento.',
+              'Guardá. El documento queda asociado a esa reserva y el estado cambia.',
+            ]} />
+            <DocAlert type="info">
+              El sistema puede mostrar alertas automáticas cuando un documento está próximo a vencer (ej. 24 horas antes).
+            </DocAlert>
+          </DocSubsection>
+
+          <DocSubsection title="Vencimiento del bloqueo temporal" color="green" icon={Clock}>
+            <DocParagraph>
+              Mientras una reserva está en estado <strong>bloqueo_temporal</strong>, en Solicitudes vas a ver una cuenta regresiva
+              hasta que vence. Si se vence sin confirmarse, el cupo se libera automáticamente y hay que pedirle al operador que
+              genere una nueva reserva.
+            </DocParagraph>
+          </DocSubsection>
+        </>
+      )}
 
       <DocSubsection title="Generar el Itinerario PDF (con marca de la agencia)" color="purple" icon={Download}>
         <DocSteps steps={[
-          'Asegurate de que el pasajero tiene un Número de Ticket asignado.',
-          'En la columna de acciones, hacé click en el ícono azul de <strong>documento</strong>.',
+          'Asegurate de que el pasajero tiene un Número de Ticket asignado' + (isAdmin ? '.' : ' (lo asigna el operador cuando emite el ticket).'),
+          `En ${isAdmin ? 'la tabla de reservas' : 'Confirmaciones'}, hacé click en el ícono azul de <strong>documento</strong>.`,
           'Se abre el modal de Itinerario con el diseño de tu agencia: logo, colores, nombre.',
           'Hacé click en <strong>"Descargar PDF"</strong>. Se abre la ventana de impresión del navegador.',
           'Elegí "Guardar como PDF" o envialo directamente a la impresora.',
         ]} />
-        <DocAlert type="tip">
-          Los colores y el logo del itinerario se toman automáticamente del <strong>Diseño / White Label</strong> configurado por tu agencia. Para cambiarlos, ingresá a la sección de Diseño.
-        </DocAlert>
+        {isAdmin && (
+          <DocAlert type="tip">
+            Los colores y el logo del itinerario se toman automáticamente del <strong>Diseño / White Label</strong> configurado por tu agencia. Para cambiarlos, ingresá a la sección de Diseño.
+          </DocAlert>
+        )}
       </DocSubsection>
 
-      <DocSubsection title="Cupos cedidos: ¿cómo los veo?" color="orange" icon={ArrowRightLeft}>
+      <DocSubsection title="Cupos cedidos o compartidos: ¿cómo los veo?" color="orange" icon={ArrowRightLeft}>
         <DocParagraph>
-          Si el operador te prestó cupos de otra agencia, esas reservas aparecerán con el indicador <strong>"Cupo cedido de [Agencia]"</strong> en la columna Cesión.
+          Si el operador te prestó o compartió cupos de otra agencia, esas reservas aparecerán con un indicador
+          <strong> "Cupo cedido de [Agencia]"</strong> o <strong>"Compartido — de [Agencia]"</strong> en la columna correspondiente.
           Esto te permite saber de dónde viene el cupo sin tener que consultar con el operador.
         </DocParagraph>
       </DocSubsection>
 
       <DocSubsection title="Solución de problemas frecuentes" color="red" icon={AlertTriangle}>
-        <DocList color="red" items={[
+        <DocList color="red" items={isAdmin ? [
           '<strong>La reserva vence y no puedo confirmarla:</strong> contactá al operador para que extienda el bloqueo o cree una nueva reserva.',
           '<strong>No aparece el botón de PDF:</strong> verificá que el pasajero tenga un Número de Ticket asignado.',
           '<strong>"Error al crear la reserva":</strong> verificá que el producto tenga cupos disponibles y que tu agencia tenga acceso.',
           '<strong>No veo mis reservas:</strong> revisá el filtro de estado y el buscador — puede haber un filtro activo.',
+        ] : [
+          '<strong>La reserva vence y no puedo confirmarla:</strong> contactá al operador para que extienda el bloqueo o cree una nueva reserva.',
+          '<strong>No aparece el botón de PDF:</strong> el ticket todavía no fue asignado por el operador — esperá la confirmación.',
+          '<strong>"Error al crear la reserva":</strong> verificá que el producto tenga cupos disponibles.',
+          '<strong>No veo mi reserva:</strong> revisá si ya fue confirmada — en ese caso está en <strong>Confirmaciones</strong>, no en Solicitudes.',
         ]} />
       </DocSubsection>
     </div>
@@ -746,18 +790,21 @@ const SECTION_CONTENT = {
 export default function Documentacion() {
   const { section } = useParams();
   const navigate = useNavigate();
-  const { config } = useWhiteLabel();
-  const primaryColor = config?.colors?.primary || '#3b82f6';
-  const secondaryColor = config?.colors?.secondary || '#64748b';
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
-  const currentIndex = DOCS_SECTIONS.findIndex((s) => s.key === section);
-  const current = DOCS_SECTIONS[currentIndex];
-  const Content = SECTION_CONTENT[section];
-  const prev = currentIndex > 0 ? DOCS_SECTIONS[currentIndex - 1] : null;
-  const next = currentIndex >= 0 && currentIndex < DOCS_SECTIONS.length - 1 ? DOCS_SECTIONS[currentIndex + 1] : null;
+  // Secciones visibles para este usuario — oculta las admin-only tanto de la
+  // navegación prev/next como del acceso directo por URL (ver docsSections.js).
+  const sections = useMemo(() => visibleDocsSections(user?.role), [user?.role]);
+
+  const currentIndex = sections.findIndex((s) => s.key === section);
+  const current = sections[currentIndex];
+  const Content = current ? SECTION_CONTENT[section] : null;
+  const prev = currentIndex > 0 ? sections[currentIndex - 1] : null;
+  const next = currentIndex >= 0 && currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6">
       <PageHeader
         title="Documentación"
         description="El manual completo del sistema: todo lo que necesitás saber para trabajar sin capacitación previa."
@@ -765,37 +812,37 @@ export default function Documentacion() {
       />
 
       {section === DEFAULT_DOCS_SECTION && (
-        <div
-          className="relative overflow-hidden rounded-2xl p-6 md:p-8 text-white shadow-md border border-zinc-200/10"
-          style={{
-            background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`
-          }}
-        >
-          {/* Decoración */}
-          <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/5 blur-xl" />
-          <div className="pointer-events-none absolute -bottom-10 right-16 h-28 w-28 rounded-full bg-white/5 blur-xl" />
-
-          <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 select-none">¿Qué es este sistema?</h2>
-          <p className="text-white/90 text-sm leading-relaxed mb-6 max-w-3xl">
-            Es una plataforma integral para la gestión de <strong>cupos aéreos</strong> (bloqueos de asientos en vuelos).
-            Permite al operador mayorista cargar, distribuir y controlar sus cupos, y a las agencias minoristas hacer reservas
-            para sus clientes de forma simple, automatizada y segura.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-            {[
-              { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo.' },
-              { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas.' },
-              { icon: '🤖', title: 'IA integrada', desc: 'Asistente que procesa DNI y asiste en lenguaje natural.' },
-            ].map(card => (
-              <div
-                key={card.title}
-                className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-all duration-200 hover:scale-[1.01] hover:shadow-sm"
-              >
-                <div className="text-2xl mb-1.5">{card.icon}</div>
-                <div className="font-semibold text-sm leading-tight">{card.title}</div>
-                <div className="text-xs text-white/80 mt-1">{card.desc}</div>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm p-6">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900">
+              <BookOpen className="h-7 w-7" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">¿Qué es este sistema?</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                  Es una plataforma integral para la gestión de <strong>cupos aéreos</strong> (bloqueos de asientos en vuelos).
+                  Permite al operador mayorista cargar, distribuir y controlar sus cupos, y a las agencias minoristas hacer reservas
+                  para sus clientes de forma simple, automatizada y segura.
+                </p>
               </div>
-            ))}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {[
+                  { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo.' },
+                  { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas.' },
+                  { icon: '🤖', title: 'IA integrada', desc: 'Asistente que procesa DNI y asiste en lenguaje natural.' },
+                ].map(card => (
+                  <div
+                    key={card.title}
+                    className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
+                  >
+                    <div className="text-2xl mb-1.5">{card.icon}</div>
+                    <div className="font-semibold text-sm leading-tight text-slate-900 dark:text-slate-100">{card.title}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{card.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -803,7 +850,7 @@ export default function Documentacion() {
       {Content ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm px-6 py-5">
           <SectionHeader icon={current.icon} title={current.label} badge={current.badge} />
-          <Content />
+          <Content isAdmin={isAdmin} />
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm px-6 py-10 text-center">

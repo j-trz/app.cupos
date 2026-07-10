@@ -176,7 +176,6 @@ header {
 main {
   background-color: var(--color-background);
   min-height: calc(100vh - 100px);
-  min-width: calc(100vw - 100px);
 }
 
 /* Estilo para cards - Estilo Vercel minimalista */

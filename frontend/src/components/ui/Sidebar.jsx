@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
@@ -9,7 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shad
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
 import NotificationService from '../../services/notificationService.js';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext.jsx';
-import { DOCS_SECTIONS } from '../../lib/docsSections.js';
+import { visibleDocsSections } from '../../lib/docsSections.js';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: Home },
@@ -17,10 +17,6 @@ const navItems = [
   { label: 'Solicitudes', path: '/requests', icon: ClipboardList },
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
 ];
-
-// Secciones de Documentación (grouped bajo Documentación) — una ruta propia
-// por sección en vez de un acordeón largo dentro del main.
-const docsItems = DOCS_SECTIONS.map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon }));
 
 // Admin-only items
 const adminNavItems = [
@@ -59,6 +55,15 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const previousUnreadRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
+
+  // Secciones de Documentación (grouped bajo Documentación) — una ruta propia
+  // por sección en vez de un acordeón largo dentro del main. Filtradas por
+  // rol para no linkear a documentación de funciones que el usuario no
+  // puede usar (ver docsSections.js).
+  const docsItems = useMemo(
+    () => visibleDocsSections(user?.role).map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon })),
+    [user?.role]
+  );
 
   // El ancho puede venir del white-label como número/string sin unidad (ej.
   // guardado como "240" en vez de "240px") — CSS descarta silenciosamente un

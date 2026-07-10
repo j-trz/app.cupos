@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3, Plane, CreditCard, Calendar, CheckCircle, RefreshCw,
   Clock, AlertCircle, Bell, FileText, ChevronRight, TrendingUp,
-  User, MapPin, ArrowRight,
+  User, MapPin, ArrowRight, Home,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGeneralReport, useUserMetrics } from '../hooks/useReports';
@@ -214,23 +214,29 @@ function RecentReservationsWidget({ reservations, loading }) {
   );
 }
 
-function NotificationsWidget({ notifications, loading }) {
+function NotificationsWidget({ notifications, loading, onOpen, onNotificationClick }) {
   const recent = notifications.slice(0, 5);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
   return (
     <Card className="flex flex-col h-full">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Notificaciones</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Últimas novedades</p>
-          </div>
-          {notifications.filter((n) => !n.is_read).length > 0 && (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex items-center justify-between border-b border-slate-200 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+      >
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Notificaciones</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Últimas novedades</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {unreadCount > 0 && (
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-              {notifications.filter((n) => !n.is_read).length}
+              {unreadCount}
             </span>
           )}
+          <ChevronRight className="h-4 w-4 text-slate-400" />
         </div>
-      </div>
+      </button>
       <div className="flex-1 divide-y divide-slate-100">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-sm text-slate-400">
@@ -245,9 +251,11 @@ function NotificationsWidget({ notifications, loading }) {
           recent.map((n) => {
             const Icon = NOTIF_ICON[n.type] || Bell;
             return (
-              <div
+              <button
+                type="button"
                 key={n.id}
-                className={`flex items-start gap-3 px-5 py-3.5 ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                onClick={() => onNotificationClick(n)}
+                className={`flex w-full items-start gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
               >
                 <div className={`mt-0.5 shrink-0 ${NOTIF_COLOR[n.type] || 'text-slate-400'}`}>
                   <Icon className="h-4 w-4" />
@@ -259,11 +267,22 @@ function NotificationsWidget({ notifications, loading }) {
                 {!n.is_read && (
                   <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                 )}
-              </div>
+              </button>
             );
           })
         )}
       </div>
+      {notifications.length > 5 && (
+        <div className="border-t border-slate-100 px-5 py-3 text-center">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="text-xs font-medium text-blue-700 hover:text-blue-900"
+          >
+            Ver todas las notificaciones →
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -319,6 +338,22 @@ const Dashboard = () => {
     setRefreshing(false);
   };
 
+  const handleOpenNotifications = () => navigate('/notificaciones');
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.is_read) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
+      );
+      try {
+        await NotificationService.markAsRead(notification.id);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    navigate('/notificaciones');
+  };
+
   /* ── métricas derivadas ── */
   const confirmed = reservations.filter((r) => r.estado === 'confirmada' || r.estado === 'confirmado').length;
   const blocked = reservations.filter((r) => r.estado === 'bloqueo_temporal').length;
@@ -366,12 +401,16 @@ const Dashboard = () => {
   /* ── vista usuario ── */
   return (
     <div className="space-y-5">
-      {/* Header mínimo */}
-      <div className="flex items-center justify-end">
-        <Button size="sm" variant="secondary" onClick={handleRefresh} disabled={refreshing} title="Actualizar">
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Resumen de tus reservas y novedades."
+        icon={Home}
+        action={
+          <Button size="sm" variant="secondary" onClick={handleRefresh} disabled={refreshing} title="Actualizar">
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        }
+      />
 
       {/* Banner de bienvenida */}
       <WelcomeBanner
@@ -425,7 +464,12 @@ const Dashboard = () => {
       {/* Columnas: últimas reservas + notificaciones */}
       <div className="grid gap-5 lg:grid-cols-2">
         <RecentReservationsWidget reservations={reservations} loading={loading} />
-        <NotificationsWidget notifications={notifications} loading={loadingNotifs} />
+        <NotificationsWidget
+          notifications={notifications}
+          loading={loadingNotifs}
+          onOpen={handleOpenNotifications}
+          onNotificationClick={handleNotificationClick}
+        />
       </div>
     </div>
   );
