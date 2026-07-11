@@ -12,7 +12,7 @@ import NotificationService from '../services/notificationService';
 import { ReportService } from '../services/reportService.js';
 import DashboardCharts from '../components/DashboardCharts';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
@@ -434,18 +434,20 @@ const Dashboard = () => {
           }
         />
         {isLoadingReports ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid gap-4 grid-cols-3">
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-24" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard icon={Calendar} label="Total Reservas" value={reports?.totalReservations || 0} description="Reservas en el sistema" />
-            <StatCard icon={CreditCard} label="Ventas Totales" value={formatCurrency(reports?.totalSales || 0)} description="Ventas confirmadas" />
-            <StatCard icon={CheckCircle} label="Usuarios Activos" value={reports?.activeUsers || 0} description="Últimos 30 días" />
-            <StatCard icon={Plane} label="Disponibilidad Promedio" value={`${reports?.avgAvailability || 0}%`} description="Cupos disponibles" />
-          </div>
+          <StatsHero
+            stats={[
+              { icon: Calendar, label: 'Total Reservas', value: reports?.totalReservations || 0, description: 'Reservas en el sistema', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+              { icon: CreditCard, label: 'Ventas Totales', value: formatCurrency(reports?.totalSales || 0), description: 'Ventas confirmadas', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
+              { icon: CheckCircle, label: 'Usuarios Activos', value: reports?.activeUsers || 0, description: 'Últimos 30 días', color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20' },
+              { icon: Plane, label: 'Disponibilidad Promedio', value: `${reports?.avgAvailability || 0}%`, description: 'Cupos disponibles', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
+            ]}
+          />
         )}
         <DashboardCharts
           destinoVentas={destinoVentas}
@@ -480,38 +482,44 @@ const Dashboard = () => {
 
       {/* Stat cards */}
       {isLoadingUserMetrics ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid gap-4 grid-cols-3">
+          {[...Array(3)].map((_, i) => (
             <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-20" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={Calendar}
-            label="Mis reservas"
-            value={reservations.length || userMetrics?.totalReservations || 0}
-            description="Total creadas"
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="Confirmadas"
-            value={confirmed || userMetrics?.confirmedReservations || 0}
-            description="Reservas confirmadas"
-          />
-          <StatCard
-            icon={Clock}
-            label="Bloqueos temporales"
-            value={blocked || userMetrics?.pendingReservations || 0}
-            description="Pendientes de doc. contable"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Mis ventas"
-            value={formatCurrency(userMetrics?.totalSales || 0)}
-            description="Ventas confirmadas"
-          />
-        </div>
+        <StatsHero
+          stats={[
+            {
+              icon: Calendar,
+              label: 'Mis reservas',
+              value: reservations.length || userMetrics?.totalReservations || 0,
+              description: 'Total creadas',
+              color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+            },
+            {
+              icon: CheckCircle,
+              label: 'Confirmadas',
+              value: confirmed || userMetrics?.confirmedReservations || 0,
+              description: 'Reservas confirmadas',
+              color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+            },
+            {
+              icon: Clock,
+              label: 'Bloqueos temporales',
+              value: blocked || userMetrics?.pendingReservations || 0,
+              description: 'Pendientes de doc. contable',
+              color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+            },
+            {
+              icon: TrendingUp,
+              label: 'Mis ventas',
+              value: formatCurrency(userMetrics?.totalSales || 0),
+              description: 'Ventas confirmadas',
+              color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+            },
+          ]}
+        />
       )}
 
       {/* Widget de bloqueos urgentes */}

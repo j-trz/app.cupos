@@ -9,7 +9,7 @@ import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import Modal from '../components/Modal.jsx';
@@ -681,32 +681,38 @@ export default function GestionNominas() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 sm:grid-cols-4 gap-4">
-        <StatCard
-          label="Productos con reservas"
-          value={loading ? '—' : totalProducts}
-          icon={Package}
-          description="Productos que tienen al menos una reserva."
-        />
-        <StatCard
-          label="Total reservas"
-          value={loading ? '—' : totalReservations}
-          icon={ClipboardList}
-          description="Cantidad total de reservas registradas."
-        />
-        <StatCard
-          label="Pasajeros"
-          value={loading ? '—' : totalPassengers}
-          icon={Users}
-          description="Pasajeros desglosados (incluye acompañantes)."
-        />
-        <StatCard
-          label="Confirmadas"
-          value={loading ? '—' : totalConfirmed}
-          icon={CheckCircle2}
-          description="Reservas en estado confirmado."
-        />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            label: 'Productos con reservas',
+            value: loading ? '—' : totalProducts,
+            icon: Package,
+            description: 'Productos que tienen al menos una reserva.',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+          },
+          {
+            label: 'Total reservas',
+            value: loading ? '—' : totalReservations,
+            icon: ClipboardList,
+            description: 'Cantidad total de reservas registradas.',
+            color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+          },
+          {
+            label: 'Pasajeros',
+            value: loading ? '—' : totalPassengers,
+            icon: Users,
+            description: 'Pasajeros desglosados (incluye acompañantes).',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+          {
+            label: 'Confirmadas',
+            value: loading ? '—' : totalConfirmed,
+            icon: CheckCircle2,
+            description: 'Reservas en estado confirmado.',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+        ]}
+      />
 
       {/* Search/filter */}
       <div className="relative max-w-md">

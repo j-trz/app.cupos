@@ -8,7 +8,7 @@ import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -503,18 +503,38 @@ export default function GestionReservas() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard icon={BarChart3} label="Total reservas" value={filtered.length}
-          description={estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total'} />
-        <StatCard icon={Ticket} label="Pasajeros" value={totalPassengers}
-          description="Tickets individuales (incluye acompañantes)" />
-        <StatCard icon={CheckCircle} label="Confirmadas"
-          value={filtered.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada').length}
-          description="Reservas confirmadas" />
-        <StatCard icon={Calendar} label="Pendientes"
-          value={filtered.filter(r => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length}
-          description="En proceso" />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            icon: BarChart3,
+            label: 'Total reservas',
+            value: filtered.length,
+            description: estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+          },
+          {
+            icon: Ticket,
+            label: 'Pasajeros',
+            value: totalPassengers,
+            description: 'Tickets individuales (incluye acompañantes)',
+            color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+          },
+          {
+            icon: CheckCircle,
+            label: 'Confirmadas',
+            value: filtered.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada').length,
+            description: 'Reservas confirmadas',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+          {
+            icon: Calendar,
+            label: 'Pendientes',
+            value: filtered.filter(r => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length,
+            description: 'En proceso',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+        ]}
+      />
 
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">

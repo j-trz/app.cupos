@@ -6,7 +6,7 @@ import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -162,26 +162,31 @@ const GestionUsuarios = () => {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={Users}
-          label="Total usuarios"
-          value={users.length}
-          description="Cantidad total de usuarios registrados."
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Activos"
-          value={activeCount}
-          description="Usuarios con estado activo."
-        />
-        <StatCard
-          icon={XCircle}
-          label="Inactivos"
-          value={inactiveCount}
-          description="Usuarios con estado inactivo."
-        />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            icon: Users,
+            label: 'Total usuarios',
+            value: users.length,
+            description: 'Cantidad total de usuarios registrados.',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+          },
+          {
+            icon: CheckCircle,
+            label: 'Activos',
+            value: activeCount,
+            description: 'Usuarios con estado activo.',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+          {
+            icon: XCircle,
+            label: 'Inactivos',
+            value: inactiveCount,
+            description: 'Usuarios con estado inactivo.',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+        ]}
+      />
 
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">

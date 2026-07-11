@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -203,26 +203,31 @@ export default function GestionPermisos() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={BarChart3}
-                    label="Total permisos"
-                    value={pagination.total}
-                    description="Cantidad total de permisos."
-                />
-                <StatCard
-                    icon={CheckCircle}
-                    label="Activos"
-                    value={permissions.filter(p => p.is_active).length}
-                    description="Permisos activos en el sistema."
-                />
-                <StatCard
-                    icon={XCircle}
-                    label="Inactivos"
-                    value={permissions.filter(p => !p.is_active).length}
-                    description="Permisos inactivos."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: BarChart3,
+                        label: 'Total permisos',
+                        value: pagination.total,
+                        description: 'Cantidad total de permisos.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: CheckCircle,
+                        label: 'Activos',
+                        value: permissions.filter(p => p.is_active).length,
+                        description: 'Permisos activos en el sistema.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                    {
+                        icon: XCircle,
+                        label: 'Inactivos',
+                        value: permissions.filter(p => !p.is_active).length,
+                        description: 'Permisos inactivos.',
+                        color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+                    },
+                ]}
+            />
 
             <div className="bg-white rounded-2xl border border-slate-200">
                 {/* Filtros */}

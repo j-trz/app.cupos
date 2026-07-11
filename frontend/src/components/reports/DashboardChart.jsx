@@ -53,7 +53,12 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
         });
       } else {
         const filteredDatasets = safeChartData.datasets.map((ds, idx) => {
-          const filtered = ds.data
+          // El backend puede mandar "data": null en vez de [] cuando un
+          // dataset queda vacío (un slice de Go sin inicializar serializa
+          // como null) — sin este fallback, .map de abajo tira "Cannot read
+          // properties of null" y rompe toda la pantalla de Reportes.
+          const dsData = Array.isArray(ds.data) ? ds.data : [];
+          const filtered = dsData
             .map((value, i) => ({ value, label: labels[i] }))
             .filter(item => item.value !== 0);
           const filteredData = filtered.map(item => item.value);

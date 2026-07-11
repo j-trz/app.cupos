@@ -9,7 +9,7 @@ import { MODULES, ACTIONS } from '../lib/permissionModules.js';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -316,26 +316,31 @@ export default function GestionRoles() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={BarChart3}
-                    label="Total roles"
-                    value={pagination.total}
-                    description="Cantidad total de roles."
-                />
-                <StatCard
-                    icon={Shield}
-                    label="Del sistema"
-                    value={roles.filter(r => r.is_system).length}
-                    description="Roles del sistema (no eliminables)."
-                />
-                <StatCard
-                    icon={Users}
-                    label="Personalizados"
-                    value={roles.filter(r => !r.is_system).length}
-                    description="Roles personalizados."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: BarChart3,
+                        label: 'Total roles',
+                        value: pagination.total,
+                        description: 'Cantidad total de roles.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: Shield,
+                        label: 'Del sistema',
+                        value: roles.filter(r => r.is_system).length,
+                        description: 'Roles del sistema (no eliminables).',
+                        color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+                    },
+                    {
+                        icon: Users,
+                        label: 'Personalizados',
+                        value: roles.filter(r => !r.is_system).length,
+                        description: 'Roles personalizados.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                ]}
+            />
 
             <div className="bg-white rounded-2xl border border-slate-200">
                 {/* Búsqueda */}

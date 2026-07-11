@@ -6,7 +6,7 @@ import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -47,12 +47,14 @@ export default function Requests() {
         value: data.length,
         icon: ClipboardList,
         description: 'Todas las solicitudes registradas en el sistema.',
+        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
       },
       {
         label: 'Pendientes',
         value: data.filter((item) => item.Estado?.toLowerCase().includes('solicit')).length,
         icon: Clock3,
         description: 'Solicitudes que siguen en estado pendiente.',
+        color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
       },
     ],
     [data],
@@ -151,17 +153,7 @@ export default function Requests() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {stats.map((item) => (
-          <StatCard
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            value={item.value}
-            description={item.description}
-          />
-        ))}
-      </div>
+      <StatsHero stats={stats} />
 
       <Card>
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">

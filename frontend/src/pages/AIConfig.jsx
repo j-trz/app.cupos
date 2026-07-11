@@ -16,7 +16,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import Swal from 'sweetalert2';
@@ -298,20 +298,24 @@ export default function AIConfig() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-                <StatCard
-                    icon={Bot}
-                    label="Proveedores"
-                    value={providers.length}
-                    description="Proveedores de IA configurados."
-                />
-                <StatCard
-                    icon={MessageSquare}
-                    label="Sesiones"
-                    value={stats?.total_sessions || 0}
-                    description="Total de sesiones de chat."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: Bot,
+                        label: 'Proveedores',
+                        value: providers.length,
+                        description: 'Proveedores de IA configurados.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: MessageSquare,
+                        label: 'Sesiones',
+                        value: stats?.total_sessions || 0,
+                        description: 'Total de sesiones de chat.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                ]}
+            />
 
             {/* Tabs */}
             <div className="flex flex-wrap gap-2 border-b border-slate-200">

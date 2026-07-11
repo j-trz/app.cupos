@@ -6,7 +6,7 @@ import LogService from '../services/logService';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
@@ -93,11 +93,13 @@ export default function LogsDelSitio() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard icon={ScrollText} label="Total (página)" value={pagination.total} description="Total de registros con los filtros actuales." />
-                <StatCard icon={AlertTriangle} label="Warnings (página)" value={warningCount} description="Avisos en la página actual." />
-                <StatCard icon={XCircle} label="Errores (página)" value={errorCount} description="Errores en la página actual." />
-            </div>
+            <StatsHero
+                stats={[
+                    { icon: ScrollText, label: 'Total (página)', value: pagination.total, description: 'Total de registros con los filtros actuales.', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+                    { icon: AlertTriangle, label: 'Warnings (página)', value: warningCount, description: 'Avisos en la página actual.', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
+                    { icon: XCircle, label: 'Errores (página)', value: errorCount, description: 'Errores en la página actual.', color: 'text-rose-300 bg-rose-500/10 border-rose-500/20' },
+                ]}
+            />
 
             <div className="bg-white rounded-2xl border border-slate-200">
                 <form onSubmit={handleSearchSubmit} className="border-b border-slate-200 p-4">

@@ -6,7 +6,7 @@ import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
@@ -38,12 +38,14 @@ export default function Confirmations() {
         value: data.length,
         icon: CheckCircle2,
         description: 'Reservas ya confirmadas en el sistema.',
+        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
       },
       {
         label: 'Últimas confirmaciones',
         value: data.slice(-3).length,
         icon: TrendingUp,
         description: 'Confirmaciones registradas recientemente.',
+        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
       },
     ],
     [data],
@@ -147,17 +149,7 @@ export default function Confirmations() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {stats.map((item) => (
-          <StatCard
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            value={item.value}
-            description={item.description}
-          />
-        ))}
-      </div>
+      <StatsHero stats={stats} />
 
       <Card>
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
