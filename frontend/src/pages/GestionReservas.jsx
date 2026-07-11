@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
@@ -359,6 +359,40 @@ export default function GestionReservas() {
     }
   };
 
+  // Aprobar/rechazar una solicitud de cancelación pendiente (solo admin) —
+  // pide notas opcionales antes de confirmar la decisión.
+  const handleResolveCancellation = async (r, decision) => {
+    const isApprove = decision === 'approve';
+    const { value: notas, isConfirmed } = await Swal.fire({
+      title: isApprove ? '¿Aprobar la cancelación?' : '¿Rechazar la cancelación?',
+      text: isApprove
+        ? `Se cancelará el pedido ${r.pedido_id} y se liberará el cupo.`
+        : `El pedido ${r.pedido_id} volverá a su estado anterior.`,
+      input: 'textarea',
+      inputLabel: 'Notas (opcional)',
+      inputPlaceholder: 'Motivo o comentario para dejar registrado...',
+      icon: isApprove ? 'warning' : 'question',
+      showCancelButton: true,
+      confirmButtonText: isApprove ? 'Aprobar' : 'Rechazar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: isApprove ? '#059669' : '#d33',
+    });
+    if (!isConfirmed) return;
+
+    try {
+      await ReservationService.resolveCancellation(r.id, decision, notas || '');
+      Swal.fire({
+        icon: 'success',
+        title: isApprove ? 'Cancelación aprobada' : 'Cancelación rechazada',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo resolver la solicitud' });
+    }
+  };
+
   // Elimina el pasajero de ESA fila únicamente — un pedido puede tener varios
   // pasajeros y cada uno es su propio ticket individual una vez reservado,
   // aunque se hayan creado juntos. Solo si es el último pasajero del pedido
@@ -635,7 +669,17 @@ export default function GestionReservas() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
-                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && (
+                      {r.estado === 'solicitud_cancelacion' && (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => handleResolveCancellation(r, 'approve')} title="Aprobar cancelación">
+                            <ThumbsUp className="h-4 w-4 text-emerald-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleResolveCancellation(r, 'decline')} title="Rechazar cancelación">
+                            <ThumbsDown className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </>
+                      )}
+                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && (
                         <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar pedido completo">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         </Button>

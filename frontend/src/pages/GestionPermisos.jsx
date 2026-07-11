@@ -9,31 +9,16 @@ import StatCard from '../components/ui/StatCard.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import { MODULES, ACTIONS, getModuleLabel } from '../lib/permissionModules.js';
 
 const emptyPermission = {
     name: '',
     code: '',
     module: '',
+    action: '',
     description: '',
     is_active: true
 };
-
-// Módulos disponibles del sistema
-const MODULES = [
-    { value: 'dashboard', label: 'Dashboard' },
-    { value: 'users', label: 'Usuarios' },
-    { value: 'agencies', label: 'Agencias' },
-    { value: 'products', label: 'Productos' },
-    { value: 'reservations', label: 'Reservas' },
-    { value: 'notifications', label: 'Notificaciones' },
-    { value: 'settings', label: 'Configuración' },
-    { value: 'white_label', label: 'Diseño' },
-    { value: 'email', label: 'Email' },
-    { value: 'ai', label: 'Inteligencia Artificial' },
-    { value: 'permissions', label: 'Permisos' },
-    { value: 'roles', label: 'Roles' },
-    { value: 'reports', label: 'Reportes' }
-];
 
 export default function GestionPermisos() {
     const [permissions, setPermissions] = useState([]);
@@ -88,6 +73,7 @@ export default function GestionPermisos() {
             name: permission.name || '',
             code: permission.code || '',
             module: permission.module || '',
+            action: permission.action || '',
             description: permission.description || '',
             is_active: permission.is_active ?? true
         });
@@ -178,11 +164,6 @@ export default function GestionPermisos() {
         p.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    const getModuleLabel = (moduleValue) => {
-        const module = MODULES.find(m => m.value === moduleValue);
-        return module ? module.label : moduleValue;
-    };
 
     const totalPages = Math.ceil(pagination.total / pagination.limit);
 
@@ -419,6 +400,25 @@ export default function GestionPermisos() {
                                 <option key={m.value} value={m.value}>{m.label}</option>
                             ))}
                         </select>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                            Acción
+                        </label>
+                        <select
+                            value={formState.action}
+                            onChange={(e) => setFormState(prev => ({ ...prev, action: e.target.value }))}
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        >
+                            <option value="">Sin acción específica</option>
+                            {ACTIONS.map(a => (
+                                <option key={a.value} value={a.value}>{a.label}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Determina en qué columna aparece este permiso en la matriz de Roles.
+                        </p>
                     </div>
 
                     <div>

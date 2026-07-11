@@ -138,11 +138,18 @@ func ListUsers(c *gin.Context) {
 }
 
 func CreateUser(c *gin.Context) {
-	var profile models.Profile
-	if err := c.ShouldBindJSON(&profile); err != nil {
+	// RoleID viaja aparte de models.Profile (el rol granular vive en la tabla
+	// UserRole, no en Profile) — se embebe Profile para bindear ambos campos
+	// del mismo body sin pisar los json tags de Profile.
+	var input struct {
+		models.Profile
+		RoleID *uuid.UUID `json:"role_id"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	profile := input.Profile
 
 	// El campo bindeado desde JSON es Password (texto plano); EncryptedPassword
 	// tiene json:"-" y nunca llega en el request, así que hashear ese campo
@@ -164,6 +171,13 @@ func CreateUser(c *gin.Context) {
 	if err := database.DB.Create(&profile).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear el usuario."})
 		return
+	}
+
+	if input.RoleID != nil {
+		if err := setUserRole(profile.ID, *input.RoleID, profile.Agencia); err != nil {
+			c.JSON(http.StatusCreated, gin.H{"success": true, "user": profile, "role_warning": err.Error()})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "user": profile})
@@ -268,13 +282,14 @@ func UpdateUser(c *gin.Context) {
 	// telefono ni admin, y con campos no-puntero esos valores se pisaban a
 	// blanco/false en cada actualización aunque el usuario no los tocara.
 	var input struct {
-		Nombre   *string `json:"nombre"`
-		Apellido *string `json:"apellido"`
-		Telefono *string `json:"telefono"`
-		Agencia  *string `json:"agencia"`
-		Role     *string `json:"role"`
-		Admin    *bool   `json:"admin"`
-		IsActive *bool   `json:"activo"`
+		Nombre   *string    `json:"nombre"`
+		Apellido *string    `json:"apellido"`
+		Telefono *string    `json:"telefono"`
+		Agencia  *string    `json:"agencia"`
+		Role     *string    `json:"role"`
+		Admin    *bool      `json:"admin"`
+		IsActive *bool      `json:"activo"`
+		RoleID   *uuid.UUID `json:"role_id"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -311,6 +326,14 @@ func UpdateUser(c *gin.Context) {
 	}
 
 	database.DB.First(&profile, "id = ?", id)
+
+	if input.RoleID != nil {
+		if err := setUserRole(profile.ID, *input.RoleID, profile.Agencia); err != nil {
+			c.JSON(http.StatusOK, gin.H{"success": true, "user": profile, "role_warning": err.Error()})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile})
 }
 

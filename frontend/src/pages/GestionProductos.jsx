@@ -294,7 +294,7 @@ const GestionProductos = () => {
         title="Carga Masiva de Productos"
         open={isBulkUploadOpen}
         onClose={() => setIsBulkUploadOpen(false)}
-        size="3xl"
+        size="5xl"
       >
         <ProductBulkUpload
           onUpload={handleBulkUpload}
@@ -306,7 +306,7 @@ const GestionProductos = () => {
         title={editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
         open={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingProduct(null); }}
-        size="xl"
+        size="4xl"
       >
         <ProductForm
           onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}

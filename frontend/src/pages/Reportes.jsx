@@ -22,8 +22,8 @@ import { ReportService } from '../services/reportService.js';
 const AGENCY_PALETTE = ['#2563eb', '#e11d48', '#16a34a', '#f59e0b', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
 
 const Reportes = () => {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'agency_admin';
+  const { user, can } = useAuth();
+  const isAdmin = can('REPORTS_VIEW');
 
   if (!isAdmin) {
     return (

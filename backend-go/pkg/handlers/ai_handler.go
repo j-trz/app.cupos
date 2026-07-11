@@ -112,6 +112,7 @@ ADEMÁS, por tu rol también PODÉS:
 - Ver TODAS las reservas de tu agencia (y las que gestionás por cesión/compartidas, si sos agency_admin) o del sistema entero (si sos admin)
 - Confirmar cualquier reserva
 - Ver estadísticas, reportes y la rentabilidad (ventas, costos y margen)
+- Consultar qué permisos tiene un rol o un usuario puntual (herramienta "consultar_rol") — nunca modifica nada, solo lectura
 
 FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 - Si te preguntan por rentabilidad, ganancia, margen, "cuánto ganamos", costos o similar, llamá SIEMPRE a la herramienta "rentabilidad" — nunca la calcules a mano combinando otros datos, ni la des por no disponible sin haberla llamado primero.
@@ -123,6 +124,27 @@ FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 - Cancelar/eliminar cualquier reserva del sistema
 - Buscar usuarios del sistema
 - (Por chat NO podés crear/editar usuarios ni tocar configuración del sistema — eso se hace desde las pantallas de administración, no puedo ejecutarlo yo)`
+	}
+
+	// PERMISOS GRANULARES: además del tier grueso de arriba (admin/
+	// agency_admin/user), un usuario puede tener asignado un rol personalizado
+	// (Gestión de Roles) con permisos MODULE_ACTION más finos — ver pero no
+	// eliminar, crear pero no confirmar, etc. Admin bypassea todo así que no
+	// hace falta listarlo; para el resto, esta es la fuente de verdad más
+	// precisa si el usuario pregunta "¿puedo hacer X?" sobre una pantalla o
+	// acción puntual del sitio.
+	if u.Role != "admin" {
+		userPerms := services.GetUserPermissions(u.ID)
+		if len(userPerms) > 0 {
+			var permList strings.Builder
+			for _, p := range userPerms {
+				permList.WriteString(fmt.Sprintf("- %s (%s)\n", p.Name, p.Code))
+			}
+			permisos += fmt.Sprintf(`
+
+PERMISOS GRANULARES DE TU ROL ASIGNADO (más preciso que las listas de arriba para preguntas puntuales tipo "¿puedo eliminar X?" o "¿puedo ver la sección Y?" — si hay conflicto con lo de arriba, priorizá esto):
+%s`, permList.String())
+		}
 	}
 
 	// CONTEXTO DE PANTALLA — se arma solo si el frontend mandó pageContext en
@@ -437,6 +459,17 @@ func getTools(role string) []ToolDef {
 					Type:       "object",
 					Properties: map[string]ToolParam{"reserva_id": {Type: "string", Description: "ID de la reserva"}},
 					Required:   []string{"reserva_id"},
+				},
+			},
+			ToolDef{
+				Name:        "consultar_rol",
+				Description: "Consulta, de solo lectura, qué permisos tiene un rol del sistema (por nombre o código) o un usuario (por email) — para responder preguntas tipo '¿qué puede hacer el rol Supervisor?' o '¿qué permisos tiene fulano@agencia.com?'. Nunca modifica nada.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"rol":   {Type: "string", Description: "Nombre o código del rol a consultar (ej. 'Supervisor de Ventas' o 'SALES_SUPERVISOR')"},
+						"email": {Type: "string", Description: "Email del usuario cuyo rol/permisos se quiere consultar"},
+					},
 				},
 			},
 		)
@@ -902,6 +935,60 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		}
 		b, _ := json.Marshal(result)
 		return string(b)
+
+	case "consultar_rol":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para consultar roles"}`
+		}
+		rolQuery, _ := args["rol"].(string)
+		emailQuery, _ := args["email"].(string)
+
+		if emailQuery != "" {
+			var target models.Profile
+			if err := database.DB.Where("LOWER(email) = LOWER(?)", emailQuery).First(&target).Error; err != nil {
+				return `{"error": "No se encontró un usuario con ese email"}`
+			}
+			if u.Role == "agency_admin" && !strings.EqualFold(target.Agencia, u.Agencia) {
+				return `{"error": "Solo podés consultar usuarios de tu propia agencia"}`
+			}
+			perms := services.GetUserPermissions(target.ID)
+			names := make([]string, len(perms))
+			for i, p := range perms {
+				names[i] = p.Name + " (" + p.Code + ")"
+			}
+			b, _ := json.Marshal(map[string]interface{}{
+				"usuario": target.Email, "rol_base": target.Role, "permisos": names,
+			})
+			return string(b)
+		}
+
+		if rolQuery != "" {
+			var role models.Role
+			if err := database.DB.Where("LOWER(name) = LOWER(?) OR LOWER(code) = LOWER(?)", rolQuery, rolQuery).First(&role).Error; err != nil {
+				return `{"error": "No se encontró un rol con ese nombre o código"}`
+			}
+			if u.Role == "agency_admin" && role.AgencyID != nil {
+				agency, aerr := services.FindAgencyByCodeOrName(u.Agencia)
+				if aerr != nil || *role.AgencyID != agency.ID {
+					return `{"error": "Solo podés consultar roles globales o de tu propia agencia"}`
+				}
+			}
+			var permissions []models.Permission
+			database.DB.Table("permissions").
+				Joins("JOIN role_permissions ON role_permissions.permission_id = permissions.id").
+				Where("role_permissions.role_id = ?", role.ID).
+				Find(&permissions)
+			names := make([]string, len(permissions))
+			for i, p := range permissions {
+				names[i] = p.Name + " (" + p.Code + ")"
+			}
+			b, _ := json.Marshal(map[string]interface{}{
+				"rol": role.Name, "codigo": role.Code, "es_global": role.AgencyID == nil, "permisos": names,
+			})
+			return string(b)
+		}
+
+		return `{"error": "Especificá 'rol' o 'email' para consultar"}`
 
 	case "buscar_usuarios":
 		if u.Role != "admin" {

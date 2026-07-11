@@ -19,8 +19,8 @@ const SOURCE_LABEL = { http: 'Solicitud web', cron: 'Tarea automática', email: 
 const SOURCE_ICON = { http: Globe, cron: Clock3, email: Mail, ai: Bot };
 
 export default function LogsDelSitio() {
-    const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    const { can } = useAuth();
+    const isAdmin = can('LOGS_VIEW');
 
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(false);

@@ -149,7 +149,7 @@ const ProductForm = ({
   };
 
   const field = (id, label, type = 'text', opts = {}) => (
-    <div className="space-y-1">
+    <div className={`space-y-1 ${opts.className || ''}`}>
       <Label htmlFor={id}>{label}{opts.required ? ' *' : ''}</Label>
       <Input
         id={id}
@@ -195,7 +195,7 @@ const ProductForm = ({
         {/* Identificación */}
         <div>
           {sectionLabel('Identificación')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {isEditing ? (
               <div className="space-y-1">
                 <Label htmlFor="codigo_cupo">Código de Cupo</Label>
@@ -209,7 +209,7 @@ const ProductForm = ({
                 </div>
               </div>
             )}
-            <div className="space-y-1">
+            <div className="space-y-1 col-span-2">
               <Label htmlFor="agencia">Agencia Dueña *</Label>
               <select
                 id="agencia"
@@ -246,19 +246,19 @@ const ProductForm = ({
         {/* Fechas y cupo */}
         <div>
           {sectionLabel('Fechas y cupo')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('fecha_salida', 'Fecha de Salida', 'date')}
             {field('fecha_regreso', 'Fecha de Regreso', 'date')}
             {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
-            {field('bloqueo_temporal_minutos', 'Bloqueo Temporal (min)', 'number', { min: '0', placeholder: '60' })}
+            {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60' })}
           </div>
         </div>
 
         {/* Precios */}
         <div>
           {sectionLabel('Precios')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('precio', 'Precio ADT', 'number', { step: '0.01', min: '0' })}
             {field('inf_fare', 'Precio INF', 'number', { step: '0.01', min: '0' })}
             {field('chd_fare', 'Precio CHD', 'number', { step: '0.01', min: '0' })}
@@ -270,19 +270,19 @@ const ProductForm = ({
         {/* Clasificación */}
         <div>
           {sectionLabel('Clasificación')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('ruta', rutaLabel)}
             {field('pnr', 'PNR')}
             {field('ficha', 'Ficha')}
             {field('temporada', 'Temporada')}
-            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje, Excursión...' })}
+            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje...', className: 'col-span-2' })}
           </div>
         </div>
 
         {/* Notas */}
         <div>
           {sectionLabel('Notas')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="notas_externas">Notas externas</Label>
               <Textarea

@@ -94,10 +94,10 @@ func init() {
 			{
 				products.GET("", handlers.GetProducts)
 				products.GET("/:id", handlers.GetProductByID)
-				products.POST("", middleware.AdminOnly(), handlers.CreateProduct)
-				products.PUT("/:id", middleware.AdminOnly(), handlers.UpdateProduct)
-				products.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteProduct)
-				products.POST("/bulk", middleware.AdminOnly(), handlers.BulkCreateProducts)
+				products.POST("", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.CreateProduct)
+				products.PUT("/:id", middleware.RequirePermission("PRODUCTS_UPDATE"), handlers.UpdateProduct)
+				products.DELETE("/:id", middleware.RequirePermission("PRODUCTS_DELETE"), handlers.DeleteProduct)
+				products.POST("/bulk", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.BulkCreateProducts)
 				products.GET("/:id/shared-agencies", handlers.ListSharedAgencies)
 				products.POST("/:id/shared-agencies", handlers.ShareProduct)
 				products.DELETE("/:id/shared-agencies/:agencia", handlers.UnshareProduct)
@@ -113,30 +113,35 @@ func init() {
 				orders.PUT("/:id", handlers.UpdateReservation)
 				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
 				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
+				orders.PUT("/:id/cancel-request/resolve", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.ResolveCancellation)
 				orders.POST("/:id/confirm", handlers.ConfirmReservation)
 				orders.PUT("/:id/passengers/:passengerId", handlers.UpdatePassengerTicket)
 				orders.PUT("/:id/passengers/:passengerId/full", handlers.UpdatePassenger)
 				orders.POST("/:id/passengers", handlers.AddPassenger)
 				orders.POST("/:id/passengers/:passengerId/duplicate", handlers.DuplicatePassenger)
 				orders.DELETE("/:id/passengers/:passengerId", handlers.DeletePassenger)
-				orders.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteReservation)
+				orders.DELETE("/:id", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.DeleteReservation)
 			}
+
+			// Mis permisos resueltos (cualquier usuario autenticado, no solo admin —
+			// se registra sobre "protected" y no sobre el grupo "/users" de abajo
+			// para no heredar su middleware.AdminOnly()).
+			protected.GET("/users/me/permissions", handlers.GetMyPermissions)
 
 			// Usuarios
 			users := protected.Group("/users")
-			users.Use(middleware.AdminOnly())
 			{
-				users.GET("", handlers.ListUsers)
-				users.GET("/:id", handlers.GetUserById)
-				users.POST("", handlers.CreateUser)
-				users.PUT("/:id", handlers.UpdateUser)
-				users.DELETE("/:id", handlers.DeleteUser)
-				users.PUT("/:id/status", handlers.ToggleUserStatus)
+				users.GET("", middleware.RequirePermission("USERS_VIEW"), handlers.ListUsers)
+				users.GET("/:id", middleware.RequirePermission("USERS_VIEW"), handlers.GetUserById)
+				users.POST("", middleware.RequirePermission("USERS_CREATE"), handlers.CreateUser)
+				users.PUT("/:id", middleware.RequirePermission("USERS_UPDATE"), handlers.UpdateUser)
+				users.DELETE("/:id", middleware.RequirePermission("USERS_DELETE"), handlers.DeleteUser)
+				users.PUT("/:id/status", middleware.RequirePermission("USERS_UNLOCK"), handlers.ToggleUserStatus)
 			}
 
-			// Reportes (solo admin y agency_admin)
+			// Reportes
 			reports := protected.Group("/reports")
-			reports.Use(middleware.AgencyAdminOrAdmin())
+			reports.Use(middleware.RequirePermission("REPORTS_VIEW"))
 			{
 				reports.GET("/stats", handlers.GetStats)
 				reports.GET("/evolution", handlers.GetEvolutionPassengers)
@@ -169,14 +174,13 @@ func init() {
 
 			// Ajustes
 			settings := protected.Group("/settings")
-			settings.Use(middleware.AdminOnly())
 			{
-				settings.GET("", handlers.ListSettings)
-				settings.PUT("/:key", handlers.UpdateSetting)
+				settings.GET("", middleware.RequirePermission("SETTINGS_VIEW"), handlers.ListSettings)
+				settings.PUT("/:key", middleware.RequirePermission("SETTINGS_UPDATE"), handlers.UpdateSetting)
 			}
 
 			// Backup
-			protected.GET("/backup", middleware.AdminOnly(), handlers.GetBackup)
+			protected.GET("/backup", middleware.RequirePermission("BACKUP_VIEW"), handlers.GetBackup)
 
 			// Exportación
 			protected.GET("/export/csv/:entityType", handlers.ExportCSV)
@@ -185,17 +189,17 @@ func init() {
 			ai := protected.Group("/ai")
 			{
 				ai.POST("/chat", handlers.Chat)
-				ai.GET("/providers", middleware.AdminOnly(), handlers.ListAIProviders)
-				ai.POST("/providers", middleware.AdminOnly(), handlers.CreateAIProvider)
-				ai.PUT("/providers/:id", middleware.AdminOnly(), handlers.UpdateAIProvider)
-				ai.DELETE("/providers/:id", middleware.AdminOnly(), handlers.DeleteAIProvider)
-				ai.POST("/providers/:id/test", middleware.AdminOnly(), handlers.TestAIProvider)
+				ai.GET("/providers", middleware.RequirePermission("AI_VIEW"), handlers.ListAIProviders)
+				ai.POST("/providers", middleware.RequirePermission("AI_UPDATE"), handlers.CreateAIProvider)
+				ai.PUT("/providers/:id", middleware.RequirePermission("AI_UPDATE"), handlers.UpdateAIProvider)
+				ai.DELETE("/providers/:id", middleware.RequirePermission("AI_UPDATE"), handlers.DeleteAIProvider)
+				ai.POST("/providers/:id/test", middleware.RequirePermission("AI_UPDATE"), handlers.TestAIProvider)
 				ai.GET("/sessions", handlers.ListAISessions)
 				ai.GET("/sessions/:id/messages", handlers.GetSessionMessages)
 				ai.DELETE("/sessions/:id", handlers.DeleteSession)
 				ai.PUT("/sessions/:id/title", handlers.UpdateSessionTitle)
-				ai.GET("/stats", middleware.AdminOnly(), handlers.GetAIStats)
-				ai.GET("/logs", middleware.AdminOnly(), handlers.GetAILogs)
+				ai.GET("/stats", middleware.RequirePermission("AI_VIEW"), handlers.GetAIStats)
+				ai.GET("/logs", middleware.RequirePermission("AI_VIEW"), handlers.GetAILogs)
 			}
 
 			// CRUD Dinámico (Data)
@@ -211,47 +215,45 @@ func init() {
 			agencies := protected.Group("/agencies")
 			{
 				agencies.GET("", handlers.ListAgencies)
-				agencies.POST("", middleware.AdminOnly(), handlers.CreateAgency)
-				agencies.PUT("/:id", middleware.AdminOnly(), handlers.UpdateAgency)
-				agencies.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteAgency)
+				agencies.POST("", middleware.RequirePermission("AGENCIES_CREATE"), handlers.CreateAgency)
+				agencies.PUT("/:id", middleware.RequirePermission("AGENCIES_UPDATE"), handlers.UpdateAgency)
+				agencies.DELETE("/:id", middleware.RequirePermission("AGENCIES_DELETE"), handlers.DeleteAgency)
 			}
 
 			// White Label — agency_admin puede gestionar su propia agencia
 			whiteLabel := protected.Group("/white-label")
 			{
 				whiteLabel.GET("/config", handlers.GetWhiteLabelConfig)
-				whiteLabel.POST("/config", middleware.AgencyAdminOrAdmin(), handlers.CreateWhiteLabelConfig)
-				whiteLabel.PUT("/config/:id", middleware.AgencyAdminOrAdmin(), handlers.UpdateWhiteLabelConfig)
-				whiteLabel.DELETE("/config/:id", middleware.AgencyAdminOrAdmin(), handlers.DeleteWhiteLabelConfig)
+				whiteLabel.POST("/config", middleware.RequirePermission("WHITE_LABEL_UPDATE"), handlers.CreateWhiteLabelConfig)
+				whiteLabel.PUT("/config/:id", middleware.RequirePermission("WHITE_LABEL_UPDATE"), handlers.UpdateWhiteLabelConfig)
+				whiteLabel.DELETE("/config/:id", middleware.RequirePermission("WHITE_LABEL_UPDATE"), handlers.DeleteWhiteLabelConfig)
 			}
 
 			// RBAC - Roles
 			roles := protected.Group("/roles")
-			roles.Use(middleware.AdminOnly())
 			{
-				roles.GET("", handlers.ListRoles)
-				roles.GET("/:id", handlers.GetRoleById)
-				roles.POST("", handlers.CreateRole)
-				roles.PUT("/:id", handlers.UpdateRole)
-				roles.DELETE("/:id", handlers.DeleteRole)
-				roles.GET("/:id/users", handlers.GetRoleUsers)
-				roles.GET("/:id/permissions", handlers.GetRolePermissions)
-				roles.POST("/:id/permissions", handlers.AssignPermissionsToRole)
+				roles.GET("", middleware.RequirePermission("ROLES_VIEW"), handlers.ListRoles)
+				roles.GET("/:id", middleware.RequirePermission("ROLES_VIEW"), handlers.GetRoleById)
+				roles.POST("", middleware.RequirePermission("ROLES_CREATE"), handlers.CreateRole)
+				roles.PUT("/:id", middleware.RequirePermission("ROLES_UPDATE"), handlers.UpdateRole)
+				roles.DELETE("/:id", middleware.RequirePermission("ROLES_DELETE"), handlers.DeleteRole)
+				roles.GET("/:id/users", middleware.RequirePermission("ROLES_VIEW"), handlers.GetRoleUsers)
+				roles.GET("/:id/permissions", middleware.RequirePermission("ROLES_VIEW"), handlers.GetRolePermissions)
+				roles.POST("/:id/permissions", middleware.RequirePermission("ROLES_ASSIGN_PERMISSIONS"), handlers.AssignPermissionsToRole)
 			}
 
 			// RBAC - Permisos
 			permissions := protected.Group("/permissions")
-			permissions.Use(middleware.AdminOnly())
 			{
-				permissions.GET("", handlers.ListPermissions)
-				permissions.GET("/:id", handlers.GetPermissionById)
-				permissions.POST("", handlers.CreatePermission)
-				permissions.PUT("/:id", handlers.UpdatePermission)
-				permissions.DELETE("/:id", handlers.DeletePermission)
+				permissions.GET("", middleware.RequirePermission("PERMISSIONS_VIEW"), handlers.ListPermissions)
+				permissions.GET("/:id", middleware.RequirePermission("PERMISSIONS_VIEW"), handlers.GetPermissionById)
+				permissions.POST("", middleware.RequirePermission("PERMISSIONS_CREATE"), handlers.CreatePermission)
+				permissions.PUT("/:id", middleware.RequirePermission("PERMISSIONS_UPDATE"), handlers.UpdatePermission)
+				permissions.DELETE("/:id", middleware.RequirePermission("PERMISSIONS_DELETE"), handlers.DeletePermission)
 			}
 
 			// RBAC - User Roles
-			protected.POST("/user-roles", middleware.AdminOnly(), handlers.AssignRoleToUser)
+			protected.POST("/user-roles", middleware.RequirePermission("ROLES_ASSIGN_PERMISSIONS"), handlers.AssignRoleToUser)
 
 			// Notificaciones
 			notifications := protected.Group("/notifications")
@@ -261,8 +263,8 @@ func init() {
 				notifications.PUT("/read-all", handlers.MarkAllNotificationsRead)
 				notifications.PUT("/:id/read", handlers.MarkNotificationRead)
 				notifications.PUT("/:id/hide", handlers.HideNotification)
-				notifications.POST("", middleware.AdminOnly(), handlers.CreateNotification)
-				notifications.DELETE("/:id", middleware.AdminOnly(), handlers.DeleteNotification)
+				notifications.POST("", middleware.RequirePermission("NOTIFICATIONS_CREATE"), handlers.CreateNotification)
+				notifications.DELETE("/:id", middleware.RequirePermission("NOTIFICATIONS_DELETE"), handlers.DeleteNotification)
 			}
 
 			// Cesión de disponibilidad (Transfers)
@@ -271,15 +273,15 @@ func init() {
 				transfers.GET("", handlers.GetUserTransfers)
 				// Ceder y recuperar cupos es una operación exclusiva de administración:
 				// no requiere autorización de la agencia afectada ni pasa por
-				// solicitudes, así que solo el admin puede ejecutarla.
-				transfers.POST("", middleware.AdminOnly(), handlers.CreateTransfer)
-				transfers.POST("/:id/reclaim", middleware.AdminOnly(), handlers.ReclaimTransfer)
+				// solicitudes, así que solo quien tenga el permiso puede ejecutarla.
+				transfers.POST("", middleware.RequirePermission("TRANSFERS_CREATE"), handlers.CreateTransfer)
+				transfers.POST("/:id/reclaim", middleware.RequirePermission("TRANSFERS_CREATE"), handlers.ReclaimTransfer)
 			}
-			// Lista completa solo para admin
-			protected.GET("/transfers/all", middleware.AdminOnly(), handlers.ListTransfers)
+			// Lista completa
+			protected.GET("/transfers/all", middleware.RequirePermission("TRANSFERS_VIEW"), handlers.ListTransfers)
 
-			// Logs del sitio (solo admin)
-			protected.GET("/logs", middleware.AdminOnly(), handlers.GetSystemLogs)
+			// Logs del sitio
+			protected.GET("/logs", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemLogs)
 
 			// Configuración de email (SMTP + plantillas) por agencia
 			emailConfig := protected.Group("/email-config")

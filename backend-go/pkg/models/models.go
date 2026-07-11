@@ -8,24 +8,24 @@ import (
 )
 
 type Profile struct {
-	ID                uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Email             string    `gorm:"unique;not null" json:"email"`
+	ID    uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	Email string    `gorm:"unique;not null" json:"email"`
 	// Password nunca se persiste (gorm:"-"): solo se usa para recibir el valor
 	// en texto plano del request y hashearlo hacia EncryptedPassword.
-	Password          string    `gorm:"-" json:"password,omitempty" binding:"required"`
-	EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"`
-	Nombre            string    `json:"nombre"`
-	Apellido          string    `json:"apellido"`
-	Telefono          string    `json:"telefono"`
-	Agencia           string    `json:"agencia"`
-	Admin             bool      `gorm:"default:false" json:"admin"`
+	Password          string `gorm:"-" json:"password,omitempty" binding:"required"`
+	EncryptedPassword string `gorm:"column:encrypted_password" json:"-"`
+	Nombre            string `json:"nombre"`
+	Apellido          string `json:"apellido"`
+	Telefono          string `json:"telefono"`
+	Agencia           string `json:"agencia"`
+	Admin             bool   `gorm:"default:false" json:"admin"`
 	// IsActive es un campo propio, distinto de Admin (antes ToggleUserStatus
 	// reusaba la columna "admin" como proxy de "activo", lo cual mezclaba
 	// privilegio de administrador con habilitación de la cuenta).
-	IsActive          bool      `gorm:"default:true" json:"activo"`
-	Role              string    `gorm:"default:'agency_user'" json:"role"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	IsActive  bool      `gorm:"default:true" json:"activo"`
+	Role      string    `gorm:"default:'agency_user'" json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Product struct {
@@ -134,15 +134,22 @@ type Reservation struct {
 	DocContableExpiresAt *time.Time `json:"doc_contable_expires_at"`
 	// ExpirationWarningSentAt evita reenviar el aviso de "por vencer" en cada corrida del cron.
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
-	CreatedAt               time.Time  `json:"created_at"`
-	UpdatedAt               time.Time  `json:"updated_at"`
+	// PreCancelEstado guarda el estado que tenía la reserva justo antes de que
+	// se pidiera su cancelación, para poder restaurarlo exactamente si un admin
+	// rechaza la solicitud (ver ResolveCancellation en order_handler.go).
+	PreCancelEstado string `gorm:"column:pre_cancel_estado" json:"pre_cancel_estado,omitempty"`
+	// CancelacionNotas son las notas que carga el admin al aprobar/rechazar
+	// una solicitud de cancelación.
+	CancelacionNotas string    `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 	// Passengers son los pasajeros desglosados de la reserva (puede haber más de
 	// uno). Si viene vacío, la UI debe usar los campos *Pasajero de arriba como
 	// fallback (reservas creadas sin desglose de pasajeros).
 	Passengers []Passenger `gorm:"foreignKey:ReservationID" json:"passengers,omitempty"`
 
 	// Associations
-	Product    Product     `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 // Passenger es la unidad real de "cupo aéreo": cada pasajero ocupa 1 lugar y
@@ -173,7 +180,7 @@ type Passenger struct {
 	UpdatedAt               time.Time  `json:"updated_at"`
 
 	// Associations
-	Reservation             Reservation `gorm:"foreignKey:ReservationID" json:"reservation,omitempty"`
+	Reservation Reservation `gorm:"foreignKey:ReservationID" json:"reservation,omitempty"`
 }
 
 type Agency struct {
@@ -240,10 +247,14 @@ type SystemLog struct {
 }
 
 type Permission struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Name        string    `gorm:"not null" json:"name"`
-	Code        string    `gorm:"unique;not null" json:"code"`
-	Module      string    `gorm:"not null" json:"module"`
+	ID     uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Name   string    `gorm:"not null" json:"name"`
+	Code   string    `gorm:"unique;not null" json:"code"`
+	Module string    `gorm:"not null" json:"module"`
+	// Action es el sufijo de Code en minúsculas (view|create|update|delete|
+	// confirm|export|unlock|assign) — permite matchear module+action sin
+	// parsear el string de Code.
+	Action      string    `json:"action"`
 	Description string    `json:"description"`
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -257,8 +268,12 @@ type Role struct {
 	Description string    `json:"description"`
 	IsSystem    bool      `gorm:"default:false" json:"is_system"`
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	// AgencyID nulo = rol global/de sistema, disponible para cualquier
+	// agencia. No nulo = rol personalizado de esa agencia únicamente (solo
+	// lo ve/edita/asigna un admin o el agency_admin de esa misma agencia).
+	AgencyID  *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 type UserRole struct {
@@ -277,15 +292,15 @@ type RolePermission struct {
 type EmailSMTPConfig struct {
 	ID         uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AgencyID   *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
-	SMTPHost   string    `json:"smtp_host"`
-	SMTPPort   int       `json:"smtp_port"`
-	SMTPUser   string    `json:"smtp_user"`
-	SMTPPass   string    `json:"smtp_pass"`
-	SMTPSecure bool      `gorm:"default:false" json:"smtp_secure"`
-	EmailFrom  string    `json:"email_from"`
-	IsActive   bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	SMTPHost   string     `json:"smtp_host"`
+	SMTPPort   int        `json:"smtp_port"`
+	SMTPUser   string     `json:"smtp_user"`
+	SMTPPass   string     `json:"smtp_pass"`
+	SMTPSecure bool       `gorm:"default:false" json:"smtp_secure"`
+	EmailFrom  string     `json:"email_from"`
+	IsActive   bool       `gorm:"default:true" json:"is_active"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 // EmailTemplate define el asunto/cuerpo de un email transaccional identificado

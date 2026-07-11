@@ -699,7 +699,13 @@ func RequestCancellation(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&reservation).Update("estado", models.EstadoSolicitudCancelacion).Error; err != nil {
+	// Guarda el estado previo para poder restaurarlo tal cual si un admin
+	// rechaza la solicitud (ver ResolveCancellation más abajo).
+	prevEstado := reservation.Estado
+	if err := database.DB.Model(&reservation).Updates(map[string]interface{}{
+		"estado":            models.EstadoSolicitudCancelacion,
+		"pre_cancel_estado": prevEstado,
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al procesar solicitud."})
 		return
 	}
@@ -712,6 +718,80 @@ func RequestCancellation(c *gin.Context) {
 		fmt.Sprintf("La reserva del pedido %s tiene una solicitud de cancelación pendiente de revisión", reservation.PedidoID),
 		map[string]string{"pedido_id": reservation.PedidoID})
 
+	c.JSON(http.StatusOK, reservation)
+}
+
+// ResolveCancellation permite a un admin aprobar o rechazar una solicitud de
+// cancelación pendiente, con notas opcionales. Aprobar cancela la reserva
+// definitivamente y libera el cupo al stock (a diferencia de DeleteReservation,
+// no borra la fila: queda en el historial marcada "cancelada", con las notas
+// del admin). Rechazar la vuelve al estado que tenía antes de la solicitud
+// (pre_cancel_estado, guardado por RequestCancellation) y avisa a quien la
+// pidió.
+func ResolveCancellation(c *gin.Context) {
+	id := c.Param("id")
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+	if reservation.Estado != models.EstadoSolicitudCancelacion {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta reserva no tiene una solicitud de cancelación pendiente."})
+		return
+	}
+
+	var input struct {
+		Decision string `json:"decision"` // "approve" | "decline"
+		Notas    string `json:"notas"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.Decision != "approve" && input.Decision != "decline" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "decision debe ser 'approve' o 'decline'"})
+		return
+	}
+
+	actor := createdByFromContext(c)
+
+	if input.Decision == "approve" {
+		var passengersCount int64
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
+		if passengersCount == 0 {
+			passengersCount = 1
+		}
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
+			Updates(map[string]interface{}{
+				"disponibilidad": gorm.Expr("disponibilidad + ?", passengersCount),
+				"vendidos":       gorm.Expr("vendidos - ?", passengersCount),
+			})
+		database.DB.Model(&reservation).Updates(map[string]interface{}{
+			"estado":            models.EstadoCancelada,
+			"cancelacion_notas": input.Notas,
+		})
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Update("estado", models.EstadoCancelada)
+
+		services.NotifyUserByCode(reservation.CreatedBy, actor, reservation.Agencia, "cancellation_approved", "Cancelación aprobada",
+			fmt.Sprintf("Se aprobó la cancelación de tu reserva del pedido %s y el cupo fue liberado", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
+	} else {
+		restoreEstado := reservation.PreCancelEstado
+		if restoreEstado == "" {
+			restoreEstado = models.EstadoConfirmada
+		}
+		database.DB.Model(&reservation).Updates(map[string]interface{}{
+			"estado":            restoreEstado,
+			"cancelacion_notas": input.Notas,
+		})
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Update("estado", restoreEstado)
+
+		services.NotifyUserByCode(reservation.CreatedBy, actor, reservation.Agencia, "cancellation_declined", "Cancelación rechazada",
+			fmt.Sprintf("Se rechazó la solicitud de cancelación de tu reserva del pedido %s", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
+	}
+
+	database.DB.First(&reservation, id)
 	c.JSON(http.StatusOK, reservation)
 }
 

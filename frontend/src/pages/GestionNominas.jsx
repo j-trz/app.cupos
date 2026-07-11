@@ -296,6 +296,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                 <TableHead>Tipo</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Agencia</TableHead>
+                <TableHead>Origen</TableHead>
                 <TableHead>Contacto</TableHead>
                 <TableHead>Email Contacto</TableHead>
                 <TableHead>Tel. Contacto</TableHead>
@@ -332,24 +333,21 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                     </Badge>
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">
+                    {agencyName(row.agencia)}
+                  </TableCell>
+                  <TableCell>
                     {row.originalAgency ? (
-                      <div className="flex flex-col gap-1">
-                        <span>{agencyName(row.agencia)}</span>
-                        <Badge variant="outline" className="w-fit text-[10px]">
-                          Cupo de {agencyName(row.originalAgency)}
-                        </Badge>
-                      </div>
+                      <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                        Cupo de {agencyName(row.originalAgency)}
+                      </Badge>
                     ) : product?.agencia && row.agencia && row.agencia !== product.agencia ? (
                       // Producto compartido (visibilidad multi-agencia, mismo
                       // stock): esta reserva la tomó otra agencia, no la dueña.
-                      <div className="flex flex-col gap-1">
-                        <span>{agencyName(row.agencia)}</span>
-                        <Badge variant="outline" className="w-fit text-[10px]">
-                          Compartido — reservado por otra agencia
-                        </Badge>
-                      </div>
+                      <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                        Compartido — otra agencia
+                      </Badge>
                     ) : (
-                      agencyName(row.agencia)
+                      <span className="text-zinc-300 dark:text-zinc-600">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>

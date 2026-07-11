@@ -250,6 +250,17 @@ class ReservationService {
     }
   }
 
+  // Aprobar o rechazar una solicitud de cancelación pendiente (solo admin)
+  static async resolveCancellation(id, decision, notas) {
+    try {
+      const result = await ApiClient.put(`/orders/${id}/cancel-request/resolve`, { decision, notas });
+      return result;
+    } catch (error) {
+      console.error(`Error resolving cancellation for ${id}:`, error);
+      throw error;
+    }
+  }
+
   // Add document to blocked reservation
   static async addDocContable(id, docData) {
     try {

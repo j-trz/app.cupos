@@ -8,7 +8,11 @@ export default function Modal({ title, open, onClose, children, size = 'md' }) {
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-3xl',
-    '3xl': 'max-w-4xl',
+    '2xl': 'max-w-4xl',
+    '3xl': 'max-w-5xl',
+    '4xl': 'max-w-6xl',
+    '5xl': 'max-w-7xl',
+    'full': 'max-w-[95vw]',
   };
 
   return createPortal(

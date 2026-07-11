@@ -14,7 +14,7 @@ import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { useAIPageContext } from '../../contexts/AIPageContext.jsx';
 
 export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
     const navigate = useNavigate();
     const { pageContext, dispatchUIActions } = useAIPageContext();
     const [messages, setMessages] = useState([]);
@@ -228,8 +228,8 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         <RotateCcw className="w-4 h-4" />
                     </button>
 
-                    {/* Configuración (solo admin) */}
-                    {user?.role === 'admin' && (
+                    {/* Configuración (requiere permiso de IA) */}
+                    {can('AI_UPDATE') && (
                         <button
                             onClick={() => window.location.href = '/config-ia'}
                             className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
