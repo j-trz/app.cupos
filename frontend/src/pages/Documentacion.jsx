@@ -836,7 +836,7 @@ export default function Documentacion() {
                     className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
                   >
                     <div className={card.className}>
-                      <div className="text-2xl h-7 w-7">{card.icon}</div>
+                      <card.icon className="h-7 w-7" />
                     </div>
                     <div className="font-semibold text-sm leading-tight text-slate-900 dark:text-slate-100">{card.title}</div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{card.desc}</div>

@@ -44,7 +44,7 @@ export default function TabsCharts({ principalPanel, salidaPanel, destinoCharts 
                 tab.content
               ) : (
                 <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  <div className="grid grid-cols-3 gap-6 sm:grid-cols-3">
                     {tab.charts.map((chart, idx) => (
                       <DashboardChart
                         key={chart.title + idx}
