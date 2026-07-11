@@ -1,6 +1,6 @@
 ﻿import { useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { BookOpen, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Bell, Download, Database, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, FileText, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TicketsPlane, MapPinHouse, BookOpen, Bot, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Bell, Download, Database, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, FileText, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useWhiteLabel } from '../contexts/WhiteLabelContext.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -821,22 +821,23 @@ export default function Documentacion() {
               <div>
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">¿Qué es este sistema?</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                  Es una plataforma integral para la gestión de <strong>cupos aéreos</strong> (bloqueos de asientos en vuelos).
-                  Permite al operador mayorista cargar, distribuir y controlar sus cupos, y a las agencias minoristas hacer reservas
-                  para sus clientes de forma simple, automatizada y segura.
+                  Es una plataforma integral para la gestión de <strong>cupos aéreos</strong>.
+                  Permite a las agencias, distribuir y controlar sus cupos, de forma simple, automatizada y segura.
                 </p>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-3 text-center gap-4 sm:grid-cols-3">
                 {[
-                  { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo.' },
-                  { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas.' },
-                  { icon: '🤖', title: 'IA integrada', desc: 'Asistente que procesa DNI y asiste en lenguaje natural.' },
+                  { icon: TicketsPlane, title: 'Cupos', desc: 'Gestión integral de cupos', className: 'flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'},
+                  { icon: MapPinHouse, title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus cupos.', className: 'flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'},
+                  { icon: Bot, title: 'IA integrada', desc: 'Agente que asiste a los usuarios en todo el proceso de reserva.', className: 'flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'},
                 ].map(card => (
                   <div
                     key={card.title}
                     className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
                   >
-                    <div className="text-2xl mb-1.5">{card.icon}</div>
+                    <div className={card.className}>
+                      <div className="text-2xl h-7 w-7">{card.icon}</div>
+                    </div>
                     <div className="font-semibold text-sm leading-tight text-slate-900 dark:text-slate-100">{card.title}</div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{card.desc}</div>
                   </div>
