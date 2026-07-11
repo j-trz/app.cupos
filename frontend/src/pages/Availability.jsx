@@ -64,14 +64,14 @@ export default function Availability() {
     }
   };
 
-  // Reutiliza el mismo endpoint que Solicitudes (ya scopeado por usuario/rol
-  // en el backend) y solo se queda con lo que está en bloqueo_temporal — acá
-  // se renderiza EXCLUSIVAMENTE destino + cuenta regresiva, nunca nombre,
-  // documento ni contacto del pasajero.
+  // Trae los bloqueos temporales de TODA la agencia (no solo los propios) —
+  // así, si un producto muestra 0 disponibilidad, cualquier usuario de la
+  // agencia sabe que hay un bloqueo de un compañero y puede especular con
+  // esperar. El backend ya devuelve EXCLUSIVAMENTE pedido + destino +
+  // vencimiento, nunca nombre, documento ni contacto del pasajero.
   const fetchBlockedReservations = async () => {
     try {
-      const result = await ReservationService.getRequests();
-      const blocked = (result.data || []).filter((item) => item.Estado === 'bloqueo_temporal');
+      const blocked = await ReservationService.getBlockedReservations();
       setBlockedReservations(blocked);
     } catch (error) {
       console.error('Error fetching blocked reservations:', error);
@@ -405,16 +405,18 @@ export default function Availability() {
         />
       </div>
 
-      {/* Bloqueos temporales propios — solo destino + cuenta regresiva, nunca
-          datos de pasajero, para que el usuario sepa si esperar o no. */}
+      {/* Bloqueos temporales de TODA la agencia — solo destino + cuenta
+          regresiva, nunca datos de pasajero, para que cualquier usuario sepa
+          que un cupo en 0 tiene un bloqueo de un compañero esperando
+          confirmación y pueda decidir si esperar o no. */}
       {blockedReservations.length > 0 && (
         <Card className="border-amber-200 bg-amber-50/40">
           <div className="flex items-center gap-2 border-b border-amber-200 px-6 py-4">
             <Clock3 className="h-4 w-4 text-amber-600" />
             <div>
-              <h2 className="text-sm font-semibold text-amber-900">Tus reservas con bloqueo temporal</h2>
+              <h2 className="text-sm font-semibold text-amber-900">Reservas bloqueadas temporalmente</h2>
               <p className="text-xs text-amber-700">
-                {blockedReservations.length} reserva{blockedReservations.length > 1 ? 's' : ''} esperando confirmación — el cupo se libera si vence.
+                {blockedReservations.length} reserva{blockedReservations.length > 1 ? 's' : ''} de tu agencia esperando confirmación — el cupo se libera si vence.
               </p>
             </div>
           </div>

@@ -715,6 +715,39 @@ func RequestCancellation(c *gin.Context) {
 	c.JSON(http.StatusOK, reservation)
 }
 
+// GetBlockedReservations devuelve las reservas en bloqueo_temporal de TODA la
+// agencia del usuario (no solo las que él mismo creó), para que cualquier
+// compañero de la agencia sepa que un cupo en 0 en realidad tiene un bloqueo
+// esperando confirmación y pueda especular con esperar. Admin ve las de todas
+// las agencias. Por eso mismo, expone EXCLUSIVAMENTE lo mínimo indispensable
+// (pedido, destino, vencimiento) — nunca nombre, documento ni contacto del
+// pasajero de otra persona.
+func GetBlockedReservations(c *gin.Context) {
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoBloqueoTemporal)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = LOWER(?)", agencia)
+	}
+
+	var reservations []models.Reservation
+	query.Order("bloqueo_expira_at asc").Find(&reservations)
+
+	result := make([]gin.H, len(reservations))
+	for i, r := range reservations {
+		result[i] = gin.H{
+			"id":                r.ID,
+			"pedido_id":         r.PedidoID,
+			"vuelo_destino":     r.VueloDestino,
+			"bloqueo_expira_at": r.BloqueoExpiraAt,
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
+}
+
 func GetReservationByID(c *gin.Context) {
 	id := c.Param("id")
 	var reservation models.Reservation

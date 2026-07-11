@@ -107,6 +107,7 @@ func main() {
 			orders := protected.Group("/orders")
 			{
 				orders.GET("/", handlers.GetAllReservations)
+				orders.GET("/blocked", handlers.GetBlockedReservations)
 				orders.POST("/", handlers.CreateReservation)
 				orders.GET("/:id", handlers.GetReservationByID)
 				orders.PUT("/:id", handlers.UpdateReservation)

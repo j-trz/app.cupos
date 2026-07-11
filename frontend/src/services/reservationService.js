@@ -196,6 +196,19 @@ class ReservationService {
     };
   }
 
+  // Reservas en bloqueo_temporal de TODA la agencia (no solo las propias) —
+  // el backend ya filtra por agencia y solo devuelve pedido/destino/vencimiento,
+  // nunca datos del pasajero de otro usuario.
+  static async getBlockedReservations() {
+    const result = await ApiClient.get('/orders/blocked');
+    return toArray(result).map((r) => ({
+      id: r.id,
+      Pedido_ID: r.pedido_id,
+      Vuelo_Destino: r.vuelo_destino,
+      Bloqueo_Expira_At: r.bloqueo_expira_at,
+    }));
+  }
+
   static async getConfirmations() {
     const result = await ApiClient.get('/orders');
     const all = toArray(result);
