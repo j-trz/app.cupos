@@ -10,7 +10,11 @@ const DEFAULT_CONFIG = {
         contact_email: '',
         slogan: '',
         logoUrl: '',
-        faviconUrl: ''
+        faviconUrl: '',
+        phone: '',
+        address: '',
+        pdf_footer_message: '¡Estimado pasajero, le deseamos un muy buen viaje! Verificá los requisitos de documentación (visas y vacunas) antes de partir.',
+        pdf_show_logo: true,
     },
     colors: {
         primary: '#3b82f6',

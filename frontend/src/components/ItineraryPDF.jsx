@@ -33,6 +33,11 @@ export default function ItineraryPDF({ reservation, passengers = [], product, vu
   const agencyEmail = config?.identity?.contact_email || '';
   const agencySlogan = config?.identity?.slogan || '';
   const logoUrl = config?.identity?.logoUrl || '';
+  const agencyPhone = config?.identity?.phone || '';
+  const agencyAddress = config?.identity?.address || '';
+  const pdfFooterMessage = config?.identity?.pdf_footer_message || 
+    `Estimado cliente, te deseamos un muy buen viaje!\nFavor verificá la documentación con la cual estarás viajando (visas y vacunas si fueran necesarias).\nNo olvides solicitarle a tu asesor que ingrese tu número de viajero frecuente en la reserva.\nTe aconsejamos hacer el web check-in con anticipación.\n¡Gracias por elegirnos!`;
+  const pdfShowLogo = config?.identity?.pdf_show_logo !== false;
 
   // Resolver vuelos
   let vuelos = [];
@@ -122,7 +127,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product, vu
         {/* Header con branding */}
         <div className="header">
           <div className="flex items-center gap-4">
-            {logoUrl ? (
+            {pdfShowLogo && logoUrl ? (
               <img src={logoUrl} alt={agencyName} className="agency-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             ) : (
               <div style={{ width: 60, height: 60, background: 'rgba(255,255,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>✈️</div>
@@ -130,7 +135,9 @@ export default function ItineraryPDF({ reservation, passengers = [], product, vu
             <div className="agency-info">
               {agencyName && <div className="agency-name">{agencyName}</div>}
               {agencyEmail && <div className="agency-sub">{agencyEmail}</div>}
-              {agencySlogan && <div className="agency-sub">{agencySlogan}</div>}
+              {agencyPhone && <div className="agency-sub">Tel: {agencyPhone}</div>}
+              {agencyAddress && <div className="agency-sub">{agencyAddress}</div>}
+              {agencySlogan && <div className="agency-sub" style={{ fontStyle: 'italic', opacity: 0.85 }}>{agencySlogan}</div>}
             </div>
           </div>
           <div className="title-block">
@@ -208,12 +215,8 @@ export default function ItineraryPDF({ reservation, passengers = [], product, vu
         {/* Footer */}
         <div className="footer">
           <div className="footer-title">Información general</div>
-          <div className="footer-text">
-            Estimado cliente, te deseamos un muy buen viaje!<br />
-            Favor verificá la documentación con la cual estarás viajando (visas y vacunas si fueran necesarias).<br />
-            No olvides solicitarle a tu asesor que ingrese tu número de viajero frecuente en la reserva.<br />
-            Te aconsejamos hacer el web check-in con anticipación.{' '}
-            <strong>¡Gracias por elegirnos!</strong>
+          <div className="footer-text" style={{ whiteSpace: 'pre-line' }}>
+            {pdfFooterMessage}
           </div>
         </div>
       </div>
