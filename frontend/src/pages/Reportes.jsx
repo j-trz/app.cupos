@@ -25,26 +25,6 @@ const Reportes = () => {
   const { user, can } = useAuth();
   const isAdmin = can('REPORTS_VIEW');
 
-  if (!isAdmin) {
-    return (
-      <div className="container p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-muted-foreground" />
-              Acceso Restringido
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Esta sección es solo para administradores. Contacte a su administrador si necesita acceder a reportes.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   // Todos los estados del cockpit ejecutivo
   const [fields, setFields] = useState([]);
   const [filters, setFilters] = useState({ 'Tipo de operación': '' });
@@ -377,6 +357,32 @@ const Reportes = () => {
   useEffect(() => {
     handleUpdate();
   }, []);
+
+  // El guard de acceso va DESPUÉS de todos los hooks (nunca antes): can()
+  // depende de permisos que cargan async en AuthContext, así que isAdmin
+  // puede pasar de false a true entre renders — si el guard cortara antes de
+  // declarar los hooks de abajo, React los llamaría 0 veces en el primer
+  // render y luego 20+ de golpe al habilitarse, violando las reglas de
+  // hooks y corrompiendo el estado (esto rompió la pantalla en producción).
+  if (!isAdmin) {
+    return (
+      <div className="container p-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              Acceso Restringido
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Esta sección es solo para administradores. Contacte a su administrador si necesita acceder a reportes.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-6">

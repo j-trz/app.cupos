@@ -379,19 +379,6 @@ export default function Availability() {
         <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
 
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white shadow-sm shrink-0">
-                <Plane className="h-4 w-4" />
-              </span>
-              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-300">Consulta de Asientos</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Buscá y Reservá Cupos Aéreos</h1>
-            <p className="max-w-xl text-sm text-slate-300">
-              Catálogo de vuelos disponibles. Podés filtrar por temporada y gestionar las reservas directamente desde aquí en un solo click.
-            </p>
-          </div>
-
           <div className="flex items-center gap-3">
             <button
               onClick={refresh}
@@ -405,7 +392,7 @@ export default function Availability() {
         </div>
 
         {/* Estadísticas integradas en el Hero como cards translúcidas */}
-        <div className="grid gap-4 mt-8 grid-cols-1 sm:grid-cols-3 relative z-10">
+        <div className="grid gap-4 mt-8 grid-cols-3 sm:grid-cols-3 relative z-10">
           {[
             {
               icon: BarChart3,

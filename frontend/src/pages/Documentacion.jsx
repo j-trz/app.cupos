@@ -921,15 +921,15 @@ export default function Documentacion() {
                       Aquí encontrarás instrucciones detalladas paso a paso para operar con éxito y sin necesidad de capacitación previa.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                  <div className="grid grid-cols-3 sm:grid-cols-3 gap-4 pt-4">
                     {[
                       { icon: TicketsPlane, title: 'Cupos Aéreos', desc: 'Consultá disponibilidad y reservá al instante.' },
                       { icon: MapPinHouse, title: 'Agencias', desc: 'Operá de manera independiente y segura.' },
-                      { icon: Bot, title: 'Asistente IA', desc: 'Asistencia en lenguaje natural y lectura de DNI.' },
+                      { icon: Bot, title: 'Asistente IA', desc: 'Asistencia en lenguaje natural y lectura de Documentos.' },
                     ].map((card, i) => (
                       <div
                         key={i}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm hover:bg-white/10 transition-colors duration-200"
+                        className="flex flex-col items-center text-center rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm hover:bg-white/10 transition-colors duration-200"
                       >
                         <card.icon className="h-5 w-5 text-zinc-300 mb-2" />
                         <div className="font-semibold text-sm leading-tight text-white">{card.title}</div>

@@ -16,7 +16,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -59,7 +59,7 @@ const GestionProductos = () => {
   // agencia, también trae lo que YO cedí a otra agencia (source_agency) —
   // así la agencia cedente sigue viendo y gestionando lo que dio, aunque en
   // Disponibilidad (reserva real) ya no le aparezca.
-  const { data: productsResult, isLoading, isError } = useProducts({ search: searchTerm, scope: 'management' });
+  const { data: productsResult, isLoading, isError, isFetching } = useProducts({ search: searchTerm, scope: 'management' });
 
   if (!can('PRODUCTS_VIEW')) {
     return (
@@ -284,6 +284,14 @@ const GestionProductos = () => {
         icon={Package}
         action={
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+              disabled={isFetching}
+              title="Actualizar catálogo"
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
             <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
               <Download className="h-4 w-4 mr-2" />
               Descargar Plantilla
