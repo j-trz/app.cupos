@@ -164,10 +164,12 @@ func CreateTransfer(c *gin.Context) {
 	database.DB.First(&product, input.ProductID)
 
 	createdByPtr := &createdBy
-	services.NotifyAgency(targetAgency, createdByPtr, "info", "Recibiste una cesión de disponibilidad",
-		fmt.Sprintf("La agencia %s te cedió %d cupos del producto %s hacia %s", sourceAgency, input.Quantity, product.CodigoCupo, product.Destino))
-	services.NotifyRole("admin", createdByPtr, "info", "Nueva cesión entre agencias",
-		fmt.Sprintf("%s cedió %d cupos de %s a %s", sourceAgency, input.Quantity, product.CodigoCupo, targetAgency))
+	services.NotifyAgencyByCode(targetAgency, createdByPtr, "transfer_received", "Recibiste una cesión de disponibilidad",
+		fmt.Sprintf("La agencia %s te cedió %d cupos del producto %s hacia %s", sourceAgency, input.Quantity, product.CodigoCupo, product.Destino),
+		map[string]string{"agencia_origen": sourceAgency, "cantidad": fmt.Sprintf("%d", input.Quantity), "codigo_cupo": product.CodigoCupo, "destino": product.Destino})
+	services.NotifyRoleByCode("admin", createdByPtr, "transfer_new_between_agencies", "Nueva cesión entre agencias",
+		fmt.Sprintf("%s cedió %d cupos de %s a %s", sourceAgency, input.Quantity, product.CodigoCupo, targetAgency),
+		map[string]string{"agencia_origen": sourceAgency, "cantidad": fmt.Sprintf("%d", input.Quantity), "codigo_cupo": product.CodigoCupo, "agencia_destino": targetAgency})
 
 	c.JSON(http.StatusCreated, gin.H{
 		"transfer":     transfer,

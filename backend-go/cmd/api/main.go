@@ -187,10 +187,6 @@ func main() {
 				ai.PUT("/providers/:id", middleware.AdminOnly(), handlers.UpdateAIProvider)
 				ai.DELETE("/providers/:id", middleware.AdminOnly(), handlers.DeleteAIProvider)
 				ai.POST("/providers/:id/test", middleware.AdminOnly(), handlers.TestAIProvider)
-				ai.GET("/actions", handlers.ListAIActions)
-				ai.POST("/actions", middleware.AdminOnly(), handlers.CreateAIAction)
-				ai.PUT("/actions/:id", middleware.AdminOnly(), handlers.UpdateAIAction)
-				ai.DELETE("/actions/:id", middleware.AdminOnly(), handlers.DeleteAIAction)
 				ai.GET("/sessions", handlers.ListAISessions)
 				ai.GET("/sessions/:id/messages", handlers.GetSessionMessages)
 				ai.DELETE("/sessions/:id", handlers.DeleteSession)
@@ -299,6 +295,14 @@ func main() {
 				emailConfig.GET("/templates", handlers.GetEmailTemplates)
 				emailConfig.PUT("/templates/:id", handlers.UpdateEmailTemplate)
 				emailConfig.GET("/templates/:id/preview", handlers.PreviewEmailTemplate)
+			}
+
+			// Plantillas de notificaciones in-app (campana), por agencia
+			notificationConfig := protected.Group("/notification-config")
+			{
+				notificationConfig.GET("/templates", handlers.GetNotificationTemplates)
+				notificationConfig.PUT("/templates/:id", handlers.UpdateNotificationTemplate)
+				notificationConfig.GET("/templates/:id/preview", handlers.PreviewNotificationTemplate)
 			}
 		}
 	}

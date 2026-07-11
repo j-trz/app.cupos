@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, X, Palette, Globe, Clock } from 'lucide-react';
+import { Settings as SettingsIcon, Save, X, Palette, Globe, Clock, Bot } from 'lucide-react';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
@@ -138,6 +138,35 @@ export default function Settings() {
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Tiempo que una reserva permanece bloqueada antes de expirar si no se confirma
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              Asistente IA
+            </CardTitle>
+            <CardDescription>
+              Parámetros del chat con el asistente IA
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="ai_historial_horas">Retención de historial de chat (horas)</Label>
+              <Input
+                id="ai_historial_horas"
+                type="number"
+                min="1"
+                value={settings.ai_historial_horas || '4'}
+                onChange={(e) => handleChange('ai_historial_horas', e.target.value)}
+                placeholder="4"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tiempo que se conserva el historial de mensajes de una sesión de chat antes de borrarse automáticamente
               </p>
             </div>
           </CardContent>

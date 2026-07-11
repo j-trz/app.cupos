@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -44,9 +45,9 @@ func InitDB() {
 		&models.RolePermission{},
 		&models.EmailSMTPConfig{},
 		&models.EmailTemplate{},
+		&models.NotificationTemplate{},
 		&models.SystemLog{},
 		&models.AIProvider{},
-		&models.AIAction{},
 		&models.AISession{},
 		&models.AIMessage{},
 		&models.ProductSharedAgency{},
@@ -56,8 +57,28 @@ func InitDB() {
 	runSQLMigrations(db)
 
 	seedEmailTemplates(db)
+	seedSystemSettings(db)
+	seedNotificationTemplates(db)
 
 	DB = db
+}
+
+// seedSystemSettings crea los ajustes globales por defecto si todavía no
+// existen, para que ListSettings/Settings.jsx los muestre desde el primer
+// arranque y GetIntSetting tenga algo que leer aunque nadie los haya tocado.
+func seedSystemSettings(db *gorm.DB) {
+	defaults := map[string]interface{}{
+		"bloqueo_minutos_default": 60,
+		"ai_historial_horas":      4,
+	}
+	for key, value := range defaults {
+		var count int64
+		db.Model(&models.SystemSetting{}).Where("key = ?", key).Count(&count)
+		if count == 0 {
+			valueJSON, _ := json.Marshal(value)
+			db.Create(&models.SystemSetting{Key: key, Value: valueJSON})
+		}
+	}
 }
 
 // seedEmailTemplates crea las plantillas globales por defecto (AgencyID = nil)
@@ -106,6 +127,55 @@ func seedEmailTemplates(db *gorm.DB) {
 	for _, tpl := range defaults {
 		var count int64
 		db.Model(&models.EmailTemplate{}).Where("code = ? AND agency_id IS NULL", tpl.Code).Count(&count)
+		if count == 0 {
+			db.Create(&tpl)
+		}
+	}
+}
+
+// seedNotificationTemplates crea las plantillas globales de notificaciones
+// in-app (campana) con el mismo texto que los handlers armaban antes a mano
+// con fmt.Sprintf, para que un admin las pueda editar desde
+// NotificationTemplates.jsx sin que cambie el comportamiento por defecto.
+func seedNotificationTemplates(db *gorm.DB) {
+	defaults := []models.NotificationTemplate{
+		{Code: "new_request", Name: "Nueva reserva creada", Title: "Nueva reserva creada",
+			Message: "Agencia {{agencia}} creó la reserva {{pasajero}} (pedido {{pedido_id}})"},
+		{Code: "low_availability", Name: "Baja disponibilidad", Title: "Baja disponibilidad",
+			Message: "El producto {{codigo_cupo}} hacia {{destino}} quedó con {{disponibilidad}} cupos disponibles"},
+		{Code: "request_confirmed_admin", Name: "Reserva confirmada (aviso a admin)", Title: "Reserva confirmada",
+			Message: "La reserva {{pasajero}} (pedido {{pedido_id}}) fue confirmada"},
+		{Code: "request_confirmed_user", Name: "Reserva confirmada (aviso al usuario)", Title: "Tu reserva fue confirmada",
+			Message: "Tu reserva del pedido {{pedido_id}} fue confirmada"},
+		{Code: "reservation_deleted", Name: "Reserva eliminada", Title: "Reserva eliminada",
+			Message: "Se eliminó la reserva del pedido {{pedido_id}} y se liberó el cupo"},
+		{Code: "passenger_deleted", Name: "Pasajero eliminado", Title: "Pasajero eliminado",
+			Message: "Se eliminó a {{nombre}} {{apellido}} del pedido {{pedido_id}} y se liberó su lugar"},
+		{Code: "cancellation_pending", Name: "Solicitud de cancelación pendiente", Title: "Solicitud de cancelación pendiente",
+			Message: "La reserva del pedido {{pedido_id}} tiene una solicitud de cancelación pendiente de revisión"},
+		{Code: "passenger_duplicated", Name: "Pasajero duplicado", Title: "Pasajero duplicado",
+			Message: "Se agregó un pasajero duplicado de {{nombre}} {{apellido}} al pedido {{pedido_id}}"},
+		{Code: "passenger_added", Name: "Pasajero agregado", Title: "Pasajero agregado",
+			Message: "Se agregó un nuevo pasajero al pedido {{pedido_id}}"},
+		{Code: "new_product", Name: "Nuevo producto disponible", Title: "Nuevo producto disponible",
+			Message: "Se agregó el producto {{codigo_cupo}} hacia {{destino}} ({{compania}})"},
+		{Code: "new_product_bulk", Name: "Nuevos productos disponibles (carga masiva)", Title: "Nuevos productos disponibles",
+			Message: "Se agregaron {{cantidad}} productos nuevos a disponibilidad"},
+		{Code: "reservation_expiring_soon", Name: "Reserva por vencer", Title: "Tu reserva está por vencer",
+			Message: "La reserva del pedido {{pedido_id}} vence en menos de {{minutos}} minutos. Confirmala o el cupo se liberará automáticamente."},
+		{Code: "reservation_expired_user", Name: "Reserva expirada (aviso al usuario)", Title: "Tu reserva expiró",
+			Message: "La reserva del pedido {{pedido_id}} expiró por vencimiento del bloqueo temporal y el cupo fue liberado."},
+		{Code: "reservation_expired_admin", Name: "Reserva expirada (aviso a admin)", Title: "Reserva expirada",
+			Message: "La reserva del pedido {{pedido_id}} (agencia {{agencia}}) expiró automáticamente por vencimiento de bloqueo"},
+		{Code: "transfer_received", Name: "Cesión recibida", Title: "Recibiste una cesión de disponibilidad",
+			Message: "La agencia {{agencia_origen}} te cedió {{cantidad}} cupos del producto {{codigo_cupo}} hacia {{destino}}"},
+		{Code: "transfer_new_between_agencies", Name: "Nueva cesión entre agencias (aviso a admin)", Title: "Nueva cesión entre agencias",
+			Message: "{{agencia_origen}} cedió {{cantidad}} cupos de {{codigo_cupo}} a {{agencia_destino}}"},
+	}
+
+	for _, tpl := range defaults {
+		var count int64
+		db.Model(&models.NotificationTemplate{}).Where("code = ? AND agency_id IS NULL", tpl.Code).Count(&count)
 		if count == 0 {
 			db.Create(&tpl)
 		}

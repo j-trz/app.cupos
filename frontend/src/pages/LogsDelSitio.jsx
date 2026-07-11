@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { ScrollText, Search, RefreshCw, AlertTriangle, XCircle } from 'lucide-react';
+import { ScrollText, Search, RefreshCw, AlertTriangle, XCircle, Globe, Clock3, Mail, Bot, ChevronDown, ChevronRight } from 'lucide-react';
 import Swal from 'sweetalert2';
 import LogService from '../services/logService';
 import Button from '../components/ui/Button.jsx';
@@ -13,6 +13,11 @@ import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../compo
 const LEVEL_BADGE = { info: 'info', warning: 'warning', error: 'danger' };
 const LEVEL_LABEL = { info: 'Info', warning: 'Warning', error: 'Error' };
 
+// Traduce las fuentes internas (nombres de módulo en inglés) a algo legible
+// para un admin sin conocimiento técnico, con un ícono para escanear rápido.
+const SOURCE_LABEL = { http: 'Solicitud web', cron: 'Tarea automática', email: 'Envío de email', ai: 'Asistente IA' };
+const SOURCE_ICON = { http: Globe, cron: Clock3, email: Mail, ai: Bot };
+
 export default function LogsDelSitio() {
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
@@ -24,6 +29,7 @@ export default function LogsDelSitio() {
     const [endDate, setEndDate] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0 });
+    const [expandedId, setExpandedId] = useState(null);
 
     useEffect(() => {
         if (isAdmin) fetchLogs();
@@ -158,28 +164,54 @@ export default function LogsDelSitio() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                logs.map((log) => (
-                                    <TableRow key={log.id}>
-                                        <TableCell className="text-center text-sm text-slate-600 whitespace-nowrap">
-                                            {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant={LEVEL_BADGE[log.level] || 'default'}>
-                                                {LEVEL_LABEL[log.level] || log.level}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center text-sm text-slate-600">{log.source || '—'}</TableCell>
-                                        <TableCell className="text-center text-sm text-slate-600">{log.method || '—'}</TableCell>
-                                        <TableCell className="text-center text-sm font-mono text-slate-700 max-w-xs truncate">{log.path || '—'}</TableCell>
-                                        <TableCell className="text-center text-sm text-slate-600">{log.status_code || '—'}</TableCell>
-                                        <TableCell className="text-left text-sm text-slate-600 max-w-md truncate" title={log.message}>
-                                            {log.message || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-center text-sm text-slate-600">
-                                            {log.duration_ms != null ? `${log.duration_ms} ms` : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                logs.map((log) => {
+                                    const SourceIcon = SOURCE_ICON[log.source];
+                                    const isExpanded = expandedId === log.id;
+                                    const hasDetails = !!log.details;
+                                    return (
+                                        <Fragment key={log.id}>
+                                            <TableRow
+                                                className={hasDetails ? 'cursor-pointer' : ''}
+                                                onClick={() => hasDetails && setExpandedId(isExpanded ? null : log.id)}
+                                            >
+                                                <TableCell className="text-center text-sm text-slate-600 whitespace-nowrap">
+                                                    {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Badge variant={LEVEL_BADGE[log.level] || 'default'}>
+                                                        {LEVEL_LABEL[log.level] || log.level}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-center text-sm text-slate-600">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        {SourceIcon && <SourceIcon className="h-3.5 w-3.5 text-slate-400" />}
+                                                        {SOURCE_LABEL[log.source] || log.source || '—'}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-center text-sm text-slate-600">{log.method || '—'}</TableCell>
+                                                <TableCell className="text-center text-sm font-mono text-slate-700 max-w-xs truncate">{log.path || '—'}</TableCell>
+                                                <TableCell className="text-center text-sm text-slate-600">{log.status_code || '—'}</TableCell>
+                                                <TableCell className="text-left text-sm text-slate-600 max-w-md truncate">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        {hasDetails && (isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />)}
+                                                        <span className="truncate" title={log.message}>{log.message || '—'}</span>
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-center text-sm text-slate-600">
+                                                    {log.duration_ms != null ? `${log.duration_ms} ms` : '—'}
+                                                </TableCell>
+                                            </TableRow>
+                                            {isExpanded && (
+                                                <TableRow>
+                                                    <TableCell colSpan={8} className="bg-slate-50 text-left">
+                                                        <div className="text-xs font-medium text-slate-500 mb-1">Detalle técnico</div>
+                                                        <pre className="text-xs font-mono text-slate-700 whitespace-pre-wrap break-all">{log.details}</pre>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </Fragment>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </TableComponent>

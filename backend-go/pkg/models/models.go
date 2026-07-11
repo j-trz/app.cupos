@@ -302,6 +302,23 @@ type EmailTemplate struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 }
 
+// NotificationTemplate permite personalizar el título/mensaje de las
+// notificaciones internas (campana in-app), análogo a EmailTemplate pero para
+// NotifyUser/NotifyRole/NotifyAgency/NotifyBroadcast en vez de emails.
+type NotificationTemplate struct {
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Code      string     `gorm:"not null;index" json:"code"`
+	Name      string     `json:"name"`
+	Title     string     `json:"title"`
+	Message   string     `json:"message"`
+	Icon      string     `json:"icon"`
+	Color     string     `json:"color"`
+	Priority  string     `json:"priority"`
+	AgencyID  *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
 type AIProvider struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name         string    `gorm:"unique;not null" json:"name"`
@@ -317,19 +334,6 @@ type AIProvider struct {
 	IsDefault    bool      `gorm:"default:false" json:"is_default"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type AIAction struct {
-	ID          uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Name        string         `gorm:"unique;not null" json:"name"`
-	Description string         `json:"description"`
-	ActionType  string         `gorm:"column:action_type;default:'api_call'" json:"action_type"`
-	Endpoint    string         `json:"endpoint"`
-	Method      string         `gorm:"default:'GET'" json:"method"`
-	Parameters  datatypes.JSON `json:"parameters"`
-	IsActive    bool           `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 type AISession struct {

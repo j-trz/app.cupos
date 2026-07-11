@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -91,16 +92,25 @@ func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
 		roleDesc = "Agente de viajes"
 	}
 
-	permisos := `Puedes ayudar con:
-- Buscar productos/cupos disponibles y verificar disponibilidad
-- Ver tus propias reservas
-- Crear nuevas reservas
-- Leer múltiples documentos de identidad (DNI, pasaportes) simultáneamente para extraer datos de pasajeros y realizar reservas masivas`
+	permisos := `PODÉS HACER (si te preguntan "qué podés hacer" / "qué sabés hacer", respondé con una lista COMPLETA y concreta basada en esto — nunca una respuesta vaga tipo "puedo ayudarte con reservas", nunca digas que no podés cambiar de pantalla o ejecutar acciones si más abajo figura que sí podés):
+- Buscar productos/cupos disponibles por destino, compañía, tipo o código, y decirte la disponibilidad real
+- Ver el detalle de tus propias reservas (fechas, estado, pasajeros, ficha, ticket)
+- Crear una reserva nueva de punta a punta vos mismo, sin que el usuario tenga que tocar ningún formulario
+- Abrir el formulario real de reserva en la pantalla del usuario y completarlo con los pasajeros que me indique (o que extraiga de una foto de DNI/pasaporte), para que él lo revise y confirme con su propio botón
+- Leer fotos de documentos de identidad (DNI, pasaporte) — incluso varias juntas — para extraer nombre, apellido, documento, nacionalidad y fecha de nacimiento de cada pasajero
+- Llevar al usuario a cualquier otra pantalla de la aplicación que me pida ver
+
+NO PODÉS HACER (si te preguntan, decilo con total claridad, no lo disimules ni des vueltas):
+- Cambiar configuración del sistema, precios de productos, o datos de otros usuarios/agencias
+- Modificar, corregir o eliminar una reserva ya creada (solo la podés crear; para editarla el usuario tiene que ir a la pantalla correspondiente)
+- Ver reservas o datos de un usuario/agencia que no sea la del usuario que te está hablando`
 
 	if u.Role == "admin" || u.Role == "agency_admin" {
 		permisos += `
+
+ADEMÁS, por tu rol también PODÉS:
 - Ver TODAS las reservas de tu agencia (y las que gestionás por cesión/compartidas, si sos agency_admin) o del sistema entero (si sos admin)
-- Confirmar o cancelar cualquier reserva
+- Confirmar cualquier reserva
 - Ver estadísticas, reportes y la rentabilidad (ventas, costos y margen)
 
 FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
@@ -110,8 +120,9 @@ FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 	}
 	if u.Role == "admin" {
 		permisos += `
-- Gestionar usuarios (crear, editar, desactivar)
-- Acceso completo a configuración del sistema`
+- Cancelar/eliminar cualquier reserva del sistema
+- Buscar usuarios del sistema
+- (Por chat NO podés crear/editar usuarios ni tocar configuración del sistema — eso se hace desde las pantallas de administración, no puedo ejecutarlo yo)`
 	}
 
 	// CONTEXTO DE PANTALLA — se arma solo si el frontend mandó pageContext en
@@ -142,7 +153,14 @@ CONTEXTO DE PANTALLA ACTUAL (IMPORTANTE):
 			pageCtx.Page, items.String())
 	}
 
+	agenciaLabel := u.Agencia
+	if agenciaLabel == "" {
+		agenciaLabel = "tu agencia"
+	}
+
 	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Eres directo, resolutivo y evitas pedir información que ya puedes obtener del sistema.
+
+PERSONA (IMPORTANTE): actuás como un compañero de trabajo más de "%s" — no como un proveedor externo, un bot de soporte genérico, ni un vendedor. Hablá como alguien de adentro de esa agencia: usá "nuestros cupos", "nuestras reservas", "tu agencia" con naturalidad, y mostrá que conocés el contexto de con quién estás hablando (su nombre, su rol). Mantené igual el mismo profesionalismo y las reglas de seguridad de abajo — ser cercano no significa aflojar ninguna restricción de datos.
 
 USUARIO ACTUAL:
 - Nombre: %s
@@ -198,6 +216,12 @@ LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Confirma los datos extraídos brevemente y úsalos para la reserva sin pedir más.
 - Si hay CONTEXTO DE PANTALLA con el formulario de reserva disponible, preferí llamar a completar_formulario_pasajeros con los datos extraídos (así el usuario ve y confirma el formulario ya completado) en vez de crear_reserva directo, salvo que el usuario haya pedido explícitamente que reserves sin confirmar nada.
 
+NAVEGACIÓN ENTRE PANTALLAS (IMPORTANTE):
+- Si el usuario pide ir a, ver, o que le muestres otra sección de la app (ej. "llevame a confirmaciones", "mostrame mis solicitudes", "andá a disponibilidad"), llamá a navegar_a_pantalla — nunca respondas que no podés cambiar de pantalla, esa herramienta existe justamente para eso.
+- Esto funciona sin importar en qué pantalla esté el usuario ahora mismo (a diferencia de abrir_modal_reserva/completar_formulario_pasajeros, que necesitan que la pantalla de destino ya esté abierta).
+- Si además de navegar el usuario pidió hacer algo en la pantalla de destino (ej. "llevame a disponibilidad y reservame la primera opción" sin estar ya ahí), navegá primero, confirmale que ya lo llevaste, y pedile que repita el pedido puntual una vez ahí — no intentes encadenar abrir_modal_reserva en el mismo turno porque la pantalla nueva todavía no cargó.
+- Si el usuario no tiene acceso a esa pantalla, navegar_a_pantalla te lo va a decir — explicáselo con amabilidad, no insistas.
+
 MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Tienes acceso al historial completo de esta sesión.
 - NO repitas preguntas que ya fueron respondidas en turnos anteriores.
@@ -207,7 +231,7 @@ MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 %s
 
 Responde siempre en español, de forma clara y concisa.`,
-		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection)
+		agenciaLabel, u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection)
 }
 
 // ─────────────────────────────────────────────
@@ -215,12 +239,12 @@ Responde siempre en español, de forma clara y concisa.`,
 // ─────────────────────────────────────────────
 
 type ToolParam struct {
-	Type        string            `json:"type"`
-	Description string            `json:"description,omitempty"`
+	Type        string               `json:"type"`
+	Description string               `json:"description,omitempty"`
 	Properties  map[string]ToolParam `json:"properties,omitempty"`
-	Items       *ToolParam        `json:"items,omitempty"`
-	Required    []string          `json:"required,omitempty"`
-	Enum        []string          `json:"enum,omitempty"`
+	Items       *ToolParam           `json:"items,omitempty"`
+	Required    []string             `json:"required,omitempty"`
+	Enum        []string             `json:"enum,omitempty"`
 }
 
 type ToolDef struct {
@@ -228,6 +252,51 @@ type ToolDef struct {
 	Description string    `json:"description"`
 	Parameters  ToolParam `json:"parameters"`
 }
+
+// knownPage es una pantalla a la que la IA puede navegar con el tool
+// navegar_a_pantalla — RequireRole vacío significa que cualquier rol
+// autenticado puede ir ahí.
+type knownPage struct {
+	Path        string
+	Label       string
+	RequireRole string // "" | "admin" | "admin_or_agency_admin"
+}
+
+var knownPages = map[string]knownPage{
+	"dashboard":             {Path: "/dashboard", Label: "Dashboard"},
+	"disponibilidad":        {Path: "/availability", Label: "Disponibilidad"},
+	"solicitudes":           {Path: "/requests", Label: "Solicitudes"},
+	"confirmaciones":        {Path: "/confirmations", Label: "Confirmaciones"},
+	"documentacion":         {Path: "/documentacion/disponibilidad", Label: "Documentación"},
+	"perfil":                {Path: "/profile", Label: "Perfil"},
+	"notificaciones":        {Path: "/notificaciones", Label: "Notificaciones"},
+	"productos":             {Path: "/productos", Label: "Gestión de Productos", RequireRole: "admin"},
+	"agencias":              {Path: "/agencias", Label: "Gestión de Agencias", RequireRole: "admin"},
+	"reservas":              {Path: "/reservas", Label: "Gestión de Reservas", RequireRole: "admin"},
+	"nominas":               {Path: "/nominas", Label: "Nóminas", RequireRole: "admin"},
+	"reportes":              {Path: "/reportes", Label: "Reportes", RequireRole: "admin_or_agency_admin"},
+	"logs":                  {Path: "/logs", Label: "Logs del sitio", RequireRole: "admin"},
+	"usuarios":              {Path: "/usuarios", Label: "Gestión de Usuarios", RequireRole: "admin"},
+	"roles":                 {Path: "/roles", Label: "Roles", RequireRole: "admin"},
+	"permisos":              {Path: "/permisos", Label: "Permisos", RequireRole: "admin"},
+	"diseno":                {Path: "/marca-blanca", Label: "Diseño / White Label", RequireRole: "admin"},
+	"email":                 {Path: "/email-config", Label: "Configuración de Email", RequireRole: "admin"},
+	"config-notificaciones": {Path: "/notification-config", Label: "Plantillas de Notificaciones", RequireRole: "admin"},
+	"config-ia":             {Path: "/config-ia", Label: "Configuración de IA", RequireRole: "admin"},
+	"ajustes":               {Path: "/settings", Label: "Ajustes generales", RequireRole: "admin"},
+}
+
+// knownPageKeys deja fijo el orden de las claves de knownPages, para usarlo
+// como Enum del tool (evita que el modelo escriba variantes libres del
+// nombre de la pantalla) y en mensajes de error.
+var knownPageKeys = func() []string {
+	keys := make([]string, 0, len(knownPages))
+	for k := range knownPages {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}()
 
 func getTools(role string) []ToolDef {
 	tools := []ToolDef{
@@ -237,8 +306,8 @@ func getTools(role string) []ToolDef {
 			Parameters: ToolParam{
 				Type: "object",
 				Properties: map[string]ToolParam{
-					"query":   {Type: "string", Description: "Texto libre para buscar (destino, compañía, código)"},
-					"tipo":    {Type: "string", Description: "Tipo de producto: CUPOS, CHARTERS, DESTINO ARG"},
+					"query":            {Type: "string", Description: "Texto libre para buscar (destino, compañía, código)"},
+					"tipo":             {Type: "string", Description: "Tipo de producto: CUPOS, CHARTERS, DESTINO ARG"},
 					"solo_disponibles": {Type: "string", Enum: []string{"true", "false"}, Description: "Solo mostrar con disponibilidad > 0"},
 				},
 			},
@@ -260,13 +329,13 @@ func getTools(role string) []ToolDef {
 			Parameters: ToolParam{
 				Type: "object",
 				Properties: map[string]ToolParam{
-					"product_id":        {Type: "string", Description: "ID numérico del producto (obtenido de buscar_productos)"},
-					"contacto_nombre":   {Type: "string", Description: "Nombre completo del contacto/pasajero principal"},
-					"contacto_email":    {Type: "string", Description: "Email de contacto (opcional)"},
-					"contacto_telefono": {Type: "string", Description: "Teléfono de contacto (opcional)"},
-					"pasajero_nombre":   {Type: "string", Description: "Nombre del pasajero (del DNI si fue adjuntado)"},
-					"pasajero_apellido": {Type: "string", Description: "Apellido del pasajero (del DNI si fue adjuntado)"},
-					"pasajero_documento":{Type: "string", Description: "Número de documento del pasajero"},
+					"product_id":            {Type: "string", Description: "ID numérico del producto (obtenido de buscar_productos)"},
+					"contacto_nombre":       {Type: "string", Description: "Nombre completo del contacto/pasajero principal"},
+					"contacto_email":        {Type: "string", Description: "Email de contacto (opcional)"},
+					"contacto_telefono":     {Type: "string", Description: "Teléfono de contacto (opcional)"},
+					"pasajero_nombre":       {Type: "string", Description: "Nombre del pasajero (del DNI si fue adjuntado)"},
+					"pasajero_apellido":     {Type: "string", Description: "Apellido del pasajero (del DNI si fue adjuntado)"},
+					"pasajero_documento":    {Type: "string", Description: "Número de documento del pasajero"},
 					"pasajero_nacionalidad": {Type: "string", Description: "Nacionalidad del pasajero"},
 				},
 				Required: []string{"product_id", "contacto_nombre"},
@@ -319,6 +388,17 @@ func getTools(role string) []ToolDef {
 				},
 			},
 		},
+		{
+			Name:        "navegar_a_pantalla",
+			Description: "Lleva al usuario a otra pantalla de la aplicación (cambia de página). Usar cuando pida ir a, ver, o mostrar una sección de la app (ej. 'llevame a confirmaciones', 'mostrame mis solicitudes'). No sirve para abrir un modal dentro de la pantalla actual — para eso usar abrir_modal_reserva.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"pagina": {Type: "string", Enum: knownPageKeys, Description: "Clave de la pantalla destino"},
+				},
+				Required: []string{"pagina"},
+			},
+		},
 	}
 
 	if role == "admin" || role == "agency_admin" {
@@ -329,7 +409,7 @@ func getTools(role string) []ToolDef {
 				Parameters: ToolParam{
 					Type: "object",
 					Properties: map[string]ToolParam{
-						"estado": {Type: "string", Description: "Filtrar por estado"},
+						"estado":  {Type: "string", Description: "Filtrar por estado"},
 						"agencia": {Type: "string", Description: "Filtrar por agencia"},
 						"limit":   {Type: "string", Description: "Cantidad (default 20)"},
 					},
@@ -354,9 +434,9 @@ func getTools(role string) []ToolDef {
 				Name:        "confirmar_reserva",
 				Description: "Confirma una reserva cambiando su estado a 'confirmado'.",
 				Parameters: ToolParam{
-					Type:     "object",
+					Type:       "object",
 					Properties: map[string]ToolParam{"reserva_id": {Type: "string", Description: "ID de la reserva"}},
-					Required: []string{"reserva_id"},
+					Required:   []string{"reserva_id"},
 				},
 			},
 		)
@@ -378,9 +458,9 @@ func getTools(role string) []ToolDef {
 				Name:        "cancelar_reserva",
 				Description: "Cancela/elimina una reserva del sistema.",
 				Parameters: ToolParam{
-					Type:     "object",
+					Type:       "object",
 					Properties: map[string]ToolParam{"reserva_id": {Type: "string", Description: "ID de la reserva"}},
-					Required: []string{"reserva_id"},
+					Required:   []string{"reserva_id"},
 				},
 			},
 		)
@@ -645,7 +725,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 
 			blockMinutes := product.BloqueoTemporalMinutos
 			if blockMinutes <= 0 {
-				blockMinutes = 60
+				blockMinutes = services.GetIntSetting("bloqueo_minutos_default", 60)
 			}
 			expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
 			reserva.BloqueoExpiraAt = &expiresAt
@@ -947,6 +1027,36 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		}
 		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se completó el formulario con %d pasajero(s). El usuario ya lo puede revisar y confirmar.", len(pasajeros))})
 		return string(b)
+
+	case "navegar_a_pantalla":
+		// Tampoco toca la DB — solo le pide al frontend que cambie de ruta.
+		pageKey := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", args["pagina"])))
+		page, ok := knownPages[pageKey]
+		if !ok {
+			b, _ := json.Marshal(map[string]interface{}{"error": fmt.Sprintf("No reconozco esa pantalla ('%s'). Pantallas válidas: %s", pageKey, strings.Join(knownPageKeys, ", "))})
+			return string(b)
+		}
+
+		hasAccess := true
+		switch page.RequireRole {
+		case "admin":
+			hasAccess = u.Role == "admin"
+		case "admin_or_agency_admin":
+			hasAccess = u.Role == "admin" || u.Role == "agency_admin"
+		}
+		if !hasAccess {
+			b, _ := json.Marshal(map[string]interface{}{"error": fmt.Sprintf("El usuario no tiene acceso a la pantalla de %s.", page.Label)})
+			return string(b)
+		}
+
+		if uiActions != nil {
+			*uiActions = append(*uiActions, UIAction{
+				Type:    "navigate",
+				Payload: map[string]interface{}{"path": page.Path},
+			})
+		}
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Te llevé a la pantalla de %s.", page.Label)})
+		return string(b)
 	}
 
 	return `{"error": "Herramienta desconocida"}`
@@ -1095,10 +1205,10 @@ func callAnthropicFull(p models.AIProvider, systemPrompt string, messages []map[
 
 	var result struct {
 		Content []struct {
-			Type  string `json:"type"`
-			Text  string `json:"text"`
-			ID    string `json:"id"`
-			Name  string `json:"name"`
+			Type  string                 `json:"type"`
+			Text  string                 `json:"text"`
+			ID    string                 `json:"id"`
+			Name  string                 `json:"name"`
 			Input map[string]interface{} `json:"input"`
 		} `json:"content"`
 		StopReason string `json:"stop_reason"`
@@ -1289,11 +1399,12 @@ func Chat(c *gin.Context) {
 		isNewSession = true
 	}
 
-	const historyTTL = 4 * time.Hour
+	historyTTL := time.Duration(services.GetIntSetting("ai_historial_horas", 4)) * time.Hour
 	const maxHistoryMessages = 20 // pares usuario/asistente → 40 mensajes máx
 	const maxSessionMessages = 30 // trimear si la sesión supera este límite
 
-	// Auto-limpieza por TTL: borrar mensajes de esta sesión con más de 4 horas
+	// Auto-limpieza por TTL (configurable en Ajustes, ai_historial_horas): borrar
+	// mensajes de esta sesión más viejos que ese umbral
 	if sessionID != uuid.Nil {
 		cutoff := time.Now().Add(-historyTTL)
 		database.DB.Where("session_id = ? AND created_at < ?", sessionID, cutoff).Delete(&models.AIMessage{})
@@ -1594,9 +1705,10 @@ func Chat(c *gin.Context) {
 		if err == nil && pr != nil && pr.Content != "" {
 			finalContent = pr.Content
 		} else {
-			services.LogFailure("ai", fmt.Sprintf(
-				"Chat de IA terminó sin respuesta de texto tras %d tool call(s) (usuario %s, proveedor %s)",
-				len(toolCallsSummary), u.Email, provider.ProviderType))
+			services.LogFailure("ai",
+				fmt.Sprintf("El asistente IA no pudo responder a %s (agencia %s) después de varios intentos", u.Email, u.Agencia),
+				fmt.Sprintf("Chat de IA terminó sin respuesta de texto tras %d tool call(s) (usuario %s, proveedor %s)",
+					len(toolCallsSummary), u.Email, provider.ProviderType))
 		}
 	}
 
@@ -1651,7 +1763,7 @@ func Chat(c *gin.Context) {
 		"role":       "assistant",
 		"content":    finalContent,
 		"tool_calls": toolCallsSummary,
-		"ui_actions": uiActions, // Acciones que el frontend debe ejecutar (abrir modal, completar formulario) — ver AIPageContext.jsx
+		"ui_actions": uiActions,          // Acciones que el frontend debe ejecutar (abrir modal, completar formulario) — ver AIPageContext.jsx
 		"sessionId":  sessionID.String(), // Siempre retornar para que el frontend lo persista
 	})
 }
@@ -1782,7 +1894,9 @@ func callOpenAI(p models.AIProvider, message string) (string, error) {
 	}
 	var result struct {
 		Choices []struct {
-			Message struct{ Content string `json:"content"` } `json:"message"`
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
 		} `json:"choices"`
 	}
 	json.Unmarshal(respBody, &result)
@@ -1861,7 +1975,9 @@ func callGoogle(p models.AIProvider, message string) (string, error) {
 	var result struct {
 		Candidates []struct {
 			Content struct {
-				Parts []struct{ Text string `json:"text"` } `json:"parts"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
 			} `json:"content"`
 		} `json:"candidates"`
 	}
@@ -1870,45 +1986,6 @@ func callGoogle(p models.AIProvider, message string) (string, error) {
 		return "", fmt.Errorf("sin respuesta")
 	}
 	return result.Candidates[0].Content.Parts[0].Text, nil
-}
-
-// ─────────────────────────────────────────────
-// ACTIONS CRUD
-// ─────────────────────────────────────────────
-
-func ListAIActions(c *gin.Context) {
-	actions := make([]models.AIAction, 0)
-	database.DB.Find(&actions)
-	c.JSON(http.StatusOK, gin.H{"actions": actions})
-}
-
-func CreateAIAction(c *gin.Context) {
-	var action models.AIAction
-	if err := c.ShouldBindJSON(&action); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	action.ID = uuid.New()
-	database.DB.Create(&action)
-	c.JSON(http.StatusCreated, action)
-}
-
-func UpdateAIAction(c *gin.Context) {
-	id := c.Param("id")
-	var action models.AIAction
-	if err := database.DB.First(&action, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Acción no encontrada"})
-		return
-	}
-	c.ShouldBindJSON(&action)
-	database.DB.Save(&action)
-	c.JSON(http.StatusOK, action)
-}
-
-func DeleteAIAction(c *gin.Context) {
-	id := c.Param("id")
-	database.DB.Delete(&models.AIAction{}, "id = ?", id)
-	c.JSON(http.StatusOK, gin.H{"message": "Acción eliminada"})
 }
 
 // ─────────────────────────────────────────────

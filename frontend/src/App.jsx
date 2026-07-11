@@ -27,6 +27,7 @@ import Requests from './pages/Requests';
 import Confirmations from './pages/Confirmations';
 import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
+import NotificationTemplates from './pages/NotificationTemplates';
 import AIConfig from './pages/AIConfig';
 import Reportes from './pages/Reportes';
 import LogsDelSitio from './pages/LogsDelSitio';
@@ -236,6 +237,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <EmailConfig />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/notification-config"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <NotificationTemplates />
                           </Layout>
                         </ProtectedRoute>
                       }

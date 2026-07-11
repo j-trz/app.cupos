@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Minus, RotateCcw, Settings, Trash2, MessageSquarePlus, Bot } from 'lucide-react';
 import AIService from '../../services/aiService';
 import AIChatMessage from './AIChatMessage';
@@ -14,6 +15,7 @@ import { useAIPageContext } from '../../contexts/AIPageContext.jsx';
 
 export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const { pageContext, dispatchUIActions } = useAIPageContext();
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -115,6 +117,14 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                 null,
                 pageContext
             );
+
+            // Navegar primero (si la IA lo pidió) — a diferencia de abrir
+            // modal/completar pasajeros, esto no depende de que la pantalla
+            // actual haya registrado handlers, funciona desde cualquier lado.
+            const navigateAction = (response.ui_actions || []).find((a) => a?.type === 'navigate' && a.payload?.path);
+            if (navigateAction) {
+                navigate(navigateAction.payload.path);
+            }
 
             // Ejecutar en pantalla lo que la IA haya pedido (abrir el modal
             // de reserva, completar el formulario de pasajeros) — si el

@@ -240,6 +240,7 @@ func logEmailError(c *gin.Context, err error) {
 		Level:   "error",
 		Source:  "email",
 		Path:    c.Request.URL.Path,
-		Message: err.Error(),
+		Message: "No se pudo completar el envío del email de prueba",
+		Details: err.Error(),
 	})
 }

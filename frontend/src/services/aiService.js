@@ -60,13 +60,6 @@ class AIService {
     return ApiClient.put(`/ai/sessions/${sessionId}/title`, { title });
   }
 
-  /**
-   * Obtener acciones disponibles
-   */
-  static async getActions() {
-    return ApiClient.get('/ai/actions');
-  }
-
   // ==========================================
   // Endpoints de administración (solo admin)
   // ==========================================
@@ -111,27 +104,6 @@ class AIService {
    */
   static async testProvider(providerId) {
     return ApiClient.post(`/ai/providers/${providerId}/test`, {});
-  }
-
-  /**
-   * Crear nueva acción para el agente IA
-   */
-  static async createAction(action) {
-    return ApiClient.post('/ai/actions', action);
-  }
-
-  /**
-   * Actualizar acción del agente IA
-   */
-  static async updateAction(actionId, action) {
-    return ApiClient.put(`/ai/actions/${actionId}`, action);
-  }
-
-  /**
-   * Eliminar acción del agente IA
-   */
-  static async deleteAction(actionId) {
-    return ApiClient.delete(`/ai/actions/${actionId}`);
   }
 
   /**

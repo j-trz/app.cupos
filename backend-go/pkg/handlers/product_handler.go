@@ -181,8 +181,9 @@ func CreateProduct(c *gin.Context) {
 
 	database.DB.Create(&product)
 
-	services.NotifyBroadcast(createdByFromContext(c), "new_product", "Nuevo producto disponible",
-		fmt.Sprintf("Se agregó el producto %s hacia %s (%s)", product.CodigoCupo, product.Destino, product.Compania))
+	services.NotifyBroadcastByCode(createdByFromContext(c), "new_product", "Nuevo producto disponible",
+		fmt.Sprintf("Se agregó el producto %s hacia %s (%s)", product.CodigoCupo, product.Destino, product.Compania),
+		map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania})
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -354,8 +355,9 @@ func BulkCreateProducts(c *gin.Context) {
 	tx.Commit()
 
 	if len(input.Products) > 0 {
-		services.NotifyBroadcast(createdByFromContext(c), "new_product", "Nuevos productos disponibles",
-			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", len(input.Products)))
+		services.NotifyBroadcastByCode(createdByFromContext(c), "new_product_bulk", "Nuevos productos disponibles",
+			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", len(input.Products)),
+			map[string]string{"cantidad": fmt.Sprintf("%d", len(input.Products))})
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Bulk creation successful", "count": len(input.Products)})

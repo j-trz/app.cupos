@@ -30,8 +30,10 @@ const adminNavItems = [
 
 // Settings items (grouped under Ajustes)
 const settingsItems = [
+  { label: 'Ajustes generales', path: '/settings', icon: Settings },
   { label: 'Diseño', path: '/marca-blanca', icon: Palette },
   { label: 'Configuración de Email', path: '/email-config', icon: Mail },
+  { label: 'Notificaciones', path: '/notification-config', icon: Bell },
   { label: 'Configuración de IA', path: '/config-ia', icon: Bot },
 ];
 
@@ -176,7 +178,12 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
         className="relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out"
       >
         <div className="flex h-full flex-col justify-between">
-          <div className="space-y-2">
+          {/* flex-1 + min-h-0 es lo que permite que este bloque se achique y
+              scrollee en vez de desbordar el <aside> — sin min-h-0, un hijo
+              flex nunca se encoge por debajo de la altura natural de su
+              contenido, así que al abrir "Ajustes"/"Usuarios" el contenido
+              nuevo quedaba fuera de pantalla y sin forma de llegar a él. */}
+          <div className="flex-1 min-h-0 overflow-y-auto sidebar-scroll space-y-2">
             {/* Header del sidebar con logo, nombre de plataforma y agencia - Estilo Vercel */}
             <div className={clsx('px-3 py-3', collapsed ? 'flex justify-center' : '')}>
               <div className={clsx('flex items-center gap-2', collapsed ? '' : 'mb-3')}>
