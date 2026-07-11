@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy, Plus } from 'lucide-react';
+import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy, Plus, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
 import ReservationService from '../services/reservationService';
+import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
@@ -414,6 +415,7 @@ const EMPTY_PASSENGER_FORM = {
 };
 
 export default function GestionNominas() {
+  const { can } = useAuth();
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -634,6 +636,16 @@ export default function GestionNominas() {
     () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
     [reservations]
   );
+
+  if (!can('RESERVATIONS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

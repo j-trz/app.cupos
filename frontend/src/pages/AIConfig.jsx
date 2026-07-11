@@ -7,8 +7,9 @@ import { useState, useEffect } from 'react';
 import {
     Bot, Plus, Edit2, Trash2, TestTube, Key,
     Activity, MessageSquare, Save, X, Eye, EyeOff, RefreshCw,
-    Zap, CheckCircle
+    Zap, CheckCircle, Lock
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import AIService from '../services/aiService';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button';
@@ -158,6 +159,7 @@ const TABS = [
 ];
 
 export default function AIConfig() {
+    const { can } = useAuth();
     const [activeTab, setActiveTab] = useState('providers');
     const [providers, setProviders] = useState([]);
     const [stats, setStats] = useState(null);
@@ -267,6 +269,16 @@ export default function AIConfig() {
         });
         setShowProviderForm(true);
     };
+
+    if (!can('AI_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

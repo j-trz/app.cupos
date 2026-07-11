@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Search, Shield, X, UserCheck, RefreshCw, BarChart3 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Search, Shield, X, UserCheck, RefreshCw, BarChart3, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import RoleService from '../services/roleService';
 import PermissionService from '../services/permissionService';
@@ -27,7 +27,7 @@ const emptyRole = {
 };
 
 export default function GestionRoles() {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
     const isSuperAdmin = user?.role === 'admin';
     const { data: agenciesData } = useAgencies();
     const agencies = agenciesData?.data || [];
@@ -281,6 +281,16 @@ export default function GestionRoles() {
     const otherPermissions = permissions.filter(p => !matrixPermissionIds.has(p.id));
 
     const totalPages = Math.ceil(pagination.total / pagination.limit);
+
+    if (!can('ROLES_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

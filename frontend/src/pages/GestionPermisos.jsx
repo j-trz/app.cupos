@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Shield, Plus, Edit, Trash2, Search, Filter, Key, CheckCircle, XCircle, RefreshCw, BarChart3 } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Search, Filter, Key, CheckCircle, XCircle, RefreshCw, BarChart3, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PermissionService from '../services/permissionService';
+import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -21,6 +22,7 @@ const emptyPermission = {
 };
 
 export default function GestionPermisos() {
+    const { can } = useAuth();
     const [permissions, setPermissions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -166,6 +168,16 @@ export default function GestionPermisos() {
     );
 
     const totalPages = Math.ceil(pagination.total / pagination.limit);
+
+    if (!can('PERMISSIONS_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

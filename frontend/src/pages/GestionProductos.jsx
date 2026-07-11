@@ -16,7 +16,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -53,13 +53,23 @@ const GestionProductos = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: agencies = [] } = useAgencies();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
   // scope=management: además del catálogo compartido y lo restringido a mi
   // agencia, también trae lo que YO cedí a otra agencia (source_agency) —
   // así la agencia cedente sigue viendo y gestionando lo que dio, aunque en
   // Disponibilidad (reserva real) ya no le aparezca.
   const { data: productsResult, isLoading, isError } = useProducts({ search: searchTerm, scope: 'management' });
+
+  if (!can('PRODUCTS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
   // El backend devuelve el array "pelado" (no { data: [...] }) — igual que
   // consumen /products el resto de las pantallas (Nóminas, Disponibilidad,
   // Reservas). Sin este fallback, products.data siempre daba undefined y la

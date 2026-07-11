@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, X, Palette, Globe, Clock, Bot } from 'lucide-react';
+import { Save, Clock, Bot, Lock } from 'lucide-react';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
+import { useAuth } from '../contexts/AuthContext';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import { Label } from '../components/ui/shadcn-label';
 
 export default function Settings() {
+  const { can } = useAuth();
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -61,59 +63,26 @@ export default function Settings() {
     return <div className="p-6">Cargando configuraciones...</div>;
   }
 
+  if (!can('SETTINGS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Configuración del Sistema</h1>
         <p className="text-muted-foreground">
-          Administra las configuraciones generales y de diseño del sistema.
+          Parámetros operativos del sistema. La identidad visual (nombre, logo, colores, contacto) se administra desde Diseño / Marca Blanca.
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        {/* General Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <SettingsIcon className="h-5 w-5" />
-              Configuración General
-            </CardTitle>
-            <CardDescription>
-              Configuraciones básicas del sistema
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="site_name">Nombre del Sitio</Label>
-              <Input
-                id="site_name"
-                value={settings.site_name || ''}
-                onChange={(e) => handleChange('site_name', e.target.value)}
-                placeholder="Nombre del sitio"
-              />
-            </div>
-            <div>
-              <Label htmlFor="contact_email">Email de Contacto</Label>
-              <Input
-                id="contact_email"
-                type="email"
-                value={settings.contact_email || ''}
-                onChange={(e) => handleChange('contact_email', e.target.value)}
-                placeholder="Email de contacto"
-              />
-            </div>
-            <div>
-              <Label htmlFor="support_phone">Teléfono de Soporte</Label>
-              <Input
-                id="support_phone"
-                value={settings.support_phone || ''}
-                onChange={(e) => handleChange('support_phone', e.target.value)}
-                placeholder="Teléfono de soporte"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Reservations Settings */}
         <Card>
           <CardHeader>
@@ -168,59 +137,6 @@ export default function Settings() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Tiempo que se conserva el historial de mensajes de una sesión de chat antes de borrarse automáticamente
               </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Branding Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Diseño
-            </CardTitle>
-            <CardDescription>
-              Personaliza la apariencia del sistema
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="brand_color">Color de Marca</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  id="brand_color"
-                  value={settings.brand_color || '#3b82f6'}
-                  onChange={(e) => handleChange('brand_color', e.target.value)}
-                  className="h-10 w-10 border border-input rounded cursor-pointer"
-                />
-                <Input
-                  type="text"
-                  value={settings.brand_color || '#3b82f6'}
-                  onChange={(e) => handleChange('brand_color', e.target.value)}
-                  placeholder="#3b82f6"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="logo_url">URL del Logo</Label>
-              <Input
-                id="logo_url"
-                type="url"
-                value={settings.logo_url || ''}
-                onChange={(e) => handleChange('logo_url', e.target.value)}
-                placeholder="URL del logo"
-              />
-            </div>
-            <div>
-              <Label htmlFor="favicon_url">Favicon URL</Label>
-              <Input
-                id="favicon_url"
-                type="url"
-                value={settings.favicon_url || ''}
-                onChange={(e) => handleChange('favicon_url', e.target.value)}
-                placeholder="URL del favicon"
-              />
             </div>
           </CardContent>
         </Card>

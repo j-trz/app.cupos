@@ -219,13 +219,39 @@ func seedRBAC(db *gorm.DB) {
 			}
 			return false
 		})
+		// SALES_AGENT es el rol al que se migra automáticamente todo usuario
+		// "user"/"agency_user" existente (ver más abajo) — es deliberadamente
+		// básico. NO incluye PRODUCTS_VIEW ni RESERVATIONS_VIEW: esos códigos
+		// son justamente los que Sidebar.jsx usa para mostrar los ítems de
+		// GESTIÓN ("Gestión de Productos", "Reservas", "Nóminas" — las
+		// pantallas de administración), a diferencia de Disponibilidad/
+		// Solicitudes/Confirmaciones (pantallas base, sin gate, que sí puede
+		// usar cualquier agente). Si se agregaran acá, cualquier usuario
+		// básico vería esas pantallas de gestión en el sidebar sin que nadie
+		// se lo haya otorgado explícitamente.
 		salesAgentCodes := map[string]bool{
-			"DASHBOARD_VIEW": true, "PRODUCTS_VIEW": true,
-			"RESERVATIONS_VIEW": true, "RESERVATIONS_CREATE": true, "RESERVATIONS_UPDATE": true,
+			"DASHBOARD_VIEW": true, "RESERVATIONS_CREATE": true, "RESERVATIONS_UPDATE": true,
 			"NOTIFICATIONS_VIEW": true,
 		}
 		assign("SALES_AGENT", func(p models.Permission) bool { return salesAgentCodes[p.Code] })
 		assign("VIEWER", func(p models.Permission) bool { return p.Action == "view" })
+	}
+
+	// Corrección idempotente (corre en cada boot, no solo al crear el rol):
+	// si SALES_AGENT ya tenía PRODUCTS_VIEW/RESERVATIONS_VIEW asignados por
+	// una versión anterior de este seed, se revocan — esos permisos no le
+	// corresponden a un agente básico (ver comentario arriba).
+	var salesAgentRole models.Role
+	if err := db.Where("code = ? AND is_system = true", "SALES_AGENT").First(&salesAgentRole).Error; err == nil {
+		var leaked []models.Permission
+		db.Where("code IN ?", []string{"PRODUCTS_VIEW", "RESERVATIONS_VIEW"}).Find(&leaked)
+		if len(leaked) > 0 {
+			leakedIDs := make([]uuid.UUID, len(leaked))
+			for i, p := range leaked {
+				leakedIDs[i] = p.ID
+			}
+			db.Where("role_id = ? AND permission_id IN ?", salesAgentRole.ID, leakedIDs).Delete(&models.RolePermission{})
+		}
 	}
 
 	// Migración aditiva: todo Profile sin ninguna fila en UserRole recibe el

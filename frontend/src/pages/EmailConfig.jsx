@@ -15,7 +15,7 @@ const INPUT_CLASSES = "w-full rounded-xl border border-slate-300 px-3 py-2 text-
 const LABEL_CLASSES = "mb-1 block text-xs font-medium text-slate-600";
 
 export default function EmailConfig() {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
@@ -180,6 +180,16 @@ export default function EmailConfig() {
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+            </div>
+        );
+    }
+
+    if (!can('EMAIL_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
             </div>
         );
     }

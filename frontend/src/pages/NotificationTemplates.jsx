@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import NotificationTemplatesService from '../services/notificationTemplatesService';
 import Swal from 'sweetalert2';
-import { Bell, Save, RefreshCw, Eye, Edit2 } from 'lucide-react';
+import { Bell, Save, RefreshCw, Eye, Edit2, Lock } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
+import { useAuth } from '../contexts/AuthContext';
 
 const INPUT_CLASSES = "w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 const LABEL_CLASSES = "mb-1 block text-xs font-medium text-slate-600";
 
 export default function NotificationTemplates() {
+    const { can } = useAuth();
     const [loading, setLoading] = useState(true);
     const [templates, setTemplates] = useState([]);
     const [editing, setEditing] = useState(null);
@@ -70,6 +72,16 @@ export default function NotificationTemplates() {
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+            </div>
+        );
+    }
+
+    if (!can('NOTIFICATION_TEMPLATES_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
             </div>
         );
     }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
 import ReservationService from '../services/reservationService';
+import { useAuth } from '../contexts/AuthContext';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -125,6 +126,7 @@ function Field({ label, required, hint, children }) {
 const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function GestionReservas() {
+  const { can } = useAuth();
   useCountdownTick(); // hace que la cuenta regresiva de vencimiento avance sola
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
@@ -471,6 +473,16 @@ export default function GestionReservas() {
     () => filtered.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
     [filtered]
   );
+
+  if (!can('RESERVATIONS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

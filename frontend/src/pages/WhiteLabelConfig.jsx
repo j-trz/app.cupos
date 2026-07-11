@@ -6,7 +6,7 @@ import Swal from 'sweetalert2';
 import {
     Palette, Type, MousePointer, Layout, Sidebar as SidebarIcon,
     Save, Download, Upload, RefreshCw, Check, Building2, Mail, FileText, Eye,
-    Image, Link
+    Image, Link, Lock
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -107,7 +107,7 @@ function PreviewButton({ config, label = 'Botón Primario' }) {
 // ═══════════════════════════════════════════════════════════════
 
 export default function WhiteLabelConfig() {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
     const { config: appConfig, refresh } = useWhiteLabel();
     const [activeTab, setActiveTab] = useState('identity');
     const [config, setConfig] = useState(null);
@@ -227,6 +227,16 @@ export default function WhiteLabelConfig() {
 
     if (loading) {
         return <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div></div>;
+    }
+
+    if (!can('WHITE_LABEL_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
     }
 
     const c = config?.colors || DEFAULT_CONFIG.colors;

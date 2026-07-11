@@ -11,11 +11,13 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import UserForm from '../components/UserForm';
-import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle, Lock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
 
 const GestionUsuarios = () => {
+  const { can } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -114,6 +116,16 @@ const GestionUsuarios = () => {
 
   const activeCount = users.filter(u => u.activo).length;
   const inactiveCount = users.length - activeCount;
+
+  if (!can('USERS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
 
   if (isError) {
     return (

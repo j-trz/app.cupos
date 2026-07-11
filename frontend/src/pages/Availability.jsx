@@ -370,39 +370,83 @@ export default function Availability() {
         title="Disponibilidad"
         description="Busca cupos disponibles por destino, compañía y temporada. Reservá en un clic."
         icon={Plane}
-        action={
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={refresh}
-              disabled={refreshing}
-              title="Refrescar datos"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={BarChart3}
-          label="Total de cupos"
-          value={filteredData.length}
-          description={temporadaFilter !== 'Todas' ? `Filtrado: ${temporadaFilter}` : 'Cantidad total de cupos cargados.'}
-        />
-        <StatCard
-          icon={Clock3}
-          label="Cupos agotados"
-          value={filteredData.filter((item) => Number(item.disponibilidad) <= 0).length}
-          description="Cupos sin disponibilidad restante."
-        />
-        <StatCard
-          icon={Plane}
-          label="Cupos disponibles"
-          value={filteredData.filter((item) => Number(item.disponibilidad) > 0).length}
-          description="Cupos listos para una nueva reserva."
-        />
+      {/* Hero Banner premium unificado */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 px-8 py-8 text-white shadow-lg">
+        {/* Decoración de fondo */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
+        <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
+
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative z-10">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white shadow-sm shrink-0">
+                <Plane className="h-4 w-4" />
+              </span>
+              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-300">Consulta de Asientos</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Buscá y Reservá Cupos Aéreos</h1>
+            <p className="max-w-xl text-sm text-slate-300">
+              Catálogo de vuelos disponibles. Podés filtrar por temporada y gestionar las reservas directamente desde aquí en un solo click.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all select-none disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Actualizar catálogo</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Estadísticas integradas en el Hero como cards translúcidas */}
+        <div className="grid gap-4 mt-8 grid-cols-1 sm:grid-cols-3 relative z-10">
+          {[
+            {
+              icon: BarChart3,
+              label: 'Total de cupos',
+              value: filteredData.length,
+              desc: temporadaFilter !== 'Todas' ? `Temporada: ${temporadaFilter}` : 'Total de vuelos cargados.',
+              color: 'text-blue-300 bg-blue-500/10 border-blue-500/20'
+            },
+            {
+              icon: Clock3,
+              label: 'Cupos agotados',
+              value: filteredData.filter((item) => Number(item.disponibilidad) <= 0).length,
+              desc: 'Vuelos sin asientos libres.',
+              color: 'text-amber-300 bg-amber-500/10 border-amber-500/20'
+            },
+            {
+              icon: Plane,
+              label: 'Cupos disponibles',
+              value: filteredData.filter((item) => Number(item.disponibilidad) > 0).length,
+              desc: 'Vuelos listos para reservar.',
+              color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+            }
+          ].map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-4 rounded-2xl bg-white/5 border border-white/10 p-4 hover:bg-white/10 transition-colors duration-200"
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${stat.color}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-350">{stat.label}</p>
+                  <h3 className="text-xl font-bold text-white mt-0.5">{stat.value}</h3>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">{stat.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Bloqueos temporales de TODA la agencia — solo destino + cuenta
@@ -410,31 +454,33 @@ export default function Availability() {
           que un cupo en 0 tiene un bloqueo de un compañero esperando
           confirmación y pueda decidir si esperar o no. */}
       {blockedReservations.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50/40">
-          <div className="flex items-center gap-2 border-b border-amber-200 px-6 py-4">
-            <Clock3 className="h-4 w-4 text-amber-600" />
+        <div className="rounded-2xl border border-amber-100 dark:border-amber-950/30 bg-amber-50/10 dark:bg-amber-950/5 p-5 shadow-xs">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock3 className="h-4 w-4" />
+            </div>
             <div>
-              <h2 className="text-sm font-semibold text-amber-900">Reservas bloqueadas temporalmente</h2>
-              <p className="text-xs text-amber-700">
-                {blockedReservations.length} reserva{blockedReservations.length > 1 ? 's' : ''} de tu agencia esperando confirmación — el cupo se libera si vence.
+              <h2 className="text-sm font-bold text-amber-900 dark:text-amber-200">Reservas bloqueadas temporalmente</h2>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                {blockedReservations.length} reserva{blockedReservations.length > 1 ? 's' : ''} de tu agencia esperando confirmación. El cupo se liberará automáticamente al vencer.
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 p-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {blockedReservations.map((item) => {
               const expiry = formatExpiry(item.Bloqueo_Expira_At);
               return (
                 <div
                   key={item.Pedido_ID || item.id}
-                  className="flex min-w-[220px] flex-1 items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-sm"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-250/30 dark:border-amber-900/10 bg-white dark:bg-zinc-900 px-4 py-3 shadow-xs"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-900">{item.Vuelo_Destino || '—'}</p>
-                    <p className="truncate text-xs text-slate-400">{item.Pedido_ID}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.Vuelo_Destino || '—'}</p>
+                    <p className="truncate text-[10px] text-zinc-400 dark:text-zinc-550 font-mono mt-0.5">{item.Pedido_ID}</p>
                   </div>
                   {expiry && (
-                    <span className={`flex shrink-0 items-center gap-1 text-xs font-semibold ${expiry.color}`}>
-                      <Clock3 className="h-3.5 w-3.5" />
+                    <span className={`flex shrink-0 items-center gap-1 text-xs font-bold ${expiry.color}`}>
+                      <Clock3 className="h-3 w-3" />
                       {expiry.label}
                     </span>
                   )}
@@ -442,7 +488,7 @@ export default function Availability() {
               );
             })}
           </div>
-        </Card>
+        </div>
       )}
 
       <Card>

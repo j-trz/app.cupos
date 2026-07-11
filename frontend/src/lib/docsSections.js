@@ -11,6 +11,7 @@ export const DOCS_SECTIONS = [
   { key: 'ia', label: 'Asistente IA', icon: MessageSquare, badge: 'Nuevo' },
   { key: 'diseno', label: 'Diseño / White Label', icon: Palette, badge: 'Solo admins', adminOnly: true },
   { key: 'email', label: 'Configuración de Email', icon: Mail, badge: 'Solo admins', adminOnly: true },
+  { key: 'plantillas-notificacion', label: 'Plantillas de Notificación', icon: Mail, badge: 'Solo admins', adminOnly: true },
   { key: 'reportes', label: 'Reportes y Dashboard', icon: BarChart3, badge: 'Solo admins', adminOnly: true },
   { key: 'usuarios', label: 'Usuarios, Roles y Permisos', icon: Users, badge: 'Solo admins', adminOnly: true },
   { key: 'agencias', label: 'Gestión de Agencias', icon: Building2, badge: 'Solo admins', adminOnly: true },
