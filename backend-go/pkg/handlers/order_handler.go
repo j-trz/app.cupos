@@ -707,7 +707,9 @@ func RequestCancellation(c *gin.Context) {
 func GetReservationByID(c *gin.Context) {
 	id := c.Param("id")
 	var reservation models.Reservation
-	if err := database.DB.First(&reservation, id).Error; err != nil {
+	// Preload("Passengers") hace falta para el itinerario PDF de Confirmations.jsx —
+	// sin esto, reservation.Passengers siempre vuelve vacío.
+	if err := database.DB.Preload("Passengers").First(&reservation, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
 		return
 	}

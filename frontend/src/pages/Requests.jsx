@@ -11,6 +11,7 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
 
@@ -28,22 +29,9 @@ const formatMoney = (value) => {
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-// Cuenta regresiva del bloqueo temporal — mismo cálculo que ya se usa en
-// Gestión de Reservas, para que el usuario vea acá el mismo dato.
-const formatExpiry = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  const now = new Date();
-  const diffMs = date - now;
-  if (diffMs <= 0) return { label: 'Expirado', color: 'text-red-600' };
-  const diffH = Math.floor(diffMs / 3600000);
-  const diffM = Math.floor((diffMs % 3600000) / 60000);
-  if (diffH < 1) return { label: `${diffM}m restantes`, color: 'text-orange-500' };
-  if (diffH < 24) return { label: `${diffH}h ${diffM}m restantes`, color: 'text-yellow-600' };
-  return { label: `${Math.floor(diffH / 24)}d restantes`, color: 'text-green-600' };
-};
 
 export default function Requests() {
+  useCountdownTick(); // hace que la cuenta regresiva de "Vencimiento" avance sola
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

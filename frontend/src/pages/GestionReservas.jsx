@@ -13,6 +13,7 @@ import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryPDF from '../components/ItineraryPDF.jsx';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 
@@ -45,19 +46,6 @@ const formatMoney = (value) => {
   const n = Number(value);
   if (!value || Number.isNaN(n)) return '—';
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
-const formatExpiry = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  const now = new Date();
-  const diffMs = date - now;
-  if (diffMs <= 0) return { label: 'Expirado', color: 'text-red-600' };
-  const diffH = Math.floor(diffMs / 3600000);
-  const diffM = Math.floor((diffMs % 3600000) / 60000);
-  if (diffH < 1) return { label: `${diffM}m restantes`, color: 'text-orange-500' };
-  if (diffH < 24) return { label: `${diffH}h ${diffM}m restantes`, color: 'text-yellow-600' };
-  return { label: `${Math.floor(diffH / 24)}d restantes`, color: 'text-green-600' };
 };
 
 const getEstadoVariant = (estado) => {
@@ -137,6 +125,7 @@ function Field({ label, required, hint, children }) {
 const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function GestionReservas() {
+  useCountdownTick(); // hace que la cuenta regresiva de vencimiento avance sola
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);

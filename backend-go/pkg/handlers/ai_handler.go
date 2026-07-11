@@ -37,6 +37,35 @@ type ChatRequest struct {
 	ImageBase64 string            `json:"imageBase64"` // base64 sin prefijo data:... (retrocompatibilidad)
 	ImageMime   string            `json:"imageMime"`   // "image/jpeg", "image/png", etc. (retrocompatibilidad)
 	Images      []ImageAttachment `json:"images"`      // Soporte para múltiples adjuntos
+	// PageContext describe en qué pantalla está el usuario y qué tiene
+	// visible en este momento (ver AIPageContext.jsx en el frontend). Es
+	// efímero: se usa solo para armar el prompt de este turno, nunca se
+	// persiste en el historial de AIMessage.
+	PageContext *PageContextInput `json:"pageContext,omitempty"`
+}
+
+// PageContextInput es lo que el frontend manda en cada mensaje sobre la
+// pantalla actual del usuario — ver frontend/src/contexts/AIPageContext.jsx.
+type PageContextInput struct {
+	Page         string             `json:"page"`
+	VisibleItems []VisibleItemInput `json:"visibleItems"`
+}
+
+// VisibleItemInput es un ítem tal como el usuario lo ve en pantalla en este
+// momento (puede diferir de una query cruda a la DB por filtros/orden
+// aplicados en el cliente) — permite resolver referencias posicionales
+// ("la primera opción") a un ID real.
+type VisibleItemInput struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// UIAction es una acción que el backend le pide al frontend que ejecute
+// (abrir un modal, completar un formulario, etc.) — nunca representa un
+// cambio ya persistido en la DB, solo una instrucción de UI.
+type UIAction struct {
+	Type    string                 `json:"type"`
+	Payload map[string]interface{} `json:"payload"`
 }
 
 type userCtx struct {
@@ -51,7 +80,7 @@ type userCtx struct {
 // SYSTEM PROMPT
 // ─────────────────────────────────────────────
 
-func buildSystemPrompt(u userCtx) string {
+func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
 	roleDesc := map[string]string{
 		"admin":        "Administrador con acceso total al sistema",
 		"agency_admin": "Administrador de agencia",
@@ -83,6 +112,34 @@ FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 		permisos += `
 - Gestionar usuarios (crear, editar, desactivar)
 - Acceso completo a configuración del sistema`
+	}
+
+	// CONTEXTO DE PANTALLA — se arma solo si el frontend mandó pageContext en
+	// este turno (ver PageContextInput). Es efímero, no se persiste.
+	pageContextSection := ""
+	if pageCtx != nil && pageCtx.Page != "" {
+		var items strings.Builder
+		if len(pageCtx.VisibleItems) == 0 {
+			items.WriteString("(no hay ítems listados en este momento en esa pantalla)")
+		} else {
+			for i, item := range pageCtx.VisibleItems {
+				label := item.Label
+				if label == "" {
+					label = item.ID
+				}
+				items.WriteString(fmt.Sprintf("%d. %s (id: %s)\n", i+1, label, item.ID))
+			}
+		}
+		pageContextSection = fmt.Sprintf(`
+
+CONTEXTO DE PANTALLA ACTUAL (IMPORTANTE):
+- El usuario está ahora mismo en la pantalla: "%s".
+- Esto es lo que tiene visible en este momento, en este orden (puede diferir de una consulta directa a la base de datos, por ejemplo si tiene un filtro aplicado en pantalla):
+%s
+- Si el usuario se refiere a algo por posición ("la primera opción", "el segundo", "esa última") o de forma ambigua, resolvelo contra ESTA lista usando el campo "posicion" de las herramientas que lo acepten (ej. abrir_modal_reserva) — no vuelvas a listar productos ni asumas cuál es sin confirmarlo contra esta lista.
+- Si te preguntan qué hace un botón, una columna, o cómo funciona algo de esta pantalla, respondé en base a lo que ves acá y a tu conocimiento del sistema — nunca inventes una funcionalidad que no existe.
+- Si esta pantalla tiene el formulario de reserva disponible (ej. "disponibilidad") y el usuario pide reservar algo, preferí abrir_modal_reserva + completar_formulario_pasajeros (así el usuario revisa y confirma él mismo desde el formulario real) en vez de crear_reserva directo — salvo que el usuario pida explícitamente que reserves sin que él tenga que confirmar nada, en cuyo caso usá crear_reserva como siempre.`,
+			pageCtx.Page, items.String())
 	}
 
 	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Eres directo, resolutivo y evitas pedir información que ya puedes obtener del sistema.
@@ -139,6 +196,7 @@ BÚSQUEDA DE PRODUCTOS — REGLA CRÍTICA:
 LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
 - Confirma los datos extraídos brevemente y úsalos para la reserva sin pedir más.
+- Si hay CONTEXTO DE PANTALLA con el formulario de reserva disponible, preferí llamar a completar_formulario_pasajeros con los datos extraídos (así el usuario ve y confirma el formulario ya completado) en vez de crear_reserva directo, salvo que el usuario haya pedido explícitamente que reserves sin confirmar nada.
 
 MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Tienes acceso al historial completo de esta sesión.
@@ -146,9 +204,10 @@ MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Si el usuario ya eligió un producto, ya sabes cuál es — no vuelvas a listar ni a preguntar.
 - Si ya tienes nombre, documento u otros datos del pasajero, no los pidas de nuevo.
 - Avanza siempre hacia el siguiente paso pendiente.
+%s
 
 Responde siempre en español, de forma clara y concisa.`,
-		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos)
+		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection)
 }
 
 // ─────────────────────────────────────────────
@@ -222,6 +281,42 @@ func getTools(role string) []ToolDef {
 					"reserva_id": {Type: "string", Description: "ID numérico de la reserva"},
 				},
 				Required: []string{"reserva_id"},
+			},
+		},
+		{
+			Name:        "abrir_modal_reserva",
+			Description: "Abre el formulario visual de reserva en la pantalla actual del usuario, para un producto puntual — todavía NO crea la reserva, el usuario la confirma manualmente después desde el formulario real. Preferir esto sobre crear_reserva cuando hay CONTEXTO DE PANTALLA con el formulario disponible y el usuario no pidió explícitamente que reserves sin que él confirme.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"product_id": {Type: "string", Description: "ID numérico del producto, si ya se conoce (ej. de una búsqueda previa con buscar_productos)"},
+					"posicion":   {Type: "string", Description: "Posición dentro de la lista de ítems que el usuario tiene visible en pantalla ahora mismo (1 = el primero, 2 = el segundo, etc.) — usar cuando el usuario se refiere a 'la primera opción', 'el segundo', etc. en vez de dar un ID"},
+				},
+			},
+		},
+		{
+			Name:        "completar_formulario_pasajeros",
+			Description: "Completa el formulario de pasajeros ya abierto en pantalla (ver abrir_modal_reserva) con los datos indicados, o con filas vacías si todavía no se conocen los datos. Usar cuando el usuario dice cuántos pasajeros son, o cuando adjuntó fotos de documentos de identidad y hay un formulario de reserva abierto en pantalla.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"pasajeros": {
+						Type:        "array",
+						Description: "Lista de pasajeros con datos ya conocidos (ej. extraídos de una foto de DNI/pasaporte). Omitir si todavía no se conocen los datos y solo se sabe la cantidad.",
+						Items: &ToolParam{
+							Type: "object",
+							Properties: map[string]ToolParam{
+								"nombre":        {Type: "string"},
+								"apellido":      {Type: "string"},
+								"documento":     {Type: "string"},
+								"nacimiento":    {Type: "string", Description: "Fecha de nacimiento en formato YYYY-MM-DD"},
+								"nacionalidad":  {Type: "string"},
+								"tipo_pasajero": {Type: "string", Enum: []string{"Adulto", "Menor", "Infante"}},
+							},
+						},
+					},
+					"cantidad_pasajeros": {Type: "string", Description: "Cantidad de filas de pasajero vacías a crear si todavía no se conocen los datos (ej. el usuario dijo 'somos 3' pero no dio nombres todavía). Ignorado si se manda 'pasajeros'."},
+				},
 			},
 		},
 	}
@@ -314,7 +409,13 @@ func sanitizeReservationForUser(r *models.Reservation) {
 // TOOL EXECUTOR (DB directo, no HTTP interno)
 // ─────────────────────────────────────────────
 
-func executeTool(name string, args map[string]interface{}, u userCtx) string {
+// executeTool ejecuta una tool call. `pageCtx` (puede ser nil) trae lo que el
+// usuario ve en pantalla en este turno, usado para resolver referencias
+// posicionales. `uiActions` (puede ser nil) es un acumulador por-request: los
+// tools de UI (abrir_modal_reserva, completar_formulario_pasajeros) le hacen
+// append en vez de tocar la base de datos — son las únicas dos excepciones a
+// la regla de que executeTool siempre opera sobre la DB.
+func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *PageContextInput, uiActions *[]UIAction) string {
 	switch name {
 
 	case "buscar_productos":
@@ -739,6 +840,113 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		}
 		b, _ := json.Marshal(map[string]interface{}{"usuarios": users, "total": len(users)})
 		return string(b)
+
+	case "abrir_modal_reserva":
+		// No toca la DB — solo resuelve a qué producto se refiere el usuario
+		// y le pide al frontend que abra el formulario real para ese
+		// producto (ver AIAction en la respuesta de Chat()).
+		var resolvedID, resolvedLabel string
+		if idStr, ok := args["product_id"].(string); ok && idStr != "" {
+			resolvedID = idStr
+		} else if posRaw, ok := args["posicion"]; ok {
+			pos := 0
+			switch v := posRaw.(type) {
+			case float64:
+				pos = int(v)
+			case string:
+				pos, _ = strconv.Atoi(v)
+			}
+			if pageCtx == nil || len(pageCtx.VisibleItems) == 0 {
+				b, _ := json.Marshal(map[string]interface{}{"error": "No tengo la lista de lo que el usuario está viendo en pantalla en este momento — pedile que te diga el destino o código de cupo puntual."})
+				return string(b)
+			}
+			if pos < 1 || pos > len(pageCtx.VisibleItems) {
+				b, _ := json.Marshal(map[string]interface{}{"error": fmt.Sprintf("Esa posición (%d) no existe en la lista visible en pantalla (hay %d ítems).", pos, len(pageCtx.VisibleItems))})
+				return string(b)
+			}
+			item := pageCtx.VisibleItems[pos-1]
+			resolvedID = item.ID
+			resolvedLabel = item.Label
+		} else {
+			b, _ := json.Marshal(map[string]interface{}{"error": "Falta indicar qué producto abrir: pasá product_id o posicion."})
+			return string(b)
+		}
+
+		if uiActions != nil {
+			*uiActions = append(*uiActions, UIAction{
+				Type:    "open_reservation_modal",
+				Payload: map[string]interface{}{"product_id": resolvedID},
+			})
+		}
+		label := resolvedLabel
+		if label == "" {
+			label = resolvedID
+		}
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se abrió el formulario de reserva para %s. El usuario ya lo puede ver y completar en pantalla.", label)})
+		return string(b)
+
+	case "completar_formulario_pasajeros":
+		// Tampoco toca la DB — solo le manda al frontend los datos para
+		// completar el formulario de pasajeros ya abierto en pantalla.
+		strField := func(m map[string]interface{}, key string) string {
+			if v, ok := m[key]; ok && v != nil {
+				return fmt.Sprintf("%v", v)
+			}
+			return ""
+		}
+
+		var pasajeros []map[string]interface{}
+		if raw, ok := args["pasajeros"].([]interface{}); ok {
+			for _, item := range raw {
+				if m, ok := item.(map[string]interface{}); ok {
+					tipo := strField(m, "tipo_pasajero")
+					if tipo == "" {
+						tipo = "Adulto"
+					}
+					pasajeros = append(pasajeros, map[string]interface{}{
+						"nombre":        strField(m, "nombre"),
+						"apellido":      strField(m, "apellido"),
+						"documento":     strField(m, "documento"),
+						"nacimiento":    strField(m, "nacimiento"),
+						"nacionalidad":  strField(m, "nacionalidad"),
+						"tipo_pasajero": tipo,
+					})
+				}
+			}
+		}
+		if len(pasajeros) == 0 {
+			cantidad := 1
+			if raw, ok := args["cantidad_pasajeros"]; ok {
+				switch v := raw.(type) {
+				case float64:
+					cantidad = int(v)
+				case string:
+					if n, err := strconv.Atoi(v); err == nil {
+						cantidad = n
+					}
+				}
+			}
+			if cantidad < 1 {
+				cantidad = 1
+			}
+			if cantidad > 20 {
+				cantidad = 20
+			}
+			for i := 0; i < cantidad; i++ {
+				pasajeros = append(pasajeros, map[string]interface{}{
+					"nombre": "", "apellido": "", "documento": "", "nacimiento": "", "nacionalidad": "", "tipo_pasajero": "Adulto",
+				})
+			}
+		}
+
+		if uiActions != nil {
+			*uiActions = append(*uiActions, UIAction{
+				Type:    "fill_passenger_form",
+				Payload: map[string]interface{}{"passengers": pasajeros},
+			})
+		}
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se completó el formulario con %d pasajero(s). El usuario ya lo puede revisar y confirmar.", len(pasajeros))})
+		return string(b)
 	}
 
 	return `{"error": "Herramienta desconocida"}`
@@ -1100,7 +1308,7 @@ func Chat(c *gin.Context) {
 			Find(&history)
 	}
 
-	systemPrompt := buildSystemPrompt(u)
+	systemPrompt := buildSystemPrompt(u, req.PageContext)
 	tools := getTools(role)
 
 	// Construir mensaje inicial del usuario (con o sin imagen/es)
@@ -1242,6 +1450,10 @@ func Chat(c *gin.Context) {
 	// Bucle de tool calling (máx 5 iteraciones)
 	var finalContent string
 	var toolCallsSummary []map[string]interface{}
+	// uiActions acumula las acciones de UI (abrir modal, completar
+	// formulario) que el modelo pidió en este turno — puede haber más de
+	// una si encadenó abrir_modal_reserva + completar_formulario_pasajeros.
+	uiActions := []UIAction{}
 
 	for i := 0; i < 5; i++ {
 		var pr *providerResponse
@@ -1293,7 +1505,7 @@ func Chat(c *gin.Context) {
 
 		// Ejecutar tool calls
 		for _, tc := range pr.ToolCalls {
-			result := executeTool(tc.Name, tc.Input, u)
+			result := executeTool(tc.Name, tc.Input, u, req.PageContext, &uiActions)
 			toolCallsSummary = append(toolCallsSummary, map[string]interface{}{
 				"tool":   tc.Name,
 				"result": result,
@@ -1439,6 +1651,7 @@ func Chat(c *gin.Context) {
 		"role":       "assistant",
 		"content":    finalContent,
 		"tool_calls": toolCallsSummary,
+		"ui_actions": uiActions, // Acciones que el frontend debe ejecutar (abrir modal, completar formulario) — ver AIPageContext.jsx
 		"sessionId":  sessionID.String(), // Siempre retornar para que el frontend lo persista
 	})
 }

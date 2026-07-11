@@ -9,10 +9,14 @@ class AIService {
   /**
    * Enviar mensaje al asistente IA con soporte para múltiples imágenes/adjuntos
    */
-  static async sendMessage(message, sessionId = null, images = [], providerId = null) {
+  static async sendMessage(message, sessionId = null, images = [], providerId = null, pageContext = null) {
     const payload = { message };
     if (sessionId) payload.sessionId = sessionId;
     if (providerId) payload.providerId = providerId;
+    // Contexto efímero de la pantalla actual (ver AIPageContext.jsx) — le
+    // permite a la IA responder sobre lo que el usuario ve y resolver
+    // referencias posicionales ("la primera opción").
+    if (pageContext && pageContext.page) payload.pageContext = pageContext;
 
     if (images && images.length > 0) {
       // Envía todas las imágenes cargadas

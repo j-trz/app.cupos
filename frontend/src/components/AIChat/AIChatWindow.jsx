@@ -10,9 +10,11 @@ import AIChatMessage from './AIChatMessage';
 import AIChatInput from './AIChatInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
+import { useAIPageContext } from '../../contexts/AIPageContext.jsx';
 
 export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     const { user } = useAuth();
+    const { pageContext, dispatchUIActions } = useAIPageContext();
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(null);
@@ -109,8 +111,16 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
             const response = await AIService.sendMessage(
                 content,
                 currentSessionId,
-                activeAttachments
+                activeAttachments,
+                null,
+                pageContext
             );
+
+            // Ejecutar en pantalla lo que la IA haya pedido (abrir el modal
+            // de reserva, completar el formulario de pasajeros) — si el
+            // usuario ya no está en la pantalla que registró esos handlers,
+            // dispatchUIActions simplemente no hace nada.
+            dispatchUIActions(response.ui_actions);
 
             // Actualizar ID de sesión si es nueva
             if (!currentSessionId && response.sessionId) {

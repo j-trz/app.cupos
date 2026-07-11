@@ -4,6 +4,7 @@ import { DEFAULT_DOCS_SECTION } from './lib/docsSections.js';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { HeaderProvider } from './contexts/HeaderContext';
+import { AIPageProvider } from './contexts/AIPageContext';
 import { SidebarProvider } from './components/ui/SidebarProvider';
 import { QueryClientProvider } from './lib/react-query';
 import { queryClient } from './lib/react-query';
@@ -44,6 +45,7 @@ function App() {
         <I18nProvider>
           <SidebarProvider>
             <HeaderProvider>
+              <AIPageProvider>
               <Router>
                 <div className="App">
                   <Routes>
@@ -305,6 +307,7 @@ function App() {
                   <ToastNotification />
                 </div>
               </Router>
+              </AIPageProvider>
             </HeaderProvider>
           </SidebarProvider>
         </I18nProvider>
