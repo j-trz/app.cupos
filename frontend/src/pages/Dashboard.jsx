@@ -442,9 +442,8 @@ const Dashboard = () => {
         ) : (
           <StatsHero
             stats={[
-              { icon: Calendar, label: 'Total Reservas', value: reports?.totalReservations || 0, description: 'Reservas en el sistema', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+              { icon: Calendar, label: 'Total Pasajeros', value: reports?.totalPassengers || 0, description: 'Pasajeros confirmados', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
               { icon: CreditCard, label: 'Ventas Totales', value: formatCurrency(reports?.totalSales || 0), description: 'Ventas confirmadas', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
-              { icon: CheckCircle, label: 'Usuarios Activos', value: reports?.activeUsers || 0, description: 'Últimos 30 días', color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20' },
               { icon: Plane, label: 'Disponibilidad Promedio', value: `${reports?.avgAvailability || 0}%`, description: 'Cupos disponibles', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
             ]}
           />

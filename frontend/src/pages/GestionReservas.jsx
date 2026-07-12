@@ -506,17 +506,10 @@ export default function GestionReservas() {
       <StatsHero
         stats={[
           {
-            icon: BarChart3,
-            label: 'Total reservas',
-            value: filtered.length,
-            description: estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total',
-            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
-          },
-          {
             icon: Ticket,
             label: 'Pasajeros',
             value: totalPassengers,
-            description: 'Tickets individuales (incluye acompañantes)',
+            description: 'Tickets individuales',
             color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
           },
           {

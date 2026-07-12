@@ -691,13 +691,6 @@ export default function GestionNominas() {
             color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
           },
           {
-            label: 'Total reservas',
-            value: loading ? '—' : totalReservations,
-            icon: ClipboardList,
-            description: 'Cantidad total de reservas registradas.',
-            color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
-          },
-          {
             label: 'Pasajeros',
             value: loading ? '—' : totalPassengers,
             icon: Users,
