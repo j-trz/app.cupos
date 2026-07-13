@@ -11,7 +11,6 @@ import DashboardChart from '../components/reports/DashboardChart';
 import DataTable from '../components/reports/DataTable';
 import DepartureTable from '../components/reports/DepartureTable';
 import TabsCharts from '../components/reports/TabsCharts';
-import LoadingSpinner from '../components/reports/LoadingSpinner';
 import PeriodSelector from '../components/reports/PeriodSelector';
 import KpiPanel from '../components/reports/KpiPanel';
 
@@ -51,8 +50,6 @@ const Reportes = () => {
   const [agenciaVendidos, setAgenciaVendidos] = useState(emptyChart);
   const [agenciaEvolucion, setAgenciaEvolucion] = useState(emptyChart);
   const [temporadasValidas, setTemporadasValidas] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Cargando datos...');
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [evolucionGranularidad, setEvolucionGranularidad] = useState('mes');
   const [agenciaEvolucionGranularidad, setAgenciaEvolucionGranularidad] = useState('mes');
@@ -98,7 +95,6 @@ const Reportes = () => {
   useEffect(() => {
     async function loadFields() {
       try {
-        setIsLoading(true);
         const data = await ReportService.getFields();
         const exclude = [
           'INFO EXTRA', 'REGION', 'TASAS', 'TARIFA', 'Código de Reserva', 'Liberados', 'Gestiona',
@@ -123,8 +119,6 @@ const Reportes = () => {
         setFields(campos);
       } catch (error) {
         console.error('Error cargando campos:', error);
-      } finally {
-        setIsLoading(false);
       }
     }
     loadFields();
@@ -170,12 +164,8 @@ const Reportes = () => {
   const handleUpdate = async () => {
     try {
       setIsFilterLoading(true);
-      setIsLoading(true);
-      setLoadingMessage('🚀 Procesando filtros y obteniendo datos...');
 
       const filtrosRequest = buildFiltersRequest(filters);
-
-      setLoadingMessage('📊 Cargando datos principales en paralelo...');
 
       const [evolucionPasajeros, detalleDestinos, porSalida] = await Promise.all([
         ReportService.getEvolucionPasajerosPost(filtrosRequest, evolucionGranularidad),
@@ -280,8 +270,6 @@ const Reportes = () => {
         { label: 'Riesgo Económico (USD)', value: `$${Math.round(totalRiesgo).toLocaleString()}`, icon: AlertTriangle },
       ]);
 
-      setLoadingMessage('📈 Cargando gráficos adicionales en paralelo...');
-
       const [agencias, evolucionAgencias, destinosCompania] = await Promise.all([
         ReportService.getAgenciasData(filtrosRequest).catch(() => null),
         ReportService.getEvolucionAgencias(filtrosRequest, agenciaEvolucionGranularidad).catch(() => null),
@@ -340,15 +328,9 @@ const Reportes = () => {
         });
       }
 
-      setLoadingMessage('✅ ¡Datos cargados exitosamente!');
-
-      setTimeout(() => {
-        setIsLoading(false);
-        setIsFilterLoading(false);
-      }, 500);
+      setIsFilterLoading(false);
     } catch (error) {
       console.error('Error en handleUpdate:', error);
-      setIsLoading(false);
       setIsFilterLoading(false);
     }
   };
@@ -392,14 +374,6 @@ const Reportes = () => {
         description="Análisis ejecutivo de ventas, rentabilidad, ocupación y riesgo comercial en tiempo real"
         icon={BarChart3}
       />
-
-      {/* Loader de pantalla completa */}
-      {isLoading && (
-        <LoadingSpinner
-          message={loadingMessage}
-          fullScreen={true}
-        />
-      )}
 
       {/* Filtros — siempre visibles, en grilla */}
       <Card className="p-6">

@@ -19,17 +19,20 @@ func GetStats(c *gin.Context) {
 	var totalSales float64
 	var activeUsers int64
 	var avgAvailability float64
+	var totalPassengers int64
 
 	database.DB.Model(&models.Reservation{}).Count(&totalReservations)
 	database.DB.Model(&models.Reservation{}).Where("estado = ?", "confirmada").Select("COALESCE(sum(precio_venta), 0)").Scan(&totalSales)
 	database.DB.Model(&models.Reservation{}).Where("created_at > ?", time.Now().AddDate(0, 0, -30)).Select("count(distinct created_by)").Scan(&activeUsers)
 	database.DB.Model(&models.Product{}).Select("COALESCE(avg(disponibilidad), 0)").Scan(&avgAvailability)
+	database.DB.Model(&models.Passenger{}).Where("estado IN ?", []string{"confirmada", "confirmado"}).Count(&totalPassengers)
 
 	c.JSON(http.StatusOK, gin.H{
 		"totalReservations": totalReservations,
 		"totalSales":        totalSales,
 		"activeUsers":       activeUsers,
 		"avgAvailability":   int(avgAvailability),
+		"totalPassengers":   totalPassengers,
 	})
 }
 

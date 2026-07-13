@@ -30,6 +30,37 @@ export default function Confirmations() {
   const [routeModal, setRouteModal] = useState(null); // { codigo_cupo, destino, ruta }
   const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
   const [pdfLoadingId, setPdfLoadingId] = useState(null);
+  const [filters, setFilters] = useState({ temporada: '', destino: '', desde: '', hasta: '' });
+
+  const temporadaOptions = useMemo(
+    () => Array.from(new Set(data.map((d) => d.Temporada).filter(Boolean))).sort(),
+    [data]
+  );
+  const destinoOptions = useMemo(
+    () => Array.from(new Set(data.map((d) => d.Vuelo_Destino).filter(Boolean))).sort(),
+    [data]
+  );
+
+  const filteredData = useMemo(() => {
+    const desdeDate = filters.desde ? new Date(`${filters.desde}T00:00:00`) : null;
+    const hastaDate = filters.hasta ? new Date(`${filters.hasta}T23:59:59`) : null;
+
+    return data.filter((item) => {
+      if (filters.temporada && (item.Temporada || '') !== filters.temporada) return false;
+      if (filters.destino && (item.Vuelo_Destino || '') !== filters.destino) return false;
+
+      if (desdeDate || hastaDate) {
+        const salidaDate = item.Vuelo_Salida ? new Date(item.Vuelo_Salida) : null;
+        if (desdeDate && (!salidaDate || salidaDate < desdeDate)) return false;
+        if (hastaDate && (!salidaDate || salidaDate > hastaDate)) return false;
+      }
+
+      return true;
+    });
+  }, [data, filters]);
+
+  const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
+  const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
 
   const stats = useMemo(
     () => [
@@ -151,6 +182,56 @@ export default function Confirmations() {
 
       <StatsHero stats={stats} />
 
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Temporada</label>
+            <select
+              value={filters.temporada}
+              onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas</option>
+              {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Destino</label>
+            <select
+              value={filters.destino}
+              onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Salida desde</label>
+            <input
+              type="date"
+              value={filters.desde}
+              onChange={(e) => setFilters((f) => ({ ...f, desde: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Salida hasta</label>
+            <input
+              type="date"
+              value={filters.hasta}
+              onChange={(e) => setFilters((f) => ({ ...f, hasta: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+      </Card>
+
       <Card>
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div>
@@ -185,14 +266,14 @@ export default function Confirmations() {
                   Cargando confirmaciones...
                 </TableCell>
               </TableRow>
-            ) : data.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <TableRow>
                 <TableCell className="text-center py-10" colSpan={13}>
-                  No hay confirmaciones registradas.
+                  {hasActiveFilters ? 'No hay confirmaciones que coincidan con los filtros.' : 'No hay confirmaciones registradas.'}
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item, index) => (
+              filteredData.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="text-center font-medium">{item.Pedido_ID}</TableCell>
                   <TableCell className="text-center">{item.Agencia || '—'}</TableCell>

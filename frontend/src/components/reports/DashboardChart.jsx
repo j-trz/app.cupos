@@ -37,9 +37,12 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
           // Si el backend ya mandó un color propio por serie (ej. uno por
           // agencia real), se respeta en vez de recalcularlo acá.
           const color = ds.borderColor || palette[idx % palette.length];
+          // Mismo resguardo que en bar/doughnut: un slice de Go sin
+          // inicializar serializa como "data": null, no [].
+          const dsData = Array.isArray(ds.data) ? ds.data : [];
           return {
             label: ds.label,
-            data: ds.data,
+            data: dsData,
             fill: false,
             borderColor: color,
             backgroundColor: color + '55',

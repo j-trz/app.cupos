@@ -108,6 +108,18 @@ const getEstadoLabel = (estado) => ({
   procesando: 'Procesando',
 }[estado] || estado || '—');
 
+// Adulto/Menor/Infante -> ADT/CHD/INF, la nomenclatura estándar de la industria.
+const TIPO_PASAJERO_CODES = { Adulto: 'ADT', Menor: 'CHD', Infante: 'INF' };
+
+const countPassengerTypes = (passengerRows) => {
+  const counts = { ADT: 0, CHD: 0, INF: 0 };
+  passengerRows.forEach((row) => {
+    const code = TIPO_PASAJERO_CODES[row.tipoPasajero];
+    if (code) counts[code]++;
+  });
+  return counts;
+};
+
 // ─── Excel export ────────────────────────────────────────────────────────────
 // Una fila por pasajero (no por reserva), con absolutamente todos los datos.
 
@@ -235,6 +247,8 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
     [reservations]
   );
 
+  const tipoCounts = useMemo(() => countPassengerTypes(passengerRows), [passengerRows]);
+
   return (
     <Card className="overflow-hidden">
       {/* Header row — always visible */}
@@ -263,8 +277,10 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Pasajeros</p>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{passengerRows.length}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">ADT · CHD · INF</p>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {tipoCounts.ADT} · {tipoCounts.CHD} · {tipoCounts.INF}
+            </p>
           </div>
           <div className="hidden sm:flex gap-2 flex-wrap">
             <Badge variant="success" className="text-xs">
@@ -421,6 +437,7 @@ export default function GestionNominas() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState({ temporada: '', destino: '', desde: '', hasta: '' });
   const [editingRow, setEditingRow] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_PASSENGER_FORM);
   const [savingPassenger, setSavingPassenger] = useState(false);
@@ -613,17 +630,62 @@ export default function GestionNominas() {
     return map;
   }, [reservations]);
 
-  // Products that have at least one reservation, filtered by search
+  // Productos con al menos una reserva — insumo para las opciones de los
+  // filtros de Temporada/Destino (no cambian según lo que ya esté filtrado).
+  const productsWithReservations = useMemo(
+    () => Object.keys(grouped).map((pid) => products.find((p) => String(p.id) === pid)).filter(Boolean),
+    [grouped, products]
+  );
+  const temporadaOptions = useMemo(
+    () => Array.from(new Set(productsWithReservations.map((p) => p.temporada).filter(Boolean))).sort(),
+    [productsWithReservations]
+  );
+  const destinoOptions = useMemo(
+    () => Array.from(new Set(productsWithReservations.map((p) => p.destino).filter(Boolean))).sort(),
+    [productsWithReservations]
+  );
+
+  // Products that have at least one reservation, filtered por búsqueda,
+  // temporada, destino y rango de fecha de salida. Por defecto sólo se
+  // muestran las salidas que todavía no ocurrieron; si el usuario define
+  // explícitamente "desde"/"hasta" se levanta esa restricción para permitir
+  // traer el histórico (ej. para consultar una salida ya cumplida).
   const filteredProductIds = useMemo(() => {
+    const hasExplicitDateFilter = !!(filters.desde || filters.hasta);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const desdeDate = filters.desde ? new Date(`${filters.desde}T00:00:00`) : null;
+    const hastaDate = filters.hasta ? new Date(`${filters.hasta}T23:59:59`) : null;
+
     return Object.keys(grouped).filter((pid) => {
-      if (!search.trim()) return true;
       const product = products.find((p) => String(p.id) === pid);
-      const destino = (product?.destino || '').toLowerCase();
-      const codigo = (product?.codigo_cupo || '').toLowerCase();
-      const q = search.toLowerCase();
-      return destino.includes(q) || codigo.includes(q);
+
+      if (search.trim()) {
+        const destino = (product?.destino || '').toLowerCase();
+        const codigo = (product?.codigo_cupo || '').toLowerCase();
+        const q = search.toLowerCase();
+        if (!destino.includes(q) && !codigo.includes(q)) return false;
+      }
+
+      if (filters.temporada && (product?.temporada || '') !== filters.temporada) return false;
+      if (filters.destino && (product?.destino || '') !== filters.destino) return false;
+
+      const fechaSalidaRaw = product?.fecha_salida || product?.salida;
+      const salidaDate = fechaSalidaRaw ? new Date(fechaSalidaRaw) : null;
+
+      if (hasExplicitDateFilter) {
+        if (desdeDate && (!salidaDate || salidaDate < desdeDate)) return false;
+        if (hastaDate && (!salidaDate || salidaDate > hastaDate)) return false;
+      } else if (salidaDate && salidaDate < today) {
+        return false;
+      }
+
+      return true;
     });
-  }, [grouped, products, search]);
+  }, [grouped, products, search, filters]);
+
+  const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
+  const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
 
   // Stats
   const totalProducts = Object.keys(grouped).length;
@@ -708,15 +770,71 @@ export default function GestionNominas() {
       />
 
       {/* Search/filter */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Filtrar por destino o código de cupo..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
-        />
+      <div className="flex flex-col gap-3">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Filtrar por destino o código de cupo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Temporada</label>
+            <select
+              value={filters.temporada}
+              onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            >
+              <option value="">Todas</option>
+              {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Destino</label>
+            <select
+              value={filters.destino}
+              onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            >
+              <option value="">Todos</option>
+              {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida desde</label>
+            <input
+              type="date"
+              value={filters.desde}
+              onChange={(e) => setFilters((f) => ({ ...f, desde: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida hasta</label>
+            <input
+              type="date"
+              value={filters.hasta}
+              onChange={(e) => setFilters((f) => ({ ...f, hasta: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          {filters.desde || filters.hasta
+            ? 'Mostrando histórico según el rango de fechas seleccionado.'
+            : 'Por defecto solo se muestran las salidas que todavía no ocurrieron. Filtrá por fecha para consultar el histórico.'}
+        </p>
       </div>
 
       {/* Error state */}

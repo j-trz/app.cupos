@@ -438,7 +438,9 @@ func getOrderedKeys(granularity string, now time.Time, keysWithData []string) []
 	meses := []string{"ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"}
 	diasSemana := []string{"Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"}
 
-	var keys []string
+	// Nunca nil: si no hay datos (ej. 0 ventas), un slice nil acá serializa
+	// como "labels": null en el JSON y rompe el .map del lado del frontend.
+	keys := []string{}
 
 	if granularity == "hoy" {
 		minHour := now.Hour()
@@ -497,7 +499,7 @@ func getOrderedKeys(granularity string, now time.Time, keysWithData []string) []
 			ord2 := y2*12 + m2
 			return ord1 < ord2
 		})
-		var dedup []string
+		dedup := []string{}
 		seen := make(map[string]bool)
 		for _, k := range keys {
 			if !seen[k] {
