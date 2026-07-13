@@ -198,7 +198,7 @@ function parseSegmentLine(line) {
   return result;
 }
 
-function parseRuta(ruta) {
+export function parseRuta(ruta) {
   if (!ruta) return [];
 
   try {

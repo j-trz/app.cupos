@@ -71,6 +71,13 @@ const getEstadoLabel = (estado) => ({
   cedido: 'Cedido a otra agencia',
 }[estado] || estado || '—');
 
+// Comparación de códigos de agencia case/espacio-insensible — igual que el
+// backend (strings.EqualFold en product_handler.go). Sin esto, una diferencia
+// de mayúsculas entre el código de agencia del producto y el de la reserva
+// (mismo código, distinta forma guardada históricamente) hacía ver
+// "Compartido — de X" en reservas que en realidad son 100% propias.
+const sameAgency = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
 // Explota una reserva (pedido) en filas — una por pasajero. Contacto y
 // pasajero quedan separados: el contacto es quien figura en la reserva, cada
 // pasajero es su propio ticket individual (1 lugar, comparte pedido_id).
@@ -656,7 +663,7 @@ export default function GestionReservas() {
                       // stock, sin fila espejo): esta reserva la tomó otra
                       // agencia distinta a la dueña del producto.
                       const ownerAgencia = products.find(p => p.id === r.product_id)?.agencia;
-                      return ownerAgencia && r.agencia && r.agencia !== ownerAgencia ? (
+                      return ownerAgencia && r.agencia && !sameAgency(r.agencia, ownerAgencia) ? (
                         <Badge variant="outline" className="w-fit text-[10px]">
                           Compartido — de {agencyName(ownerAgencia)}
                         </Badge>
@@ -722,7 +729,14 @@ export default function GestionReservas() {
                         <Button variant="ghost" size="sm" onClick={() => {
                           const reservation = r;
                           const passengers = [row]; // Pasamos el pasajero de esta fila
-                          const product = { ruta: r.vuelo_ruta, destino: r.vuelo_destino };
+                          const liveProduct = products.find(p => p.id === r.product_id);
+                          const product = {
+                            ruta: r.vuelo_ruta,
+                            destino: r.vuelo_destino,
+                            carryon: liveProduct?.carryon,
+                            handbag: liveProduct?.handbag,
+                            checkedbag: liveProduct?.checkedbag,
+                          };
                           setPdfModalData({ reservation, passengers, product });
                         }} title="Generar Itinerario">
                           <FileText className="h-4 w-4 text-blue-600" />

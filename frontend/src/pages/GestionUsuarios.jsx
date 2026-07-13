@@ -92,7 +92,7 @@ const GestionUsuarios = () => {
   const handleEditUser = (user) => {
     setEditingUser(user);
     setSelectedPermissions(user.permissions || []);
-    setSelectedRole(user.roleId || user.rol);
+    setSelectedRole(user.role_id || null);
     setIsModalOpen(true);
   };
 
@@ -242,7 +242,12 @@ const GestionUsuarios = () => {
                     {user.nombre} {user.apellido}
                   </TableCell>
                   <TableCell className="text-center">{user.email}</TableCell>
-                  <TableCell className="text-center">{user.role}</TableCell>
+                  <TableCell className="text-center">
+                    {user.role_name || user.role}
+                    {user.role_name && (
+                      <span className="block text-xs text-slate-400">{user.role}</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">{user.agencia || '—'}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant={user.activo ? 'success' : 'danger'}>

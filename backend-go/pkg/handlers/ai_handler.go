@@ -216,7 +216,7 @@ FLUJO PARA CREAR RESERVA (IMPORTANTE - seguir exactamente):
 2. Presenta los productos como lista numerada: número, destino, compañía, salida/regreso, precio, cupos. Ej: "1. Cancún - Aerolíneas - $850 - 5 cupos"
 3. Pide al usuario que elija por número. NUNCA le pidas al usuario el ID interno del producto (product_id).
 4. Una vez que el usuario elija el número de la lista, tú internamente DEBES mapear ese número al "id" real del producto que obtuviste de buscar_productos.
-5. Pide SOLO lo que falte para reservar: datos del o los pasajeros.
+5. Pide SOLO lo que falte para reservar: datos del o los pasajeros. Fecha de nacimiento, tipo de pasajero (Adulto/Menor/Infante) y ficha de venta son OBLIGATORIOS — nunca llames a crear_reserva sin los tres, y nunca inventes un valor para ninguno. El tipo de pasajero podés inferirlo vos mismo de la fecha de nacimiento (menor a 2 años = Infante, de 2 a 11 = Menor, 12 o más = Adulto) sin necesidad de preguntarlo aparte; la ficha de venta en cambio NUNCA se puede inferir — siempre hay que pedírsela al usuario, incluso si adjuntó un DNI.
 6. El precio se toma automáticamente del producto — NUNCA pidas precio al usuario.
 7. SOPORTE DE MÚLTIPLES ADJUNTOS (RESERVAS MASIVAS): Si el usuario adjunta uno o múltiples documentos (DNI, pasaporte, etc.) o provee datos de varios pasajeros:
    a. Extrae minuciosamente los datos de todos y cada uno de los pasajeros contenidos en las imágenes (nombre, apellido, documento, nacionalidad, fecha de nacimiento, etc.).
@@ -235,7 +235,8 @@ BÚSQUEDA DE PRODUCTOS — REGLA CRÍTICA:
 
 LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
-- Confirma los datos extraídos brevemente y úsalos para la reserva sin pedir más.
+- Confirma los datos extraídos brevemente y úsalos para la reserva.
+- La ficha de venta NUNCA viene en un DNI — aunque hayas extraído todo el resto de una imagen, siempre tenés que preguntarle al usuario la ficha de venta antes de reservar.
 - Si hay CONTEXTO DE PANTALLA con el formulario de reserva disponible, preferí llamar a completar_formulario_pasajeros con los datos extraídos (así el usuario ve y confirma el formulario ya completado) en vez de crear_reserva directo, salvo que el usuario haya pedido explícitamente que reserves sin confirmar nada.
 
 NAVEGACIÓN ENTRE PANTALLAS (IMPORTANTE):
@@ -347,7 +348,7 @@ func getTools(role string) []ToolDef {
 		},
 		{
 			Name:        "crear_reserva",
-			Description: "Crea una nueva reserva. El precio se toma automáticamente del producto — nunca pedir al usuario.",
+			Description: "Crea una nueva reserva. El precio se toma automáticamente del producto — nunca pedir al usuario. ficha_venta, pasajero_nacimiento y pasajero_tipo son obligatorios: si el usuario no los dio (ni vienen de un DNI adjuntado), pedíselos antes de llamar a esta herramienta — no la llames con esos campos vacíos ni inventes valores.",
 			Parameters: ToolParam{
 				Type: "object",
 				Properties: map[string]ToolParam{
@@ -359,8 +360,11 @@ func getTools(role string) []ToolDef {
 					"pasajero_apellido":     {Type: "string", Description: "Apellido del pasajero (del DNI si fue adjuntado)"},
 					"pasajero_documento":    {Type: "string", Description: "Número de documento del pasajero"},
 					"pasajero_nacionalidad": {Type: "string", Description: "Nacionalidad del pasajero"},
+					"pasajero_nacimiento":   {Type: "string", Description: "OBLIGATORIO. Fecha de nacimiento del pasajero en formato YYYY-MM-DD (del DNI si fue adjuntado, o preguntada al usuario)"},
+					"pasajero_tipo":         {Type: "string", Description: "OBLIGATORIO. Tipo de pasajero.", Enum: []string{"Adulto", "Menor", "Infante"}},
+					"ficha_venta":           {Type: "string", Description: "OBLIGATORIO. Ficha de venta / número de ficha interno de la agencia — preguntarle siempre al usuario, nunca inventar un valor."},
 				},
-				Required: []string{"product_id", "contacto_nombre"},
+				Required: []string{"product_id", "contacto_nombre", "pasajero_nacimiento", "pasajero_tipo", "ficha_venta"},
 			},
 		},
 		{
@@ -747,6 +751,9 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				ApellidoPasajero:     strArg("pasajero_apellido"),
 				DocumentoPasajero:    strArg("pasajero_documento"),
 				NacionalidadPasajero: strArg("pasajero_nacionalidad"),
+				NacimientoPasajero:   parseDateFlexible(strArg("pasajero_nacimiento")),
+				TipoPasajero:         strArg("pasajero_tipo"),
+				FichaVenta:           strArg("ficha_venta"),
 			}
 
 			// Copiar datos de vuelo y ruta del producto
@@ -784,6 +791,8 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				Apellido:        reserva.ApellidoPasajero,
 				Documento:       reserva.DocumentoPasajero,
 				Nacionalidad:    reserva.NacionalidadPasajero,
+				Nacimiento:      reserva.NacimientoPasajero,
+				TipoPasajero:    reserva.TipoPasajero,
 				Estado:          reserva.Estado,
 				PrecioVenta:     reserva.PrecioVenta,
 				Neto1:           reserva.Neto1,

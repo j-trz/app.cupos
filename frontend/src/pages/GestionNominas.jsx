@@ -108,6 +108,13 @@ const getEstadoLabel = (estado) => ({
   procesando: 'Procesando',
 }[estado] || estado || '—');
 
+// Comparación de códigos de agencia case/espacio-insensible — igual que el
+// backend (strings.EqualFold) en product_handler.go. Sin esto, una diferencia
+// de mayúsculas entre Product.Agencia y Reservation.Agencia (mismo código,
+// distinta forma guardada históricamente) hacía ver "Compartido — otra
+// agencia" en reservas que en realidad son 100% propias de esa agencia.
+const sameAgency = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
 // Adulto/Menor/Infante -> ADT/CHD/INF, la nomenclatura estándar de la industria.
 const TIPO_PASAJERO_CODES = { Adulto: 'ADT', Menor: 'CHD', Infante: 'INF' };
 
@@ -357,14 +364,14 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                       <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
                         Cupo de {agencyName(row.originalAgency)}
                       </Badge>
-                    ) : product?.agencia && row.agencia && row.agencia !== product.agencia ? (
+                    ) : product?.agencia && row.agencia && !sameAgency(row.agencia, product.agencia) ? (
                       // Producto compartido (visibilidad multi-agencia, mismo
                       // stock): esta reserva la tomó otra agencia, no la dueña.
                       <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
                         Compartido — otra agencia
                       </Badge>
                     ) : (
-                      <span className="text-zinc-300 dark:text-zinc-600">—</span>
+                      <span className="text-zinc-300 dark:text-zinc-600" title="Producto propio">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>

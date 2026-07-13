@@ -57,7 +57,13 @@ const adaptRequest = (item) => ({
   Fecha_Registro: item.Fecha_Registro || item.fecha_registro || item.created_at || '',
   Vuelo_Codigo: item.Vuelo_Codigo || item.vuelo_codigo || item.product?.codigo_cupo || '',
   Vuelo_Compania: item.Vuelo_Compania || item.vuelo_compania || item.product?.compania || '',
-  Vuelo_Precio: item.Vuelo_Precio || item.vuelo_precio || item.product?.precio || '',
+  // El precio del pasajero principal (passengers[0].precio_venta) es la
+  // fuente de verdad — es el campo que se corrige desde "Editar Pasajero" en
+  // Nóminas/Reservas. item.Vuelo_Precio/vuelo_precio son una foto fija tomada
+  // al momento de la reserva y nunca se actualizan después, así que usarlos
+  // primero hacía que Confirmaciones mostrara un precio viejo aunque ya se
+  // hubiera corregido el del pasajero.
+  Vuelo_Precio: item.passengers?.[0]?.precio_venta || item.precio_venta || item.Vuelo_Precio || item.vuelo_precio || item.product?.precio || '',
   Usuario_Email: item.Usuario_Email || item.usuario_email || '',
   Pnr: item.Pnr || item.pnr || item.product?.pnr || '',
   Ficha: item.Ficha || item.ficha || item.ficha_venta || '',

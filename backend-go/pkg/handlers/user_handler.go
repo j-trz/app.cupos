@@ -131,10 +131,39 @@ func UpdateMyProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
 }
 
+// UserWithRole agrega el rol granular (UserRole -> Role) resuelto a la
+// respuesta de un usuario — sin esto, el frontend no tiene forma de mostrar
+// ni de pre-seleccionar en el modal de edición el rol personalizado que se le
+// asignó, y a simple vista "no queda guardado" aunque el UserRole sí se haya
+// creado correctamente.
+type UserWithRole struct {
+	models.Profile
+	RoleID   *uuid.UUID `json:"role_id,omitempty"`
+	RoleName string     `json:"role_name,omitempty"`
+}
+
+func attachUserRoles(users []models.Profile) []UserWithRole {
+	result := make([]UserWithRole, len(users))
+	for i, u := range users {
+		result[i] = UserWithRole{Profile: u}
+		var ur models.UserRole
+		if err := database.DB.Where("user_id = ?", u.ID).First(&ur).Error; err != nil {
+			continue
+		}
+		roleID := ur.RoleID
+		result[i].RoleID = &roleID
+		var role models.Role
+		if database.DB.First(&role, "id = ?", roleID).Error == nil {
+			result[i].RoleName = role.Name
+		}
+	}
+	return result
+}
+
 func ListUsers(c *gin.Context) {
 	users := []models.Profile{}
 	database.DB.Order("created_at desc").Find(&users)
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": users})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": attachUserRoles(users)})
 }
 
 func CreateUser(c *gin.Context) {
