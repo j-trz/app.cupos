@@ -224,15 +224,24 @@ func AssignPermissionsToRole(c *gin.Context) {
 	}
 
 	// Eliminar permisos existentes
-	database.DB.Where("role_id = ?", roleId).Delete(&models.RolePermission{})
+	if err := database.DB.Where("role_id = ?", roleId).Delete(&models.RolePermission{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al limpiar los permisos existentes."})
+		return
+	}
 
 	// Crear nuevos permisos
-	for _, permissionId := range input.Permissions {
-		rolePermission := models.RolePermission{
+	rolePermissions := make([]models.RolePermission, len(input.Permissions))
+	for i, permissionId := range input.Permissions {
+		rolePermissions[i] = models.RolePermission{
 			RoleID:       roleUUID,
 			PermissionID: permissionId,
 		}
-		database.DB.Create(&rolePermission)
+	}
+	if len(rolePermissions) > 0 {
+		if err := database.DB.Create(&rolePermissions).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al asignar los permisos."})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Permisos actualizados."})

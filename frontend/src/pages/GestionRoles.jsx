@@ -110,7 +110,7 @@ export default function GestionRoles() {
     const openPermissions = async (role) => {
         setSelectedRole(role);
         try {
-            const response = await PermissionService.getRolePermissions(role.id);
+            const response = await RoleService.getRolePermissions(role.id);
             const rolePermissionIds = (response.data || []).map(p => p.id);
             setSelectedPermissions(rolePermissionIds);
             setShowPermissionsModal(true);
@@ -226,7 +226,7 @@ export default function GestionRoles() {
 
     const handleSavePermissions = async () => {
         try {
-            await PermissionService.assignPermissionsToRole(selectedRole.id, selectedPermissions);
+            await RoleService.assignPermissionsToRole(selectedRole.id, selectedPermissions);
             Swal.fire({
                 icon: 'success',
                 title: 'Guardado',
