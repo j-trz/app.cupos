@@ -101,7 +101,7 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
                     <ChevronUpDownIcon className="ml-1 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
                   </ListboxButton>
                   <ListboxOptions className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white text-sm shadow-lg">
-                    {f.values.map((v, idx) => {
+                    {(f.values || []).map((v, idx) => {
                       const value = typeof v === 'object' ? v.text : v;
                       return (
                         <ListboxOption key={value + '-' + idx} value={value} className={({ active }) => `flex items-center px-3 py-1.5 cursor-pointer ${active ? 'bg-slate-50' : ''}`}>
@@ -151,7 +151,7 @@ export default function FiltersPanel({ fields, filters, onFilterChange, onApplyF
                       <option value="CUPOS">CUPOS</option>
                     </>
                   ) : (
-                    f.values.map((v, idx) => (
+                    (f.values || []).map((v, idx) => (
                       <option key={(typeof v === 'object' ? v.text : v) + '-' + idx} value={typeof v === 'object' ? v.text : v}>
                         {typeof v === 'object' ? v.text : v}
                       </option>

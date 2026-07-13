@@ -360,8 +360,11 @@ func passengerMatches(p models.Passenger, filters map[string]interface{}) bool {
 	return true
 }
 
+// Nunca nil: si el mapa está vacío (ej. cero pasajeros porque no hay ventas
+// confirmadas), un slice nil acá serializa como "values": null en el JSON y
+// rompe el .map del lado del frontend (FiltersPanel, etc.).
 func mapToSlice(m map[string]bool) []string {
-	var s []string
+	s := []string{}
 	for k := range m {
 		if k != "" {
 			s = append(s, k)
@@ -373,9 +376,9 @@ func mapToSlice(m map[string]bool) []string {
 
 // intMapKeys devuelve las claves (ordenadas) de un contador por-agencia — se
 // usa en vez de mapToSlice porque acá el valor es la cuenta de ventas, no un
-// simple flag de presencia.
+// simple flag de presencia. Mismo resguardo anti-nil que mapToSlice.
 func intMapKeys(m map[string]int) []string {
-	var s []string
+	s := []string{}
 	for k := range m {
 		if k != "" {
 			s = append(s, k)
@@ -872,7 +875,7 @@ func DetalleDestinosHandler(c *gin.Context) {
 		item.Riesgo += float64(disponibles) * neto1Unit
 	}
 
-	var dataList []*FilaCalculada
+	dataList := []*FilaCalculada{}
 	for _, v := range grouped {
 		dataList = append(dataList, v)
 	}
@@ -964,13 +967,13 @@ func DestinosCompaniaHandler(c *gin.Context) {
 		m.Venta += precioUnit * float64(vendidos)
 	}
 
-	var companies []string
+	companies := []string{}
 	for k := range companiesSet {
 		companies = append(companies, k)
 	}
 	sort.Strings(companies)
 
-	var seasons []string
+	seasons := []string{}
 	for k := range porTemporada {
 		seasons = append(seasons, k)
 	}
@@ -998,7 +1001,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 	}
 
 	makeComparativoInt := func(selector string) gin.H {
-		var datasets []gin.H
+		datasets := []gin.H{}
 		for _, temp := range seasons {
 			data := make([]int, len(companies))
 			for idx, comp := range companies {
@@ -1028,7 +1031,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 	}
 
 	makeComparativoFloat := func(selector string) gin.H {
-		var datasets []gin.H
+		datasets := []gin.H{}
 		for _, temp := range seasons {
 			data := make([]float64, len(companies))
 			for idx, comp := range companies {
@@ -1074,7 +1077,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 }
 
 func mapKeysInt(m map[string]int) []string {
-	var keys []string
+	keys := []string{}
 	for k := range m {
 		keys = append(keys, k)
 	}
@@ -1092,7 +1095,7 @@ func mapValuesInt(m map[string]int) []int {
 }
 
 func mapKeysFloat(m map[string]float64) []string {
-	var keys []string
+	keys := []string{}
 	for k := range m {
 		keys = append(keys, k)
 	}
@@ -1350,7 +1353,7 @@ func PorSalidaHandler(c *gin.Context) {
 		Riesgo             float64 `json:"Riesgo"`
 	}
 
-	var rows []FilaSalida
+	rows := []FilaSalida{}
 
 	for _, cupo := range cuposUnicos {
 		if !productMatches(cupo, req.Filters) {
@@ -1601,7 +1604,7 @@ func DashboardDataHandler(c *gin.Context) {
 		item.Riesgo += float64(disponibles) * neto1Unit
 	}
 
-	var dataList []*FilaCalculada
+	dataList := []*FilaCalculada{}
 	for _, v := range grouped {
 		dataList = append(dataList, v)
 	}
@@ -1811,7 +1814,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		item.Riesgo += ((float64(tomados-canc) * neto1) - (neto1 * float64(v)))
 	}
 
-	var rows []*DestinationMetrics
+	rows := []*DestinationMetrics{}
 	for _, v := range agg {
 		rows = append(rows, v)
 	}
@@ -1866,7 +1869,7 @@ func ForecastSalesHandler(c *gin.Context) {
 		series[key]++
 	}
 
-	var histLabels []string
+	histLabels := []string{}
 	for k := range series {
 		histLabels = append(histLabels, k)
 	}
