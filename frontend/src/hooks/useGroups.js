@@ -86,6 +86,17 @@ export const useConfirmGroup = () => {
   });
 };
 
+export const useSendGroupQuote = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => GroupService.sendGroupQuote(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+    },
+  });
+};
+
 export const useRequestGroupCancellation = () => {
   const queryClient = useQueryClient();
 

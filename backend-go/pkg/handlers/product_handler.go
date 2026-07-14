@@ -58,7 +58,7 @@ func fixNumbers(data map[string]interface{}) {
 
 // fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
 func fixDates(data map[string]interface{}) {
-	dateFields := []string{"salida", "regreso", "fecha_salida", "fecha_regreso"}
+	dateFields := []string{"salida", "regreso", "fecha_salida", "fecha_regreso", "vencimiento_pago", "nomination_date", "fecha_emision", "fecha_gastos"}
 	for _, field := range dateFields {
 		if v, ok := data[field]; ok && v != nil {
 			if s, ok := v.(string); ok && len(s) == 10 {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,6 +13,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// fixGroupDates convierte fechas "YYYY-MM-DD" (lo que manda un <input
+// type="date">) a RFC3339 antes de mapearlas a *time.Time — mismo patrón que
+// fixDates en product_handler.go. Sin esto, json.Unmarshal fallaba con 400 en
+// cuanto el formulario de Grupos mandaba cualquier campo de fecha, porque
+// "2026-07-20" no es un time.Time válido para encoding/json (pide RFC3339
+// completo, ej. "2026-07-20T00:00:00Z").
+func fixGroupDates(data map[string]interface{}) {
+	dateFields := []string{"salida", "regreso", "vencimiento_pago", "nomination_date", "vencimiento_cotizacion", "fecha_emision", "fecha_gastos"}
+	for _, field := range dateFields {
+		if v, ok := data[field]; ok && v != nil {
+			if s, ok := v.(string); ok && len(s) == 10 {
+				data[field] = s + "T00:00:00Z"
+			}
+		}
+	}
+}
 
 // groupOptionInput es una opción de itinerario dentro de una solicitud de
 // grupo — tanto RequestGroup (usuario) como CreateGroup (admin, cuando quiere
@@ -99,25 +117,56 @@ func GetGroupByID(c *gin.Context) {
 // solicitud_id — igual que si el pedido hubiera venido de un usuario, para
 // que el flujo de aceptar-una-rechaza-las-demás funcione idéntico.
 func CreateGroup(c *gin.Context) {
-	var input struct {
-		models.Group
-		Opciones []groupOptionInput `json:"opciones"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var rawData map[string]interface{}
+	if err := c.ShouldBindJSON(&rawData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if input.Vendedor == uuid.Nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Debe seleccionar el usuario que va a recibir esta cotización."})
+	fixGroupDates(rawData)
+
+	// "opciones" no es un campo de models.Group — se separa antes de mapear
+	// el resto del body al struct tipado.
+	var opciones []groupOptionInput
+	if raw, ok := rawData["opciones"]; ok {
+		if arr, ok := raw.([]interface{}); ok {
+			for _, item := range arr {
+				m, ok := item.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				var opt groupOptionInput
+				if s, ok := m["itinerario"].(string); ok {
+					opt.Itinerario = s
+				}
+				if s, ok := m["notas"].(string); ok {
+					opt.Notas = s
+				}
+				opciones = append(opciones, opt)
+			}
+		}
+	}
+	delete(rawData, "opciones")
+
+	jsonBytes, err := json.Marshal(rawData)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var base models.Group
+	if err := json.Unmarshal(jsonBytes, &base); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	base := input.Group
+	if base.Vendedor == uuid.Nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Debe seleccionar el usuario que va a recibir esta cotización."})
+		return
+	}
 	if base.EstadoCotizacion == "" {
 		base.EstadoCotizacion = models.GroupCotizacionPendiente
 	}
 
-	if len(input.Opciones) == 0 {
+	if len(opciones) == 0 {
 		if err := database.DB.Create(&base).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear el grupo: " + err.Error()})
 			return
@@ -127,8 +176,8 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	solicitudID := uuid.New()
-	rows := make([]models.Group, len(input.Opciones))
-	for i, opt := range input.Opciones {
+	rows := make([]models.Group, len(opciones))
+	for i, opt := range opciones {
 		row := base
 		row.SolicitudID = &solicitudID
 		row.OpcionNumero = i + 1
@@ -145,8 +194,72 @@ func CreateGroup(c *gin.Context) {
 	c.JSON(http.StatusCreated, rows)
 }
 
+// groupQuoteReadyToSend valida que una cotización tenga los datos mínimos
+// (condiciones, precio y vencimiento de cotización) antes de poder enviarse
+// al usuario para su aceptación.
+func groupQuoteReadyToSend(g *models.Group) error {
+	if g.Condiciones == "" {
+		return fmt.Errorf("faltan las condiciones de la cotización")
+	}
+	if g.Neto01 <= 0 {
+		return fmt.Errorf("falta cargar el neto/precio de la cotización")
+	}
+	if g.VencimientoCotizacion == nil {
+		return fmt.Errorf("falta la fecha de vencimiento de la cotización")
+	}
+	return nil
+}
+
+// groupQuoteExpired chequea si el deadline de vencimiento_cotizacion ya pasó
+// — el usuario no puede aceptar una cotización vencida.
+func groupQuoteExpired(g *models.Group) bool {
+	return g.VencimientoCotizacion != nil && time.Now().After(*g.VencimientoCotizacion)
+}
+
+// SendGroupQuoteRow es el paso explícito "enviar cotización": pasa
+// pendiente/cotizada -> cotizada solo si los datos mínimos están completos, y
+// notifica al vendedor. La usan tanto el endpoint HTTP SendGroupQuote como la
+// tool de IA enviar_cotizacion_grupo (ai_handler.go) — antes esta transición
+// ocurría sola dentro de UpdateGroup apenas se cargaba cualquier condición o
+// neto, sin ser una acción intencional del admin ni exigir el vencimiento de
+// cotización que dispara el resto del flujo.
+func SendGroupQuoteRow(group *models.Group, createdBy *uuid.UUID) error {
+	if group.EstadoCotizacion != models.GroupCotizacionPendiente && group.EstadoCotizacion != models.GroupCotizacionCotizada {
+		return fmt.Errorf("esta opción ya fue aceptada, rechazada o no está disponible para cotizar")
+	}
+	if err := groupQuoteReadyToSend(group); err != nil {
+		return err
+	}
+	if err := database.DB.Model(group).Update("estado_cotizacion", models.GroupCotizacionCotizada).Error; err != nil {
+		return err
+	}
+	database.DB.First(group, group.ID)
+	services.NotifyUserByCode(group.Vendedor, createdBy, group.Agency, "group_quoted", "Cotización de grupo disponible",
+		fmt.Sprintf("Tu solicitud de grupo hacia %s ya tiene una cotización lista para revisar.", group.Destino),
+		map[string]string{"destino": group.Destino})
+	return nil
+}
+
+// SendGroupQuote: acción explícita del admin para enviarle al usuario la
+// cotización cargada — antes esto pasaba solo dentro de UpdateGroup.
+func SendGroupQuote(c *gin.Context) {
+	id := c.Param("id")
+	var group models.Group
+	if err := database.DB.First(&group, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Grupo no encontrado"})
+		return
+	}
+	if err := SendGroupQuoteRow(&group, createdByFromContext(c)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, group)
+}
+
 // UpdateGroup: el admin completa/edita los datos de cotización y operativos.
-// No permite tocar vendedor/solicitud_id/opcion_numero (identidad de la fila).
+// No permite tocar vendedor/solicitud_id/opcion_numero (identidad de la fila)
+// ni estado_cotizacion (eso solo cambia vía SendGroupQuote/AcceptGroupQuote/
+// ConfirmGroup — acciones explícitas, no un efecto secundario de editar campos).
 func UpdateGroup(c *gin.Context) {
 	id := c.Param("id")
 	var existing models.Group
@@ -155,8 +268,20 @@ func UpdateGroup(c *gin.Context) {
 		return
 	}
 
+	var rawData map[string]interface{}
+	if err := c.ShouldBindJSON(&rawData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	fixGroupDates(rawData)
+
+	jsonBytes, err := json.Marshal(rawData)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	var input models.Group
-	if err := c.ShouldBindJSON(&input); err != nil {
+	if err := json.Unmarshal(jsonBytes, &input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -186,32 +311,12 @@ func UpdateGroup(c *gin.Context) {
 		"fecha_gastos":           input.FechaGastos,
 	}
 
-	// Si el admin manda un estado_cotizacion explícito lo respetamos; si no,
-	// y la fila seguía "pendiente" pero ya tiene itinerario/condiciones
-	// cargadas, la pasamos a "cotizada" automáticamente — así no depende de
-	// que el frontend siempre setee el estado a mano.
-	if input.EstadoCotizacion != "" {
-		updates["estado_cotizacion"] = input.EstadoCotizacion
-	} else if existing.EstadoCotizacion == models.GroupCotizacionPendiente && (input.Condiciones != "" || input.Neto01 != 0) {
-		updates["estado_cotizacion"] = models.GroupCotizacionCotizada
-	}
-
 	if err := database.DB.Model(&existing).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el grupo: " + err.Error()})
 		return
 	}
 
 	database.DB.First(&existing, id)
-
-	// Si la fila recién pasó a "cotizada", avisarle al vendedor que ya tiene
-	// una cotización esperando su aceptación.
-	if updates["estado_cotizacion"] == models.GroupCotizacionCotizada {
-		services.NotifyUserByCode(existing.Vendedor, createdByFromContext(c), existing.Agency, "group_quoted",
-			"Cotización de grupo disponible",
-			fmt.Sprintf("Tu solicitud de grupo hacia %s ya tiene una cotización lista para revisar.", existing.Destino),
-			map[string]string{"destino": existing.Destino})
-	}
-
 	c.JSON(http.StatusOK, existing)
 }
 
@@ -304,6 +409,12 @@ func AcceptGroupQuote(c *gin.Context) {
 	}
 	if group.EstadoCotizacion != models.GroupCotizacionCotizada {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta opción no tiene una cotización pendiente de aceptar."})
+		return
+	}
+	if groupQuoteExpired(&group) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf(
+			"La cotización venció el %s, pedile al administrador que la actualice.",
+			group.VencimientoCotizacion.Format("02/01/2006"))})
 		return
 	}
 

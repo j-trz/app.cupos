@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Clock, Bot, Lock } from 'lucide-react';
+import { Save, Clock, Bot, Lock, CalendarClock } from 'lucide-react';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import { useAuth } from '../contexts/AuthContext';
@@ -107,6 +107,35 @@ export default function Settings() {
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Tiempo que una reserva permanece bloqueada antes de expirar si no se confirma
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Deadlines Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              Vencimientos y Alertas
+            </CardTitle>
+            <CardDescription>
+              Antelación con la que se avisan los vencimientos operativos de Grupos y Productos
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="dias_aviso_vencimientos">Días de antelación para avisos de vencimiento</Label>
+              <Input
+                id="dias_aviso_vencimientos"
+                type="number"
+                min="1"
+                value={settings.dias_aviso_vencimientos || '3'}
+                onChange={(e) => handleChange('dias_aviso_vencimientos', e.target.value)}
+                placeholder="3"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Días antes de vencimiento de pago, fecha de nominación, fecha de emisión o entrada en gastos en los que se notifica al administrador y al solicitante
               </p>
             </div>
           </CardContent>

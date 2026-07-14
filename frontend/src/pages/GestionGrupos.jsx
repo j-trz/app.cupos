@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Swal from 'sweetalert2';
-import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useConfirmGroup, useResolveGroupCancellation } from '../hooks/useGroups';
+import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useConfirmGroup, useSendGroupQuote, useResolveGroupCancellation } from '../hooks/useGroups';
 import { useUsers } from '../hooks/useUsers';
 import { useAgencies } from '../hooks/useAgencies';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +18,7 @@ import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import { useToast } from '../hooks/use-toast';
 import { formatDateOnly } from '../lib/dateOnly.js';
-import { Search, Plus, Edit, Trash2, Luggage, ThumbsUp, ThumbsDown, Lock, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Luggage, ThumbsUp, ThumbsDown, Lock, RefreshCw, CheckCircle2, Send } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 const formatDate = formatDateOnly;
@@ -95,6 +95,7 @@ const GestionGrupos = () => {
   const updateGroupMutation = useUpdateGroup();
   const deleteGroupMutation = useDeleteGroup();
   const confirmGroupMutation = useConfirmGroup();
+  const sendQuoteMutation = useSendGroupQuote();
   const resolveCancellationMutation = useResolveGroupCancellation();
 
   const handleCreateGroup = async (groupData) => {
@@ -158,6 +159,24 @@ const GestionGrupos = () => {
       Swal.fire({ icon: 'success', title: 'Confirmado', timer: 1500, showConfirmButton: false });
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo confirmar el grupo' });
+    }
+  };
+
+  const handleSendQuote = async (group) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: '¿Enviar cotización al usuario?',
+      text: 'Va a poder ver las condiciones cargadas y aceptarla o esperar a que venza.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, enviar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await sendQuoteMutation.mutateAsync(group.id);
+      Swal.fire({ icon: 'success', title: 'Cotización enviada', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'No se pudo enviar', text: error.message || 'Faltan datos de la cotización' });
     }
   };
 
@@ -307,6 +326,11 @@ const GestionGrupos = () => {
                         <Button variant="outline" size="sm" onClick={() => handleEditGroup(group)} title="Editar / Cotizar">
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {(group.estado_cotizacion === 'pendiente' || group.estado_cotizacion === 'cotizada') && (
+                          <Button variant="outline" size="sm" onClick={() => handleSendQuote(group)} title="Enviar cotización al usuario" className="text-blue-600 hover:text-blue-800">
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
                         {group.estado_cotizacion === 'aceptada' && !group.estado_reservar && (
                           <Button variant="outline" size="sm" onClick={() => handleConfirmGroup(group)} title="Confirmar grupo" className="text-emerald-600 hover:text-emerald-800">
                             <CheckCircle2 className="h-4 w-4" />

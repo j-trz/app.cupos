@@ -82,6 +82,7 @@ func main() {
 
 		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
 		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
+		api.GET("/cron/check-deadlines", handlers.CheckDeadlineReminders)
 
 		// Rutas protegidas
 		protected := api.Group("/")
@@ -137,6 +138,7 @@ func main() {
 				groups.POST("/request", handlers.RequestGroup)
 				groups.POST("/:id/accept", handlers.AcceptGroupQuote)
 				groups.POST("/:id/confirm", middleware.RequirePermission("GROUPS_UPDATE"), handlers.ConfirmGroup)
+				groups.POST("/:id/send-quote", middleware.RequirePermission("GROUPS_UPDATE"), handlers.SendGroupQuote)
 				groups.POST("/:id/request-cancellation", handlers.RequestGroupCancellation)
 				groups.POST("/:id/resolve-cancellation", middleware.RequirePermission("GROUPS_UPDATE"), handlers.ResolveGroupCancellation)
 			}

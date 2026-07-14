@@ -148,6 +148,21 @@ func ResolveReservationRecipientEmail(createdBy uuid.UUID) string {
 	return profile.Email
 }
 
+// SendRawEmail manda subject/bodyHTML tal cual, sin pasar por un EmailTemplate
+// — lo usa NotifyRoleByCode para las "casillas de correo adicionales" de una
+// NotificationTemplate, que ya traen el título/mensaje resuelto y no
+// necesitan una plantilla de email separada.
+func SendRawEmail(agencyCode, to, subject, bodyHTML string) error {
+	if to == "" {
+		return fmt.Errorf("destinatario vacío")
+	}
+	cfg, err := resolveSMTPConfig(agencyCode)
+	if err != nil {
+		return err
+	}
+	return sendMail(cfg, to, subject, bodyHTML)
+}
+
 func SendTemplateEmail(agencyCode, templateCode, recipientEmail string, data map[string]string) error {
 	if recipientEmail == "" {
 		return fmt.Errorf("recipientEmail vacío")

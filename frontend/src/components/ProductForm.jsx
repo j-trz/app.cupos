@@ -49,6 +49,10 @@ const EMPTY_FORM = {
   is_blocked_for_sale: false,
   notas_internas: '',
   notas_externas: '',
+  vencimiento_pago: '',
+  nomination_date: '',
+  fecha_emision: '',
+  fecha_gastos: '',
 };
 
 function toFormValues(product) {
@@ -81,6 +85,10 @@ function toFormValues(product) {
     is_blocked_for_sale: product.is_blocked_for_sale ?? false,
     notas_internas: product.notas_internas || '',
     notas_externas: product.notas_externas || '',
+    vencimiento_pago: fmt(product.vencimiento_pago),
+    nomination_date: fmt(product.nomination_date),
+    fecha_emision: fmt(product.fecha_emision),
+    fecha_gastos: fmt(product.fecha_gastos),
   };
 }
 
@@ -113,6 +121,10 @@ function toPayload(form) {
     is_blocked_for_sale: form.is_blocked_for_sale,
     notas_internas: form.notas_internas,
     notas_externas: form.notas_externas,
+    vencimiento_pago: form.vencimiento_pago || null,
+    nomination_date: form.nomination_date || null,
+    fecha_emision: form.fecha_emision || null,
+    fecha_gastos: form.fecha_gastos || null,
   };
 }
 
@@ -252,6 +264,17 @@ const ProductForm = ({
             {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
             {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60' })}
+          </div>
+        </div>
+
+        {/* Vencimientos operativos */}
+        <div>
+          {sectionLabel('Vencimientos operativos')}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {field('vencimiento_pago', 'Vencimiento de pago', 'date')}
+            {field('nomination_date', 'Fecha de nominación', 'date')}
+            {field('fecha_emision', 'Fecha de emisión', 'date')}
+            {field('fecha_gastos', 'Fecha entrada en gastos', 'date')}
           </div>
         </div>
 

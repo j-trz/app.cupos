@@ -15,7 +15,7 @@ export default function NotificationTemplates() {
     const [loading, setLoading] = useState(true);
     const [templates, setTemplates] = useState([]);
     const [editing, setEditing] = useState(null);
-    const [form, setForm] = useState({ title: '', message: '' });
+    const [form, setForm] = useState({ title: '', message: '', extra_emails: '' });
     const [saving, setSaving] = useState(false);
     const [preview, setPreview] = useState(null);
     const [previewing, setPreviewing] = useState(null);
@@ -39,7 +39,7 @@ export default function NotificationTemplates() {
 
     const openEdit = (tpl) => {
         setEditing(tpl);
-        setForm({ title: tpl.title || '', message: tpl.message || '' });
+        setForm({ title: tpl.title || '', message: tpl.message || '', extra_emails: tpl.extra_emails || '' });
     };
 
     const handleSave = async () => {
@@ -153,6 +153,19 @@ export default function NotificationTemplates() {
                         />
                         <p className="mt-1 text-xs text-muted-foreground text-slate-500">
                             Podés usar placeholders entre llaves dobles (ej. {'{{pedido_id}}'}) — se reemplazan automáticamente con el dato real de cada evento.
+                        </p>
+                    </div>
+                    <div>
+                        <label className={LABEL_CLASSES}>Emails adicionales (casillas)</label>
+                        <textarea
+                            rows={2}
+                            value={form.extra_emails}
+                            onChange={(e) => setForm(prev => ({ ...prev, extra_emails: e.target.value }))}
+                            className={INPUT_CLASSES}
+                            placeholder="ops@agencia.com, otra@agencia.com"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground text-slate-500">
+                            Además de la notificación in-app al rol correspondiente, se manda un email con este mismo título/mensaje a estas direcciones (separadas por coma). Dejalo vacío si no aplica.
                         </p>
                     </div>
                     <div className="flex justify-end gap-2">

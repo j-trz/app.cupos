@@ -374,6 +374,10 @@ const GestionProductos = () => {
                   <TableHead>Cupo</TableHead>
                   <TableHead>Salida</TableHead>
                   <TableHead>Regreso</TableHead>
+                  <TableHead>Venc. Pago</TableHead>
+                  <TableHead>Nominación</TableHead>
+                  <TableHead>Emisión</TableHead>
+                  <TableHead>Entrada en gastos</TableHead>
                   <TableHead>Bloqueo (min)</TableHead>
                   <TableHead>Precio ADT</TableHead>
                   <TableHead>Precio INF</TableHead>
@@ -453,6 +457,10 @@ const GestionProductos = () => {
                     <TableCell>{product.cupo || '—'}</TableCell>
                     <TableCell>{formatDate(product.fecha_salida)}</TableCell>
                     <TableCell>{formatDate(product.fecha_regreso)}</TableCell>
+                    <TableCell>{formatDate(product.vencimiento_pago)}</TableCell>
+                    <TableCell>{formatDate(product.nomination_date)}</TableCell>
+                    <TableCell>{formatDate(product.fecha_emision)}</TableCell>
+                    <TableCell>{formatDate(product.fecha_gastos)}</TableCell>
                     <TableCell>{product.bloqueo_temporal_minutos || '—'}</TableCell>
                     <TableCell>{formatMoney(product.precio)}</TableCell>
                     <TableCell>{formatMoney(product.inf_fare)}</TableCell>

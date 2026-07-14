@@ -1,0 +1,20 @@
+name: Avisar vencimientos próximos (Grupos y Productos)
+
+# Dispara periódicamente GET /api/cron/check-deadlines: recordatorios de
+# vencimiento (pago, nominación, emisión, entrada en gastos) para Grupos
+# confirmados y Productos, con la antelación configurada en Settings
+# (dias_aviso_vencimientos). Corrida diaria, no cada 10 min como la
+# expiración de bloqueos — estos deadlines son de fecha, no de minutos.
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  check-deadlines:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al endpoint de chequeo de vencimientos
+        run: |
+          curl -sf -X GET "${{ secrets.BACKEND_URL }}/api/cron/check-deadlines" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"

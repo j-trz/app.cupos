@@ -38,10 +38,11 @@ func UpdateNotificationTemplate(c *gin.Context) {
 	}
 
 	var input struct {
-		Title   string `json:"title"`
-		Message string `json:"message"`
-		Icon    string `json:"icon"`
-		Color   string `json:"color"`
+		Title       string `json:"title"`
+		Message     string `json:"message"`
+		Icon        string `json:"icon"`
+		Color       string `json:"color"`
+		ExtraEmails string `json:"extra_emails"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -49,10 +50,11 @@ func UpdateNotificationTemplate(c *gin.Context) {
 	}
 
 	database.DB.Model(&tpl).Updates(map[string]interface{}{
-		"title":   input.Title,
-		"message": input.Message,
-		"icon":    input.Icon,
-		"color":   input.Color,
+		"title":        input.Title,
+		"message":      input.Message,
+		"icon":         input.Icon,
+		"color":        input.Color,
+		"extra_emails": input.ExtraEmails,
 	})
 	database.DB.First(&tpl, "id = ?", id)
 	c.JSON(http.StatusOK, gin.H{"template": tpl})
@@ -83,6 +85,6 @@ func PreviewNotificationTemplate(c *gin.Context) {
 		"cantidad":        "5",
 		"minutos":         "15",
 	}
-	title, message, _, _, _ := services.ResolveNotificationText("", tpl.Code, tpl.Title, tpl.Message, sampleData)
+	title, message, _, _, _, _ := services.ResolveNotificationText("", tpl.Code, tpl.Title, tpl.Message, sampleData)
 	c.JSON(http.StatusOK, gin.H{"title": title, "message": message})
 }

@@ -243,7 +243,7 @@ FLUJO PARA GRUPOS (vuelos a medida — IMPORTANTE, seguir exactamente):
 5. Cuando "mis_grupos" muestre una opción con estado_cotizacion "cotizada", mostrale al usuario los datos cargados (condiciones, PNRs, netos, vencimiento) y preguntale si la acepta. Si dice que sí, llamá a "aceptar_cotizacion_grupo" — nunca la aceptes sin que el usuario lo confirme explícitamente. Si hay varias opciones cotizadas de la misma solicitud, dejá que elija cuál.
 6. Una vez aceptada, el grupo queda esperando la confirmación del admin — no hay nada más que el usuario pueda hacer hasta entonces salvo consultar el estado.
 7. Si el usuario pide cancelar un grupo ya confirmado, llamá a "solicitar_cancelacion_grupo" (nunca lo canceles vos directamente — el admin tiene que aprobarlo).
-8. Si sos admin/agency_admin y te piden cargar o revisar cotizaciones de grupos, usá "todos_los_grupos" para listarlas y "cotizar_grupo" para completar los datos — pedile al usuario/admin los valores concretos antes de llamarla, nunca inventes condiciones, PNRs o montos.
+8. Si sos admin/agency_admin y te piden cargar o revisar cotizaciones de grupos, usá "todos_los_grupos" para listarlas y "cotizar_grupo" para completar los datos — pedile al usuario/admin los valores concretos antes de llamarla, nunca inventes condiciones, PNRs o montos. Cargar los datos NO le avisa nada al usuario todavía: una vez que condiciones, neto/precio y vencimiento_cotizacion estén completos, llamá "enviar_cotizacion_grupo" para pasarla a "cotizada" y recién ahí notificarlo — si falta algo, la tool devuelve el motivo puntual, pasáselo al admin.
 
 LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
@@ -569,6 +569,15 @@ func getTools(role string) []ToolDef {
 						"vencimiento_pago":       {Type: "string", Description: "Fecha en formato YYYY-MM-DD"},
 					},
 					Required: []string{"grupo_id"},
+				},
+			},
+			ToolDef{
+				Name:        "enviar_cotizacion_grupo",
+				Description: "Envía al usuario la cotización cargada con 'cotizar_grupo', pasándola a estado 'cotizada' — recién ahí el usuario la puede ver/aceptar. Falla con el motivo puntual si faltan condiciones, neto/precio o vencimiento_cotizacion.",
+				Parameters: ToolParam{
+					Type:       "object",
+					Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico de la opción de grupo"}},
+					Required:   []string{"grupo_id"},
 				},
 			},
 			ToolDef{
@@ -1189,11 +1198,27 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		if len(updates) == 0 {
 			return `{"error": "No se indicó ningún dato para cotizar"}`
 		}
-		if group.EstadoCotizacion == models.GroupCotizacionPendiente {
-			updates["estado_cotizacion"] = models.GroupCotizacionCotizada
-		}
 		database.DB.Model(&group).Updates(updates)
 		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "enviar_cotizacion_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para enviar cotizaciones de grupos"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+		if err := SendGroupQuoteRow(&group, &u.ID); err != nil {
+			b, _ := json.Marshal(map[string]string{"error": err.Error()})
+			return string(b)
+		}
 		b, _ := json.Marshal(group)
 		return string(b)
 
@@ -1440,6 +1465,12 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		}
 		if group.EstadoCotizacion != models.GroupCotizacionCotizada {
 			return `{"error": "Esta opción no tiene una cotización pendiente de aceptar"}`
+		}
+		if groupQuoteExpired(&group) {
+			b, _ := json.Marshal(map[string]string{"error": fmt.Sprintf(
+				"La cotización venció el %s, pedile al administrador que la actualice.",
+				group.VencimientoCotizacion.Format("02/01/2006"))})
+			return string(b)
 		}
 		database.DB.Model(&group).Update("estado_cotizacion", models.GroupCotizacionAceptada)
 		if group.SolicitudID != nil {

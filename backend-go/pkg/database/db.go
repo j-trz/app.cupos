@@ -299,6 +299,7 @@ func seedSystemSettings(db *gorm.DB) {
 	defaults := map[string]interface{}{
 		"bloqueo_minutos_default": 60,
 		"ai_historial_horas":      4,
+		"dias_aviso_vencimientos": 3,
 	}
 	for key, value := range defaults {
 		var count int64
@@ -404,6 +405,22 @@ func seedNotificationTemplates(db *gorm.DB) {
 			Message: "Se aprobó la cancelación de tu reserva del pedido {{pedido_id}} y el cupo fue liberado"},
 		{Code: "cancellation_declined", Name: "Cancelación rechazada", Title: "Cancelación rechazada",
 			Message: "Se rechazó la solicitud de cancelación de tu reserva del pedido {{pedido_id}}"},
+		{Code: "group_deadline_pago", Name: "Grupo: vencimiento de pago próximo", Title: "Vencimiento de pago próximo",
+			Message: "El grupo hacia {{destino}} tiene el vencimiento de pago el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "group_deadline_nominacion", Name: "Grupo: fecha de nominación próxima", Title: "Fecha de nominación próxima",
+			Message: "El grupo hacia {{destino}} tiene la fecha de nominación el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "group_deadline_emision", Name: "Grupo: fecha de emisión próxima", Title: "Fecha de emisión próxima",
+			Message: "El grupo hacia {{destino}} tiene la fecha de emisión el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "group_deadline_gastos", Name: "Grupo: entrada en gastos próxima", Title: "Entrada en gastos próxima",
+			Message: "El grupo hacia {{destino}} entra en gastos el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_pago", Name: "Producto: vencimiento de pago próximo", Title: "Vencimiento de pago próximo",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene el vencimiento de pago el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_nominacion", Name: "Producto: fecha de nominación próxima", Title: "Fecha de nominación próxima",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene la fecha de nominación el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_emision", Name: "Producto: fecha de emisión próxima", Title: "Fecha de emisión próxima",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene la fecha de emisión el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_gastos", Name: "Producto: entrada en gastos próxima", Title: "Entrada en gastos próxima",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} entra en gastos el {{fecha}} (en {{dias}} día(s))"},
 	}
 
 	for _, tpl := range defaults {

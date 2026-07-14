@@ -83,8 +83,21 @@ type Product struct {
 	// TransferID vincula un producto-espejo de cesión con su AvailabilityTransfer
 	// de origen, para poder auditar el movimiento completo.
 	TransferID *uuid.UUID `gorm:"type:uuid;column:transfer_id" json:"transfer_id,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	// Deadlines operativos del cupo (mismos nombres de columna que Group, para
+	// que el cron de avisos de vencimiento trate ambos modelos de forma
+	// uniforme).
+	VencimientoPago *time.Time `gorm:"column:vencimiento_pago" json:"vencimiento_pago"`
+	NominationDate  *time.Time `gorm:"column:nomination_date" json:"nomination_date"`
+	FechaEmision    *time.Time `gorm:"column:fecha_emision" json:"fecha_emision"`
+	FechaGastos     *time.Time `gorm:"column:fecha_gastos" json:"fecha_gastos"`
+	// AvisoXEnviado evita repetir el recordatorio de vencimiento en cada
+	// corrida del cron una vez que ya se avisó ese deadline puntual.
+	AvisoPagoEnviado       bool      `gorm:"column:aviso_pago_enviado;default:false" json:"-"`
+	AvisoNominacionEnviado bool      `gorm:"column:aviso_nominacion_enviado;default:false" json:"-"`
+	AvisoEmisionEnviado    bool      `gorm:"column:aviso_emision_enviado;default:false" json:"-"`
+	AvisoGastosEnviado     bool      `gorm:"column:aviso_gastos_enviado;default:false" json:"-"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 // Estados posibles de Reservation.Estado (antes convivían "confirmado"/"confirmada" como
@@ -254,6 +267,14 @@ type Group struct {
 	PreCancelEstadoReservar string `gorm:"column:pre_cancel_estado_reservar" json:"pre_cancel_estado_reservar,omitempty"`
 	CancelacionNotas        string `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
 
+	// AvisoXEnviado evita repetir el recordatorio de vencimiento en cada
+	// corrida del cron una vez que ya se avisó ese deadline puntual (ver
+	// deadline_cron_handler.go).
+	AvisoPagoEnviado       bool `gorm:"column:aviso_pago_enviado;default:false" json:"-"`
+	AvisoNominacionEnviado bool `gorm:"column:aviso_nominacion_enviado;default:false" json:"-"`
+	AvisoEmisionEnviado    bool `gorm:"column:aviso_emision_enviado;default:false" json:"-"`
+	AvisoGastosEnviado     bool `gorm:"column:aviso_gastos_enviado;default:false" json:"-"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -396,17 +417,23 @@ type EmailTemplate struct {
 // notificaciones internas (campana in-app), análogo a EmailTemplate pero para
 // NotifyUser/NotifyRole/NotifyAgency/NotifyBroadcast en vez de emails.
 type NotificationTemplate struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Code      string     `gorm:"not null;index" json:"code"`
-	Name      string     `json:"name"`
-	Title     string     `json:"title"`
-	Message   string     `json:"message"`
-	Icon      string     `json:"icon"`
-	Color     string     `json:"color"`
-	Priority  string     `json:"priority"`
-	AgencyID  *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID       uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Code     string     `gorm:"not null;index" json:"code"`
+	Name     string     `json:"name"`
+	Title    string     `json:"title"`
+	Message  string     `json:"message"`
+	Icon     string     `json:"icon"`
+	Color    string     `json:"color"`
+	Priority string     `json:"priority"`
+	AgencyID *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	// ExtraEmails son casillas de correo adicionales (separadas por coma/salto
+	// de línea/punto y coma) que reciben este mismo título/mensaje por email,
+	// además de la notificación in-app al rol correspondiente — pensado para
+	// que ops/operaciones reciba los avisos de vencimiento sin ser un usuario
+	// del sistema. Vacío = sin casillas extra (comportamiento de siempre).
+	ExtraEmails string    `gorm:"column:extra_emails" json:"extra_emails,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type AIProvider struct {

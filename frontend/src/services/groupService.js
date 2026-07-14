@@ -46,6 +46,12 @@ export class GroupService {
     return await ApiClient.post(`/groups/${id}/confirm`);
   }
 
+  // Acción explícita del admin para enviarle al usuario la cotización cargada
+  // (requiere condiciones + neto/precio + vencimiento_cotizacion completos).
+  static async sendGroupQuote(id) {
+    return await ApiClient.post(`/groups/${id}/send-quote`);
+  }
+
   static async requestGroupCancellation(id) {
     return await ApiClient.post(`/groups/${id}/request-cancellation`);
   }
