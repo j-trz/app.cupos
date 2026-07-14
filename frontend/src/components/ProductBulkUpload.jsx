@@ -44,7 +44,11 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
         // XLSX.read entiende tanto binarios .xlsx/.xls reales como texto CSV
         // (a diferencia de PapaParse, que solo puede leer CSV) — un solo
         // parser para los tres formatos que la zona de drop dice aceptar.
-        const workbook = XLSX.read(e.target.result, { type: 'array' });
+        // cellDates:true hace que una celda con formato de fecha llegue como
+        // objeto Date en vez del número de serie interno de Excel (ej.
+        // 45993) — sin esto, validateProductRow rechazaba cualquier fecha
+        // cargada con formato de fecha real (no como texto plano).
+        const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
