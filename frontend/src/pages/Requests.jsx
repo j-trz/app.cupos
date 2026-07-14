@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X, Luggage, Plus, CheckCircle2 } from 'lucide-react';
+import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X, Luggage, Plus, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -11,6 +11,7 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import { formatGroupItinerary } from '../lib/itineraryText.js';
 import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
@@ -426,67 +427,12 @@ export default function Requests() {
                   </p>
                 )}
                 {opciones.map((group) => (
-                  <div key={group.id} className="rounded-2xl border border-slate-200 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        {group.opcion_numero > 0 && (
-                          <p className="text-xs font-medium text-slate-400">Opción {group.opcion_numero}</p>
-                        )}
-                        <p className="text-sm font-semibold text-slate-900">
-                          {group.destino || 'Destino a confirmar'} {group.compania ? `— ${group.compania}` : ''}
-                        </p>
-                        <p className="text-xs text-slate-500">Lugares: {group.cantidad_lugares || '—'}</p>
-                        {group.itinerario && (
-                          <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600 max-w-xl">{group.itinerario}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge variant={GROUP_COTIZACION_VARIANT[group.estado_cotizacion] || 'default'}>
-                          {GROUP_COTIZACION_LABEL[group.estado_cotizacion] || group.estado_cotizacion || 'Solicitada'}
-                        </Badge>
-                        {group.estado_reservar && (
-                          <Badge variant={GROUP_RESERVAR_VARIANT[group.estado_reservar] || 'default'}>
-                            {GROUP_RESERVAR_LABEL[group.estado_reservar] || group.estado_reservar}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {group.estado_cotizacion === 'cotizada' && (
-                      <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-4">
-                        {group.condiciones && <div className="col-span-2"><span className="text-slate-400">Condiciones:</span> {group.condiciones}</div>}
-                        {group.pnr_airline && <div><span className="text-slate-400">PNR Aerolínea:</span> {group.pnr_airline}</div>}
-                        {group.pnr_agency && <div><span className="text-slate-400">PNR Agencia:</span> {group.pnr_agency}</div>}
-                        {!!group.neto_01 && <div><span className="text-slate-400">Neto:</span> {formatMoney(group.neto_01)}</div>}
-                        {group.vencimiento_cotizacion && <div><span className="text-slate-400">Vence:</span> {formatDate(group.vencimiento_cotizacion)}</div>}
-                      </div>
-                    )}
-
-                    {group.estado_reservar === 'confirmada' && (
-                      <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-emerald-50 p-3 text-xs sm:grid-cols-4">
-                        {group.nomination_date && <div><span className="text-slate-400">Nominación:</span> {formatDate(group.nomination_date)}</div>}
-                        {group.fecha_emision && <div><span className="text-slate-400">Emisión:</span> {formatDate(group.fecha_emision)}</div>}
-                        {group.fecha_gastos && <div><span className="text-slate-400">Entrada en gastos:</span> {formatDate(group.fecha_gastos)}</div>}
-                        {group.vencimiento_pago && <div><span className="text-slate-400">Vencimiento de pago:</span> {formatDate(group.vencimiento_pago)}</div>}
-                        {group.notas_externas && <div className="col-span-2 sm:col-span-4"><span className="text-slate-400">Notas:</span> {group.notas_externas}</div>}
-                      </div>
-                    )}
-
-                    <div className="mt-3 flex justify-end gap-2">
-                      {group.estado_cotizacion === 'cotizada' && (
-                        <Button size="sm" onClick={() => handleAcceptGroup(group)}>
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Aceptar esta opción
-                        </Button>
-                      )}
-                      {group.estado_reservar === 'confirmada' && (
-                        <Button size="sm" variant="secondary" onClick={() => handleRequestGroupCancellation(group)}>
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Solicitar cancelación
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                  <GroupOptionCard
+                    key={group.id}
+                    group={group}
+                    onAccept={handleAcceptGroup}
+                    onRequestCancellation={handleRequestGroupCancellation}
+                  />
                 ))}
               </div>
             ))}
@@ -588,6 +534,104 @@ export default function Requests() {
             <div className="p-5">
               <ItineraryTable ruta={routeModal.ruta} showCopyButton={true} />
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Group option card (colapsable) ──────────────────────────────────────────
+// Mismo patrón que ProductSection en GestionNominas.jsx: header siempre
+// visible con el resumen (opción, destino, aerolínea, lugares, estado) y el
+// resto de la info (itinerario, condiciones, PNRs, fechas operativas, notas,
+// acciones) solo al expandir.
+function GroupOptionCard({ group, onAccept, onRequestCancellation }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const cotizacionLabel = group.estado_cotizacion === 'aceptada' && group.estado_reservar === 'confirmada'
+    ? 'Aceptada'
+    : (GROUP_COTIZACION_LABEL[group.estado_cotizacion] || group.estado_cotizacion || 'Solicitada');
+
+  return (
+    <div className="rounded-2xl border border-slate-200 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+      >
+        <span className="text-slate-400 shrink-0">
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </span>
+
+        <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-5 gap-2 items-center">
+          <div className="min-w-0 col-span-2 sm:col-span-1">
+            {group.opcion_numero > 0 && (
+              <p className="text-xs font-medium text-slate-400">Opción {group.opcion_numero}</p>
+            )}
+            <p className="text-sm font-semibold text-slate-900 truncate">{group.destino || 'Destino a confirmar'}</p>
+          </div>
+          <div className="hidden sm:block min-w-0">
+            <p className="text-xs text-slate-400">Aerolínea</p>
+            <p className="text-sm text-slate-700 truncate">{group.compania || '—'}</p>
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-xs text-slate-400">Lugares</p>
+            <p className="text-sm text-slate-700">{group.cantidad_lugares || '—'}</p>
+          </div>
+          <div className="col-span-2 sm:col-span-2 flex flex-wrap justify-end gap-1">
+            <Badge variant={GROUP_COTIZACION_VARIANT[group.estado_cotizacion] || 'default'}>
+              {cotizacionLabel}
+            </Badge>
+            {group.estado_reservar && (
+              <Badge variant={GROUP_RESERVAR_VARIANT[group.estado_reservar] || 'default'}>
+                {GROUP_RESERVAR_LABEL[group.estado_reservar] || group.estado_reservar}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-slate-100 p-4 space-y-3">
+          <p className="text-xs text-slate-500 sm:hidden">Lugares: {group.cantidad_lugares || '—'}</p>
+          {group.itinerario && (
+            <p className="whitespace-pre-wrap text-xs text-slate-600">{formatGroupItinerary(group.itinerario)}</p>
+          )}
+
+          {group.estado_cotizacion === 'cotizada' && (
+            <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-4">
+              {group.condiciones && <div className="col-span-2"><span className="text-slate-400">Condiciones:</span> {group.condiciones}</div>}
+              {group.pnr_airline && <div><span className="text-slate-400">PNR Aerolínea:</span> {group.pnr_airline}</div>}
+              {group.pnr_agency && <div><span className="text-slate-400">PNR Agencia:</span> {group.pnr_agency}</div>}
+              {!!group.neto_01 && <div><span className="text-slate-400">Neto:</span> {formatMoney(group.neto_01)}</div>}
+              {group.vencimiento_cotizacion && <div><span className="text-slate-400">Vence:</span> {formatDateOnly(group.vencimiento_cotizacion)}</div>}
+            </div>
+          )}
+
+          {group.estado_reservar === 'confirmada' && (
+            <div className="grid grid-cols-2 gap-3 rounded-xl bg-emerald-50 p-3 text-xs sm:grid-cols-4">
+              {group.nomination_date && <div><span className="text-slate-400">Nominación:</span> {formatDateOnly(group.nomination_date)}</div>}
+              {group.fecha_emision && <div><span className="text-slate-400">Emisión:</span> {formatDateOnly(group.fecha_emision)}</div>}
+              {group.fecha_gastos && <div><span className="text-slate-400">Entrada en gastos:</span> {formatDateOnly(group.fecha_gastos)}</div>}
+              {group.vencimiento_pago && <div><span className="text-slate-400">Vencimiento de pago:</span> {formatDateOnly(group.vencimiento_pago)}</div>}
+              {group.notas_externas && <div className="col-span-2 sm:col-span-4"><span className="text-slate-400">Notas:</span> {group.notas_externas}</div>}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            {group.estado_cotizacion === 'cotizada' && (
+              <Button size="sm" onClick={() => onAccept(group)}>
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Aceptar esta opción
+              </Button>
+            )}
+            {group.estado_reservar === 'confirmada' && (
+              <Button size="sm" variant="secondary" onClick={() => onRequestCancellation(group)}>
+                <XCircle className="h-3 w-3 mr-1" />
+                Solicitar cancelación
+              </Button>
+            )}
           </div>
         </div>
       )}
