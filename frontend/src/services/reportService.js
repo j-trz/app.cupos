@@ -119,6 +119,10 @@ export class ReportService {
     return await ApiClient.get('/reports/fields');
   }
 
+  static async getGroupsReport() {
+    return await ApiClient.get('/reports/grupos');
+  }
+
   static async getDashboardData(filters = {}) {
     return await ApiClient.post('/reports/dashboard-data', { filters });
   }

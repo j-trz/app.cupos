@@ -123,6 +123,24 @@ func init() {
 				orders.DELETE("/:id", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.DeleteReservation)
 			}
 
+			// Grupos (vuelos a medida): igual que /orders, el listado no está
+			// gateado a nivel de ruta — el handler filtra internamente (admin/
+			// agency_admin con GROUPS_VIEW ven la gestión completa, cualquier
+			// otro usuario autenticado solo ve sus propias solicitudes).
+			groups := protected.Group("/groups")
+			{
+				groups.GET("", handlers.ListGroups)
+				groups.GET("/:id", handlers.GetGroupByID)
+				groups.POST("", middleware.RequirePermission("GROUPS_CREATE"), handlers.CreateGroup)
+				groups.PUT("/:id", middleware.RequirePermission("GROUPS_UPDATE"), handlers.UpdateGroup)
+				groups.DELETE("/:id", middleware.RequirePermission("GROUPS_DELETE"), handlers.DeleteGroup)
+				groups.POST("/request", handlers.RequestGroup)
+				groups.POST("/:id/accept", handlers.AcceptGroupQuote)
+				groups.POST("/:id/confirm", middleware.RequirePermission("GROUPS_UPDATE"), handlers.ConfirmGroup)
+				groups.POST("/:id/request-cancellation", handlers.RequestGroupCancellation)
+				groups.POST("/:id/resolve-cancellation", middleware.RequirePermission("GROUPS_UPDATE"), handlers.ResolveGroupCancellation)
+			}
+
 			// Mis permisos resueltos (cualquier usuario autenticado, no solo admin —
 			// se registra sobre "protected" y no sobre el grupo "/users" de abajo
 			// para no heredar su middleware.AdminOnly()).
@@ -168,6 +186,7 @@ func init() {
 				reports.GET("/metrics-summary", handlers.MetricsSummaryHandler)
 				reports.GET("/metrics-by-destination", handlers.MetricsByDestinationHandler)
 				reports.GET("/forecast-sales", handlers.ForecastSalesHandler)
+				reports.GET("/grupos", handlers.GetGroupsReport)
 			}
 			// Métricas personales para usuarios regulares
 			protected.GET("/reports/user-metrics", handlers.GetUserMetrics)

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, BarChart3, Info, DollarSign, TrendingUp, Wallet, AlertTriangle, Filter } from 'lucide-react';
+import { Lock, BarChart3, Info, DollarSign, TrendingUp, Wallet, AlertTriangle, Filter, Luggage, Clock3, CheckCircle2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { Tooltip } from 'react-tooltip';
 
@@ -59,8 +59,12 @@ const Reportes = () => {
     { label: 'Ventas Totales (USD)', value: '$0', icon: DollarSign },
     { label: 'Rentabilidad (USD)', value: '$0', icon: TrendingUp },
     { label: 'Costo (USD)', value: '$0', icon: Wallet },
-    { label: 'Riesgo (USD)', value: '$0', icon: AlertTriangle },
+    { label: 'Riesgo Económico (USD)', value: '$0', icon: AlertTriangle },
   ]);
+
+  // Pestaña Grupos — métricas simples propias, sin pasar por el pipeline de
+  // Producto+Pasajero (ver GetGroupsReport en el backend).
+  const [gruposReport, setGruposReport] = useState(null);
 
   const buildFiltersRequest = (baseFilters) => {
     let filtrosRequest = { ...(baseFilters || {}) };
@@ -340,6 +344,12 @@ const Reportes = () => {
     handleUpdate();
   }, []);
 
+  // Pestaña Grupos: métricas propias, independientes de los filtros del
+  // cockpit (GetGroupsReport no los usa) — se cargan una sola vez al montar.
+  useEffect(() => {
+    ReportService.getGroupsReport().then(setGruposReport).catch(() => setGruposReport(null));
+  }, []);
+
   // El guard de acceso va DESPUÉS de todos los hooks (nunca antes): can()
   // depende de permisos que cargan async en AuthContext, así que isAdmin
   // puede pasar de false a true entre renders — si el guard cortara antes de
@@ -505,6 +515,48 @@ const Reportes = () => {
                   title=""
                   isLoading={isFilterLoading}
                 />
+              </div>
+            </div>
+          }
+          gruposPanel={
+            <div className="space-y-4">
+              <KpiPanel
+                kpis={[
+                  { label: 'Total grupos', value: gruposReport?.total ?? 0, icon: Luggage },
+                  { label: 'Lugares solicitados', value: gruposReport?.lugares_solicitados ?? 0, icon: Clock3 },
+                  { label: 'Lugares confirmados', value: gruposReport?.lugares_confirmados ?? 0, icon: CheckCircle2 },
+                  { label: 'Próximos vencimientos (30 días)', value: gruposReport?.proximos_vencimientos ?? 0, icon: AlertTriangle },
+                ]}
+              />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h4 className="mb-3 text-sm font-semibold text-slate-900">Por estado de cotización</h4>
+                  <div className="space-y-1 text-sm text-slate-600">
+                    {Object.entries(gruposReport?.por_estado_cotizacion || {}).map(([estado, count]) => (
+                      <div key={estado} className="flex justify-between border-b border-slate-100 py-1.5">
+                        <span className="capitalize">{estado.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-slate-900">{count}</span>
+                      </div>
+                    ))}
+                    {Object.keys(gruposReport?.por_estado_cotizacion || {}).length === 0 && (
+                      <p className="text-slate-400">Sin datos.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h4 className="mb-3 text-sm font-semibold text-slate-900">Por estado de reserva</h4>
+                  <div className="space-y-1 text-sm text-slate-600">
+                    {Object.entries(gruposReport?.por_estado_reservar || {}).map(([estado, count]) => (
+                      <div key={estado} className="flex justify-between border-b border-slate-100 py-1.5">
+                        <span className="capitalize">{estado.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-slate-900">{count}</span>
+                      </div>
+                    ))}
+                    {Object.keys(gruposReport?.por_estado_reservar || {}).length === 0 && (
+                      <p className="text-slate-400">Sin datos.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           }

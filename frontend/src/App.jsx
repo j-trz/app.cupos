@@ -13,6 +13,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import GestionUsuarios from './pages/GestionUsuarios';
 import GestionProductos from './pages/GestionProductos';
+import GestionGrupos from './pages/GestionGrupos';
 import GestionReservas from './pages/GestionReservas';
 import GestionAgencias from './pages/GestionAgencias';
 import GestionTemas from './pages/GestionTemas';
@@ -87,6 +88,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <GestionProductos />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/grupos"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <GestionGrupos />
                           </Layout>
                         </ProtectedRoute>
                       }

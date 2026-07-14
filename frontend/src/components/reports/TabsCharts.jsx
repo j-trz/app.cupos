@@ -1,13 +1,13 @@
 import { Tab, TabList, TabPanel, TabPanels, TabGroup } from '@headlessui/react';
 import DashboardChart from './DashboardChart';
-import { HiOutlineHome, HiGlobeAmericas, HiOutlineChartPie, HiOutlineTableCells } from "react-icons/hi2";
+import { HiOutlineHome, HiGlobeAmericas, HiOutlineChartPie, HiOutlineTableCells, HiOutlineUserGroup } from "react-icons/hi2";
 import { PiAirplaneTakeoff } from "react-icons/pi";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-export default function TabsCharts({ principalPanel, salidaPanel, destinoCharts = [], companiaCharts = [], agenciaCharts = [], agenciaPanel = null, isLoading = false }) {
+export default function TabsCharts({ principalPanel, salidaPanel, destinoCharts = [], companiaCharts = [], agenciaCharts = [], agenciaPanel = null, gruposPanel = null, isLoading = false }) {
   const iconSize = 16;
   const tabs = [
     { name: 'Principal', key: 'principal', icon: <HiOutlineHome size={iconSize} className="inline mr-1 align-middle" />, content: principalPanel },
@@ -15,6 +15,7 @@ export default function TabsCharts({ principalPanel, salidaPanel, destinoCharts 
     { name: 'Destino', key: 'destino', icon: <HiGlobeAmericas size={iconSize} className="inline mr-1 align-middle" />, charts: destinoCharts },
     { name: 'Compañía', key: 'compania', icon: <PiAirplaneTakeoff size={iconSize} className="inline mr-1 align-middle" />, charts: companiaCharts },
     { name: 'Agencia', key: 'agencia', icon: <HiOutlineChartPie size={iconSize} className="inline mr-1 align-middle" />, content: agenciaPanel, charts: agenciaCharts },
+    { name: 'Grupos', key: 'grupos', icon: <HiOutlineUserGroup size={iconSize} className="inline mr-1 align-middle" />, content: gruposPanel },
   ];
 
   return (

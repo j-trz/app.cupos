@@ -52,6 +52,7 @@ func InitDB() {
 		&models.AISession{},
 		&models.AIMessage{},
 		&models.ProductSharedAgency{},
+		&models.Group{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -100,6 +101,11 @@ func seedRBAC(db *gorm.DB) {
 		{"PRODUCTS_CREATE", "Crear Productos", "products", "create", "Crear nuevos productos"},
 		{"PRODUCTS_UPDATE", "Editar Productos", "products", "update", "Modificar datos de productos"},
 		{"PRODUCTS_DELETE", "Eliminar Productos", "products", "delete", "Eliminar productos"},
+
+		{"GROUPS_VIEW", "Ver Grupos", "groups", "view", "Listar y gestionar solicitudes de grupo"},
+		{"GROUPS_CREATE", "Crear Grupos", "groups", "create", "Cargar un grupo nuevo desde cero"},
+		{"GROUPS_UPDATE", "Editar Grupos", "groups", "update", "Cotizar, confirmar y editar grupos"},
+		{"GROUPS_DELETE", "Eliminar Grupos", "groups", "delete", "Eliminar grupos"},
 
 		{"RESERVATIONS_VIEW", "Ver Reservas", "reservations", "view", "Listar y buscar reservas"},
 		{"RESERVATIONS_CREATE", "Crear Reservas", "reservations", "create", "Crear nuevas reservas"},

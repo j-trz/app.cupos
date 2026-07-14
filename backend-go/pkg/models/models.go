@@ -183,6 +183,81 @@ type Passenger struct {
 	Reservation Reservation `gorm:"foreignKey:ReservationID" json:"reservation,omitempty"`
 }
 
+// Estados de la máquina de 2 fases de Group (ver comentario en el struct):
+// EstadoCotizacion avanza pendiente -> cotizada -> aceptada|rechazada;
+// EstadoReservar solo aplica una vez aceptada la cotización.
+const (
+	GroupCotizacionPendiente = "pendiente"
+	GroupCotizacionCotizada  = "cotizada"
+	GroupCotizacionAceptada  = "aceptada"
+	GroupCotizacionRechazada = "rechazada"
+
+	GroupReservarConfirmada            = "confirmada"
+	GroupReservarCancelacionSolicitada = "cancelacion_solicitada"
+	GroupReservarCancelada             = "cancelada"
+)
+
+// Group representa una cotización de vuelo "a medida" (grupo), distinta del
+// catálogo fijo de Product: nace de una solicitud de usuario (uno o más
+// itinerarios candidatos) o de una carga directa del admin, pasa por una
+// cotización que el usuario debe aceptar, y recién luego de la confirmación
+// del admin se activan los datos operativos (nominación, emisión, gastos).
+type Group struct {
+	ID uint `gorm:"primaryKey" json:"id"`
+
+	// SolicitudID agrupa las N líneas nacidas de UNA misma solicitud (una fila
+	// por opción de itinerario) — permite mostrarlas juntas y que aceptar una
+	// opción rechace automáticamente a sus hermanas. Nil en grupos que el
+	// admin carga sueltos, sin pasar por el flujo de solicitud de usuario.
+	SolicitudID  *uuid.UUID `gorm:"type:uuid;column:solicitud_id;index" json:"solicitud_id,omitempty"`
+	OpcionNumero int        `gorm:"column:opcion_numero" json:"opcion_numero,omitempty"`
+
+	// Vendedor es el usuario dueño de esta cotización: quien la solicitó, o el
+	// usuario que el admin eligió al cargar un grupo de cero (para que solo
+	// ese usuario pueda ver/aceptar esa cotización puntual).
+	Vendedor uuid.UUID `gorm:"type:uuid;column:vendedor;index" json:"vendedor"`
+	Agency   string    `gorm:"column:agency" json:"agency"`
+
+	NotasVendedor     string `gorm:"column:notas_vendedor" json:"notas_vendedor"`
+	Itinerario        string `gorm:"column:itinerario" json:"itinerario"`
+	Ficha             string `gorm:"column:ficha" json:"ficha"`
+	Destino           string `gorm:"column:destino" json:"destino"`
+	Compania          string `gorm:"column:compania" json:"compania"`
+	Condiciones       string `gorm:"column:condiciones" json:"condiciones"`
+	NotasInternas     string `gorm:"column:notas_internas" json:"notas_internas,omitempty"`
+	NotasExternas     string `gorm:"column:notas_externas" json:"notas_externas,omitempty"`
+	IDAerolinea       string `gorm:"column:id_aerolinea" json:"id_aerolinea"`
+	CantidadLugares   int    `gorm:"column:cantidad_lugares" json:"cantidad_lugares"`
+	CantidadLiberados int    `gorm:"column:cantidad_liberados" json:"cantidad_liberados"`
+
+	Salida  *time.Time `gorm:"column:salida" json:"salida"`
+	Regreso *time.Time `gorm:"column:regreso" json:"regreso"`
+
+	PnrAirline   string  `gorm:"column:pnr_airline" json:"pnr_airline"`
+	PnrAgency    string  `gorm:"column:pnr_agency" json:"pnr_agency"`
+	Neto01       float64 `gorm:"column:neto_01" json:"neto_01"`
+	NetoLiberado float64 `gorm:"column:neto_liberado" json:"neto_liberado"`
+
+	VencimientoPago       *time.Time `gorm:"column:vencimiento_pago" json:"vencimiento_pago"`
+	NominationDate        *time.Time `gorm:"column:nomination_date" json:"nomination_date"`
+	VencimientoCotizacion *time.Time `gorm:"column:vencimiento_cotizacion" json:"vencimiento_cotizacion"`
+	FechaEmision          *time.Time `gorm:"column:fecha_emision" json:"fecha_emision"`
+	FechaGastos           *time.Time `gorm:"column:fecha_gastos" json:"fecha_gastos"`
+
+	// Máquina de estados de 2 fases — ver constantes GroupCotizacion*/GroupReservar* arriba.
+	EstadoCotizacion string `gorm:"column:estado_cotizacion;default:'pendiente'" json:"estado_cotizacion"`
+	EstadoReservar   string `gorm:"column:estado_reservar" json:"estado_reservar"`
+
+	// Espejo de Reservation.PreCancelEstado/CancelacionNotas: permite
+	// restaurar el estado previo si el admin rechaza una solicitud de
+	// cancelación en vez de aprobarla.
+	PreCancelEstadoReservar string `gorm:"column:pre_cancel_estado_reservar" json:"pre_cancel_estado_reservar,omitempty"`
+	CancelacionNotas        string `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Agency struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Code      string    `gorm:"unique;not null" json:"code"`

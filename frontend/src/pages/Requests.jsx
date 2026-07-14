@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X } from 'lucide-react';
+import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X, Luggage, Plus, CheckCircle2 } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -14,6 +14,31 @@ import { formatDateOnly } from '../lib/dateOnly.js';
 import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
+import GroupOptionsFields from '../components/GroupOptionsFields.jsx';
+import { useGroups, useRequestGroup, useAcceptGroupQuote, useRequestGroupCancellation } from '../hooks/useGroups';
+
+const GROUP_COTIZACION_LABEL = {
+  pendiente: 'Solicitada',
+  cotizada: 'Cotización disponible',
+  aceptada: 'Aceptada — esperando confirmación',
+  rechazada: 'Rechazada',
+};
+const GROUP_COTIZACION_VARIANT = {
+  pendiente: 'default',
+  cotizada: 'warning',
+  aceptada: 'success',
+  rechazada: 'danger',
+};
+const GROUP_RESERVAR_LABEL = {
+  confirmada: 'Confirmado',
+  cancelacion_solicitada: 'Cancelación solicitada',
+  cancelada: 'Cancelado',
+};
+const GROUP_RESERVAR_VARIANT = {
+  confirmada: 'success',
+  cancelacion_solicitada: 'warning',
+  cancelada: 'danger',
+};
 
 const statusVariant = (status) => {
   if (!status) return 'default';
@@ -39,6 +64,100 @@ export default function Requests() {
   const [docValue, setDocValue] = useState('');
   const [docSaving, setDocSaving] = useState(false);
   const [routeModal, setRouteModal] = useState(null); // { codigo_cupo, destino, ruta }
+
+  // ─── Solicitud de grupos (vuelos a medida) ───────────────────────────────
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [groupCantidadLugares, setGroupCantidadLugares] = useState('');
+  const [groupOptions, setGroupOptions] = useState([{ itinerario: '', notas: '' }]);
+  const [groupNotas, setGroupNotas] = useState('');
+
+  const { data: myGroupsResult } = useGroups();
+  const myGroups = Array.isArray(myGroupsResult) ? myGroupsResult : Array.isArray(myGroupsResult?.data) ? myGroupsResult.data : [];
+  const requestGroupMutation = useRequestGroup();
+  const acceptGroupMutation = useAcceptGroupQuote();
+  const requestGroupCancellationMutation = useRequestGroupCancellation();
+
+  const openGroupModal = () => {
+    setGroupCantidadLugares('');
+    setGroupOptions([{ itinerario: '', notas: '' }]);
+    setGroupNotas('');
+    setIsGroupModalOpen(true);
+  };
+
+  const submitGroupRequest = async () => {
+    const cantidad = Number(groupCantidadLugares);
+    if (!cantidad || cantidad <= 0) {
+      Swal.fire({ icon: 'warning', title: 'Cantidad requerida', text: 'Ingresá la cantidad de lugares.' });
+      return;
+    }
+    if (groupOptions.some((opt) => !opt.itinerario.trim())) {
+      Swal.fire({ icon: 'warning', title: 'Itinerario requerido', text: 'Completá el itinerario de cada opción.' });
+      return;
+    }
+    try {
+      await requestGroupMutation.mutateAsync({
+        cantidad_lugares: cantidad,
+        notas_vendedor: groupNotas,
+        opciones: groupOptions.map((opt) => ({ itinerario: opt.itinerario, notas: opt.notas })),
+      });
+      Swal.fire({ icon: 'success', title: 'Solicitud enviada', text: 'El administrador va a cargar la cotización a la brevedad.', timer: 2000, showConfirmButton: false });
+      setIsGroupModalOpen(false);
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo enviar la solicitud de grupo.' });
+    }
+  };
+
+  const handleAcceptGroup = async (group) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: '¿Aceptar esta opción?',
+      text: 'Las demás opciones de esta solicitud van a quedar rechazadas automáticamente.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, aceptar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await acceptGroupMutation.mutateAsync(group.id);
+      Swal.fire({ icon: 'success', title: '¡Aceptada!', text: 'Ahora queda esperando la confirmación del administrador.', timer: 2000, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo aceptar la cotización.' });
+    }
+  };
+
+  const handleRequestGroupCancellation = async (group) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: '¿Solicitar cancelación del grupo?',
+      text: 'El administrador decidirá si se cancela.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, solicitar',
+      cancelButtonText: 'No',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await requestGroupCancellationMutation.mutateAsync(group.id);
+      Swal.fire({ icon: 'success', title: 'Solicitud enviada', timer: 2000, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo enviar la solicitud.' });
+    }
+  };
+
+  // Agrupa visualmente las opciones que nacieron de una misma solicitud
+  // (solicitud_id compartido) para mostrarlas juntas en vez de sueltas.
+  const groupedMyGroups = useMemo(() => {
+    const bySolicitud = new Map();
+    const standalone = [];
+    myGroups.forEach((g) => {
+      if (!g.solicitud_id) {
+        standalone.push([g]);
+        return;
+      }
+      if (!bySolicitud.has(g.solicitud_id)) bySolicitud.set(g.solicitud_id, []);
+      bySolicitud.get(g.solicitud_id).push(g);
+    });
+    return [...bySolicitud.values(), ...standalone].sort((a, b) => (b[0].id || 0) - (a[0].id || 0));
+  }, [myGroups]);
 
   const stats = useMemo(
     () => [
@@ -142,14 +261,20 @@ export default function Requests() {
         description="Visualiza rápidamente el estado actual de las solicitudes de reserva."
         icon={ClipboardList}
         action={
-          <Button
-            size="sm"
-            onClick={refresh}
-            disabled={refreshing}
-            title="Refrescar datos"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={refresh}
+              disabled={refreshing}
+              title="Refrescar datos"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button size="sm" variant="secondary" onClick={openGroupModal} title="Solicitar un vuelo a medida (grupo)">
+              <Luggage className="h-4 w-4 mr-1" />
+              Solicitar Grupo
+            </Button>
+          </div>
         }
       />
 
@@ -282,6 +407,135 @@ export default function Requests() {
           </TableBody>
         </TableComponent>
       </Card>
+
+      {/* Mis solicitudes de grupo (vuelos a medida) */}
+      {groupedMyGroups.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Mis solicitudes de grupo</h2>
+              <p className="text-sm text-slate-500">Seguí el estado de tus vuelos a medida y aceptá cotizaciones cuando estén listas.</p>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {groupedMyGroups.map((opciones, idx) => (
+              <div key={opciones[0]?.id || idx} className="p-6 space-y-3">
+                {opciones.length > 1 && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Solicitud con {opciones.length} opciones
+                  </p>
+                )}
+                {opciones.map((group) => (
+                  <div key={group.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {group.opcion_numero > 0 && (
+                          <p className="text-xs font-medium text-slate-400">Opción {group.opcion_numero}</p>
+                        )}
+                        <p className="text-sm font-semibold text-slate-900">
+                          {group.destino || 'Destino a confirmar'} {group.compania ? `— ${group.compania}` : ''}
+                        </p>
+                        <p className="text-xs text-slate-500">Lugares: {group.cantidad_lugares || '—'}</p>
+                        {group.itinerario && (
+                          <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600 max-w-xl">{group.itinerario}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant={GROUP_COTIZACION_VARIANT[group.estado_cotizacion] || 'default'}>
+                          {GROUP_COTIZACION_LABEL[group.estado_cotizacion] || group.estado_cotizacion || 'Solicitada'}
+                        </Badge>
+                        {group.estado_reservar && (
+                          <Badge variant={GROUP_RESERVAR_VARIANT[group.estado_reservar] || 'default'}>
+                            {GROUP_RESERVAR_LABEL[group.estado_reservar] || group.estado_reservar}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {group.estado_cotizacion === 'cotizada' && (
+                      <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-4">
+                        {group.condiciones && <div className="col-span-2"><span className="text-slate-400">Condiciones:</span> {group.condiciones}</div>}
+                        {group.pnr_airline && <div><span className="text-slate-400">PNR Aerolínea:</span> {group.pnr_airline}</div>}
+                        {group.pnr_agency && <div><span className="text-slate-400">PNR Agencia:</span> {group.pnr_agency}</div>}
+                        {!!group.neto_01 && <div><span className="text-slate-400">Neto:</span> {formatMoney(group.neto_01)}</div>}
+                        {group.vencimiento_cotizacion && <div><span className="text-slate-400">Vence:</span> {formatDate(group.vencimiento_cotizacion)}</div>}
+                      </div>
+                    )}
+
+                    {group.estado_reservar === 'confirmada' && (
+                      <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-emerald-50 p-3 text-xs sm:grid-cols-4">
+                        {group.nomination_date && <div><span className="text-slate-400">Nominación:</span> {formatDate(group.nomination_date)}</div>}
+                        {group.fecha_emision && <div><span className="text-slate-400">Emisión:</span> {formatDate(group.fecha_emision)}</div>}
+                        {group.fecha_gastos && <div><span className="text-slate-400">Entrada en gastos:</span> {formatDate(group.fecha_gastos)}</div>}
+                        {group.vencimiento_pago && <div><span className="text-slate-400">Vencimiento de pago:</span> {formatDate(group.vencimiento_pago)}</div>}
+                        {group.notas_externas && <div className="col-span-2 sm:col-span-4"><span className="text-slate-400">Notas:</span> {group.notas_externas}</div>}
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex justify-end gap-2">
+                      {group.estado_cotizacion === 'cotizada' && (
+                        <Button size="sm" onClick={() => handleAcceptGroup(group)}>
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Aceptar esta opción
+                        </Button>
+                      )}
+                      {group.estado_reservar === 'confirmada' && (
+                        <Button size="sm" variant="secondary" onClick={() => handleRequestGroupCancellation(group)}>
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Solicitar cancelación
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Modal Solicitar Grupo */}
+      <Modal
+        title="Solicitar Grupo"
+        open={isGroupModalOpen}
+        onClose={() => setIsGroupModalOpen(false)}
+        size="2xl"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Pedí un vuelo a medida. Podés proponer más de una opción de itinerario — el administrador va a cotizar y vos elegís cuál te sirve.
+          </p>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Cantidad de lugares *</label>
+            <input
+              type="number"
+              min="1"
+              value={groupCantidadLugares}
+              onChange={(e) => setGroupCantidadLugares(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+          <GroupOptionsFields options={groupOptions} onChange={setGroupOptions} />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Notas (opcional)</label>
+            <textarea
+              value={groupNotas}
+              onChange={(e) => setGroupNotas(e.target.value)}
+              rows={2}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+          <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+            <Button variant="secondary" onClick={() => setIsGroupModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={submitGroupRequest} disabled={requestGroupMutation.isPending}>
+              {requestGroupMutation.isPending ? 'Enviando...' : 'Enviar solicitud'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Modal Doc. Contable */}
       <Modal
         title={`Doc. Contable — ${docModal?.pedido_id || ''}`}
