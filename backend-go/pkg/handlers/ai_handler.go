@@ -99,6 +99,7 @@ func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
 - Abrir el formulario real de reserva en la pantalla del usuario y completarlo con los pasajeros que me indique (o que extraiga de una foto de DNI/pasaporte), para que él lo revise y confirme con su propio botón
 - Leer fotos de documentos de identidad (DNI, pasaporte) — incluso varias juntas — para extraer nombre, apellido, documento, nacionalidad y fecha de nacimiento de cada pasajero
 - Llevar al usuario a cualquier otra pantalla de la aplicación que me pida ver
+- Pedir un vuelo a medida (Grupo) proponiendo una o más opciones de itinerario, ver el estado de tus propias solicitudes de grupo (pendiente/cotizada/aceptada/confirmada), aceptar una cotización cuando el admin la cargue, y solicitar la cancelación de un grupo ya confirmado
 
 NO PODÉS HACER (si te preguntan, decilo con total claridad, no lo disimules ni des vueltas):
 - Cambiar configuración del sistema, precios de productos, o datos de otros usuarios/agencias
@@ -113,6 +114,7 @@ ADEMÁS, por tu rol también PODÉS:
 - Confirmar cualquier reserva
 - Ver estadísticas, reportes y la rentabilidad (ventas, costos y margen)
 - Consultar qué permisos tiene un rol o un usuario puntual (herramienta "consultar_rol") — nunca modifica nada, solo lectura
+- Ver todas las solicitudes de grupo de tu agencia (o del sistema entero si sos admin), cargarles la cotización (destino, compañía, condiciones, PNRs, netos, vencimientos), confirmarlas una vez que el usuario aceptó, y resolver (aprobar o rechazar) sus pedidos de cancelación
 
 FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 - Si te preguntan por rentabilidad, ganancia, margen, "cuánto ganamos", costos o similar, llamá SIEMPRE a la herramienta "rentabilidad" — nunca la calcules a mano combinando otros datos, ni la des por no disponible sin haberla llamado primero.
@@ -233,6 +235,16 @@ BÚSQUEDA DE PRODUCTOS — REGLA CRÍTICA:
 - NUNCA digas "no hay productos disponibles" si la herramienta devolvió una lista de productos.
 - Si el usuario menciona un destino que no existe, muéstrale lo que hay y déjalo elegir.
 
+FLUJO PARA GRUPOS (vuelos a medida — IMPORTANTE, seguir exactamente):
+1. "Grupo" es distinto de una reserva sobre un producto ya cargado: es un vuelo a medida que el usuario propone y el admin cotiza después. Usalo cuando el usuario pida algo que no es un cupo ya publicado (ej. "necesito un vuelo grupal a Cancún para 15 personas", "quiero armar un charter").
+2. Pedí SIEMPRE la cantidad de lugares y al menos un itinerario propuesto (texto libre: aerolínea, fechas, tramos — lo que el usuario tenga, no hace falta que esté estructurado). El usuario puede dar más de una opción de itinerario si quiere que el admin le cotice varias alternativas — cada opción es un texto separado.
+3. Con esos datos llamá a "solicitar_grupo". Nunca inventes un itinerario si el usuario no te dio ninguno — preguntáselo antes de llamar la herramienta.
+4. Después de crear la solicitud, avisale al usuario que el administrador va a cargar la cotización y que se la vas a poder mostrar apenas esté lista (llamando a "mis_grupos" cuando pregunte por el estado).
+5. Cuando "mis_grupos" muestre una opción con estado_cotizacion "cotizada", mostrale al usuario los datos cargados (condiciones, PNRs, netos, vencimiento) y preguntale si la acepta. Si dice que sí, llamá a "aceptar_cotizacion_grupo" — nunca la aceptes sin que el usuario lo confirme explícitamente. Si hay varias opciones cotizadas de la misma solicitud, dejá que elija cuál.
+6. Una vez aceptada, el grupo queda esperando la confirmación del admin — no hay nada más que el usuario pueda hacer hasta entonces salvo consultar el estado.
+7. Si el usuario pide cancelar un grupo ya confirmado, llamá a "solicitar_cancelacion_grupo" (nunca lo canceles vos directamente — el admin tiene que aprobarlo).
+8. Si sos admin/agency_admin y te piden cargar o revisar cotizaciones de grupos, usá "todos_los_grupos" para listarlas y "cotizar_grupo" para completar los datos — pedile al usuario/admin los valores concretos antes de llamarla, nunca inventes condiciones, PNRs o montos.
+
 LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
 - Confirma los datos extraídos brevemente y úsalos para la reserva.
@@ -294,6 +306,7 @@ var knownPages = map[string]knownPage{
 	"perfil":                {Path: "/profile", Label: "Perfil"},
 	"notificaciones":        {Path: "/notificaciones", Label: "Notificaciones"},
 	"productos":             {Path: "/productos", Label: "Gestión de Productos", RequireRole: "admin"},
+	"grupos":                {Path: "/grupos", Label: "Grupos", RequireRole: "admin_or_agency_admin"},
 	"agencias":              {Path: "/agencias", Label: "Gestión de Agencias", RequireRole: "admin"},
 	"reservas":              {Path: "/reservas", Label: "Gestión de Reservas", RequireRole: "admin"},
 	"nominas":               {Path: "/nominas", Label: "Nóminas", RequireRole: "admin"},
@@ -425,6 +438,52 @@ func getTools(role string) []ToolDef {
 				Required: []string{"pagina"},
 			},
 		},
+		{
+			Name:        "mis_grupos",
+			Description: "Lista las solicitudes de grupo (vuelos a medida) del usuario actual, con su estado de cotización y de reserva. Para admins/agency_admin, solo trae las propias — para ver todas usar todos_los_grupos.",
+			Parameters:  ToolParam{Type: "object", Properties: map[string]ToolParam{}},
+		},
+		{
+			Name:        "solicitar_grupo",
+			Description: "Crea una solicitud de vuelo a medida (grupo) con una o más opciones de itinerario candidatas. El admin va a cotizar cada opción y el usuario elige cuál aceptar.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"cantidad_lugares": {Type: "string", Description: "OBLIGATORIO. Cantidad de lugares/pasajeros del grupo."},
+					"notas_vendedor":   {Type: "string", Description: "Notas generales sobre la solicitud (opcional)."},
+					"opciones": {
+						Type:        "array",
+						Description: "OBLIGATORIO. Al menos una opción de itinerario propuesta por el usuario (texto libre — lo que haya dado, no hace falta estructurado).",
+						Items: &ToolParam{
+							Type: "object",
+							Properties: map[string]ToolParam{
+								"itinerario": {Type: "string", Description: "Itinerario propuesto para esta opción"},
+								"notas":      {Type: "string", Description: "Aclaración puntual de esta opción (opcional)"},
+							},
+						},
+					},
+				},
+				Required: []string{"cantidad_lugares", "opciones"},
+			},
+		},
+		{
+			Name:        "aceptar_cotizacion_grupo",
+			Description: "Acepta una opción de grupo ya cotizada (estado_cotizacion = 'cotizada'). Si la solicitud tenía otras opciones, quedan rechazadas automáticamente. Nunca llamar sin que el usuario confirme explícitamente que quiere aceptar esa opción puntual.",
+			Parameters: ToolParam{
+				Type:       "object",
+				Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico de la opción de grupo (obtenido de mis_grupos)"}},
+				Required:   []string{"grupo_id"},
+			},
+		},
+		{
+			Name:        "solicitar_cancelacion_grupo",
+			Description: "Solicita la cancelación de un grupo ya confirmado (estado_reservar = 'confirmada'). El admin tiene que aprobarla — esto no cancela nada por sí solo.",
+			Parameters: ToolParam{
+				Type:       "object",
+				Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico del grupo"}},
+				Required:   []string{"grupo_id"},
+			},
+		},
 	}
 
 	if role == "admin" || role == "agency_admin" {
@@ -474,6 +533,64 @@ func getTools(role string) []ToolDef {
 						"rol":   {Type: "string", Description: "Nombre o código del rol a consultar (ej. 'Supervisor de Ventas' o 'SALES_SUPERVISOR')"},
 						"email": {Type: "string", Description: "Email del usuario cuyo rol/permisos se quiere consultar"},
 					},
+				},
+			},
+			ToolDef{
+				Name:        "todos_los_grupos",
+				Description: "Lista todas las solicitudes de grupo (vuelos a medida) — de tu agencia si sos agency_admin, o del sistema entero si sos admin.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"estado_cotizacion": {Type: "string", Description: "Filtrar por estado de cotización: pendiente, cotizada, aceptada, rechazada"},
+						"estado_reservar":   {Type: "string", Description: "Filtrar por estado de reserva: confirmada, cancelacion_solicitada, cancelada"},
+						"limit":             {Type: "string", Description: "Cantidad de resultados (default 20)"},
+					},
+				},
+			},
+			ToolDef{
+				Name:        "cotizar_grupo",
+				Description: "Completa o corrige los datos de cotización de una opción de grupo. Solo mandar los campos que el admin efectivamente indicó — nunca inventar condiciones, PNRs o montos que no te dieron.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"grupo_id":               {Type: "string", Description: "ID numérico de la opción de grupo (obtenido de todos_los_grupos)"},
+						"destino":                {Type: "string"},
+						"compania":               {Type: "string"},
+						"condiciones":            {Type: "string"},
+						"id_aerolinea":           {Type: "string"},
+						"pnr_airline":            {Type: "string"},
+						"pnr_agency":             {Type: "string"},
+						"neto_01":                {Type: "string", Description: "Neto 01 (número)"},
+						"neto_liberado":          {Type: "string", Description: "Neto liberado (número)"},
+						"cantidad_liberados":     {Type: "string", Description: "Cantidad de lugares liberados (número)"},
+						"salida":                 {Type: "string", Description: "Fecha de salida en formato YYYY-MM-DD"},
+						"regreso":                {Type: "string", Description: "Fecha de regreso en formato YYYY-MM-DD"},
+						"vencimiento_cotizacion": {Type: "string", Description: "Fecha en formato YYYY-MM-DD"},
+						"vencimiento_pago":       {Type: "string", Description: "Fecha en formato YYYY-MM-DD"},
+					},
+					Required: []string{"grupo_id"},
+				},
+			},
+			ToolDef{
+				Name:        "confirmar_grupo",
+				Description: "Confirma un grupo cuya cotización ya fue aceptada por el usuario — recién ahí se le revelan al usuario los datos de nominación, emisión y gastos.",
+				Parameters: ToolParam{
+					Type:       "object",
+					Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico del grupo"}},
+					Required:   []string{"grupo_id"},
+				},
+			},
+			ToolDef{
+				Name:        "resolver_cancelacion_grupo",
+				Description: "Aprueba o rechaza un pedido de cancelación de grupo pendiente.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"grupo_id": {Type: "string", Description: "ID numérico del grupo"},
+						"decision": {Type: "string", Enum: []string{"approve", "decline"}, Description: "'approve' para aprobar la cancelación, 'decline' para rechazarla"},
+						"notas":    {Type: "string", Description: "Notas sobre la decisión (opcional)"},
+					},
+					Required: []string{"grupo_id", "decision"},
 				},
 			},
 		)
@@ -999,6 +1116,138 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 
 		return `{"error": "Especificá 'rol' o 'email' para consultar"}`
 
+	case "todos_los_grupos":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para ver todos los grupos"}`
+		}
+		var grupos []models.Group
+		q := database.DB.Model(&models.Group{})
+		if u.Role == "agency_admin" {
+			q = q.Where("LOWER(agency) = LOWER(?)", u.Agencia)
+		}
+		if ec, ok := args["estado_cotizacion"].(string); ok && ec != "" {
+			q = q.Where("estado_cotizacion = ?", ec)
+		}
+		if er, ok := args["estado_reservar"].(string); ok && er != "" {
+			q = q.Where("estado_reservar = ?", er)
+		}
+		limit := 20
+		if l, ok := args["limit"].(string); ok {
+			if v, err := strconv.Atoi(l); err == nil {
+				limit = v
+			}
+		}
+		q.Order("created_at desc").Limit(limit).Find(&grupos)
+		b, _ := json.Marshal(map[string]interface{}{"grupos": grupos, "total": len(grupos)})
+		return string(b)
+
+	case "cotizar_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para cotizar grupos"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+
+		strArg := func(key string) (string, bool) {
+			v, ok := args[key]
+			if !ok || v == nil {
+				return "", false
+			}
+			s := fmt.Sprintf("%v", v)
+			return s, s != ""
+		}
+
+		updates := map[string]interface{}{}
+		for _, key := range []string{"destino", "compania", "condiciones", "id_aerolinea", "pnr_airline", "pnr_agency"} {
+			if v, ok := strArg(key); ok {
+				updates[key] = v
+			}
+		}
+		for _, key := range []string{"neto_01", "neto_liberado"} {
+			if v, ok := strArg(key); ok {
+				if f, err := strconv.ParseFloat(v, 64); err == nil {
+					updates[key] = f
+				}
+			}
+		}
+		if v, ok := strArg("cantidad_liberados"); ok {
+			if n, err := strconv.Atoi(v); err == nil {
+				updates["cantidad_liberados"] = n
+			}
+		}
+		for _, key := range []string{"salida", "regreso", "vencimiento_cotizacion", "vencimiento_pago"} {
+			if v, ok := strArg(key); ok {
+				updates[key] = parseDateFlexible(v)
+			}
+		}
+		if len(updates) == 0 {
+			return `{"error": "No se indicó ningún dato para cotizar"}`
+		}
+		if group.EstadoCotizacion == models.GroupCotizacionPendiente {
+			updates["estado_cotizacion"] = models.GroupCotizacionCotizada
+		}
+		database.DB.Model(&group).Updates(updates)
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "confirmar_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para confirmar grupos"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+		if group.EstadoCotizacion != models.GroupCotizacionAceptada {
+			return `{"error": "Solo se puede confirmar un grupo cuya cotización ya fue aceptada"}`
+		}
+		database.DB.Model(&group).Update("estado_reservar", models.GroupReservarConfirmada)
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "resolver_cancelacion_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para resolver cancelaciones de grupo"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+		if group.EstadoReservar != models.GroupReservarCancelacionSolicitada {
+			return `{"error": "Este grupo no tiene una solicitud de cancelación pendiente"}`
+		}
+		decision, _ := args["decision"].(string)
+		if decision != "approve" && decision != "decline" {
+			return `{"error": "decision debe ser 'approve' o 'decline'"}`
+		}
+		notas, _ := args["notas"].(string)
+		updates := map[string]interface{}{"cancelacion_notas": notas}
+		if decision == "approve" {
+			updates["estado_reservar"] = models.GroupReservarCancelada
+		} else {
+			updates["estado_reservar"] = group.PreCancelEstadoReservar
+		}
+		database.DB.Model(&group).Updates(updates)
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
 	case "buscar_usuarios":
 		if u.Role != "admin" {
 			return `{"error": "Solo administradores pueden buscar usuarios"}`
@@ -1123,6 +1372,103 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		}
 		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se completó el formulario con %d pasajero(s). El usuario ya lo puede revisar y confirmar.", len(pasajeros))})
 		return string(b)
+
+	case "mis_grupos":
+		var grupos []models.Group
+		database.DB.Where("vendedor = ?", u.ID).Order("created_at desc").Find(&grupos)
+		b, _ := json.Marshal(map[string]interface{}{"grupos": grupos, "total": len(grupos)})
+		return string(b)
+
+	case "solicitar_grupo":
+		cantidad, _ := strconv.Atoi(fmt.Sprintf("%v", args["cantidad_lugares"]))
+		if cantidad <= 0 {
+			return `{"error": "La cantidad de lugares debe ser mayor a 0"}`
+		}
+		notasVendedor, _ := args["notas_vendedor"].(string)
+		opcionesRaw, _ := args["opciones"].([]interface{})
+		if len(opcionesRaw) == 0 {
+			return `{"error": "Agregá al menos una opción de itinerario antes de solicitar el grupo"}`
+		}
+
+		solicitudID := uuid.New()
+		rows := make([]models.Group, 0, len(opcionesRaw))
+		for _, raw := range opcionesRaw {
+			m, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			itinerario, _ := m["itinerario"].(string)
+			if itinerario == "" {
+				continue
+			}
+			row := models.Group{
+				SolicitudID:      &solicitudID,
+				OpcionNumero:     len(rows) + 1,
+				Vendedor:         u.ID,
+				Agency:           u.Agencia,
+				NotasVendedor:    notasVendedor,
+				Itinerario:       itinerario,
+				CantidadLugares:  cantidad,
+				EstadoCotizacion: models.GroupCotizacionPendiente,
+			}
+			if notas, ok := m["notas"].(string); ok && notas != "" && notasVendedor == "" {
+				row.NotasVendedor = notas
+			}
+			rows = append(rows, row)
+		}
+		if len(rows) == 0 {
+			return `{"error": "No se pudo interpretar ninguna opción de itinerario"}`
+		}
+		if err := database.DB.Create(&rows).Error; err != nil {
+			return fmt.Sprintf(`{"error": "Error al crear la solicitud de grupo: %s"}`, err.Error())
+		}
+		b, _ := json.Marshal(map[string]interface{}{
+			"exito":   true,
+			"grupos":  rows,
+			"mensaje": fmt.Sprintf("Solicitud de grupo creada con %d opción(es). El administrador va a cargar la cotización.", len(rows)),
+		})
+		return string(b)
+
+	case "aceptar_cotizacion_grupo":
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role != "admin" && group.Vendedor != u.ID {
+			return `{"error": "Sin permiso para aceptar esta cotización"}`
+		}
+		if group.EstadoCotizacion != models.GroupCotizacionCotizada {
+			return `{"error": "Esta opción no tiene una cotización pendiente de aceptar"}`
+		}
+		database.DB.Model(&group).Update("estado_cotizacion", models.GroupCotizacionAceptada)
+		if group.SolicitudID != nil {
+			database.DB.Model(&models.Group{}).
+				Where("solicitud_id = ? AND id != ? AND estado_cotizacion IN ?", group.SolicitudID, group.ID,
+					[]string{models.GroupCotizacionPendiente, models.GroupCotizacionCotizada}).
+				Update("estado_cotizacion", models.GroupCotizacionRechazada)
+		}
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "solicitar_cancelacion_grupo":
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role != "admin" && u.Role != "agency_admin" && group.Vendedor != u.ID {
+			return `{"error": "Sin permiso"}`
+		}
+		if group.EstadoReservar != models.GroupReservarConfirmada {
+			return `{"error": "Solo se puede solicitar la cancelación de un grupo confirmado"}`
+		}
+		database.DB.Model(&group).Updates(map[string]interface{}{
+			"estado_reservar":            models.GroupReservarCancelacionSolicitada,
+			"pre_cancel_estado_reservar": group.EstadoReservar,
+		})
+		return `{"exito": true, "mensaje": "Solicitud de cancelación enviada. El administrador la va a revisar."}`
 
 	case "navegar_a_pantalla":
 		// Tampoco toca la DB — solo le pide al frontend que cambie de ruta.
