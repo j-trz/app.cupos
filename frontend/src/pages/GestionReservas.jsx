@@ -733,6 +733,8 @@ export default function GestionReservas() {
                           const product = {
                             ruta: r.vuelo_ruta,
                             destino: r.vuelo_destino,
+                            fecha_salida: r.vuelo_salida,
+                            pnr: liveProduct?.pnr,
                             carryon: liveProduct?.carryon,
                             handbag: liveProduct?.handbag,
                             checkedbag: liveProduct?.checkedbag,

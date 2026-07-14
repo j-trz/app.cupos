@@ -84,6 +84,41 @@ export const AIRPORTS = {
 
 };
 
+// Zona horaria IANA por aeropuerto — necesaria para calcular la duración real
+// de un vuelo (la hora de llegada es hora LOCAL de la ciudad de destino, no
+// tiempo transcurrido; sin la zona horaria de origen/destino no se puede
+// calcular la duración real, solo la diferencia entre relojes de pared).
+// Solo cubre los aeropuertos de AIRPORTS de arriba — si falta alguno, la
+// duración se muestra como "N/A" en vez de arriesgar un cálculo incorrecto.
+export const AIRPORT_TIMEZONES = {
+  EZE: 'America/Argentina/Buenos_Aires',
+  AEP: 'America/Argentina/Buenos_Aires',
+  MVD: 'America/Montevideo',
+  SCL: 'America/Santiago',
+  GRU: 'America/Sao_Paulo',
+  GIG: 'America/Sao_Paulo',
+  BOG: 'America/Bogota',
+  LIM: 'America/Lima',
+  MIA: 'America/New_York',
+  JFK: 'America/New_York',
+  LAX: 'America/Los_Angeles',
+  MAD: 'Europe/Madrid',
+  PUJ: 'America/Santo_Domingo',
+  CUN: 'America/Cancun',
+  AUA: 'America/Aruba',
+  CUR: 'America/Curacao',
+  PTY: 'America/Panama',
+  SJO: 'America/Costa_Rica',
+  MCZ: 'America/Maceio',
+  SSA: 'America/Bahia',
+  REC: 'America/Recife',
+  NAT: 'America/Fortaleza',
+  POA: 'America/Sao_Paulo',
+  FLN: 'America/Sao_Paulo',
+  FOR: 'America/Fortaleza',
+  CBF: 'America/Sao_Paulo',
+};
+
 const FALLBACK_LOGO = 'https://documents.sabre.com/static/images/tc/mail/icon-air.png';
 
 /**

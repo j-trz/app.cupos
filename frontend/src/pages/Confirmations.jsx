@@ -146,14 +146,14 @@ export default function Confirmations() {
       setPdfModalData({
         reservation: { pedido_id: item.Pedido_ID, estado: item.Estado },
         passengers,
-        product: { ruta: item.Ruta, destino: item.Vuelo_Destino, carryon: item.CarryOn, handbag: item.HandBag, checkedbag: item.CheckedBag },
+        product: { ruta: item.Ruta, destino: item.Vuelo_Destino, fecha_salida: item.Vuelo_Salida, pnr: item.Pnr, carryon: item.CarryOn, handbag: item.HandBag, checkedbag: item.CheckedBag },
       });
     } catch (error) {
       console.error('Error al obtener el detalle de la reserva para el itinerario:', error);
       setPdfModalData({
         reservation: { pedido_id: item.Pedido_ID, estado: item.Estado },
         passengers: fallbackPassengers,
-        product: { ruta: item.Ruta, destino: item.Vuelo_Destino, carryon: item.CarryOn, handbag: item.HandBag, checkedbag: item.CheckedBag },
+        product: { ruta: item.Ruta, destino: item.Vuelo_Destino, fecha_salida: item.Vuelo_Salida, pnr: item.Pnr, carryon: item.CarryOn, handbag: item.HandBag, checkedbag: item.CheckedBag },
       });
     } finally {
       setPdfLoadingId(null);
@@ -312,7 +312,7 @@ export default function Confirmations() {
                         title="Solicitar cancelación de esta reserva"
                       >
                         <XCircle className="h-3 w-3 mr-1" />
-                        Solicitar cancelación
+                        Cancelar
                       </Button>
                       <Button
                         size="sm"
