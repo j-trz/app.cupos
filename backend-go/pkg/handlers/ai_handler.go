@@ -39,12 +39,12 @@ type ChatRequest struct {
 	ImageBase64 string            `json:"imageBase64"` // base64 sin prefijo data:... (retrocompatibilidad)
 	ImageMime   string            `json:"imageMime"`   // "image/jpeg", "image/png", etc. (retrocompatibilidad)
 	Images      []ImageAttachment `json:"images"`      // Soporte para múltiples adjuntos
-<<<<<<< HEAD
 	// PageContext describe en qué pantalla está el usuario y qué tiene
 	// visible en este momento (ver AIPageContext.jsx en el frontend). Es
 	// efímero: se usa solo para armar el prompt de este turno, nunca se
 	// persiste en el historial de AIMessage.
 	PageContext *PageContextInput `json:"pageContext,omitempty"`
+	ExpertID    string            `json:"expertId"` // Experto elegido explícitamente por el usuario (opcional)
 }
 
 // PageContextInput es lo que el frontend manda en cada mensaje sobre la
@@ -69,9 +69,6 @@ type VisibleItemInput struct {
 type UIAction struct {
 	Type    string                 `json:"type"`
 	Payload map[string]interface{} `json:"payload"`
-=======
-	ExpertID    string            `json:"expertId"`    // Experto elegido explícitamente por el usuario (opcional)
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 }
 
 type userCtx struct {
@@ -86,11 +83,7 @@ type userCtx struct {
 // SYSTEM PROMPT
 // ─────────────────────────────────────────────
 
-<<<<<<< HEAD
-func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
-=======
-func buildSystemPrompt(u userCtx, experts []models.AIExpert) string {
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
+func buildSystemPrompt(u userCtx, pageCtx *PageContextInput, experts []models.AIExpert) string {
 	roleDesc := map[string]string{
 		"admin":        "Administrador con acceso total al sistema",
 		"agency_admin": "Administrador de agencia",
@@ -101,21 +94,9 @@ func buildSystemPrompt(u userCtx, experts []models.AIExpert) string {
 		roleDesc = "Agente de viajes"
 	}
 
-<<<<<<< HEAD
-	permisos := `PODÉS HACER (si te preguntan "qué podés hacer" / "qué sabés hacer", respondé con una lista COMPLETA y concreta basada en esto — nunca una respuesta vaga tipo "puedo ayudarte con reservas", nunca digas que no podés cambiar de pantalla o ejecutar acciones si más abajo figura que sí podés):
-- Buscar productos/cupos disponibles por destino, compañía, tipo o código, y decirte la disponibilidad real
-- Ver el detalle de tus propias reservas (fechas, estado, pasajeros, ficha, ticket)
-- Crear una reserva nueva de punta a punta vos mismo, sin que el usuario tenga que tocar ningún formulario
-- Abrir el formulario real de reserva en la pantalla del usuario y completarlo con los pasajeros que me indique (o que extraiga de una foto de DNI/pasaporte), para que él lo revise y confirme con su propio botón
-- Leer fotos de documentos de identidad (DNI, pasaporte) — incluso varias juntas — para extraer nombre, apellido, documento, nacionalidad y fecha de nacimiento de cada pasajero
-- Llevar al usuario a cualquier otra pantalla de la aplicación que me pida ver
-- Pedir un vuelo a medida (Grupo) proponiendo una o más opciones de itinerario, ver el estado de tus propias solicitudes de grupo (pendiente/cotizada/aceptada/confirmada), aceptar una cotización cuando el admin la cargue, y solicitar la cancelación de un grupo ya confirmado
-
-NO PODÉS HACER (si te preguntan, decilo con total claridad, no lo disimules ni des vueltas):
-- Cambiar configuración del sistema, precios de productos, o datos de otros usuarios/agencias
-- Modificar, corregir o eliminar una reserva ya creada (solo la podés crear; para editarla el usuario tiene que ir a la pantalla correspondiente)
-- Ver reservas o datos de un usuario/agencia que no sea la del usuario que te está hablando`
-=======
+	// EXPERTOS DISPONIBLES: sección independiente del "permisos" de abajo —
+	// se computa acá y se interpola aparte, cerca del cierre del prompt (ver
+	// expertsSection más abajo en el fmt.Sprintf final).
 	expertsSection := ""
 	if len(experts) > 0 {
 		var lines []string
@@ -133,12 +114,19 @@ Si el usuario pregunta algo que podría responderse con el conocimiento de algun
 `, strings.Join(lines, "\n"))
 	}
 
-	permisos := `Puedes ayudar con:
-- Buscar productos/cupos disponibles y verificar disponibilidad
-- Ver tus propias reservas
-- Crear nuevas reservas
-- Leer múltiples documentos de identidad (DNI, pasaportes) simultáneamente para extraer datos de pasajeros y realizar reservas masivas`
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
+	permisos := `PODÉS HACER (si te preguntan "qué podés hacer" / "qué sabés hacer", respondé con una lista COMPLETA y concreta basada en esto — nunca una respuesta vaga tipo "puedo ayudarte con reservas", nunca digas que no podés cambiar de pantalla o ejecutar acciones si más abajo figura que sí podés):
+- Buscar productos/cupos disponibles por destino, compañía, tipo o código, y decirte la disponibilidad real
+- Ver el detalle de tus propias reservas (fechas, estado, pasajeros, ficha, ticket)
+- Crear una reserva nueva de punta a punta vos mismo, sin que el usuario tenga que tocar ningún formulario
+- Abrir el formulario real de reserva en la pantalla del usuario y completarlo con los pasajeros que me indique (o que extraiga de una foto de DNI/pasaporte), para que él lo revise y confirme con su propio botón
+- Leer fotos de documentos de identidad (DNI, pasaporte) — incluso varias juntas — para extraer nombre, apellido, documento, nacionalidad y fecha de nacimiento de cada pasajero
+- Llevar al usuario a cualquier otra pantalla de la aplicación que me pida ver
+- Pedir un vuelo a medida (Grupo) proponiendo una o más opciones de itinerario, ver el estado de tus propias solicitudes de grupo (pendiente/cotizada/aceptada/confirmada), aceptar una cotización cuando el admin la cargue, y solicitar la cancelación de un grupo ya confirmado
+
+NO PODÉS HACER (si te preguntan, decilo con total claridad, no lo disimules ni des vueltas):
+- Cambiar configuración del sistema, precios de productos, o datos de otros usuarios/agencias
+- Modificar, corregir o eliminar una reserva ya creada (solo la podés crear; para editarla el usuario tiene que ir a la pantalla correspondiente)
+- Ver reservas o datos de un usuario/agencia que no sea la del usuario que te está hablando`
 
 	if u.Role == "admin" || u.Role == "agency_admin" {
 		permisos += `
@@ -304,14 +292,9 @@ MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Si ya tienes nombre, documento u otros datos del pasajero, no los pidas de nuevo.
 - Avanza siempre hacia el siguiente paso pendiente.
 %s
-<<<<<<< HEAD
-
+%s
 Responde siempre en español, de forma clara y concisa.`,
-		agenciaLabel, u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection)
-=======
-Responde siempre en español, de forma clara y concisa.`,
-		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, expertsSection)
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
+		agenciaLabel, u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection, expertsSection)
 }
 
 // ─────────────────────────────────────────────
@@ -333,7 +316,6 @@ type ToolDef struct {
 	Parameters  ToolParam `json:"parameters"`
 }
 
-<<<<<<< HEAD
 // knownPage es una pantalla a la que la IA puede navegar con el tool
 // navegar_a_pantalla — RequireRole vacío significa que cualquier rol
 // autenticado puede ir ahí.
@@ -380,10 +362,7 @@ var knownPageKeys = func() []string {
 	return keys
 }()
 
-func getTools(role string) []ToolDef {
-=======
 func getTools(role string, experts []models.AIExpert) []ToolDef {
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	tools := []ToolDef{
 		{
 			Name:        "buscar_productos",
@@ -441,7 +420,6 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 			},
 		},
 		{
-<<<<<<< HEAD
 			Name:        "abrir_modal_reserva",
 			Description: "Abre el formulario visual de reserva en la pantalla actual del usuario, para un producto puntual — todavía NO crea la reserva, el usuario la confirma manualmente después desde el formulario real. Preferir esto sobre crear_reserva cuando hay CONTEXTO DE PANTALLA con el formulario disponible y el usuario no pidió explícitamente que reserves sin que él confirme.",
 			Parameters: ToolParam{
@@ -532,7 +510,9 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 				Type:       "object",
 				Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico del grupo"}},
 				Required:   []string{"grupo_id"},
-=======
+			},
+		},
+		{
 			Name: "generar_itinerario_pdf",
 			Description: "Genera los datos para armar el itinerario de vuelo en PDF de UNA reserva propia del usuario " +
 				"(o de su agencia si es agency_admin/admin). Identificá la reserva por el número de pedido/localizador " +
@@ -556,7 +536,6 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 					"identificador": {Type: "string", Description: "Número de pedido/localizador, ID interno, o destino/nombre de contacto"},
 				},
 				Required: []string{"identificador"},
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 			},
 		},
 	}
@@ -2298,10 +2277,6 @@ func Chat(c *gin.Context) {
 			Find(&history)
 	}
 
-<<<<<<< HEAD
-	systemPrompt := buildSystemPrompt(u, req.PageContext)
-	tools := getTools(role)
-=======
 	// Expertos activos visibles para el usuario (scopeados a su agencia,
 	// salvo admin que ve los de todas) — se ofrecen como una tool más
 	// (consultar_experto), no como un sistema paralelo.
@@ -2312,7 +2287,7 @@ func Chat(c *gin.Context) {
 	}
 	expertsQuery.Find(&experts)
 
-	systemPrompt := buildSystemPrompt(u, experts)
+	systemPrompt := buildSystemPrompt(u, req.PageContext, experts)
 	tools := getTools(role, experts)
 
 	// Si el usuario eligió explícitamente un experto (selector en el chat),
@@ -2331,7 +2306,6 @@ func Chat(c *gin.Context) {
 			}
 		}
 	}
->>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
 	// Construir mensaje inicial del usuario (con o sin imagen/es)
 	var userContent interface{}

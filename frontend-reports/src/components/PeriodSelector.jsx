@@ -14,11 +14,7 @@ const PERIOD_OPTIONS = [
 
 export default function PeriodSelector({ value = 'mes', onChange, disabled = false }) {
   const [isOpen, setIsOpen] = useState(false);
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> main
   const selectedOption = PERIOD_OPTIONS.find(o => o.value === value) || PERIOD_OPTIONS[0];
 
   const handleSelect = (optionValue) => {
@@ -59,11 +55,7 @@ export default function PeriodSelector({ value = 'mes', onChange, disabled = fal
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> main
           {/* Dropdown menu */}
           <div className="absolute right-0 mt-1 z-20 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150">
             {PERIOD_OPTIONS.map((option) => (
@@ -72,13 +64,8 @@ export default function PeriodSelector({ value = 'mes', onChange, disabled = fal
                 onClick={() => handleSelect(option.value)}
                 className={`
                   w-full text-left px-3 py-1.5 text-xs
-<<<<<<< HEAD
                   ${value === option.value
                     ? 'bg-blue-50 text-blue-700 font-medium'
-=======
-                  ${value === option.value 
-                    ? 'bg-blue-50 text-blue-700 font-medium' 
->>>>>>> main
                     : 'text-gray-700 hover:bg-gray-50'
                   }
                   transition-colors duration-100

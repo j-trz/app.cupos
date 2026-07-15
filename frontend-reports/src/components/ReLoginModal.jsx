@@ -15,28 +15,16 @@ export default function ReLoginModal({ isOpen, onReLogin, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-<<<<<<< HEAD
 
     const safeEmail = sanitize(email);
     // La contraseña no se sanitiza para no corromper caracteres especiales
     const rawPassword = password.trim();
 
-=======
-    
-    const safeEmail = sanitize(email);
-    // La contraseña no se sanitiza para no corromper caracteres especiales
-    const rawPassword = password.trim();
-    
->>>>>>> main
     if (!safeEmail || !rawPassword) {
       setError('Completa todos los campos.');
       return;
     }
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> main
     setLoading(true);
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
     try {
@@ -47,15 +35,9 @@ export default function ReLoginModal({ isOpen, onReLogin, onCancel }) {
         body: JSON.stringify({ email: safeEmail, password: rawPassword }),
         credentials: 'include',
       });
-<<<<<<< HEAD
 
       const result = await resp.json();
 
-=======
-      
-      const result = await resp.json();
-      
->>>>>>> main
       if (!resp.ok || !result.token) {
         setError(result.error || 'Credenciales incorrectas.');
       } else {
@@ -77,11 +59,7 @@ export default function ReLoginModal({ isOpen, onReLogin, onCancel }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 bg-opacity-50">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative animate-fadeIn">
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> main
         {/* Icono de advertencia */}
         <div className="flex flex-col items-center mb-6">
           <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
@@ -108,11 +86,7 @@ export default function ReLoginModal({ isOpen, onReLogin, onCancel }) {
               autoFocus
             />
           </div>
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> main
           <div>
             <label className="block text-sm font-semibold mb-2 text-[#304D85]">Contraseña</label>
             <input
@@ -126,21 +100,13 @@ export default function ReLoginModal({ isOpen, onReLogin, onCancel }) {
               placeholder="********"
             />
           </div>
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> main
           {error && (
             <div className="text-red-600 text-sm font-semibold text-center bg-red-50 p-3 rounded-lg">
               {error}
             </div>
           )}
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> main
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -172,11 +138,7 @@ export default function ReLoginModal({ isOpen, onReLogin, onCancel }) {
             </button>
           </div>
         </form>
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> main
         <div className="mt-6 text-xs text-gray-500 text-center">
           Tus datos y filtros se mantendrán tal como los dejaste
         </div>

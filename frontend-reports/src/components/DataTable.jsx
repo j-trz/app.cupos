@@ -67,11 +67,7 @@ export default function DataTable({ columns, data, rentabilidadData, costoData, 
     if (newRow["_disponibles_original"] === undefined) {
       newRow["_disponibles_original"] = newRow["Lugares disponibles"];
     }
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> main
     if (newRow["Costo total"] === undefined || newRow["Costo total"] === null) newRow["Costo total"] = 0;
 
     // Si el backend ya envía Riesgo, respetarlo. Fallback local: disponibles * NETO 1 unitario.

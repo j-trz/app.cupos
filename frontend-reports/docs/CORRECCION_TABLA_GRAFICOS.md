@@ -105,11 +105,7 @@ En Render Dashboard -> Logs, buscar:
 
 ### **Gráficos por Destino**
 - [ ] "Lugares vendidos por destino" - barras con datos
-<<<<<<< HEAD
 - [ ] "Lugares disponibles por destino" - barras con datos
-=======
-- [ ] "Lugares disponibles por destino" - barras con datos  
->>>>>>> main
 - [ ] "Lugares cancelados por destino" - barras con datos
 - [ ] "Rentabilidad por destino" - barras con datos
 - [ ] "Costo por destino" - barras con datos
@@ -176,11 +172,7 @@ git push origin main
 
 **🎉 CORREGIDO**: La tabla y gráficos por destino ahora funcionan correctamente usando:
 - ✅ **Endpoints probados** (detalle-destinos, evolucion-pasajeros)
-<<<<<<< HEAD
 - ✅ **Carga paralela** para mejor rendimiento
-=======
-- ✅ **Carga paralela** para mejor rendimiento  
->>>>>>> main
 - ✅ **Caché activo** en backend para optimización
 - ✅ **Funcionalidad completa** garantizada
 
