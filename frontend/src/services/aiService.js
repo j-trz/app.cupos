@@ -9,11 +9,22 @@ class AIService {
   /**
    * Enviar mensaje al asistente IA con soporte para múltiples imágenes/adjuntos
    */
+<<<<<<< HEAD
+  static async sendMessage(message, sessionId = null, images = [], providerId = null, pageContext = null) {
+    const payload = { message };
+    if (sessionId) payload.sessionId = sessionId;
+    if (providerId) payload.providerId = providerId;
+    // Contexto efímero de la pantalla actual (ver AIPageContext.jsx) — le
+    // permite a la IA responder sobre lo que el usuario ve y resolver
+    // referencias posicionales ("la primera opción").
+    if (pageContext && pageContext.page) payload.pageContext = pageContext;
+=======
   static async sendMessage(message, sessionId = null, images = [], providerId = null, expertId = null) {
     const payload = { message };
     if (sessionId) payload.sessionId = sessionId;
     if (providerId) payload.providerId = providerId;
     if (expertId) payload.expertId = expertId;
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
     if (images && images.length > 0) {
       // Envía todas las imágenes cargadas
@@ -55,13 +66,6 @@ class AIService {
    */
   static async updateSessionTitle(sessionId, title) {
     return ApiClient.put(`/ai/sessions/${sessionId}/title`, { title });
-  }
-
-  /**
-   * Obtener acciones disponibles
-   */
-  static async getActions() {
-    return ApiClient.get('/ai/actions');
   }
 
   // ==========================================
@@ -108,27 +112,6 @@ class AIService {
    */
   static async testProvider(providerId) {
     return ApiClient.post(`/ai/providers/${providerId}/test`, {});
-  }
-
-  /**
-   * Crear nueva acción para el agente IA
-   */
-  static async createAction(action) {
-    return ApiClient.post('/ai/actions', action);
-  }
-
-  /**
-   * Actualizar acción del agente IA
-   */
-  static async updateAction(actionId, action) {
-    return ApiClient.put(`/ai/actions/${actionId}`, action);
-  }
-
-  /**
-   * Eliminar acción del agente IA
-   */
-  static async deleteAction(actionId) {
-    return ApiClient.delete(`/ai/actions/${actionId}`);
   }
 
   /**

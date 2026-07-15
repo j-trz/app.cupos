@@ -49,7 +49,7 @@ const CardDescription = ({ className, ...props }) => {
 
 // Contenido de la tarjeta
 const CardContent = ({ className, ...props }) => {
-  return <div className={clsx('p-6 pt-0', className)} {...props} />;
+  return <div className={clsx('p-4 pt-0', className)} {...props} />;
 };
 
 // Footer de la tarjeta

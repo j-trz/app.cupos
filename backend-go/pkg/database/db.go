@@ -1,12 +1,14 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
 	"backend-go/pkg/models"
 
+	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -44,23 +46,275 @@ func InitDB() {
 		&models.RolePermission{},
 		&models.EmailSMTPConfig{},
 		&models.EmailTemplate{},
+		&models.NotificationTemplate{},
 		&models.SystemLog{},
 		&models.AIProvider{},
-		&models.AIAction{},
 		&models.AISession{},
 		&models.AIMessage{},
 		&models.ProductSharedAgency{},
+<<<<<<< HEAD
+		&models.Group{},
+=======
 		&models.AIExpert{},
 		&models.AIExpertDocument{},
 		&models.AIExpertChunk{},
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
 	runSQLMigrations(db)
 
 	seedEmailTemplates(db)
+	seedSystemSettings(db)
+	seedNotificationTemplates(db)
+	seedRBAC(db)
 
 	DB = db
+}
+
+// seedRBAC siembra el esquema granular de permisos (MODULO_ACCION) y los 5
+// roles de sistema con sus permisos por defecto — la migración
+// database/migrations/001_create_permissions_system.sql que documentaba este
+// mismo esquema nunca se ejecutó contra la base real (confirmado: ninguna
+// referencia a ese archivo en el código Go), así que se siembra acá con el
+// mismo patrón que seedEmailTemplates/seedNotificationTemplates/
+// seedSystemSettings. Se agregan además los módulos que existen hoy y no
+// estaban cubiertos (transfers, notification_templates, logs, backup) para
+// cubrir "todos los aspectos del sitio".
+//
+// Además, migra a cada usuario existente sin ninguna fila en UserRole hacia
+// el rol de sistema equivalente a su Profile.Role actual, para que nadie
+// pierda acceso el día de este deploy (admin→SUPER_ADMIN,
+// agency_admin→AGENCY_ADMIN, cualquier otro→SALES_AGENT).
+func seedRBAC(db *gorm.DB) {
+	permissions := []struct {
+		Code, Name, Module, Action, Description string
+	}{
+		{"DASHBOARD_VIEW", "Ver Dashboard", "dashboard", "view", "Acceso al panel principal"},
+
+		{"USERS_VIEW", "Ver Usuarios", "users", "view", "Listar y buscar usuarios"},
+		{"USERS_CREATE", "Crear Usuarios", "users", "create", "Crear nuevos usuarios"},
+		{"USERS_UPDATE", "Editar Usuarios", "users", "update", "Modificar datos de usuarios"},
+		{"USERS_DELETE", "Eliminar Usuarios", "users", "delete", "Eliminar usuarios"},
+		{"USERS_UNLOCK", "Desbloquear Usuarios", "users", "unlock", "Desbloquear cuentas de usuarios"},
+
+		{"AGENCIES_VIEW", "Ver Agencias", "agencies", "view", "Listar y buscar agencias"},
+		{"AGENCIES_CREATE", "Crear Agencias", "agencies", "create", "Crear nuevas agencias"},
+		{"AGENCIES_UPDATE", "Editar Agencias", "agencies", "update", "Modificar datos de agencias"},
+		{"AGENCIES_DELETE", "Eliminar Agencias", "agencies", "delete", "Eliminar agencias"},
+
+		{"PRODUCTS_VIEW", "Ver Productos", "products", "view", "Listar y buscar productos"},
+		{"PRODUCTS_CREATE", "Crear Productos", "products", "create", "Crear nuevos productos"},
+		{"PRODUCTS_UPDATE", "Editar Productos", "products", "update", "Modificar datos de productos"},
+		{"PRODUCTS_DELETE", "Eliminar Productos", "products", "delete", "Eliminar productos"},
+
+		{"GROUPS_VIEW", "Ver Grupos", "groups", "view", "Listar y gestionar solicitudes de grupo"},
+		{"GROUPS_CREATE", "Crear Grupos", "groups", "create", "Cargar un grupo nuevo desde cero"},
+		{"GROUPS_UPDATE", "Editar Grupos", "groups", "update", "Cotizar, confirmar y editar grupos"},
+		{"GROUPS_DELETE", "Eliminar Grupos", "groups", "delete", "Eliminar grupos"},
+
+		{"RESERVATIONS_VIEW", "Ver Reservas", "reservations", "view", "Listar y buscar reservas"},
+		{"RESERVATIONS_CREATE", "Crear Reservas", "reservations", "create", "Crear nuevas reservas"},
+		{"RESERVATIONS_UPDATE", "Editar Reservas", "reservations", "update", "Modificar reservas"},
+		{"RESERVATIONS_DELETE", "Eliminar Reservas", "reservations", "delete", "Eliminar reservas"},
+		{"RESERVATIONS_CONFIRM", "Confirmar Reservas", "reservations", "confirm", "Confirmar reservas pendientes"},
+
+		{"TRANSFERS_VIEW", "Ver Cesiones", "transfers", "view", "Ver cesiones de disponibilidad entre agencias"},
+		{"TRANSFERS_CREATE", "Crear Cesiones", "transfers", "create", "Ceder disponibilidad a otra agencia"},
+
+		{"NOTIFICATIONS_VIEW", "Ver Notificaciones", "notifications", "view", "Listar notificaciones"},
+		{"NOTIFICATIONS_CREATE", "Crear Notificaciones", "notifications", "create", "Crear notificaciones del sistema"},
+		{"NOTIFICATIONS_DELETE", "Eliminar Notificaciones", "notifications", "delete", "Eliminar notificaciones"},
+
+		{"NOTIFICATION_TEMPLATES_VIEW", "Ver Plantillas de Notificación", "notification_templates", "view", "Ver plantillas de notificaciones internas"},
+		{"NOTIFICATION_TEMPLATES_UPDATE", "Editar Plantillas de Notificación", "notification_templates", "update", "Modificar plantillas de notificaciones internas"},
+
+		{"SETTINGS_VIEW", "Ver Configuración", "settings", "view", "Ver configuración del sistema"},
+		{"SETTINGS_UPDATE", "Editar Configuración", "settings", "update", "Modificar configuración del sistema"},
+
+		{"WHITE_LABEL_VIEW", "Ver Marca Blanca", "white_label", "view", "Ver configuración de marca blanca"},
+		{"WHITE_LABEL_UPDATE", "Editar Marca Blanca", "white_label", "update", "Modificar configuración de marca blanca"},
+
+		{"EMAIL_VIEW", "Ver Config Email", "email", "view", "Ver configuración SMTP"},
+		{"EMAIL_UPDATE", "Editar Config Email", "email", "update", "Modificar configuración SMTP"},
+
+		{"AI_VIEW", "Ver Config IA", "ai", "view", "Ver configuración de IA"},
+		{"AI_UPDATE", "Editar Config IA", "ai", "update", "Modificar configuración de IA"},
+
+		{"LOGS_VIEW", "Ver Logs del Sitio", "logs", "view", "Ver logs y eventos del sistema"},
+
+		{"BACKUP_VIEW", "Ver Backups", "backup", "view", "Ver backups del sistema"},
+		{"BACKUP_CREATE", "Crear Backups", "backup", "create", "Generar un backup del sistema"},
+
+		{"PERMISSIONS_VIEW", "Ver Permisos", "permissions", "view", "Listar permisos"},
+		{"PERMISSIONS_CREATE", "Crear Permisos", "permissions", "create", "Crear nuevos permisos"},
+		{"PERMISSIONS_UPDATE", "Editar Permisos", "permissions", "update", "Modificar permisos"},
+		{"PERMISSIONS_DELETE", "Eliminar Permisos", "permissions", "delete", "Eliminar permisos"},
+
+		{"ROLES_VIEW", "Ver Roles", "roles", "view", "Listar roles"},
+		{"ROLES_CREATE", "Crear Roles", "roles", "create", "Crear nuevos roles"},
+		{"ROLES_UPDATE", "Editar Roles", "roles", "update", "Modificar roles"},
+		{"ROLES_DELETE", "Eliminar Roles", "roles", "delete", "Eliminar roles"},
+		{"ROLES_ASSIGN_PERMISSIONS", "Asignar Permisos", "roles", "assign", "Asignar permisos a roles"},
+
+		{"REPORTS_VIEW", "Ver Reportes", "reports", "view", "Acceder a reportes y estadísticas"},
+		{"REPORTS_EXPORT", "Exportar Datos", "reports", "export", "Exportar datos en CSV/Excel/PDF"},
+	}
+	for _, p := range permissions {
+		var count int64
+		db.Model(&models.Permission{}).Where("code = ?", p.Code).Count(&count)
+		if count == 0 {
+			db.Create(&models.Permission{
+				Code: p.Code, Name: p.Name, Module: p.Module, Action: p.Action,
+				Description: p.Description, IsActive: true,
+			})
+		}
+	}
+
+	roles := []struct {
+		Code, Name, Description string
+	}{
+		{"SUPER_ADMIN", "Administrador Total", "Acceso total al sistema con todos los permisos"},
+		{"AGENCY_ADMIN", "Administrador de Agencia", "Administrador con acceso completo a su agencia"},
+		{"SALES_SUPERVISOR", "Supervisor de Ventas", "Puede gestionar reservas y productos de su agencia"},
+		{"SALES_AGENT", "Agente de Ventas", "Puede crear y gestionar reservas"},
+		{"VIEWER", "Solo Consulta", "Solo puede ver información sin modificar"},
+	}
+	// Solo se asignan permisos por defecto al MOMENTO de crear un rol de
+	// sistema — si el rol ya existía (de un boot anterior), no se
+	// re-asignan, para no pisar una personalización que un admin haya hecho
+	// desde GestionRoles.jsx.
+	newRoleIDs := map[string]uuid.UUID{}
+	for _, r := range roles {
+		var existing models.Role
+		if err := db.Where("code = ?", r.Code).First(&existing).Error; err != nil {
+			role := models.Role{Code: r.Code, Name: r.Name, Description: r.Description, IsSystem: true, IsActive: true}
+			db.Create(&role)
+			newRoleIDs[r.Code] = role.ID
+		}
+	}
+
+	if len(newRoleIDs) > 0 {
+		var allPermissions []models.Permission
+		db.Find(&allPermissions)
+
+		assign := func(roleCode string, matches func(models.Permission) bool) {
+			roleID, ok := newRoleIDs[roleCode]
+			if !ok {
+				return
+			}
+			for _, p := range allPermissions {
+				if matches(p) {
+					db.Create(&models.RolePermission{RoleID: roleID, PermissionID: p.ID})
+				}
+			}
+		}
+
+		assign("SUPER_ADMIN", func(p models.Permission) bool { return true })
+		assign("AGENCY_ADMIN", func(p models.Permission) bool {
+			// Puede crear/gestionar roles personalizados para su propia agencia
+			// (el scoping por agencia se valida a nivel de handler, no acá) y
+			// necesita ver el catálogo de permisos para armar esos roles — pero
+			// no puede definir permisos nuevos ni tocar logs/backups del sistema.
+			switch p.Module {
+			case "backup", "logs":
+				return false
+			case "permissions":
+				return p.Action == "view"
+			}
+			return true
+		})
+		assign("SALES_SUPERVISOR", func(p models.Permission) bool {
+			switch p.Module {
+			case "dashboard", "products", "reservations", "transfers", "notifications", "reports":
+				return true
+			}
+			return false
+		})
+		// SALES_AGENT es el rol al que se migra automáticamente todo usuario
+		// "user"/"agency_user" existente (ver más abajo) — es deliberadamente
+		// básico. NO incluye PRODUCTS_VIEW ni RESERVATIONS_VIEW: esos códigos
+		// son justamente los que Sidebar.jsx usa para mostrar los ítems de
+		// GESTIÓN ("Gestión de Productos", "Reservas", "Nóminas" — las
+		// pantallas de administración), a diferencia de Disponibilidad/
+		// Solicitudes/Confirmaciones (pantallas base, sin gate, que sí puede
+		// usar cualquier agente). Si se agregaran acá, cualquier usuario
+		// básico vería esas pantallas de gestión en el sidebar sin que nadie
+		// se lo haya otorgado explícitamente.
+		salesAgentCodes := map[string]bool{
+			"DASHBOARD_VIEW": true, "RESERVATIONS_CREATE": true, "RESERVATIONS_UPDATE": true,
+			"NOTIFICATIONS_VIEW": true,
+		}
+		assign("SALES_AGENT", func(p models.Permission) bool { return salesAgentCodes[p.Code] })
+		assign("VIEWER", func(p models.Permission) bool { return p.Action == "view" })
+	}
+
+	// Corrección idempotente (corre en cada boot, no solo al crear el rol):
+	// si SALES_AGENT ya tenía PRODUCTS_VIEW/RESERVATIONS_VIEW asignados por
+	// una versión anterior de este seed, se revocan — esos permisos no le
+	// corresponden a un agente básico (ver comentario arriba).
+	var salesAgentRole models.Role
+	if err := db.Where("code = ? AND is_system = true", "SALES_AGENT").First(&salesAgentRole).Error; err == nil {
+		var leaked []models.Permission
+		db.Where("code IN ?", []string{"PRODUCTS_VIEW", "RESERVATIONS_VIEW"}).Find(&leaked)
+		if len(leaked) > 0 {
+			leakedIDs := make([]uuid.UUID, len(leaked))
+			for i, p := range leaked {
+				leakedIDs[i] = p.ID
+			}
+			db.Where("role_id = ? AND permission_id IN ?", salesAgentRole.ID, leakedIDs).Delete(&models.RolePermission{})
+		}
+	}
+
+	// Migración aditiva: todo Profile sin ninguna fila en UserRole recibe el
+	// rol de sistema equivalente a su Profile.Role actual.
+	var migrationRoles []models.Role
+	db.Where("code IN ?", []string{"SUPER_ADMIN", "AGENCY_ADMIN", "SALES_AGENT"}).Find(&migrationRoles)
+	roleIDByCode := map[string]uuid.UUID{}
+	for _, r := range migrationRoles {
+		roleIDByCode[r.Code] = r.ID
+	}
+
+	var profiles []models.Profile
+	db.Find(&profiles)
+	for _, profile := range profiles {
+		var count int64
+		db.Model(&models.UserRole{}).Where("user_id = ?", profile.ID).Count(&count)
+		if count > 0 {
+			continue
+		}
+		targetCode := "SALES_AGENT"
+		switch profile.Role {
+		case "admin":
+			targetCode = "SUPER_ADMIN"
+		case "agency_admin":
+			targetCode = "AGENCY_ADMIN"
+		}
+		roleID, ok := roleIDByCode[targetCode]
+		if !ok {
+			continue
+		}
+		db.Create(&models.UserRole{UserID: profile.ID, RoleID: roleID})
+	}
+}
+
+// seedSystemSettings crea los ajustes globales por defecto si todavía no
+// existen, para que ListSettings/Settings.jsx los muestre desde el primer
+// arranque y GetIntSetting tenga algo que leer aunque nadie los haya tocado.
+func seedSystemSettings(db *gorm.DB) {
+	defaults := map[string]interface{}{
+		"bloqueo_minutos_default": 60,
+		"ai_historial_horas":      4,
+		"dias_aviso_vencimientos": 3,
+	}
+	for key, value := range defaults {
+		var count int64
+		db.Model(&models.SystemSetting{}).Where("key = ?", key).Count(&count)
+		if count == 0 {
+			valueJSON, _ := json.Marshal(value)
+			db.Create(&models.SystemSetting{Key: key, Value: valueJSON})
+		}
+	}
 }
 
 // seedEmailTemplates crea las plantillas globales por defecto (AgencyID = nil)
@@ -109,6 +363,75 @@ func seedEmailTemplates(db *gorm.DB) {
 	for _, tpl := range defaults {
 		var count int64
 		db.Model(&models.EmailTemplate{}).Where("code = ? AND agency_id IS NULL", tpl.Code).Count(&count)
+		if count == 0 {
+			db.Create(&tpl)
+		}
+	}
+}
+
+// seedNotificationTemplates crea las plantillas globales de notificaciones
+// in-app (campana) con el mismo texto que los handlers armaban antes a mano
+// con fmt.Sprintf, para que un admin las pueda editar desde
+// NotificationTemplates.jsx sin que cambie el comportamiento por defecto.
+func seedNotificationTemplates(db *gorm.DB) {
+	defaults := []models.NotificationTemplate{
+		{Code: "new_request", Name: "Nueva reserva creada", Title: "Nueva reserva creada",
+			Message: "Agencia {{agencia}} creó la reserva {{pasajero}} (pedido {{pedido_id}})"},
+		{Code: "low_availability", Name: "Baja disponibilidad", Title: "Baja disponibilidad",
+			Message: "El producto {{codigo_cupo}} hacia {{destino}} quedó con {{disponibilidad}} cupos disponibles"},
+		{Code: "request_confirmed_admin", Name: "Reserva confirmada (aviso a admin)", Title: "Reserva confirmada",
+			Message: "La reserva {{pasajero}} (pedido {{pedido_id}}) fue confirmada"},
+		{Code: "request_confirmed_user", Name: "Reserva confirmada (aviso al usuario)", Title: "Tu reserva fue confirmada",
+			Message: "Tu reserva del pedido {{pedido_id}} fue confirmada"},
+		{Code: "reservation_deleted", Name: "Reserva eliminada", Title: "Reserva eliminada",
+			Message: "Se eliminó la reserva del pedido {{pedido_id}} y se liberó el cupo"},
+		{Code: "passenger_deleted", Name: "Pasajero eliminado", Title: "Pasajero eliminado",
+			Message: "Se eliminó a {{nombre}} {{apellido}} del pedido {{pedido_id}} y se liberó su lugar"},
+		{Code: "cancellation_pending", Name: "Solicitud de cancelación pendiente", Title: "Solicitud de cancelación pendiente",
+			Message: "La reserva del pedido {{pedido_id}} tiene una solicitud de cancelación pendiente de revisión"},
+		{Code: "passenger_duplicated", Name: "Pasajero duplicado", Title: "Pasajero duplicado",
+			Message: "Se agregó un pasajero duplicado de {{nombre}} {{apellido}} al pedido {{pedido_id}}"},
+		{Code: "passenger_added", Name: "Pasajero agregado", Title: "Pasajero agregado",
+			Message: "Se agregó un nuevo pasajero al pedido {{pedido_id}}"},
+		{Code: "new_product", Name: "Nuevo producto disponible", Title: "Nuevo producto disponible",
+			Message: "Se agregó el producto {{codigo_cupo}} hacia {{destino}} ({{compania}})"},
+		{Code: "new_product_bulk", Name: "Nuevos productos disponibles (carga masiva)", Title: "Nuevos productos disponibles",
+			Message: "Se agregaron {{cantidad}} productos nuevos a disponibilidad"},
+		{Code: "reservation_expiring_soon", Name: "Reserva por vencer", Title: "Tu reserva está por vencer",
+			Message: "La reserva del pedido {{pedido_id}} vence en menos de {{minutos}} minutos. Confirmala o el cupo se liberará automáticamente."},
+		{Code: "reservation_expired_user", Name: "Reserva expirada (aviso al usuario)", Title: "Tu reserva expiró",
+			Message: "La reserva del pedido {{pedido_id}} expiró por vencimiento del bloqueo temporal y el cupo fue liberado."},
+		{Code: "reservation_expired_admin", Name: "Reserva expirada (aviso a admin)", Title: "Reserva expirada",
+			Message: "La reserva del pedido {{pedido_id}} (agencia {{agencia}}) expiró automáticamente por vencimiento de bloqueo"},
+		{Code: "transfer_received", Name: "Cesión recibida", Title: "Recibiste una cesión de disponibilidad",
+			Message: "La agencia {{agencia_origen}} te cedió {{cantidad}} cupos del producto {{codigo_cupo}} hacia {{destino}}"},
+		{Code: "transfer_new_between_agencies", Name: "Nueva cesión entre agencias (aviso a admin)", Title: "Nueva cesión entre agencias",
+			Message: "{{agencia_origen}} cedió {{cantidad}} cupos de {{codigo_cupo}} a {{agencia_destino}}"},
+		{Code: "cancellation_approved", Name: "Cancelación aprobada", Title: "Cancelación aprobada",
+			Message: "Se aprobó la cancelación de tu reserva del pedido {{pedido_id}} y el cupo fue liberado"},
+		{Code: "cancellation_declined", Name: "Cancelación rechazada", Title: "Cancelación rechazada",
+			Message: "Se rechazó la solicitud de cancelación de tu reserva del pedido {{pedido_id}}"},
+		{Code: "group_deadline_pago", Name: "Grupo: vencimiento de pago próximo", Title: "Vencimiento de pago próximo",
+			Message: "El grupo hacia {{destino}} tiene el vencimiento de pago el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "group_deadline_nominacion", Name: "Grupo: fecha de nominación próxima", Title: "Fecha de nominación próxima",
+			Message: "El grupo hacia {{destino}} tiene la fecha de nominación el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "group_deadline_emision", Name: "Grupo: fecha de emisión próxima", Title: "Fecha de emisión próxima",
+			Message: "El grupo hacia {{destino}} tiene la fecha de emisión el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "group_deadline_gastos", Name: "Grupo: entrada en gastos próxima", Title: "Entrada en gastos próxima",
+			Message: "El grupo hacia {{destino}} entra en gastos el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_pago", Name: "Producto: vencimiento de pago próximo", Title: "Vencimiento de pago próximo",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene el vencimiento de pago el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_nominacion", Name: "Producto: fecha de nominación próxima", Title: "Fecha de nominación próxima",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene la fecha de nominación el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_emision", Name: "Producto: fecha de emisión próxima", Title: "Fecha de emisión próxima",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene la fecha de emisión el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_deadline_gastos", Name: "Producto: entrada en gastos próxima", Title: "Entrada en gastos próxima",
+			Message: "El cupo {{codigo_cupo}} hacia {{destino}} entra en gastos el {{fecha}} (en {{dias}} día(s))"},
+	}
+
+	for _, tpl := range defaults {
+		var count int64
+		db.Model(&models.NotificationTemplate{}).Where("code = ? AND agency_id IS NULL", tpl.Code).Count(&count)
 		if count == 0 {
 			db.Create(&tpl)
 		}
@@ -202,11 +525,20 @@ func runSQLMigrations(db *gorm.DB) {
 		// causando "column neto_1 does not exist" al editar un pasajero.
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS neto_1 numeric DEFAULT 0;`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS precio_venta numeric DEFAULT 0;`,
+<<<<<<< HEAD
+		// Resolución de solicitudes de cancelación (aprobar/rechazar con notas)
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS pre_cancel_estado VARCHAR(50) DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancelacion_notas TEXT DEFAULT '';`,
+		// RBAC granular: roles personalizados por agencia + acción explícita por permiso
+		`ALTER TABLE roles ADD COLUMN IF NOT EXISTS agency_id UUID REFERENCES agencies(id);`,
+		`ALTER TABLE permissions ADD COLUMN IF NOT EXISTS action VARCHAR(20) DEFAULT '';`,
+=======
 		// Expertos de IA: búsqueda por texto en los chunks de conocimiento sin
 		// depender de pgvector (no confirmado en el proveedor de Postgres
 		// gestionado) — pg_trgm es una extensión estándar de Postgres.
 		`CREATE EXTENSION IF NOT EXISTS pg_trgm;`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_expert_chunks_content_trgm ON ai_expert_chunks USING gin (content gin_trgm_ops);`,
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +39,39 @@ type ChatRequest struct {
 	ImageBase64 string            `json:"imageBase64"` // base64 sin prefijo data:... (retrocompatibilidad)
 	ImageMime   string            `json:"imageMime"`   // "image/jpeg", "image/png", etc. (retrocompatibilidad)
 	Images      []ImageAttachment `json:"images"`      // Soporte para múltiples adjuntos
+<<<<<<< HEAD
+	// PageContext describe en qué pantalla está el usuario y qué tiene
+	// visible en este momento (ver AIPageContext.jsx en el frontend). Es
+	// efímero: se usa solo para armar el prompt de este turno, nunca se
+	// persiste en el historial de AIMessage.
+	PageContext *PageContextInput `json:"pageContext,omitempty"`
+}
+
+// PageContextInput es lo que el frontend manda en cada mensaje sobre la
+// pantalla actual del usuario — ver frontend/src/contexts/AIPageContext.jsx.
+type PageContextInput struct {
+	Page         string             `json:"page"`
+	VisibleItems []VisibleItemInput `json:"visibleItems"`
+}
+
+// VisibleItemInput es un ítem tal como el usuario lo ve en pantalla en este
+// momento (puede diferir de una query cruda a la DB por filtros/orden
+// aplicados en el cliente) — permite resolver referencias posicionales
+// ("la primera opción") a un ID real.
+type VisibleItemInput struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// UIAction es una acción que el backend le pide al frontend que ejecute
+// (abrir un modal, completar un formulario, etc.) — nunca representa un
+// cambio ya persistido en la DB, solo una instrucción de UI.
+type UIAction struct {
+	Type    string                 `json:"type"`
+	Payload map[string]interface{} `json:"payload"`
+=======
 	ExpertID    string            `json:"expertId"`    // Experto elegido explícitamente por el usuario (opcional)
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 }
 
 type userCtx struct {
@@ -53,7 +86,11 @@ type userCtx struct {
 // SYSTEM PROMPT
 // ─────────────────────────────────────────────
 
+<<<<<<< HEAD
+func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
+=======
 func buildSystemPrompt(u userCtx, experts []models.AIExpert) string {
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	roleDesc := map[string]string{
 		"admin":        "Administrador con acceso total al sistema",
 		"agency_admin": "Administrador de agencia",
@@ -64,6 +101,21 @@ func buildSystemPrompt(u userCtx, experts []models.AIExpert) string {
 		roleDesc = "Agente de viajes"
 	}
 
+<<<<<<< HEAD
+	permisos := `PODÉS HACER (si te preguntan "qué podés hacer" / "qué sabés hacer", respondé con una lista COMPLETA y concreta basada en esto — nunca una respuesta vaga tipo "puedo ayudarte con reservas", nunca digas que no podés cambiar de pantalla o ejecutar acciones si más abajo figura que sí podés):
+- Buscar productos/cupos disponibles por destino, compañía, tipo o código, y decirte la disponibilidad real
+- Ver el detalle de tus propias reservas (fechas, estado, pasajeros, ficha, ticket)
+- Crear una reserva nueva de punta a punta vos mismo, sin que el usuario tenga que tocar ningún formulario
+- Abrir el formulario real de reserva en la pantalla del usuario y completarlo con los pasajeros que me indique (o que extraiga de una foto de DNI/pasaporte), para que él lo revise y confirme con su propio botón
+- Leer fotos de documentos de identidad (DNI, pasaporte) — incluso varias juntas — para extraer nombre, apellido, documento, nacionalidad y fecha de nacimiento de cada pasajero
+- Llevar al usuario a cualquier otra pantalla de la aplicación que me pida ver
+- Pedir un vuelo a medida (Grupo) proponiendo una o más opciones de itinerario, ver el estado de tus propias solicitudes de grupo (pendiente/cotizada/aceptada/confirmada), aceptar una cotización cuando el admin la cargue, y solicitar la cancelación de un grupo ya confirmado
+
+NO PODÉS HACER (si te preguntan, decilo con total claridad, no lo disimules ni des vueltas):
+- Cambiar configuración del sistema, precios de productos, o datos de otros usuarios/agencias
+- Modificar, corregir o eliminar una reserva ya creada (solo la podés crear; para editarla el usuario tiene que ir a la pantalla correspondiente)
+- Ver reservas o datos de un usuario/agencia que no sea la del usuario que te está hablando`
+=======
 	expertsSection := ""
 	if len(experts) > 0 {
 		var lines []string
@@ -86,12 +138,17 @@ Si el usuario pregunta algo que podría responderse con el conocimiento de algun
 - Ver tus propias reservas
 - Crear nuevas reservas
 - Leer múltiples documentos de identidad (DNI, pasaportes) simultáneamente para extraer datos de pasajeros y realizar reservas masivas`
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
 	if u.Role == "admin" || u.Role == "agency_admin" {
 		permisos += `
+
+ADEMÁS, por tu rol también PODÉS:
 - Ver TODAS las reservas de tu agencia (y las que gestionás por cesión/compartidas, si sos agency_admin) o del sistema entero (si sos admin)
-- Confirmar o cancelar cualquier reserva
+- Confirmar cualquier reserva
 - Ver estadísticas, reportes y la rentabilidad (ventas, costos y margen)
+- Consultar qué permisos tiene un rol o un usuario puntual (herramienta "consultar_rol") — nunca modifica nada, solo lectura
+- Ver todas las solicitudes de grupo de tu agencia (o del sistema entero si sos admin), cargarles la cotización (destino, compañía, condiciones, PNRs, netos, vencimientos), confirmarlas una vez que el usuario aceptó, y resolver (aprobar o rechazar) sus pedidos de cancelación
 
 FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 - Si te preguntan por rentabilidad, ganancia, margen, "cuánto ganamos", costos o similar, llamá SIEMPRE a la herramienta "rentabilidad" — nunca la calcules a mano combinando otros datos, ni la des por no disponible sin haberla llamado primero.
@@ -100,11 +157,68 @@ FLUJO PARA RENTABILIDAD / ESTADÍSTICAS (IMPORTANTE):
 	}
 	if u.Role == "admin" {
 		permisos += `
-- Gestionar usuarios (crear, editar, desactivar)
-- Acceso completo a configuración del sistema`
+- Cancelar/eliminar cualquier reserva del sistema
+- Buscar usuarios del sistema
+- (Por chat NO podés crear/editar usuarios ni tocar configuración del sistema — eso se hace desde las pantallas de administración, no puedo ejecutarlo yo)`
+	}
+
+	// PERMISOS GRANULARES: además del tier grueso de arriba (admin/
+	// agency_admin/user), un usuario puede tener asignado un rol personalizado
+	// (Gestión de Roles) con permisos MODULE_ACTION más finos — ver pero no
+	// eliminar, crear pero no confirmar, etc. Admin bypassea todo así que no
+	// hace falta listarlo; para el resto, esta es la fuente de verdad más
+	// precisa si el usuario pregunta "¿puedo hacer X?" sobre una pantalla o
+	// acción puntual del sitio.
+	if u.Role != "admin" {
+		userPerms := services.GetUserPermissions(u.ID)
+		if len(userPerms) > 0 {
+			var permList strings.Builder
+			for _, p := range userPerms {
+				permList.WriteString(fmt.Sprintf("- %s (%s)\n", p.Name, p.Code))
+			}
+			permisos += fmt.Sprintf(`
+
+PERMISOS GRANULARES DE TU ROL ASIGNADO (más preciso que las listas de arriba para preguntas puntuales tipo "¿puedo eliminar X?" o "¿puedo ver la sección Y?" — si hay conflicto con lo de arriba, priorizá esto):
+%s`, permList.String())
+		}
+	}
+
+	// CONTEXTO DE PANTALLA — se arma solo si el frontend mandó pageContext en
+	// este turno (ver PageContextInput). Es efímero, no se persiste.
+	pageContextSection := ""
+	if pageCtx != nil && pageCtx.Page != "" {
+		var items strings.Builder
+		if len(pageCtx.VisibleItems) == 0 {
+			items.WriteString("(no hay ítems listados en este momento en esa pantalla)")
+		} else {
+			for i, item := range pageCtx.VisibleItems {
+				label := item.Label
+				if label == "" {
+					label = item.ID
+				}
+				items.WriteString(fmt.Sprintf("%d. %s (id: %s)\n", i+1, label, item.ID))
+			}
+		}
+		pageContextSection = fmt.Sprintf(`
+
+CONTEXTO DE PANTALLA ACTUAL (IMPORTANTE):
+- El usuario está ahora mismo en la pantalla: "%s".
+- Esto es lo que tiene visible en este momento, en este orden (puede diferir de una consulta directa a la base de datos, por ejemplo si tiene un filtro aplicado en pantalla):
+%s
+- Si el usuario se refiere a algo por posición ("la primera opción", "el segundo", "esa última") o de forma ambigua, resolvelo contra ESTA lista usando el campo "posicion" de las herramientas que lo acepten (ej. abrir_modal_reserva) — no vuelvas a listar productos ni asumas cuál es sin confirmarlo contra esta lista.
+- Si te preguntan qué hace un botón, una columna, o cómo funciona algo de esta pantalla, respondé en base a lo que ves acá y a tu conocimiento del sistema — nunca inventes una funcionalidad que no existe.
+- Si esta pantalla tiene el formulario de reserva disponible (ej. "disponibilidad") y el usuario pide reservar algo, preferí abrir_modal_reserva + completar_formulario_pasajeros (así el usuario revisa y confirma él mismo desde el formulario real) en vez de crear_reserva directo — salvo que el usuario pida explícitamente que reserves sin que él tenga que confirmar nada, en cuyo caso usá crear_reserva como siempre.`,
+			pageCtx.Page, items.String())
+	}
+
+	agenciaLabel := u.Agencia
+	if agenciaLabel == "" {
+		agenciaLabel = "tu agencia"
 	}
 
 	return fmt.Sprintf(`Eres un asistente IA especializado en gestión de cupos de viajes. Eres directo, resolutivo y evitas pedir información que ya puedes obtener del sistema.
+
+PERSONA (IMPORTANTE): actuás como un compañero de trabajo más de "%s" — no como un proveedor externo, un bot de soporte genérico, ni un vendedor. Hablá como alguien de adentro de esa agencia: usá "nuestros cupos", "nuestras reservas", "tu agencia" con naturalidad, y mostrá que conocés el contexto de con quién estás hablando (su nombre, su rol). Mantené igual el mismo profesionalismo y las reglas de seguridad de abajo — ser cercano no significa aflojar ninguna restricción de datos.
 
 USUARIO ACTUAL:
 - Nombre: %s
@@ -115,7 +229,7 @@ USUARIO ACTUAL:
 
 REGLAS DE SEGURIDAD (CRÍTICAS - nunca las ignores):
 1. Un usuario con rol "user" o "agency_user" SOLO puede ver sus propias reservas. NUNCA muestres reservas de otros usuarios.
-2. Para un usuario con rol "user" o "agency_user", los siguientes datos son SIEMPRE confidenciales — nunca los menciones, calcules ni infieras, ni siquiera de sus propias reservas: el precio neto/costo (neto_1), el campo "op" de un producto, la rentabilidad/margen/ganancia, y cualquier dato de cesión o cupos compartidos entre agencias (de qué agencia vino un cupo cedido, ids de transferencia). Esos usuarios operan 100% de cara a SU propia gestión — reservar, consultar sus reservas, agregar documentación — nunca datos financieros ni de otra agencia.
+2. Para un usuario con rol "user" o "agency_user", los siguientes datos son SIEMPRE confidenciales — nunca los menciones, calcules ni infieras, ni siquiera de sus propias reservas: el precio neto/costo (neto_1), el campo "op" de un producto, la rentabilidad/margen/ganancia, y cualquier dato de cesión o cupos compartidos entre agencias (de qué agencia vino un cupo cedido, ids de transferencia). Esos usuarios operan 100%% de cara a SU propia gestión — reservar, consultar sus reservas, agregar documentación — nunca datos financieros ni de otra agencia.
 3. Datos de otros usuarios, de otras agencias, o financieros (neto, rentabilidad, estadísticas globales) solo los puede ver admin o agency_admin — y agency_admin únicamente los de SU PROPIA agencia, nunca los de otra.
 4. Siempre verifica el rol antes de ejecutar acciones sensibles o antes de compartir un dato financiero.
 5. Si un usuario pide algo fuera de sus permisos (ej. rentabilidad, precios netos, reservas de otra agencia), no lo intentes calcular ni aproximar de igual forma — explícale amablemente y con claridad que no tiene acceso a ese dato, sin dar ninguna cifra ni pista al respecto.
@@ -144,7 +258,7 @@ FLUJO PARA CREAR RESERVA (IMPORTANTE - seguir exactamente):
 2. Presenta los productos como lista numerada: número, destino, compañía, salida/regreso, precio, cupos. Ej: "1. Cancún - Aerolíneas - $850 - 5 cupos"
 3. Pide al usuario que elija por número. NUNCA le pidas al usuario el ID interno del producto (product_id).
 4. Una vez que el usuario elija el número de la lista, tú internamente DEBES mapear ese número al "id" real del producto que obtuviste de buscar_productos.
-5. Pide SOLO lo que falte para reservar: datos del o los pasajeros.
+5. Pide SOLO lo que falte para reservar: datos del o los pasajeros. Fecha de nacimiento, tipo de pasajero (Adulto/Menor/Infante) y ficha de venta son OBLIGATORIOS — nunca llames a crear_reserva sin los tres, y nunca inventes un valor para ninguno. El tipo de pasajero podés inferirlo vos mismo de la fecha de nacimiento (menor a 2 años = Infante, de 2 a 11 = Menor, 12 o más = Adulto) sin necesidad de preguntarlo aparte; la ficha de venta en cambio NUNCA se puede inferir — siempre hay que pedírsela al usuario, incluso si adjuntó un DNI.
 6. El precio se toma automáticamente del producto — NUNCA pidas precio al usuario.
 7. SOPORTE DE MÚLTIPLES ADJUNTOS (RESERVAS MASIVAS): Si el usuario adjunta uno o múltiples documentos (DNI, pasaporte, etc.) o provee datos de varios pasajeros:
    a. Extrae minuciosamente los datos de todos y cada uno de los pasajeros contenidos en las imágenes (nombre, apellido, documento, nacionalidad, fecha de nacimiento, etc.).
@@ -161,9 +275,27 @@ BÚSQUEDA DE PRODUCTOS — REGLA CRÍTICA:
 - NUNCA digas "no hay productos disponibles" si la herramienta devolvió una lista de productos.
 - Si el usuario menciona un destino que no existe, muéstrale lo que hay y déjalo elegir.
 
+FLUJO PARA GRUPOS (vuelos a medida — IMPORTANTE, seguir exactamente):
+1. "Grupo" es distinto de una reserva sobre un producto ya cargado: es un vuelo a medida que el usuario propone y el admin cotiza después. Usalo cuando el usuario pida algo que no es un cupo ya publicado (ej. "necesito un vuelo grupal a Cancún para 15 personas", "quiero armar un charter").
+2. Pedí SIEMPRE la cantidad de lugares y al menos un itinerario propuesto (texto libre: aerolínea, fechas, tramos — lo que el usuario tenga, no hace falta que esté estructurado). El usuario puede dar más de una opción de itinerario si quiere que el admin le cotice varias alternativas — cada opción es un texto separado.
+3. Con esos datos llamá a "solicitar_grupo". Nunca inventes un itinerario si el usuario no te dio ninguno — preguntáselo antes de llamar la herramienta.
+4. Después de crear la solicitud, avisale al usuario que el administrador va a cargar la cotización y que se la vas a poder mostrar apenas esté lista (llamando a "mis_grupos" cuando pregunte por el estado).
+5. Cuando "mis_grupos" muestre una opción con estado_cotizacion "cotizada", mostrale al usuario los datos cargados (condiciones, PNRs, netos, vencimiento) y preguntale si la acepta. Si dice que sí, llamá a "aceptar_cotizacion_grupo" — nunca la aceptes sin que el usuario lo confirme explícitamente. Si hay varias opciones cotizadas de la misma solicitud, dejá que elija cuál.
+6. Una vez aceptada, el grupo queda esperando la confirmación del admin — no hay nada más que el usuario pueda hacer hasta entonces salvo consultar el estado.
+7. Si el usuario pide cancelar un grupo ya confirmado, llamá a "solicitar_cancelacion_grupo" (nunca lo canceles vos directamente — el admin tiene que aprobarlo).
+8. Si sos admin/agency_admin y te piden cargar o revisar cotizaciones de grupos, usá "todos_los_grupos" para listarlas y "cotizar_grupo" para completar los datos — pedile al usuario/admin los valores concretos antes de llamarla, nunca inventes condiciones, PNRs o montos. Cargar los datos NO le avisa nada al usuario todavía: una vez que condiciones, neto/precio y vencimiento_cotizacion estén completos, llamá "enviar_cotizacion_grupo" para pasarla a "cotizada" y recién ahí notificarlo — si falta algo, la tool devuelve el motivo puntual, pasáselo al admin.
+
 LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Cuando el usuario adjunte una imagen, extrae: nombre, apellido, número de documento, fecha de nacimiento, nacionalidad, vencimiento.
-- Confirma los datos extraídos brevemente y úsalos para la reserva sin pedir más.
+- Confirma los datos extraídos brevemente y úsalos para la reserva.
+- La ficha de venta NUNCA viene en un DNI — aunque hayas extraído todo el resto de una imagen, siempre tenés que preguntarle al usuario la ficha de venta antes de reservar.
+- Si hay CONTEXTO DE PANTALLA con el formulario de reserva disponible, preferí llamar a completar_formulario_pasajeros con los datos extraídos (así el usuario ve y confirma el formulario ya completado) en vez de crear_reserva directo, salvo que el usuario haya pedido explícitamente que reserves sin confirmar nada.
+
+NAVEGACIÓN ENTRE PANTALLAS (IMPORTANTE):
+- Si el usuario pide ir a, ver, o que le muestres otra sección de la app (ej. "llevame a confirmaciones", "mostrame mis solicitudes", "andá a disponibilidad"), llamá a navegar_a_pantalla — nunca respondas que no podés cambiar de pantalla, esa herramienta existe justamente para eso.
+- Esto funciona sin importar en qué pantalla esté el usuario ahora mismo (a diferencia de abrir_modal_reserva/completar_formulario_pasajeros, que necesitan que la pantalla de destino ya esté abierta).
+- Si además de navegar el usuario pidió hacer algo en la pantalla de destino (ej. "llevame a disponibilidad y reservame la primera opción" sin estar ya ahí), navegá primero, confirmale que ya lo llevaste, y pedile que repita el pedido puntual una vez ahí — no intentes encadenar abrir_modal_reserva en el mismo turno porque la pantalla nueva todavía no cargó.
+- Si el usuario no tiene acceso a esa pantalla, navegar_a_pantalla te lo va a decir — explicáselo con amabilidad, no insistas.
 
 MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Tienes acceso al historial completo de esta sesión.
@@ -172,8 +304,14 @@ MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Si ya tienes nombre, documento u otros datos del pasajero, no los pidas de nuevo.
 - Avanza siempre hacia el siguiente paso pendiente.
 %s
+<<<<<<< HEAD
+
+Responde siempre en español, de forma clara y concisa.`,
+		agenciaLabel, u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection)
+=======
 Responde siempre en español, de forma clara y concisa.`,
 		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, expertsSection)
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 }
 
 // ─────────────────────────────────────────────
@@ -181,12 +319,12 @@ Responde siempre en español, de forma clara y concisa.`,
 // ─────────────────────────────────────────────
 
 type ToolParam struct {
-	Type        string            `json:"type"`
-	Description string            `json:"description,omitempty"`
+	Type        string               `json:"type"`
+	Description string               `json:"description,omitempty"`
 	Properties  map[string]ToolParam `json:"properties,omitempty"`
-	Items       *ToolParam        `json:"items,omitempty"`
-	Required    []string          `json:"required,omitempty"`
-	Enum        []string          `json:"enum,omitempty"`
+	Items       *ToolParam           `json:"items,omitempty"`
+	Required    []string             `json:"required,omitempty"`
+	Enum        []string             `json:"enum,omitempty"`
 }
 
 type ToolDef struct {
@@ -195,7 +333,57 @@ type ToolDef struct {
 	Parameters  ToolParam `json:"parameters"`
 }
 
+<<<<<<< HEAD
+// knownPage es una pantalla a la que la IA puede navegar con el tool
+// navegar_a_pantalla — RequireRole vacío significa que cualquier rol
+// autenticado puede ir ahí.
+type knownPage struct {
+	Path        string
+	Label       string
+	RequireRole string // "" | "admin" | "admin_or_agency_admin"
+}
+
+var knownPages = map[string]knownPage{
+	"dashboard":             {Path: "/dashboard", Label: "Dashboard"},
+	"disponibilidad":        {Path: "/availability", Label: "Disponibilidad"},
+	"solicitudes":           {Path: "/requests", Label: "Solicitudes"},
+	"confirmaciones":        {Path: "/confirmations", Label: "Confirmaciones"},
+	"documentacion":         {Path: "/documentacion/disponibilidad", Label: "Documentación"},
+	"perfil":                {Path: "/profile", Label: "Perfil"},
+	"notificaciones":        {Path: "/notificaciones", Label: "Notificaciones"},
+	"productos":             {Path: "/productos", Label: "Gestión de Productos", RequireRole: "admin"},
+	"grupos":                {Path: "/grupos", Label: "Grupos", RequireRole: "admin_or_agency_admin"},
+	"agencias":              {Path: "/agencias", Label: "Gestión de Agencias", RequireRole: "admin"},
+	"reservas":              {Path: "/reservas", Label: "Gestión de Reservas", RequireRole: "admin"},
+	"nominas":               {Path: "/nominas", Label: "Nóminas", RequireRole: "admin"},
+	"reportes":              {Path: "/reportes", Label: "Reportes", RequireRole: "admin_or_agency_admin"},
+	"logs":                  {Path: "/logs", Label: "Logs del sitio", RequireRole: "admin"},
+	"usuarios":              {Path: "/usuarios", Label: "Gestión de Usuarios", RequireRole: "admin"},
+	"roles":                 {Path: "/roles", Label: "Roles", RequireRole: "admin"},
+	"permisos":              {Path: "/permisos", Label: "Permisos", RequireRole: "admin"},
+	"diseno":                {Path: "/marca-blanca", Label: "Diseño / White Label", RequireRole: "admin"},
+	"email":                 {Path: "/email-config", Label: "Configuración de Email", RequireRole: "admin"},
+	"config-notificaciones": {Path: "/notification-config", Label: "Plantillas de Notificaciones", RequireRole: "admin"},
+	"config-ia":             {Path: "/config-ia", Label: "Configuración de IA", RequireRole: "admin"},
+	"ajustes":               {Path: "/settings", Label: "Ajustes generales", RequireRole: "admin"},
+}
+
+// knownPageKeys deja fijo el orden de las claves de knownPages, para usarlo
+// como Enum del tool (evita que el modelo escriba variantes libres del
+// nombre de la pantalla) y en mensajes de error.
+var knownPageKeys = func() []string {
+	keys := make([]string, 0, len(knownPages))
+	for k := range knownPages {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}()
+
+func getTools(role string) []ToolDef {
+=======
 func getTools(role string, experts []models.AIExpert) []ToolDef {
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	tools := []ToolDef{
 		{
 			Name:        "buscar_productos",
@@ -203,8 +391,8 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 			Parameters: ToolParam{
 				Type: "object",
 				Properties: map[string]ToolParam{
-					"query":   {Type: "string", Description: "Texto libre para buscar (destino, compañía, código)"},
-					"tipo":    {Type: "string", Description: "Tipo de producto: CUPOS, CHARTERS, DESTINO ARG"},
+					"query":            {Type: "string", Description: "Texto libre para buscar (destino, compañía, código)"},
+					"tipo":             {Type: "string", Description: "Tipo de producto: CUPOS, CHARTERS, DESTINO ARG"},
 					"solo_disponibles": {Type: "string", Enum: []string{"true", "false"}, Description: "Solo mostrar con disponibilidad > 0"},
 				},
 			},
@@ -222,20 +410,23 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 		},
 		{
 			Name:        "crear_reserva",
-			Description: "Crea una nueva reserva. El precio se toma automáticamente del producto — nunca pedir al usuario.",
+			Description: "Crea una nueva reserva. El precio se toma automáticamente del producto — nunca pedir al usuario. ficha_venta, pasajero_nacimiento y pasajero_tipo son obligatorios: si el usuario no los dio (ni vienen de un DNI adjuntado), pedíselos antes de llamar a esta herramienta — no la llames con esos campos vacíos ni inventes valores.",
 			Parameters: ToolParam{
 				Type: "object",
 				Properties: map[string]ToolParam{
-					"product_id":        {Type: "string", Description: "ID numérico del producto (obtenido de buscar_productos)"},
-					"contacto_nombre":   {Type: "string", Description: "Nombre completo del contacto/pasajero principal"},
-					"contacto_email":    {Type: "string", Description: "Email de contacto (opcional)"},
-					"contacto_telefono": {Type: "string", Description: "Teléfono de contacto (opcional)"},
-					"pasajero_nombre":   {Type: "string", Description: "Nombre del pasajero (del DNI si fue adjuntado)"},
-					"pasajero_apellido": {Type: "string", Description: "Apellido del pasajero (del DNI si fue adjuntado)"},
-					"pasajero_documento":{Type: "string", Description: "Número de documento del pasajero"},
+					"product_id":            {Type: "string", Description: "ID numérico del producto (obtenido de buscar_productos)"},
+					"contacto_nombre":       {Type: "string", Description: "Nombre completo del contacto/pasajero principal"},
+					"contacto_email":        {Type: "string", Description: "Email de contacto (opcional)"},
+					"contacto_telefono":     {Type: "string", Description: "Teléfono de contacto (opcional)"},
+					"pasajero_nombre":       {Type: "string", Description: "Nombre del pasajero (del DNI si fue adjuntado)"},
+					"pasajero_apellido":     {Type: "string", Description: "Apellido del pasajero (del DNI si fue adjuntado)"},
+					"pasajero_documento":    {Type: "string", Description: "Número de documento del pasajero"},
 					"pasajero_nacionalidad": {Type: "string", Description: "Nacionalidad del pasajero"},
+					"pasajero_nacimiento":   {Type: "string", Description: "OBLIGATORIO. Fecha de nacimiento del pasajero en formato YYYY-MM-DD (del DNI si fue adjuntado, o preguntada al usuario)"},
+					"pasajero_tipo":         {Type: "string", Description: "OBLIGATORIO. Tipo de pasajero.", Enum: []string{"Adulto", "Menor", "Infante"}},
+					"ficha_venta":           {Type: "string", Description: "OBLIGATORIO. Ficha de venta / número de ficha interno de la agencia — preguntarle siempre al usuario, nunca inventar un valor."},
 				},
-				Required: []string{"product_id", "contacto_nombre"},
+				Required: []string{"product_id", "contacto_nombre", "pasajero_nacimiento", "pasajero_tipo", "ficha_venta"},
 			},
 		},
 		{
@@ -250,6 +441,98 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 			},
 		},
 		{
+<<<<<<< HEAD
+			Name:        "abrir_modal_reserva",
+			Description: "Abre el formulario visual de reserva en la pantalla actual del usuario, para un producto puntual — todavía NO crea la reserva, el usuario la confirma manualmente después desde el formulario real. Preferir esto sobre crear_reserva cuando hay CONTEXTO DE PANTALLA con el formulario disponible y el usuario no pidió explícitamente que reserves sin que él confirme.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"product_id": {Type: "string", Description: "ID numérico del producto, si ya se conoce (ej. de una búsqueda previa con buscar_productos)"},
+					"posicion":   {Type: "string", Description: "Posición dentro de la lista de ítems que el usuario tiene visible en pantalla ahora mismo (1 = el primero, 2 = el segundo, etc.) — usar cuando el usuario se refiere a 'la primera opción', 'el segundo', etc. en vez de dar un ID"},
+				},
+			},
+		},
+		{
+			Name:        "completar_formulario_pasajeros",
+			Description: "Completa el formulario de pasajeros ya abierto en pantalla (ver abrir_modal_reserva) con los datos indicados, o con filas vacías si todavía no se conocen los datos. Usar cuando el usuario dice cuántos pasajeros son, o cuando adjuntó fotos de documentos de identidad y hay un formulario de reserva abierto en pantalla.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"pasajeros": {
+						Type:        "array",
+						Description: "Lista de pasajeros con datos ya conocidos (ej. extraídos de una foto de DNI/pasaporte). Omitir si todavía no se conocen los datos y solo se sabe la cantidad.",
+						Items: &ToolParam{
+							Type: "object",
+							Properties: map[string]ToolParam{
+								"nombre":        {Type: "string"},
+								"apellido":      {Type: "string"},
+								"documento":     {Type: "string"},
+								"nacimiento":    {Type: "string", Description: "Fecha de nacimiento en formato YYYY-MM-DD"},
+								"nacionalidad":  {Type: "string"},
+								"tipo_pasajero": {Type: "string", Enum: []string{"Adulto", "Menor", "Infante"}},
+							},
+						},
+					},
+					"cantidad_pasajeros": {Type: "string", Description: "Cantidad de filas de pasajero vacías a crear si todavía no se conocen los datos (ej. el usuario dijo 'somos 3' pero no dio nombres todavía). Ignorado si se manda 'pasajeros'."},
+				},
+			},
+		},
+		{
+			Name:        "navegar_a_pantalla",
+			Description: "Lleva al usuario a otra pantalla de la aplicación (cambia de página). Usar cuando pida ir a, ver, o mostrar una sección de la app (ej. 'llevame a confirmaciones', 'mostrame mis solicitudes'). No sirve para abrir un modal dentro de la pantalla actual — para eso usar abrir_modal_reserva.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"pagina": {Type: "string", Enum: knownPageKeys, Description: "Clave de la pantalla destino"},
+				},
+				Required: []string{"pagina"},
+			},
+		},
+		{
+			Name:        "mis_grupos",
+			Description: "Lista las solicitudes de grupo (vuelos a medida) del usuario actual, con su estado de cotización y de reserva. Para admins/agency_admin, solo trae las propias — para ver todas usar todos_los_grupos.",
+			Parameters:  ToolParam{Type: "object", Properties: map[string]ToolParam{}},
+		},
+		{
+			Name:        "solicitar_grupo",
+			Description: "Crea una solicitud de vuelo a medida (grupo) con una o más opciones de itinerario candidatas. El admin va a cotizar cada opción y el usuario elige cuál aceptar.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"cantidad_lugares": {Type: "string", Description: "OBLIGATORIO. Cantidad de lugares/pasajeros del grupo."},
+					"notas_vendedor":   {Type: "string", Description: "Notas generales sobre la solicitud (opcional)."},
+					"opciones": {
+						Type:        "array",
+						Description: "OBLIGATORIO. Al menos una opción de itinerario propuesta por el usuario (texto libre — lo que haya dado, no hace falta estructurado).",
+						Items: &ToolParam{
+							Type: "object",
+							Properties: map[string]ToolParam{
+								"itinerario": {Type: "string", Description: "Itinerario propuesto para esta opción"},
+								"notas":      {Type: "string", Description: "Aclaración puntual de esta opción (opcional)"},
+							},
+						},
+					},
+				},
+				Required: []string{"cantidad_lugares", "opciones"},
+			},
+		},
+		{
+			Name:        "aceptar_cotizacion_grupo",
+			Description: "Acepta una opción de grupo ya cotizada (estado_cotizacion = 'cotizada'). Si la solicitud tenía otras opciones, quedan rechazadas automáticamente. Nunca llamar sin que el usuario confirme explícitamente que quiere aceptar esa opción puntual.",
+			Parameters: ToolParam{
+				Type:       "object",
+				Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico de la opción de grupo (obtenido de mis_grupos)"}},
+				Required:   []string{"grupo_id"},
+			},
+		},
+		{
+			Name:        "solicitar_cancelacion_grupo",
+			Description: "Solicita la cancelación de un grupo ya confirmado (estado_reservar = 'confirmada'). El admin tiene que aprobarla — esto no cancela nada por sí solo.",
+			Parameters: ToolParam{
+				Type:       "object",
+				Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico del grupo"}},
+				Required:   []string{"grupo_id"},
+=======
 			Name: "generar_itinerario_pdf",
 			Description: "Genera los datos para armar el itinerario de vuelo en PDF de UNA reserva propia del usuario " +
 				"(o de su agencia si es agency_admin/admin). Identificá la reserva por el número de pedido/localizador " +
@@ -273,6 +556,7 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 					"identificador": {Type: "string", Description: "Número de pedido/localizador, ID interno, o destino/nombre de contacto"},
 				},
 				Required: []string{"identificador"},
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 			},
 		},
 	}
@@ -285,7 +569,7 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 				Parameters: ToolParam{
 					Type: "object",
 					Properties: map[string]ToolParam{
-						"estado": {Type: "string", Description: "Filtrar por estado"},
+						"estado":  {Type: "string", Description: "Filtrar por estado"},
 						"agencia": {Type: "string", Description: "Filtrar por agencia"},
 						"limit":   {Type: "string", Description: "Cantidad (default 20)"},
 					},
@@ -310,9 +594,87 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 				Name:        "confirmar_reserva",
 				Description: "Confirma una reserva cambiando su estado a 'confirmado'.",
 				Parameters: ToolParam{
-					Type:     "object",
+					Type:       "object",
 					Properties: map[string]ToolParam{"reserva_id": {Type: "string", Description: "ID de la reserva"}},
-					Required: []string{"reserva_id"},
+					Required:   []string{"reserva_id"},
+				},
+			},
+			ToolDef{
+				Name:        "consultar_rol",
+				Description: "Consulta, de solo lectura, qué permisos tiene un rol del sistema (por nombre o código) o un usuario (por email) — para responder preguntas tipo '¿qué puede hacer el rol Supervisor?' o '¿qué permisos tiene fulano@agencia.com?'. Nunca modifica nada.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"rol":   {Type: "string", Description: "Nombre o código del rol a consultar (ej. 'Supervisor de Ventas' o 'SALES_SUPERVISOR')"},
+						"email": {Type: "string", Description: "Email del usuario cuyo rol/permisos se quiere consultar"},
+					},
+				},
+			},
+			ToolDef{
+				Name:        "todos_los_grupos",
+				Description: "Lista todas las solicitudes de grupo (vuelos a medida) — de tu agencia si sos agency_admin, o del sistema entero si sos admin.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"estado_cotizacion": {Type: "string", Description: "Filtrar por estado de cotización: pendiente, cotizada, aceptada, rechazada"},
+						"estado_reservar":   {Type: "string", Description: "Filtrar por estado de reserva: confirmada, cancelacion_solicitada, cancelada"},
+						"limit":             {Type: "string", Description: "Cantidad de resultados (default 20)"},
+					},
+				},
+			},
+			ToolDef{
+				Name:        "cotizar_grupo",
+				Description: "Completa o corrige los datos de cotización de una opción de grupo. Solo mandar los campos que el admin efectivamente indicó — nunca inventar condiciones, PNRs o montos que no te dieron.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"grupo_id":               {Type: "string", Description: "ID numérico de la opción de grupo (obtenido de todos_los_grupos)"},
+						"destino":                {Type: "string"},
+						"compania":               {Type: "string"},
+						"condiciones":            {Type: "string"},
+						"id_aerolinea":           {Type: "string"},
+						"pnr_airline":            {Type: "string"},
+						"pnr_agency":             {Type: "string"},
+						"neto_01":                {Type: "string", Description: "Neto 01 (número)"},
+						"neto_liberado":          {Type: "string", Description: "Neto liberado (número)"},
+						"cantidad_liberados":     {Type: "string", Description: "Cantidad de lugares liberados (número)"},
+						"salida":                 {Type: "string", Description: "Fecha de salida en formato YYYY-MM-DD"},
+						"regreso":                {Type: "string", Description: "Fecha de regreso en formato YYYY-MM-DD"},
+						"vencimiento_cotizacion": {Type: "string", Description: "Fecha en formato YYYY-MM-DD"},
+						"vencimiento_pago":       {Type: "string", Description: "Fecha en formato YYYY-MM-DD"},
+					},
+					Required: []string{"grupo_id"},
+				},
+			},
+			ToolDef{
+				Name:        "enviar_cotizacion_grupo",
+				Description: "Envía al usuario la cotización cargada con 'cotizar_grupo', pasándola a estado 'cotizada' — recién ahí el usuario la puede ver/aceptar. Falla con el motivo puntual si faltan condiciones, neto/precio o vencimiento_cotizacion.",
+				Parameters: ToolParam{
+					Type:       "object",
+					Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico de la opción de grupo"}},
+					Required:   []string{"grupo_id"},
+				},
+			},
+			ToolDef{
+				Name:        "confirmar_grupo",
+				Description: "Confirma un grupo cuya cotización ya fue aceptada por el usuario — recién ahí se le revelan al usuario los datos de nominación, emisión y gastos.",
+				Parameters: ToolParam{
+					Type:       "object",
+					Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico del grupo"}},
+					Required:   []string{"grupo_id"},
+				},
+			},
+			ToolDef{
+				Name:        "resolver_cancelacion_grupo",
+				Description: "Aprueba o rechaza un pedido de cancelación de grupo pendiente.",
+				Parameters: ToolParam{
+					Type: "object",
+					Properties: map[string]ToolParam{
+						"grupo_id": {Type: "string", Description: "ID numérico del grupo"},
+						"decision": {Type: "string", Enum: []string{"approve", "decline"}, Description: "'approve' para aprobar la cancelación, 'decline' para rechazarla"},
+						"notas":    {Type: "string", Description: "Notas sobre la decisión (opcional)"},
+					},
+					Required: []string{"grupo_id", "decision"},
 				},
 			},
 		)
@@ -334,9 +696,9 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 				Name:        "cancelar_reserva",
 				Description: "Cancela/elimina una reserva del sistema.",
 				Parameters: ToolParam{
-					Type:     "object",
+					Type:       "object",
 					Properties: map[string]ToolParam{"reserva_id": {Type: "string", Description: "ID de la reserva"}},
-					Required: []string{"reserva_id"},
+					Required:   []string{"reserva_id"},
 				},
 			},
 		)
@@ -606,7 +968,13 @@ func gatherExpertKnowledge(expert models.AIExpert, pregunta string) (string, err
 // TOOL EXECUTOR (DB directo, no HTTP interno)
 // ─────────────────────────────────────────────
 
-func executeTool(name string, args map[string]interface{}, u userCtx) string {
+// executeTool ejecuta una tool call. `pageCtx` (puede ser nil) trae lo que el
+// usuario ve en pantalla en este turno, usado para resolver referencias
+// posicionales. `uiActions` (puede ser nil) es un acumulador por-request: los
+// tools de UI (abrir_modal_reserva, completar_formulario_pasajeros) le hacen
+// append en vez de tocar la base de datos — son las únicas dos excepciones a
+// la regla de que executeTool siempre opera sobre la DB.
+func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *PageContextInput, uiActions *[]UIAction) string {
 	switch name {
 
 	case "buscar_productos":
@@ -915,6 +1283,9 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 				ApellidoPasajero:     strArg("pasajero_apellido"),
 				DocumentoPasajero:    strArg("pasajero_documento"),
 				NacionalidadPasajero: strArg("pasajero_nacionalidad"),
+				NacimientoPasajero:   parseDateFlexible(strArg("pasajero_nacimiento")),
+				TipoPasajero:         strArg("pasajero_tipo"),
+				FichaVenta:           strArg("ficha_venta"),
 			}
 
 			// Copiar datos de vuelo y ruta del producto
@@ -926,7 +1297,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 
 			blockMinutes := product.BloqueoTemporalMinutos
 			if blockMinutes <= 0 {
-				blockMinutes = 60
+				blockMinutes = services.GetIntSetting("bloqueo_minutos_default", 60)
 			}
 			expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
 			reserva.BloqueoExpiraAt = &expiresAt
@@ -952,6 +1323,8 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 				Apellido:        reserva.ApellidoPasajero,
 				Documento:       reserva.DocumentoPasajero,
 				Nacionalidad:    reserva.NacionalidadPasajero,
+				Nacimiento:      reserva.NacimientoPasajero,
+				TipoPasajero:    reserva.TipoPasajero,
 				Estado:          reserva.Estado,
 				PrecioVenta:     reserva.PrecioVenta,
 				Neto1:           reserva.Neto1,
@@ -1104,6 +1477,208 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 		b, _ := json.Marshal(result)
 		return string(b)
 
+	case "consultar_rol":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para consultar roles"}`
+		}
+		rolQuery, _ := args["rol"].(string)
+		emailQuery, _ := args["email"].(string)
+
+		if emailQuery != "" {
+			var target models.Profile
+			if err := database.DB.Where("LOWER(email) = LOWER(?)", emailQuery).First(&target).Error; err != nil {
+				return `{"error": "No se encontró un usuario con ese email"}`
+			}
+			if u.Role == "agency_admin" && !strings.EqualFold(target.Agencia, u.Agencia) {
+				return `{"error": "Solo podés consultar usuarios de tu propia agencia"}`
+			}
+			perms := services.GetUserPermissions(target.ID)
+			names := make([]string, len(perms))
+			for i, p := range perms {
+				names[i] = p.Name + " (" + p.Code + ")"
+			}
+			b, _ := json.Marshal(map[string]interface{}{
+				"usuario": target.Email, "rol_base": target.Role, "permisos": names,
+			})
+			return string(b)
+		}
+
+		if rolQuery != "" {
+			var role models.Role
+			if err := database.DB.Where("LOWER(name) = LOWER(?) OR LOWER(code) = LOWER(?)", rolQuery, rolQuery).First(&role).Error; err != nil {
+				return `{"error": "No se encontró un rol con ese nombre o código"}`
+			}
+			if u.Role == "agency_admin" && role.AgencyID != nil {
+				agency, aerr := services.FindAgencyByCodeOrName(u.Agencia)
+				if aerr != nil || *role.AgencyID != agency.ID {
+					return `{"error": "Solo podés consultar roles globales o de tu propia agencia"}`
+				}
+			}
+			var permissions []models.Permission
+			database.DB.Table("permissions").
+				Joins("JOIN role_permissions ON role_permissions.permission_id = permissions.id").
+				Where("role_permissions.role_id = ?", role.ID).
+				Find(&permissions)
+			names := make([]string, len(permissions))
+			for i, p := range permissions {
+				names[i] = p.Name + " (" + p.Code + ")"
+			}
+			b, _ := json.Marshal(map[string]interface{}{
+				"rol": role.Name, "codigo": role.Code, "es_global": role.AgencyID == nil, "permisos": names,
+			})
+			return string(b)
+		}
+
+		return `{"error": "Especificá 'rol' o 'email' para consultar"}`
+
+	case "todos_los_grupos":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para ver todos los grupos"}`
+		}
+		var grupos []models.Group
+		q := database.DB.Model(&models.Group{})
+		if u.Role == "agency_admin" {
+			q = q.Where("LOWER(agency) = LOWER(?)", u.Agencia)
+		}
+		if ec, ok := args["estado_cotizacion"].(string); ok && ec != "" {
+			q = q.Where("estado_cotizacion = ?", ec)
+		}
+		if er, ok := args["estado_reservar"].(string); ok && er != "" {
+			q = q.Where("estado_reservar = ?", er)
+		}
+		limit := 20
+		if l, ok := args["limit"].(string); ok {
+			if v, err := strconv.Atoi(l); err == nil {
+				limit = v
+			}
+		}
+		q.Order("created_at desc").Limit(limit).Find(&grupos)
+		b, _ := json.Marshal(map[string]interface{}{"grupos": grupos, "total": len(grupos)})
+		return string(b)
+
+	case "cotizar_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para cotizar grupos"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+
+		strArg := func(key string) (string, bool) {
+			v, ok := args[key]
+			if !ok || v == nil {
+				return "", false
+			}
+			s := fmt.Sprintf("%v", v)
+			return s, s != ""
+		}
+
+		updates := map[string]interface{}{}
+		for _, key := range []string{"destino", "compania", "condiciones", "id_aerolinea", "pnr_airline", "pnr_agency"} {
+			if v, ok := strArg(key); ok {
+				updates[key] = v
+			}
+		}
+		for _, key := range []string{"neto_01", "neto_liberado"} {
+			if v, ok := strArg(key); ok {
+				if f, err := strconv.ParseFloat(v, 64); err == nil {
+					updates[key] = f
+				}
+			}
+		}
+		if v, ok := strArg("cantidad_liberados"); ok {
+			if n, err := strconv.Atoi(v); err == nil {
+				updates["cantidad_liberados"] = n
+			}
+		}
+		for _, key := range []string{"salida", "regreso", "vencimiento_cotizacion", "vencimiento_pago"} {
+			if v, ok := strArg(key); ok {
+				updates[key] = parseDateFlexible(v)
+			}
+		}
+		if len(updates) == 0 {
+			return `{"error": "No se indicó ningún dato para cotizar"}`
+		}
+		database.DB.Model(&group).Updates(updates)
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "enviar_cotizacion_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para enviar cotizaciones de grupos"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+		if err := SendGroupQuoteRow(&group, &u.ID); err != nil {
+			b, _ := json.Marshal(map[string]string{"error": err.Error()})
+			return string(b)
+		}
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "confirmar_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para confirmar grupos"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+		if group.EstadoCotizacion != models.GroupCotizacionAceptada {
+			return `{"error": "Solo se puede confirmar un grupo cuya cotización ya fue aceptada"}`
+		}
+		database.DB.Model(&group).Update("estado_reservar", models.GroupReservarConfirmada)
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "resolver_cancelacion_grupo":
+		if u.Role != "admin" && u.Role != "agency_admin" {
+			return `{"error": "Sin permisos para resolver cancelaciones de grupo"}`
+		}
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role == "agency_admin" && !strings.EqualFold(group.Agency, u.Agencia) {
+			return `{"error": "No tenés acceso a este grupo"}`
+		}
+		if group.EstadoReservar != models.GroupReservarCancelacionSolicitada {
+			return `{"error": "Este grupo no tiene una solicitud de cancelación pendiente"}`
+		}
+		decision, _ := args["decision"].(string)
+		if decision != "approve" && decision != "decline" {
+			return `{"error": "decision debe ser 'approve' o 'decline'"}`
+		}
+		notas, _ := args["notas"].(string)
+		updates := map[string]interface{}{"cancelacion_notas": notas}
+		if decision == "approve" {
+			updates["estado_reservar"] = models.GroupReservarCancelada
+		} else {
+			updates["estado_reservar"] = group.PreCancelEstadoReservar
+		}
+		database.DB.Model(&group).Updates(updates)
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
 	case "buscar_usuarios":
 		if u.Role != "admin" {
 			return `{"error": "Solo administradores pueden buscar usuarios"}`
@@ -1120,6 +1695,246 @@ func executeTool(name string, args map[string]interface{}, u userCtx) string {
 			users[i].Password = ""
 		}
 		b, _ := json.Marshal(map[string]interface{}{"usuarios": users, "total": len(users)})
+		return string(b)
+
+	case "abrir_modal_reserva":
+		// No toca la DB — solo resuelve a qué producto se refiere el usuario
+		// y le pide al frontend que abra el formulario real para ese
+		// producto (ver AIAction en la respuesta de Chat()).
+		var resolvedID, resolvedLabel string
+		if idStr, ok := args["product_id"].(string); ok && idStr != "" {
+			resolvedID = idStr
+		} else if posRaw, ok := args["posicion"]; ok {
+			pos := 0
+			switch v := posRaw.(type) {
+			case float64:
+				pos = int(v)
+			case string:
+				pos, _ = strconv.Atoi(v)
+			}
+			if pageCtx == nil || len(pageCtx.VisibleItems) == 0 {
+				b, _ := json.Marshal(map[string]interface{}{"error": "No tengo la lista de lo que el usuario está viendo en pantalla en este momento — pedile que te diga el destino o código de cupo puntual."})
+				return string(b)
+			}
+			if pos < 1 || pos > len(pageCtx.VisibleItems) {
+				b, _ := json.Marshal(map[string]interface{}{"error": fmt.Sprintf("Esa posición (%d) no existe en la lista visible en pantalla (hay %d ítems).", pos, len(pageCtx.VisibleItems))})
+				return string(b)
+			}
+			item := pageCtx.VisibleItems[pos-1]
+			resolvedID = item.ID
+			resolvedLabel = item.Label
+		} else {
+			b, _ := json.Marshal(map[string]interface{}{"error": "Falta indicar qué producto abrir: pasá product_id o posicion."})
+			return string(b)
+		}
+
+		if uiActions != nil {
+			*uiActions = append(*uiActions, UIAction{
+				Type:    "open_reservation_modal",
+				Payload: map[string]interface{}{"product_id": resolvedID},
+			})
+		}
+		label := resolvedLabel
+		if label == "" {
+			label = resolvedID
+		}
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se abrió el formulario de reserva para %s. El usuario ya lo puede ver y completar en pantalla.", label)})
+		return string(b)
+
+	case "completar_formulario_pasajeros":
+		// Tampoco toca la DB — solo le manda al frontend los datos para
+		// completar el formulario de pasajeros ya abierto en pantalla.
+		strField := func(m map[string]interface{}, key string) string {
+			if v, ok := m[key]; ok && v != nil {
+				return fmt.Sprintf("%v", v)
+			}
+			return ""
+		}
+
+		var pasajeros []map[string]interface{}
+		if raw, ok := args["pasajeros"].([]interface{}); ok {
+			for _, item := range raw {
+				if m, ok := item.(map[string]interface{}); ok {
+					tipo := strField(m, "tipo_pasajero")
+					if tipo == "" {
+						tipo = "Adulto"
+					}
+					pasajeros = append(pasajeros, map[string]interface{}{
+						"nombre":        strField(m, "nombre"),
+						"apellido":      strField(m, "apellido"),
+						"documento":     strField(m, "documento"),
+						"nacimiento":    strField(m, "nacimiento"),
+						"nacionalidad":  strField(m, "nacionalidad"),
+						"tipo_pasajero": tipo,
+					})
+				}
+			}
+		}
+		if len(pasajeros) == 0 {
+			cantidad := 1
+			if raw, ok := args["cantidad_pasajeros"]; ok {
+				switch v := raw.(type) {
+				case float64:
+					cantidad = int(v)
+				case string:
+					if n, err := strconv.Atoi(v); err == nil {
+						cantidad = n
+					}
+				}
+			}
+			if cantidad < 1 {
+				cantidad = 1
+			}
+			if cantidad > 20 {
+				cantidad = 20
+			}
+			for i := 0; i < cantidad; i++ {
+				pasajeros = append(pasajeros, map[string]interface{}{
+					"nombre": "", "apellido": "", "documento": "", "nacimiento": "", "nacionalidad": "", "tipo_pasajero": "Adulto",
+				})
+			}
+		}
+
+		if uiActions != nil {
+			*uiActions = append(*uiActions, UIAction{
+				Type:    "fill_passenger_form",
+				Payload: map[string]interface{}{"passengers": pasajeros},
+			})
+		}
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se completó el formulario con %d pasajero(s). El usuario ya lo puede revisar y confirmar.", len(pasajeros))})
+		return string(b)
+
+	case "mis_grupos":
+		var grupos []models.Group
+		database.DB.Where("vendedor = ?", u.ID).Order("created_at desc").Find(&grupos)
+		b, _ := json.Marshal(map[string]interface{}{"grupos": grupos, "total": len(grupos)})
+		return string(b)
+
+	case "solicitar_grupo":
+		cantidad, _ := strconv.Atoi(fmt.Sprintf("%v", args["cantidad_lugares"]))
+		if cantidad <= 0 {
+			return `{"error": "La cantidad de lugares debe ser mayor a 0"}`
+		}
+		notasVendedor, _ := args["notas_vendedor"].(string)
+		opcionesRaw, _ := args["opciones"].([]interface{})
+		if len(opcionesRaw) == 0 {
+			return `{"error": "Agregá al menos una opción de itinerario antes de solicitar el grupo"}`
+		}
+
+		solicitudID := uuid.New()
+		rows := make([]models.Group, 0, len(opcionesRaw))
+		for _, raw := range opcionesRaw {
+			m, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			itinerario, _ := m["itinerario"].(string)
+			if itinerario == "" {
+				continue
+			}
+			row := models.Group{
+				SolicitudID:      &solicitudID,
+				OpcionNumero:     len(rows) + 1,
+				Vendedor:         u.ID,
+				Agency:           u.Agencia,
+				NotasVendedor:    notasVendedor,
+				Itinerario:       itinerario,
+				CantidadLugares:  cantidad,
+				EstadoCotizacion: models.GroupCotizacionPendiente,
+			}
+			if notas, ok := m["notas"].(string); ok && notas != "" && notasVendedor == "" {
+				row.NotasVendedor = notas
+			}
+			rows = append(rows, row)
+		}
+		if len(rows) == 0 {
+			return `{"error": "No se pudo interpretar ninguna opción de itinerario"}`
+		}
+		if err := database.DB.Create(&rows).Error; err != nil {
+			return fmt.Sprintf(`{"error": "Error al crear la solicitud de grupo: %s"}`, err.Error())
+		}
+		b, _ := json.Marshal(map[string]interface{}{
+			"exito":   true,
+			"grupos":  rows,
+			"mensaje": fmt.Sprintf("Solicitud de grupo creada con %d opción(es). El administrador va a cargar la cotización.", len(rows)),
+		})
+		return string(b)
+
+	case "aceptar_cotizacion_grupo":
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role != "admin" && group.Vendedor != u.ID {
+			return `{"error": "Sin permiso para aceptar esta cotización"}`
+		}
+		if group.EstadoCotizacion != models.GroupCotizacionCotizada {
+			return `{"error": "Esta opción no tiene una cotización pendiente de aceptar"}`
+		}
+		if groupQuoteExpired(&group) {
+			b, _ := json.Marshal(map[string]string{"error": fmt.Sprintf(
+				"La cotización venció el %s, pedile al administrador que la actualice.",
+				group.VencimientoCotizacion.Format("02/01/2006"))})
+			return string(b)
+		}
+		database.DB.Model(&group).Update("estado_cotizacion", models.GroupCotizacionAceptada)
+		if group.SolicitudID != nil {
+			database.DB.Model(&models.Group{}).
+				Where("solicitud_id = ? AND id != ? AND estado_cotizacion IN ?", group.SolicitudID, group.ID,
+					[]string{models.GroupCotizacionPendiente, models.GroupCotizacionCotizada}).
+				Update("estado_cotizacion", models.GroupCotizacionRechazada)
+		}
+		database.DB.First(&group, id)
+		b, _ := json.Marshal(group)
+		return string(b)
+
+	case "solicitar_cancelacion_grupo":
+		id, _ := args["grupo_id"].(string)
+		var group models.Group
+		if err := database.DB.First(&group, id).Error; err != nil {
+			return `{"error": "Grupo no encontrado"}`
+		}
+		if u.Role != "admin" && u.Role != "agency_admin" && group.Vendedor != u.ID {
+			return `{"error": "Sin permiso"}`
+		}
+		if group.EstadoReservar != models.GroupReservarConfirmada {
+			return `{"error": "Solo se puede solicitar la cancelación de un grupo confirmado"}`
+		}
+		database.DB.Model(&group).Updates(map[string]interface{}{
+			"estado_reservar":            models.GroupReservarCancelacionSolicitada,
+			"pre_cancel_estado_reservar": group.EstadoReservar,
+		})
+		return `{"exito": true, "mensaje": "Solicitud de cancelación enviada. El administrador la va a revisar."}`
+
+	case "navegar_a_pantalla":
+		// Tampoco toca la DB — solo le pide al frontend que cambie de ruta.
+		pageKey := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", args["pagina"])))
+		page, ok := knownPages[pageKey]
+		if !ok {
+			b, _ := json.Marshal(map[string]interface{}{"error": fmt.Sprintf("No reconozco esa pantalla ('%s'). Pantallas válidas: %s", pageKey, strings.Join(knownPageKeys, ", "))})
+			return string(b)
+		}
+
+		hasAccess := true
+		switch page.RequireRole {
+		case "admin":
+			hasAccess = u.Role == "admin"
+		case "admin_or_agency_admin":
+			hasAccess = u.Role == "admin" || u.Role == "agency_admin"
+		}
+		if !hasAccess {
+			b, _ := json.Marshal(map[string]interface{}{"error": fmt.Sprintf("El usuario no tiene acceso a la pantalla de %s.", page.Label)})
+			return string(b)
+		}
+
+		if uiActions != nil {
+			*uiActions = append(*uiActions, UIAction{
+				Type:    "navigate",
+				Payload: map[string]interface{}{"path": page.Path},
+			})
+		}
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Te llevé a la pantalla de %s.", page.Label)})
 		return string(b)
 	}
 
@@ -1269,10 +2084,10 @@ func callAnthropicFull(p models.AIProvider, systemPrompt string, messages []map[
 
 	var result struct {
 		Content []struct {
-			Type  string `json:"type"`
-			Text  string `json:"text"`
-			ID    string `json:"id"`
-			Name  string `json:"name"`
+			Type  string                 `json:"type"`
+			Text  string                 `json:"text"`
+			ID    string                 `json:"id"`
+			Name  string                 `json:"name"`
 			Input map[string]interface{} `json:"input"`
 		} `json:"content"`
 		StopReason string `json:"stop_reason"`
@@ -1463,11 +2278,12 @@ func Chat(c *gin.Context) {
 		isNewSession = true
 	}
 
-	const historyTTL = 4 * time.Hour
+	historyTTL := time.Duration(services.GetIntSetting("ai_historial_horas", 4)) * time.Hour
 	const maxHistoryMessages = 20 // pares usuario/asistente → 40 mensajes máx
 	const maxSessionMessages = 30 // trimear si la sesión supera este límite
 
-	// Auto-limpieza por TTL: borrar mensajes de esta sesión con más de 4 horas
+	// Auto-limpieza por TTL (configurable en Ajustes, ai_historial_horas): borrar
+	// mensajes de esta sesión más viejos que ese umbral
 	if sessionID != uuid.Nil {
 		cutoff := time.Now().Add(-historyTTL)
 		database.DB.Where("session_id = ? AND created_at < ?", sessionID, cutoff).Delete(&models.AIMessage{})
@@ -1482,6 +2298,10 @@ func Chat(c *gin.Context) {
 			Find(&history)
 	}
 
+<<<<<<< HEAD
+	systemPrompt := buildSystemPrompt(u, req.PageContext)
+	tools := getTools(role)
+=======
 	// Expertos activos visibles para el usuario (scopeados a su agencia,
 	// salvo admin que ve los de todas) — se ofrecen como una tool más
 	// (consultar_experto), no como un sistema paralelo.
@@ -1511,6 +2331,7 @@ func Chat(c *gin.Context) {
 			}
 		}
 	}
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
 	// Construir mensaje inicial del usuario (con o sin imagen/es)
 	var userContent interface{}
@@ -1651,6 +2472,10 @@ func Chat(c *gin.Context) {
 	// Bucle de tool calling (máx 5 iteraciones)
 	var finalContent string
 	var toolCallsSummary []map[string]interface{}
+	// uiActions acumula las acciones de UI (abrir modal, completar
+	// formulario) que el modelo pidió en este turno — puede haber más de
+	// una si encadenó abrir_modal_reserva + completar_formulario_pasajeros.
+	uiActions := []UIAction{}
 
 	for i := 0; i < 5; i++ {
 		var pr *providerResponse
@@ -1702,7 +2527,7 @@ func Chat(c *gin.Context) {
 
 		// Ejecutar tool calls
 		for _, tc := range pr.ToolCalls {
-			result := executeTool(tc.Name, tc.Input, u)
+			result := executeTool(tc.Name, tc.Input, u, req.PageContext, &uiActions)
 			toolCallsSummary = append(toolCallsSummary, map[string]interface{}{
 				"tool":   tc.Name,
 				"result": result,
@@ -1791,9 +2616,10 @@ func Chat(c *gin.Context) {
 		if err == nil && pr != nil && pr.Content != "" {
 			finalContent = pr.Content
 		} else {
-			services.LogFailure("ai", fmt.Sprintf(
-				"Chat de IA terminó sin respuesta de texto tras %d tool call(s) (usuario %s, proveedor %s)",
-				len(toolCallsSummary), u.Email, provider.ProviderType))
+			services.LogFailure("ai",
+				fmt.Sprintf("El asistente IA no pudo responder a %s (agencia %s) después de varios intentos", u.Email, u.Agencia),
+				fmt.Sprintf("Chat de IA terminó sin respuesta de texto tras %d tool call(s) (usuario %s, proveedor %s)",
+					len(toolCallsSummary), u.Email, provider.ProviderType))
 		}
 	}
 
@@ -1854,6 +2680,7 @@ func Chat(c *gin.Context) {
 		"role":       "assistant",
 		"content":    finalContent,
 		"tool_calls": toolCallsSummary,
+		"ui_actions": uiActions,          // Acciones que el frontend debe ejecutar (abrir modal, completar formulario) — ver AIPageContext.jsx
 		"sessionId":  sessionID.String(), // Siempre retornar para que el frontend lo persista
 	})
 }
@@ -1984,7 +2811,9 @@ func callOpenAI(p models.AIProvider, message string) (string, error) {
 	}
 	var result struct {
 		Choices []struct {
-			Message struct{ Content string `json:"content"` } `json:"message"`
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
 		} `json:"choices"`
 	}
 	json.Unmarshal(respBody, &result)
@@ -2063,7 +2892,9 @@ func callGoogle(p models.AIProvider, message string) (string, error) {
 	var result struct {
 		Candidates []struct {
 			Content struct {
-				Parts []struct{ Text string `json:"text"` } `json:"parts"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
 			} `json:"content"`
 		} `json:"candidates"`
 	}
@@ -2072,45 +2903,6 @@ func callGoogle(p models.AIProvider, message string) (string, error) {
 		return "", fmt.Errorf("sin respuesta")
 	}
 	return result.Candidates[0].Content.Parts[0].Text, nil
-}
-
-// ─────────────────────────────────────────────
-// ACTIONS CRUD
-// ─────────────────────────────────────────────
-
-func ListAIActions(c *gin.Context) {
-	actions := make([]models.AIAction, 0)
-	database.DB.Find(&actions)
-	c.JSON(http.StatusOK, gin.H{"actions": actions})
-}
-
-func CreateAIAction(c *gin.Context) {
-	var action models.AIAction
-	if err := c.ShouldBindJSON(&action); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	action.ID = uuid.New()
-	database.DB.Create(&action)
-	c.JSON(http.StatusCreated, action)
-}
-
-func UpdateAIAction(c *gin.Context) {
-	id := c.Param("id")
-	var action models.AIAction
-	if err := database.DB.First(&action, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Acción no encontrada"})
-		return
-	}
-	c.ShouldBindJSON(&action)
-	database.DB.Save(&action)
-	c.JSON(http.StatusOK, action)
-}
-
-func DeleteAIAction(c *gin.Context) {
-	id := c.Param("id")
-	database.DB.Delete(&models.AIAction{}, "id = ?", id)
-	c.JSON(http.StatusOK, gin.H{"message": "Acción eliminada"})
 }
 
 // ─────────────────────────────────────────────

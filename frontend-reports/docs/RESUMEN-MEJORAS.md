@@ -11,7 +11,11 @@
 
 ### ✅ 2. Backend Node.js Completo
 - **Estructura**: Backend completo en `/backend` con toda la lógica de negocio
+<<<<<<< HEAD
+- **Endpoints seguros**:
+=======
 - **Endpoints seguros**: 
+>>>>>>> main
   - `/api/login` - Autenticación
   - `/api/upload` - Subida de archivos
   - `/api/data` - Procesamiento de datos

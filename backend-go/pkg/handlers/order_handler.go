@@ -193,7 +193,7 @@ func CreateReservation(c *gin.Context) {
 	// 3. Preparar reserva
 	blockMinutes := product.BloqueoTemporalMinutos
 	if blockMinutes <= 0 {
-		blockMinutes = 60 // Default
+		blockMinutes = services.GetIntSetting("bloqueo_minutos_default", 60)
 	}
 	expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
 	input.Reservation.BloqueoExpiraAt = &expiresAt
@@ -280,14 +280,16 @@ func CreateReservation(c *gin.Context) {
 	tx.Commit()
 
 	createdBy := &input.Reservation.CreatedBy
-	services.NotifyRole("admin", createdBy, "new_request",
+	services.NotifyRoleByCode("admin", createdBy, "new_request",
 		"Nueva reserva creada",
-		fmt.Sprintf("Agencia %s creó la reserva %s (pedido %s)", input.Reservation.Agencia, input.Reservation.NombrePasajero, input.Reservation.PedidoID))
+		fmt.Sprintf("Agencia %s creó la reserva %s (pedido %s)", input.Reservation.Agencia, input.Reservation.NombrePasajero, input.Reservation.PedidoID),
+		map[string]string{"agencia": input.Reservation.Agencia, "pasajero": input.Reservation.NombrePasajero, "pedido_id": input.Reservation.PedidoID})
 
 	if product.Disponibilidad <= services.LowAvailabilityThreshold {
-		services.NotifyRole("admin", createdBy, "low_availability",
+		services.NotifyRoleByCode("admin", createdBy, "low_availability",
 			"Baja disponibilidad",
-			fmt.Sprintf("El producto %s hacia %s quedó con %d cupos disponibles", product.CodigoCupo, product.Destino, product.Disponibilidad))
+			fmt.Sprintf("El producto %s hacia %s quedó con %d cupos disponibles", product.CodigoCupo, product.Destino, product.Disponibilidad),
+			map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "disponibilidad": fmt.Sprintf("%d", product.Disponibilidad)})
 	}
 
 	// B2B: el email va a quien creó la reserva (la agencia), no al contacto
@@ -306,7 +308,9 @@ func CreateReservation(c *gin.Context) {
 			"contacto_nombre": input.Reservation.NombrePasajero,
 			"vence":           vence,
 		}); err != nil {
-			services.LogFailure("email", fmt.Sprintf("No se pudo enviar email de %s para pedido %s: %s", templateCode, input.Reservation.PedidoID, err.Error()))
+			services.LogFailure("email",
+				fmt.Sprintf("No se pudo enviar el email de aviso para el pedido %s", input.Reservation.PedidoID),
+				fmt.Sprintf("template=%s pedido=%s error=%s", templateCode, input.Reservation.PedidoID, err.Error()))
 		}
 	}
 
@@ -482,17 +486,21 @@ func ConfirmReservation(c *gin.Context) {
 		Update("estado", models.EstadoConfirmada)
 
 	actor := createdByFromContext(c)
-	services.NotifyRole("admin", actor, "request_confirmed", "Reserva confirmada",
-		fmt.Sprintf("La reserva %s (pedido %s) fue confirmada", reservation.NombrePasajero, reservation.PedidoID))
-	services.NotifyUser(reservation.CreatedBy, actor, "request_confirmed", "Tu reserva fue confirmada",
-		fmt.Sprintf("Tu reserva del pedido %s fue confirmada", reservation.PedidoID))
+	services.NotifyRoleByCode("admin", actor, "request_confirmed_admin", "Reserva confirmada",
+		fmt.Sprintf("La reserva %s (pedido %s) fue confirmada", reservation.NombrePasajero, reservation.PedidoID),
+		map[string]string{"pasajero": reservation.NombrePasajero, "pedido_id": reservation.PedidoID})
+	services.NotifyUserByCode(reservation.CreatedBy, actor, reservation.Agencia, "request_confirmed_user", "Tu reserva fue confirmada",
+		fmt.Sprintf("Tu reserva del pedido %s fue confirmada", reservation.PedidoID),
+		map[string]string{"pedido_id": reservation.PedidoID})
 
 	if recipient := services.ResolveReservationRecipientEmail(reservation.CreatedBy); recipient != "" {
 		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", recipient, map[string]string{
 			"pedido_id":       reservation.PedidoID,
 			"contacto_nombre": reservation.NombrePasajero,
 		}); err != nil {
-			services.LogFailure("email", fmt.Sprintf("No se pudo enviar email de confirmación para pedido %s: %s", reservation.PedidoID, err.Error()))
+			services.LogFailure("email",
+				fmt.Sprintf("No se pudo enviar el email de confirmación para el pedido %s", reservation.PedidoID),
+				fmt.Sprintf("pedido=%s error=%s", reservation.PedidoID, err.Error()))
 		}
 	}
 
@@ -528,8 +536,9 @@ func DeleteReservation(c *gin.Context) {
 	}
 
 	if found {
-		services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Reserva eliminada",
-			fmt.Sprintf("Se eliminó la reserva del pedido %s y se liberó el cupo", reservation.PedidoID))
+		services.NotifyAgencyByCode(reservation.Agencia, createdByFromContext(c), "reservation_deleted", "Reserva eliminada",
+			fmt.Sprintf("Se eliminó la reserva del pedido %s y se liberó el cupo", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Reserva eliminada."})
@@ -577,8 +586,9 @@ func DeletePassenger(c *gin.Context) {
 		pedidoEliminado = true
 	}
 
-	services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Pasajero eliminado",
-		fmt.Sprintf("Se eliminó a %s %s del pedido %s y se liberó su lugar", passenger.Nombre, passenger.Apellido, reservation.PedidoID))
+	services.NotifyAgencyByCode(reservation.Agencia, createdByFromContext(c), "passenger_deleted", "Pasajero eliminado",
+		fmt.Sprintf("Se eliminó a %s %s del pedido %s y se liberó su lugar", passenger.Nombre, passenger.Apellido, reservation.PedidoID),
+		map[string]string{"nombre": passenger.Nombre, "apellido": passenger.Apellido, "pedido_id": reservation.PedidoID})
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "pedido_eliminado": pedidoEliminado, "pasajeros_restantes": remaining})
 }
@@ -689,7 +699,13 @@ func RequestCancellation(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&reservation).Update("estado", models.EstadoSolicitudCancelacion).Error; err != nil {
+	// Guarda el estado previo para poder restaurarlo tal cual si un admin
+	// rechaza la solicitud (ver ResolveCancellation más abajo).
+	prevEstado := reservation.Estado
+	if err := database.DB.Model(&reservation).Updates(map[string]interface{}{
+		"estado":            models.EstadoSolicitudCancelacion,
+		"pre_cancel_estado": prevEstado,
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al procesar solicitud."})
 		return
 	}
@@ -698,16 +714,126 @@ func RequestCancellation(c *gin.Context) {
 
 	database.DB.First(&reservation, id)
 
-	services.NotifyRole("admin", createdByFromContext(c), "info", "Solicitud de cancelación pendiente",
-		fmt.Sprintf("La reserva del pedido %s tiene una solicitud de cancelación pendiente de revisión", reservation.PedidoID))
+	services.NotifyRoleByCode("admin", createdByFromContext(c), "cancellation_pending", "Solicitud de cancelación pendiente",
+		fmt.Sprintf("La reserva del pedido %s tiene una solicitud de cancelación pendiente de revisión", reservation.PedidoID),
+		map[string]string{"pedido_id": reservation.PedidoID})
 
 	c.JSON(http.StatusOK, reservation)
+}
+
+// ResolveCancellation permite a un admin aprobar o rechazar una solicitud de
+// cancelación pendiente, con notas opcionales. Aprobar cancela la reserva
+// definitivamente y libera el cupo al stock (a diferencia de DeleteReservation,
+// no borra la fila: queda en el historial marcada "cancelada", con las notas
+// del admin). Rechazar la vuelve al estado que tenía antes de la solicitud
+// (pre_cancel_estado, guardado por RequestCancellation) y avisa a quien la
+// pidió.
+func ResolveCancellation(c *gin.Context) {
+	id := c.Param("id")
+	var reservation models.Reservation
+	if err := database.DB.First(&reservation, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+	if reservation.Estado != models.EstadoSolicitudCancelacion {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta reserva no tiene una solicitud de cancelación pendiente."})
+		return
+	}
+
+	var input struct {
+		Decision string `json:"decision"` // "approve" | "decline"
+		Notas    string `json:"notas"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.Decision != "approve" && input.Decision != "decline" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "decision debe ser 'approve' o 'decline'"})
+		return
+	}
+
+	actor := createdByFromContext(c)
+
+	if input.Decision == "approve" {
+		var passengersCount int64
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
+		if passengersCount == 0 {
+			passengersCount = 1
+		}
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
+			Updates(map[string]interface{}{
+				"disponibilidad": gorm.Expr("disponibilidad + ?", passengersCount),
+				"vendidos":       gorm.Expr("vendidos - ?", passengersCount),
+			})
+		database.DB.Model(&reservation).Updates(map[string]interface{}{
+			"estado":            models.EstadoCancelada,
+			"cancelacion_notas": input.Notas,
+		})
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Update("estado", models.EstadoCancelada)
+
+		services.NotifyUserByCode(reservation.CreatedBy, actor, reservation.Agencia, "cancellation_approved", "Cancelación aprobada",
+			fmt.Sprintf("Se aprobó la cancelación de tu reserva del pedido %s y el cupo fue liberado", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
+	} else {
+		restoreEstado := reservation.PreCancelEstado
+		if restoreEstado == "" {
+			restoreEstado = models.EstadoConfirmada
+		}
+		database.DB.Model(&reservation).Updates(map[string]interface{}{
+			"estado":            restoreEstado,
+			"cancelacion_notas": input.Notas,
+		})
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Update("estado", restoreEstado)
+
+		services.NotifyUserByCode(reservation.CreatedBy, actor, reservation.Agencia, "cancellation_declined", "Cancelación rechazada",
+			fmt.Sprintf("Se rechazó la solicitud de cancelación de tu reserva del pedido %s", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
+	}
+
+	database.DB.First(&reservation, id)
+	c.JSON(http.StatusOK, reservation)
+}
+
+// GetBlockedReservations devuelve las reservas en bloqueo_temporal de TODA la
+// agencia del usuario (no solo las que él mismo creó), para que cualquier
+// compañero de la agencia sepa que un cupo en 0 en realidad tiene un bloqueo
+// esperando confirmación y pueda especular con esperar. Admin ve las de todas
+// las agencias. Por eso mismo, expone EXCLUSIVAMENTE lo mínimo indispensable
+// (pedido, destino, vencimiento) — nunca nombre, documento ni contacto del
+// pasajero de otra persona.
+func GetBlockedReservations(c *gin.Context) {
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoBloqueoTemporal)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = LOWER(?)", agencia)
+	}
+
+	var reservations []models.Reservation
+	query.Order("bloqueo_expira_at asc").Find(&reservations)
+
+	result := make([]gin.H, len(reservations))
+	for i, r := range reservations {
+		result[i] = gin.H{
+			"id":                r.ID,
+			"pedido_id":         r.PedidoID,
+			"vuelo_destino":     r.VueloDestino,
+			"bloqueo_expira_at": r.BloqueoExpiraAt,
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
 }
 
 func GetReservationByID(c *gin.Context) {
 	id := c.Param("id")
 	var reservation models.Reservation
-	if err := database.DB.First(&reservation, id).Error; err != nil {
+	// Preload("Passengers") hace falta para el itinerario PDF de Confirmations.jsx —
+	// sin esto, reservation.Passengers siempre vuelve vacío.
+	if err := database.DB.Preload("Passengers").First(&reservation, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
 		return
 	}
@@ -898,8 +1024,9 @@ func DuplicatePassenger(c *gin.Context) {
 
 	tx.Commit()
 
-	services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Pasajero duplicado",
-		fmt.Sprintf("Se agregó un pasajero duplicado de %s %s al pedido %s", source.Nombre, source.Apellido, reservation.PedidoID))
+	services.NotifyAgencyByCode(reservation.Agencia, createdByFromContext(c), "passenger_duplicated", "Pasajero duplicado",
+		fmt.Sprintf("Se agregó un pasajero duplicado de %s %s al pedido %s", source.Nombre, source.Apellido, reservation.PedidoID),
+		map[string]string{"nombre": source.Nombre, "apellido": source.Apellido, "pedido_id": reservation.PedidoID})
 
 	c.JSON(http.StatusCreated, newPassenger)
 }
@@ -989,8 +1116,9 @@ func AddPassenger(c *gin.Context) {
 
 	tx.Commit()
 
-	services.NotifyAgency(reservation.Agencia, createdByFromContext(c), "info", "Pasajero agregado",
-		fmt.Sprintf("Se agregó un nuevo pasajero al pedido %s", reservation.PedidoID))
+	services.NotifyAgencyByCode(reservation.Agencia, createdByFromContext(c), "passenger_added", "Pasajero agregado",
+		fmt.Sprintf("Se agregó un nuevo pasajero al pedido %s", reservation.PedidoID),
+		map[string]string{"pedido_id": reservation.PedidoID})
 
 	c.JSON(http.StatusCreated, newPassenger)
 }

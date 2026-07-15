@@ -5,17 +5,38 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
+import { X, Minus, RotateCcw, Settings, Trash2, MessageSquarePlus, Bot } from 'lucide-react';
+import AIService from '../../services/aiService';
+=======
 import { Minus, RotateCcw, Settings, MessageSquarePlus, Bot, Maximize2 } from 'lucide-react';
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 import AIChatMessage from './AIChatMessage';
 import AIChatInput from './AIChatInput';
 import AIChatSessionsSidebar from './AIChatSessionsSidebar';
 import ExpertPicker from './ExpertPicker';
 import useAIChat from '../../hooks/useAIChat';
 import { useAuth } from '../../contexts/AuthContext';
+<<<<<<< HEAD
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
+import { useAIPageContext } from '../../contexts/AIPageContext.jsx';
+
+export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
+    const { user, can } = useAuth();
+    const navigate = useNavigate();
+    const { pageContext, dispatchUIActions } = useAIPageContext();
+    const [messages, setMessages] = useState([]);
+    const [sessions, setSessions] = useState([]);
+    const [currentSessionId, setCurrentSessionId] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const [error, setError] = useState(null);
+=======
 
 export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     const { user } = useAuth();
     const navigate = useNavigate();
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
     const [showSessions, setShowSessions] = useState(false);
     const messagesEndRef = useRef(null);
 
@@ -53,9 +74,88 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
         setShowSessions(false);
     };
 
+<<<<<<< HEAD
+    const handleSendMessage = async (content, attachments = []) => {
+        // Normalizar los adjuntos para asegurar que sea un arreglo
+        const activeAttachments = Array.isArray(attachments) ? attachments : (attachments ? [attachments] : []);
+
+        // Agregar mensaje del usuario inmediatamente
+        const userMessage = {
+            id: `temp-${Date.now()}`,
+            role: 'user',
+            content,
+            imagePreview: activeAttachments[0]?.dataUrl || null, // Retrocompatibilidad
+            imagePreviews: activeAttachments.map(img => img.dataUrl), // Soporte para múltiples adjuntos
+            created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, userMessage]);
+        setIsTyping(true);
+        setError(null);
+
+        try {
+            const response = await AIService.sendMessage(
+                content,
+                currentSessionId,
+                activeAttachments,
+                null,
+                pageContext
+            );
+
+            // Navegar primero (si la IA lo pidió) — a diferencia de abrir
+            // modal/completar pasajeros, esto no depende de que la pantalla
+            // actual haya registrado handlers, funciona desde cualquier lado.
+            const navigateAction = (response.ui_actions || []).find((a) => a?.type === 'navigate' && a.payload?.path);
+            if (navigateAction) {
+                navigate(navigateAction.payload.path);
+            }
+
+            // Ejecutar en pantalla lo que la IA haya pedido (abrir el modal
+            // de reserva, completar el formulario de pasajeros) — si el
+            // usuario ya no está en la pantalla que registró esos handlers,
+            // dispatchUIActions simplemente no hace nada.
+            dispatchUIActions(response.ui_actions);
+
+            // Actualizar ID de sesión si es nueva
+            if (!currentSessionId && response.sessionId) {
+                setCurrentSessionId(response.sessionId);
+                loadSessions(); // Recargar lista de sesiones
+            }
+
+            // Agregar respuesta del asistente
+            const responseContent = response.content || response.message || '';
+            const assistantMessage = {
+                id: response.id || `resp-${Date.now()}`,
+                role: 'assistant',
+                content: responseContent,
+                toolCalls: response.toolCalls,
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+
+            // Notificar al widget padre (para el badge)
+            if (onNewMessage && responseContent) {
+                onNewMessage(responseContent);
+            }
+        } catch (err) {
+            console.error('Error al enviar mensaje:', err);
+            setError(err.message || 'Error al comunicarse con la IA');
+
+            // Agregar mensaje de error
+            setMessages(prev => [...prev, {
+                id: `error-${Date.now()}`,
+                role: 'assistant',
+                content: 'Lo siento, hubo un problema al procesar tu mensaje. Por favor intenta de nuevo.',
+                isError: true,
+                created_at: new Date().toISOString()
+            }]);
+        } finally {
+            setIsTyping(false);
+        }
+=======
     const handleNewSessionClick = () => {
         handleNewSession();
         setShowSessions(false);
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
     };
 
     const handleExpand = () => {
@@ -97,6 +197,10 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         <RotateCcw className="w-4 h-4" />
                     </button>
 
+<<<<<<< HEAD
+                    {/* Configuración (requiere permiso de IA) */}
+                    {can('AI_UPDATE') && (
+=======
                     {/* Expandir a pantalla completa */}
                     <button
                         onClick={handleExpand}
@@ -108,6 +212,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
 
                     {/* Configuración (solo admin) */}
                     {user?.role === 'admin' && (
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
                         <button
                             onClick={() => window.location.href = '/config-ia'}
                             className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"

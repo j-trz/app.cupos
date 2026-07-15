@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, X } from 'lucide-react';
+import { Building2, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, X, Lock } from 'lucide-react';
 import AgencyService from '../services/agencyService';
+import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -20,6 +21,7 @@ const emptyAgency = {
 };
 
 export default function GestionAgencias() {
+  const { can } = useAuth();
   const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -137,6 +139,16 @@ export default function GestionAgencias() {
     []
   );
 
+  if (!can('AGENCIES_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -161,26 +173,31 @@ export default function GestionAgencias() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={BarChart3}
-          label="Total agencias"
-          value={filteredAgencies.length}
-          description="Cantidad total de agencias registradas."
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Con email"
-          value={filteredAgencies.filter((a) => a.email).length}
-          description="Agencias con email configurado."
-        />
-        <StatCard
-          icon={Building2}
-          label="Sin email"
-          value={filteredAgencies.filter((a) => !a.email).length}
-          description="Agencias sin email configurado."
-        />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            icon: BarChart3,
+            label: 'Total agencias',
+            value: filteredAgencies.length,
+            description: 'Cantidad total de agencias registradas.',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+          },
+          {
+            icon: CheckCircle,
+            label: 'Con email',
+            value: filteredAgencies.filter((a) => a.email).length,
+            description: 'Agencias con email configurado.',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+          {
+            icon: Building2,
+            label: 'Sin email',
+            value: filteredAgencies.filter((a) => !a.email).length,
+            description: 'Agencias sin email configurado.',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+        ]}
+      />
 
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">

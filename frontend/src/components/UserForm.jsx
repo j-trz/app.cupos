@@ -56,10 +56,15 @@ const UserForm = ({
   };
 
   const handleFormSubmit = (data) => {
+    // "role" (string: admin/agency_admin/user) y "role_id" (UUID del rol
+    // granular elegido en el selector de abajo) son campos DISTINTOS en el
+    // backend — antes se mandaba el UUID bajo la misma clave "role" que el
+    // string de rol, lo que corrompía Profile.Role con un UUID en vez de
+    // asignar el rol granular (que además nunca llegaba a aplicarse).
     onSubmit({
       ...data,
-      permissions: selectedPermissions,
-      role: selectedRole || data.rol
+      role: data.rol,
+      role_id: selectedRole || undefined,
     });
   };
 

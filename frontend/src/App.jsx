@@ -4,6 +4,7 @@ import { DEFAULT_DOCS_SECTION } from './lib/docsSections.js';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { HeaderProvider } from './contexts/HeaderContext';
+import { AIPageProvider } from './contexts/AIPageContext';
 import { SidebarProvider } from './components/ui/SidebarProvider';
 import { QueryClientProvider } from './lib/react-query';
 import { queryClient } from './lib/react-query';
@@ -12,6 +13,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import GestionUsuarios from './pages/GestionUsuarios';
 import GestionProductos from './pages/GestionProductos';
+import GestionGrupos from './pages/GestionGrupos';
 import GestionReservas from './pages/GestionReservas';
 import GestionAgencias from './pages/GestionAgencias';
 import GestionTemas from './pages/GestionTemas';
@@ -26,6 +28,7 @@ import Requests from './pages/Requests';
 import Confirmations from './pages/Confirmations';
 import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
+import NotificationTemplates from './pages/NotificationTemplates';
 import AIConfig from './pages/AIConfig';
 import AIChatPage from './pages/AIChatPage';
 import Reportes from './pages/Reportes';
@@ -45,6 +48,7 @@ function App() {
         <I18nProvider>
           <SidebarProvider>
             <HeaderProvider>
+              <AIPageProvider>
               <Router>
                 <div className="App">
                   <Routes>
@@ -85,6 +89,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <GestionProductos />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/grupos"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <GestionGrupos />
                           </Layout>
                         </ProtectedRoute>
                       }
@@ -240,6 +254,16 @@ function App() {
                       }
                     />
                     <Route
+                      path="/notification-config"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <NotificationTemplates />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
                       path="/config-ia"
                       element={
                         <ProtectedRoute>
@@ -317,6 +341,7 @@ function App() {
                   <ToastNotification />
                 </div>
               </Router>
+              </AIPageProvider>
             </HeaderProvider>
           </SidebarProvider>
         </I18nProvider>

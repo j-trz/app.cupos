@@ -1,6 +1,6 @@
-﻿import { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { BookOpen, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Bell, Download, Database, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, FileText, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TicketsPlane, MapPinHouse, BookOpen, Bot, ArrowRightLeft, MessageSquare, Users, Shield, BarChart3, Bell, Download, Database, AlertTriangle, CheckCircle, Info, Zap, Star, Clock, Search, FileText, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useWhiteLabel } from '../contexts/WhiteLabelContext.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -12,15 +12,17 @@ function SectionHeader({ icon: Icon, title, badge }) {
   const { config } = useWhiteLabel();
   const primaryColor = config?.colors?.primary || '#3b82f6';
   return (
-    <div className="flex items-center gap-3 mb-5">
-      {Icon && <span className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800" style={{ color: primaryColor }}>
-        <Icon className="w-5 h-5" />
-      </span>}
-      <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
+    <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+      {Icon && (
+        <span className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800" style={{ color: primaryColor }}>
+          <Icon className="w-5.5 h-5.5" />
+        </span>
+      )}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{title}</h2>
         {badge && (
           <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-semibold border select-none"
+            className="text-[10px] px-2 py-0.5 rounded-full font-semibold border select-none tracking-wide"
             style={{ backgroundColor: `${primaryColor}10`, color: primaryColor, borderColor: `${primaryColor}20` }}
           >
             {badge}
@@ -33,7 +35,7 @@ function SectionHeader({ icon: Icon, title, badge }) {
 
 // ─── Componentes de contenido rediseñados ──────────────────────────────────────
 function DocParagraph({ children }) {
-  return <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm">{children}</p>;
+  return <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-[13px]">{children}</p>;
 }
 
 function DocSubsection({ title, children, icon: Icon, color = 'blue' }) {
@@ -44,27 +46,28 @@ function DocSubsection({ title, children, icon: Icon, color = 'blue' }) {
   const error = config?.colors?.error || '#ef4444';
 
   const colorMap = {
-    blue: { border: primary, bg: `${primary}08` },
-    green: { border: success, bg: `${success}08` },
-    orange: { border: warning, bg: `${warning}08` },
-    purple: { border: primary, bg: `${primary}08` },
-    red: { border: error, bg: `${error}08` },
+    blue: { border: primary, text: 'text-blue-600 dark:text-blue-400', borderLeft: 'border-l-blue-500' },
+    green: { border: success, text: 'text-emerald-600 dark:text-emerald-400', borderLeft: 'border-l-emerald-500' },
+    orange: { border: warning, text: 'text-amber-600 dark:text-amber-400', borderLeft: 'border-l-amber-500' },
+    purple: { border: primary, text: 'text-indigo-600 dark:text-indigo-400', borderLeft: 'border-l-indigo-500' },
+    red: { border: error, text: 'text-rose-600 dark:text-rose-400', borderLeft: 'border-l-rose-500' },
   };
 
   const c = colorMap[color] || colorMap.blue;
 
   return (
     <div
-      className="border-l-4 rounded-r-xl px-4 py-3 mb-4 shadow-sm border-opacity-70"
-      style={{ borderColor: c.border, backgroundColor: c.bg }}
+      className={`rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 p-5 mb-5 shadow-sm border-l-4 ${c.borderLeft}`}
     >
       {title && (
-        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 mb-2 flex items-center gap-2">
-          {Icon && <Icon className="w-3.5 h-3.5" style={{ color: c.border }} />}
+        <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
+          {Icon && <Icon className={`w-4 h-4 ${c.text}`} />}
           {title}
         </h4>
       )}
-      {children}
+      <div className="space-y-2">
+        {children}
+      </div>
     </div>
   );
 }
@@ -74,16 +77,16 @@ function DocSteps({ steps }) {
   const primaryColor = config?.colors?.primary || '#3b82f6';
 
   return (
-    <ol className="space-y-3 my-4">
+    <ol className="space-y-4 my-4">
       {steps.map((step, i) => (
-        <li key={i} className="flex items-start gap-3.5 text-sm text-zinc-600 dark:text-zinc-400">
+        <li key={i} className="flex items-start gap-3.5 text-[13px] text-zinc-600 dark:text-zinc-400">
           <span
-            className="w-5.5 h-5.5 rounded-full text-white flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5 shadow-sm"
+            className="w-6 h-6 rounded-full text-white flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5 shadow-sm"
             style={{ backgroundColor: primaryColor }}
           >
             {i + 1}
           </span>
-          <span className="leading-relaxed pt-0.5" dangerouslySetInnerHTML={{ __html: step }} />
+          <span className="leading-relaxed pt-0.5 flex-1" dangerouslySetInnerHTML={{ __html: step }} />
         </li>
       ))}
     </ol>
@@ -107,14 +110,14 @@ function DocList({ items, color = 'blue' }) {
   const activeColor = dotColors[color] || primary;
 
   return (
-    <ul className="space-y-2 my-3">
+    <ul className="space-y-3 my-3">
       {items.map((item, i) => (
-        <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+        <li key={i} className="flex items-start gap-3 text-[13px] text-zinc-600 dark:text-zinc-400">
           <span
-            className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2 shadow-sm animate-pulse"
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2 shadow-sm"
             style={{ backgroundColor: activeColor }}
           />
-          <span className="leading-relaxed" dangerouslySetInnerHTML={{ __html: item }} />
+          <span className="leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: item }} />
         </li>
       ))}
     </ul>
@@ -129,28 +132,27 @@ function DocAlert({ type = 'info', children }) {
   const error = config?.colors?.error || '#ef4444';
 
   const styles = {
-    info: { border: primary, bg: `${primary}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: Info },
-    warning: { border: warning, bg: `${warning}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: AlertTriangle },
-    success: { border: success, bg: `${success}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: CheckCircle },
-    tip: { border: primary, bg: `${primary}10`, text: 'text-zinc-800 dark:text-zinc-200', Icon: Star },
+    info: { border: primary, bg: 'bg-blue-50/50 dark:bg-blue-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-blue-200 dark:border-blue-900/30', colorText: 'text-blue-600 dark:text-blue-400', Icon: Info },
+    warning: { border: warning, bg: 'bg-amber-50/50 dark:bg-amber-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-amber-200 dark:border-amber-900/30', colorText: 'text-amber-600 dark:text-amber-400', Icon: AlertTriangle },
+    success: { border: success, bg: 'bg-emerald-50/50 dark:bg-emerald-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-emerald-200 dark:border-emerald-900/30', colorText: 'text-emerald-600 dark:text-emerald-400', Icon: CheckCircle },
+    tip: { border: primary, bg: 'bg-indigo-50/50 dark:bg-indigo-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-indigo-200 dark:border-indigo-900/30', colorText: 'text-indigo-600 dark:text-indigo-400', Icon: Star },
   };
 
   const s = styles[type] || styles.info;
 
   return (
     <div
-      className={`flex items-start gap-3 p-3.5 rounded-xl border ${s.text} text-xs my-3 shadow-sm`}
-      style={{ borderColor: s.border, backgroundColor: s.bg }}
+      className={`flex items-start gap-3 p-4 rounded-2xl border ${s.bg} ${s.borderColor} ${s.text} text-xs my-4 shadow-sm`}
     >
-      <s.Icon className="w-4 h-4 flex-shrink-0 mt-0.5 animate-bounce-slow" style={{ color: s.border }} />
-      <div className="leading-relaxed">{children}</div>
+      <s.Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${s.colorText}`} />
+      <div className="leading-relaxed flex-1">{children}</div>
     </div>
   );
 }
 
 function DocCode({ children }) {
   return (
-    <code className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-200 dark:border-zinc-700/50">
+    <code className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-200/60 dark:border-zinc-700/50">
       {children}
     </code>
   );
@@ -743,6 +745,42 @@ function PanelControlSection() {
   );
 }
 
+function PlantillasNotificacionSection() {
+  return (
+    <div className="space-y-4">
+      <DocSubsection title="¿Qué son las plantillas de notificación?" color="blue" icon={Info}>
+        <DocParagraph>
+          Son plantillas de correo electrónico en formato HTML que el sistema utiliza para enviar notificaciones automáticas ante eventos clave.
+          Permiten a los administradores personalizar el diseño, colores y contenido de cada comunicación utilizando variables dinámicas.
+        </DocParagraph>
+      </DocSubsection>
+
+      <DocSubsection title="Variables dinámicas soportadas" color="green" icon={CheckCircle}>
+        <DocParagraph>
+          Las plantillas permiten insertar variables dinámicas entre llaves dobles (ej: <DocCode>{`{{nombre}}`}</DocCode>). El sistema las reemplazará automáticamente con los datos reales al enviar el correo:
+        </DocParagraph>
+        <DocList items={[
+          '<strong>&#123;&#123;nombre&#125;&#125;</strong> — Nombre completo del destinatario del correo.',
+          '<strong>&#123;&#123;pedido_id&#125;&#125;</strong> — Código único de reserva (ej: P12345).',
+          '<strong>&#123;&#123;destino&#125;&#125;</strong> — Ciudad o aeropuerto de destino del vuelo.',
+          '<strong>&#123;&#123;fecha_salida&#125;&#125;</strong> — Fecha y hora programada de la salida del vuelo.',
+          '<strong>&#123;&#123;vence_at&#125;&#125;</strong> — Fecha y hora límite antes de la cual expira el bloqueo.',
+        ]} />
+      </DocSubsection>
+
+      <DocSubsection title="Cómo editar y probar una plantilla" color="purple" icon={Settings}>
+        <DocSteps steps={[
+          'Dirigite a <strong>Ajustes → Plantillas de Notificación</strong> en el menú lateral.',
+          'Seleccioná la plantilla que querés modificar (ej: Confirmación de Reserva, Alerta de Vencimiento).',
+          'Modificá el asunto y el cuerpo del mensaje en el editor HTML. Podés insertar variables dinámicas en cualquier parte.',
+          'Hacé click en <strong>"Previsualizar"</strong> para ver en tiempo real cómo lucirá el correo en pantallas móviles y de escritorio.',
+          'Hacé click en <strong>"Guardar"</strong> para registrar los cambios en la base de datos.',
+        ]} />
+      </DocSubsection>
+    </div>
+  );
+}
+
 function InicioRapidoSection() {
   return (
     <div className="space-y-4">
@@ -778,6 +816,7 @@ const SECTION_CONTENT = {
   ia: IASection,
   diseno: DisenoSection,
   email: EmailSection,
+  'plantillas-notificacion': PlantillasNotificacionSection,
   reportes: ReportesSection,
   usuarios: UsuariosSection,
   agencias: AgenciasSection,
@@ -811,83 +850,141 @@ export default function Documentacion() {
         icon={BookOpen}
       />
 
-      {section === DEFAULT_DOCS_SECTION && (
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm p-6">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900">
-              <BookOpen className="h-7 w-7" />
-            </div>
-            <div className="flex-1 space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">¿Qué es este sistema?</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                  Es una plataforma integral para la gestión de <strong>cupos aéreos</strong> (bloqueos de asientos en vuelos).
-                  Permite al operador mayorista cargar, distribuir y controlar sus cupos, y a las agencias minoristas hacer reservas
-                  para sus clientes de forma simple, automatizada y segura.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                {[
-                  { icon: '✈️', title: 'Cupos', desc: 'Asientos bloqueados en vuelos a precio fijo.' },
-                  { icon: '🏢', title: 'Agencias', desc: 'Cada agencia ve y gestiona solo sus reservas.' },
-                  { icon: '🤖', title: 'IA integrada', desc: 'Asistente que procesa DNI y asiste en lenguaje natural.' },
-                ].map(card => (
-                  <div
-                    key={card.title}
-                    className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
-                  >
-                    <div className="text-2xl mb-1.5">{card.icon}</div>
-                    <div className="font-semibold text-sm leading-tight text-slate-900 dark:text-slate-100">{card.title}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{card.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Barra de navegación lateral de la documentación para pantallas grandes */}
+        <aside className="hidden lg:block w-72 shrink-0">
+          <div className="sticky top-24 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 shadow-sm space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-3 mb-2">Secciones</p>
+            {sections.map((s) => {
+              const Icon = s.icon;
+              const active = s.key === section;
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => navigate(`/documentacion/${s.key}`)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-all duration-200 ${
+                    active
+                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 shadow-sm'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/80 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? '' : 'text-zinc-400 dark:text-zinc-500'}`} />
+                  <span className="truncate flex-1">{s.label}</span>
+                  {s.badge && (
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold border ${
+                      active
+                        ? 'bg-white/20 border-white/20 text-white dark:bg-black/10 dark:border-black/10 dark:text-zinc-950'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
+                    }`}>
+                      {s.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      )}
+        </aside>
 
-      {Content ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm px-6 py-5">
-          <SectionHeader icon={current.icon} title={current.label} badge={current.badge} />
-          <Content isAdmin={isAdmin} />
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm px-6 py-10 text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">Esa sección de documentación no existe.</p>
-          <Link to={`/documentacion/${DEFAULT_DOCS_SECTION}`} className="text-sm font-medium text-blue-600 hover:underline">
-            Ir al inicio de la documentación
-          </Link>
-        </div>
-      )}
+        {/* Contenido principal */}
+        <div className="flex-1 min-w-0 space-y-6">
+          {/* Selector para móviles en la parte superior del contenido */}
+          <div className="lg:hidden">
+            <label htmlFor="docs-section-select" className="sr-only">Seleccionar sección</label>
+            <select
+              id="docs-section-select"
+              value={section}
+              onChange={(e) => navigate(`/documentacion/${e.target.value}`)}
+              className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 shadow-sm focus:border-zinc-450 dark:focus:border-zinc-750 focus:outline-none"
+            >
+              {sections.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label} {s.badge ? `(${s.badge})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      {/* Navegación prev/next entre secciones */}
-      {Content && (
-        <div className="flex items-center justify-between gap-3 pt-2">
-          {prev ? (
-            <button
-              onClick={() => navigate(`/documentacion/${prev.key}`)}
-              className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              {prev.label}
-            </button>
-          ) : <span />}
-          {next && (
-            <button
-              onClick={() => navigate(`/documentacion/${next.key}`)}
-              className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors ml-auto"
-            >
-              {next.label}
-              <ChevronRight className="w-4 h-4" />
-            </button>
+          {section === DEFAULT_DOCS_SECTION && (
+            <div className="rounded-3xl border border-zinc-200 dark:border-zinc-850 bg-gradient-to-br from-zinc-900 via-zinc-850 to-zinc-950 text-white shadow-lg p-8 relative overflow-hidden">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
+              <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
+              
+              <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white ring-2 ring-white/20 backdrop-blur-sm">
+                  <BookOpen className="h-8 w-8" />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h2 className="text-2xl font-bold tracking-tight">Manual del Sistema</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-300">
+                      Bienvenido al centro de documentación de la plataforma de <strong>Gestión de Cupos</strong>.
+                      Aquí encontrarás instrucciones detalladas paso a paso para operar con éxito y sin necesidad de capacitación previa.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-3 gap-4 pt-4">
+                    {[
+                      { icon: TicketsPlane, title: 'Cupos Aéreos', desc: 'Consultá disponibilidad y reservá al instante.' },
+                      { icon: MapPinHouse, title: 'Agencias', desc: 'Operá de manera independiente y segura.' },
+                      { icon: Bot, title: 'Asistente IA', desc: 'Asistencia en lenguaje natural y lectura de Documentos.' },
+                    ].map((card, i) => (
+                      <div
+                        key={i}
+                        className="flex flex-col items-center text-center rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm hover:bg-white/10 transition-colors duration-200"
+                      >
+                        <card.icon className="h-5 w-5 text-zinc-300 mb-2" />
+                        <div className="font-semibold text-sm leading-tight text-white">{card.title}</div>
+                        <div className="text-xs text-zinc-400 mt-1">{card.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {Content ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-7">
+              <SectionHeader icon={current.icon} title={current.label} badge={current.badge} />
+              <Content isAdmin={isAdmin} />
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-12 text-center">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Esa sección de documentación no existe o no tenés permisos.</p>
+              <Link to={`/documentacion/${DEFAULT_DOCS_SECTION}`} className="inline-flex items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold px-4 py-2 hover:bg-zinc-850 dark:hover:bg-zinc-200 transition-colors">
+                Ir al inicio de la documentación
+              </Link>
+            </div>
+          )}
+
+          {/* Navegación prev/next entre secciones */}
+          {Content && (
+            <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800/65">
+              {prev ? (
+                <button
+                  onClick={() => navigate(`/documentacion/${prev.key}`)}
+                  className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  {prev.label}
+                </button>
+              ) : <span />}
+              {next && (
+                <button
+                  onClick={() => navigate(`/documentacion/${next.key}`)}
+                  className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors ml-auto"
+                >
+                  {next.label}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Footer */}
-      <div className="text-center text-xs text-zinc-400 dark:text-zinc-600 pt-6 pb-10 select-none">
-        <p>Sistema de Gestión de Cupos de Viajes Aéreos — Documentación v2.1</p>
+      <div className="text-center text-xs text-zinc-400 dark:text-zinc-650 pt-6 pb-10 select-none">
+        <p>Sistema de Gestión de Cupos de Viajes Aéreos — Documentación v3.0</p>
         <p className="mt-1">¿Algo no está claro? Abrí el Chat de IA para preguntar directamente al asistente.</p>
       </div>
     </div>

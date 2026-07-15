@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import Swal from 'sweetalert2';
@@ -19,28 +19,33 @@ const navItems = [
   { label: 'Asistente IA', path: '/asistente', icon: Bot },
 ];
 
-// Admin-only items
+// Admin-only items — cada uno declara el permiso MODULO_ACCION que lo
+// habilita (ver GET /users/me/permissions), para que un rol personalizado
+// pueda ver, por ejemplo, "Reportes" sin heredar automáticamente el resto.
 const adminNavItems = [
-  { label: 'Productos', path: '/productos', icon: Package },
-  { label: 'Agencias', path: '/agencias', icon: Building2 },
-  { label: 'Reservas', path: '/reservas', icon: CreditCard },
-  { label: 'Nóminas', path: '/nominas', icon: Users },
-  { label: 'Reportes', path: '/reportes', icon: BarChart3 },
-  { label: 'Logs del sitio', path: '/logs', icon: ScrollText },
+  { label: 'Productos', path: '/productos', icon: Package, permission: 'PRODUCTS_VIEW' },
+  { label: 'Grupos', path: '/grupos', icon: Luggage, permission: 'GROUPS_VIEW' },
+  { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
+  { label: 'Reservas', path: '/reservas', icon: CreditCard, permission: 'RESERVATIONS_VIEW' },
+  { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
+  { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
+  { label: 'Logs del sitio', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
 ];
 
 // Settings items (grouped under Ajustes)
 const settingsItems = [
-  { label: 'Diseño', path: '/marca-blanca', icon: Palette },
-  { label: 'Configuración de Email', path: '/email-config', icon: Mail },
-  { label: 'Configuración de IA', path: '/config-ia', icon: Bot },
+  { label: 'Ajustes generales', path: '/settings', icon: Settings, permission: 'SETTINGS_VIEW' },
+  { label: 'Diseño', path: '/marca-blanca', icon: Palette, permission: 'WHITE_LABEL_VIEW' },
+  { label: 'Configuración de Email', path: '/email-config', icon: Mail, permission: 'EMAIL_VIEW' },
+  { label: 'Notificaciones', path: '/notification-config', icon: Bell, permission: 'NOTIFICATION_TEMPLATES_VIEW' },
+  { label: 'Configuración de IA', path: '/config-ia', icon: Bot, permission: 'AI_VIEW' },
 ];
 
 // User management items (grouped under Usuarios)
 const userManagementItems = [
-  { label: 'Gestión de usuarios', path: '/usuarios', icon: Users },
-  { label: 'Roles', path: '/roles', icon: Shield },
-  { label: 'Permisos', path: '/permisos', icon: Key },
+  { label: 'Gestión de usuarios', path: '/usuarios', icon: Users, permission: 'USERS_VIEW' },
+  { label: 'Roles', path: '/roles', icon: Shield, permission: 'ROLES_VIEW' },
+  { label: 'Permisos', path: '/permisos', icon: Key, permission: 'PERMISSIONS_VIEW' },
 ];
 
 export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }) {
@@ -56,6 +61,17 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const previousUnreadRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
+  // can(): admin siempre ve todo; el resto según los permisos resueltos por
+  // el backend en GET /users/me/permissions (guardados en user.permissions
+  // por AuthContext).
+  const can = (code) => {
+    if (!code) return true;
+    if (isAdmin) return true;
+    return Array.isArray(user?.permissions) && user.permissions.includes(code);
+  };
+  const visibleAdminNavItems = adminNavItems.filter((item) => can(item.permission));
+  const visibleSettingsItems = settingsItems.filter((item) => can(item.permission));
+  const visibleUserManagementItems = userManagementItems.filter((item) => can(item.permission));
 
   // Secciones de Documentación (grouped bajo Documentación) — una ruta propia
   // por sección en vez de un acordeón largo dentro del main. Filtradas por
@@ -177,7 +193,12 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
         className="relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out"
       >
         <div className="flex h-full flex-col justify-between">
-          <div className="space-y-2">
+          {/* flex-1 + min-h-0 es lo que permite que este bloque se achique y
+              scrollee en vez de desbordar el <aside> — sin min-h-0, un hijo
+              flex nunca se encoge por debajo de la altura natural de su
+              contenido, así que al abrir "Ajustes"/"Usuarios" el contenido
+              nuevo quedaba fuera de pantalla y sin forma de llegar a él. */}
+          <div className="flex-1 min-h-0 overflow-y-auto sidebar-scroll space-y-2">
             {/* Header del sidebar con logo, nombre de plataforma y agencia - Estilo Vercel */}
             <div className={clsx('px-3 py-3', collapsed ? 'flex justify-center' : '')}>
               <div className={clsx('flex items-center gap-2', collapsed ? '' : 'mb-3')}>
@@ -374,14 +395,14 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               </div>
 
               {/* Admin-only menu items */}
-              {isAdmin && (
+              {visibleAdminNavItems.length > 0 && (
                 <>
                   {!collapsed && (
                     <div className="my-2 px-3">
                       <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Administración</p>
                     </div>
                   )}
-                  {adminNavItems.map(({ label, path, icon: Icon }) => (
+                  {visibleAdminNavItems.map(({ label, path, icon: Icon }) => (
                     <NavLink
                       key={path}
                       to={path}
@@ -434,7 +455,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               )}
 
               {/* Separadores para submenús */}
-              {isAdmin && !collapsed && (
+              {(visibleSettingsItems.length > 0 || visibleUserManagementItems.length > 0) && !collapsed && (
                 <>
                   <div className="my-2 px-3">
                     <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Gestión</p>
@@ -443,7 +464,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               )}
 
               {/* Settings submenu */}
-              {isAdmin && (
+              {visibleSettingsItems.length > 0 && (
                 <div className="mt-0.5">
                   <button
                     onClick={() => toggleSubmenu('settings')}
@@ -452,33 +473,33 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
                     style={{
-                      color: isSubmenuActive(settingsItems) ? '#fff' : sbText,
-                      backgroundColor: isSubmenuActive(settingsItems) ? sbActiveBg : 'transparent',
+                      color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText,
+                      backgroundColor: isSubmenuActive(visibleSettingsItems) ? sbActiveBg : 'transparent',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSubmenuActive(settingsItems)) {
+                      if (!isSubmenuActive(visibleSettingsItems)) {
                         e.currentTarget.style.backgroundColor = sbHoverBg;
                         e.currentTarget.style.color = sbHoverText;
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSubmenuActive(settingsItems)) {
+                      if (!isSubmenuActive(visibleSettingsItems)) {
                         e.currentTarget.style.backgroundColor = 'transparent';
                         e.currentTarget.style.color = sbText;
                       }
                     }}
                   >
-                    <Settings className="h-4 w-4" style={{ color: isSubmenuActive(settingsItems) ? '#fff' : sbText }} />
+                    <Settings className="h-4 w-4" style={{ color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText }} />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">Ajustes</span>
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.settings ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(settingsItems) ? '#fff' : sbText }} />
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.settings ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText }} />
                       </>
                     )}
                   </button>
                   {!collapsed && openSubmenus.settings && (
                     <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
-                      {settingsItems.map(({ label, path, icon: Icon }) => (
+                      {visibleSettingsItems.map(({ label, path, icon: Icon }) => (
                         <NavLink
                           key={path}
                           to={path}
@@ -529,7 +550,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
               )}
 
               {/* User management submenu */}
-              {isAdmin && (
+              {visibleUserManagementItems.length > 0 && (
                 <div className="mt-0.5">
                   <button
                     onClick={() => toggleSubmenu('userManagement')}
@@ -538,33 +559,33 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
                     style={{
-                      color: isSubmenuActive(userManagementItems) ? '#fff' : sbText,
-                      backgroundColor: isSubmenuActive(userManagementItems) ? sbActiveBg : 'transparent',
+                      color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText,
+                      backgroundColor: isSubmenuActive(visibleUserManagementItems) ? sbActiveBg : 'transparent',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSubmenuActive(userManagementItems)) {
+                      if (!isSubmenuActive(visibleUserManagementItems)) {
                         e.currentTarget.style.backgroundColor = sbHoverBg;
                         e.currentTarget.style.color = sbHoverText;
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSubmenuActive(userManagementItems)) {
+                      if (!isSubmenuActive(visibleUserManagementItems)) {
                         e.currentTarget.style.backgroundColor = 'transparent';
                         e.currentTarget.style.color = sbText;
                       }
                     }}
                   >
-                    <Users className="h-4 w-4" style={{ color: isSubmenuActive(userManagementItems) ? '#fff' : sbText }} />
+                    <Users className="h-4 w-4" style={{ color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText }} />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">Usuarios</span>
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.userManagement ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(userManagementItems) ? '#fff' : sbText }} />
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.userManagement ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText }} />
                       </>
                     )}
                   </button>
                   {!collapsed && openSubmenus.userManagement && (
                     <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
-                      {userManagementItems.map(({ label, path, icon: Icon }) => (
+                      {visibleUserManagementItems.map(({ label, path, icon: Icon }) => (
                         <NavLink
                           key={path}
                           to={path}

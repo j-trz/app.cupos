@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Download, MapPin, StickyNote } from 'lucide-react';
 import ItineraryTable from '../components/ItineraryTable';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
 import ReservationService from '../services/reservationService';
 import BackofficeService from '../services/backofficeService';
+import { useAIPageContext } from '../contexts/AIPageContext.jsx';
+import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -29,6 +31,7 @@ const EMPTY_FORM = {
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
 
 export default function Availability() {
+  useCountdownTick(); // hace que la cuenta regresiva de bloqueos avance sola
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,9 +43,12 @@ export default function Availability() {
   // Modal de ruta
   const [routeModalProduct, setRouteModalProduct] = useState(null);
   const [notesModalProduct, setNotesModalProduct] = useState(null);
+  // Bloqueos temporales propios (sección "¿espero o no?" — sin datos de pasajero)
+  const [blockedReservations, setBlockedReservations] = useState([]);
 
   useEffect(() => {
     fetchAvailability();
+    fetchBlockedReservations();
   }, []);
 
   const fetchAvailability = async () => {
@@ -58,11 +64,26 @@ export default function Availability() {
     }
   };
 
+  // Trae los bloqueos temporales de TODA la agencia (no solo los propios) —
+  // así, si un producto muestra 0 disponibilidad, cualquier usuario de la
+  // agencia sabe que hay un bloqueo de un compañero y puede especular con
+  // esperar. El backend ya devuelve EXCLUSIVAMENTE pedido + destino +
+  // vencimiento, nunca nombre, documento ni contacto del pasajero.
+  const fetchBlockedReservations = async () => {
+    try {
+      const blocked = await ReservationService.getBlockedReservations();
+      setBlockedReservations(blocked);
+    } catch (error) {
+      console.error('Error fetching blocked reservations:', error);
+      setBlockedReservations([]);
+    }
+  };
+
   const refresh = async () => {
     setRefreshing(true);
     try {
       ReservationService.refreshCache?.();
-      await fetchAvailability();
+      await Promise.all([fetchAvailability(), fetchBlockedReservations()]);
       Swal.fire({ icon: 'success', title: 'Actualizado', text: 'Disponibilidad actualizada correctamente', timer: 1500, showConfirmButton: false });
     } catch (error) {
       console.error(error);
@@ -106,6 +127,55 @@ export default function Availability() {
     setSelectedProduct(null);
     setForm(EMPTY_FORM);
   };
+
+  // ---- Contexto de pantalla para el Asistente IA ----
+  const { setPageContext, clearPageContext, registerActionHandlers } = useAIPageContext();
+
+  // El Asistente IA abre este mismo modal para un producto puntual —
+  // resuelve el id (puede venir de una posición como "el primero") contra
+  // la lista de productos ya cargada y reutiliza openReservationModal tal
+  // cual la usa el botón "Reservar" de la tabla.
+  const handleAIOpenReservationModal = useCallback((productId) => {
+    const product = data.find((p) => String(p.id) === String(productId));
+    if (!product) return;
+    openReservationModal(product);
+  }, [data]);
+
+  // El Asistente IA completa el formulario de pasajeros ya abierto (con
+  // datos extraídos de una foto de DNI/pasaporte, o filas vacías si solo se
+  // sabe la cantidad) — el usuario revisa y confirma manualmente después.
+  const handleAIFillPassengers = useCallback((passengers) => {
+    if (!Array.isArray(passengers) || passengers.length === 0) return;
+    setForm((prev) => ({
+      ...prev,
+      passengers: passengers.map((p) => ({
+        nombre: p?.nombre || '',
+        apellido: p?.apellido || '',
+        documento: p?.documento || '',
+        nacimiento: p?.nacimiento || '',
+        nacionalidad: p?.nacionalidad || '',
+        tipo_pasajero: p?.tipo_pasajero || 'Adulto',
+      })),
+    }));
+  }, []);
+
+  useEffect(() => {
+    const visibleItems = filteredData.map((item) => ({
+      id: String(item.id),
+      label: `${item.destino} — ${item.compania} — $${item.precio || 0} — ${item.disponibilidad} cupo(s) disponibles`,
+    }));
+    setPageContext({ page: 'disponibilidad', visibleItems });
+  }, [filteredData, setPageContext]);
+
+  useEffect(() => {
+    const cleanup = registerActionHandlers({
+      openReservationModal: handleAIOpenReservationModal,
+      fillPassengers: handleAIFillPassengers,
+    });
+    return cleanup;
+  }, [registerActionHandlers, handleAIOpenReservationModal, handleAIFillPassengers]);
+
+  useEffect(() => () => clearPageContext(), [clearPageContext]);
 
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -284,7 +354,7 @@ export default function Availability() {
         confirmButtonText: 'Entendido',
       });
       closeReservationModal();
-      await fetchAvailability();
+      await Promise.all([fetchAvailability(), fetchBlockedReservations()]);
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error al reservar', text: error.message || 'No se pudo crear la reserva.' });
     } finally {
@@ -301,39 +371,79 @@ export default function Availability() {
         description="Busca cupos disponibles por destino, compañía y temporada. Reservá en un clic."
         icon={Plane}
         action={
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={refresh}
-              disabled={refreshing}
-              title="Refrescar datos"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
+          <Button size="sm" onClick={refresh} disabled={refreshing} title="Actualizar catálogo">
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={BarChart3}
-          label="Total de cupos"
-          value={filteredData.length}
-          description={temporadaFilter !== 'Todas' ? `Filtrado: ${temporadaFilter}` : 'Cantidad total de cupos cargados.'}
-        />
-        <StatCard
-          icon={Clock3}
-          label="Cupos agotados"
-          value={filteredData.filter((item) => Number(item.disponibilidad) <= 0).length}
-          description="Cupos sin disponibilidad restante."
-        />
-        <StatCard
-          icon={Plane}
-          label="Cupos disponibles"
-          value={filteredData.filter((item) => Number(item.disponibilidad) > 0).length}
-          description="Cupos listos para una nueva reserva."
-        />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            icon: BarChart3,
+            label: 'Total de cupos',
+            value: filteredData.length,
+            description: temporadaFilter !== 'Todas' ? `Temporada: ${temporadaFilter}` : 'Total de vuelos cargados.',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20'
+          },
+          {
+            icon: Clock3,
+            label: 'Cupos agotados',
+            value: filteredData.filter((item) => Number(item.disponibilidad) <= 0).length,
+            description: 'Vuelos sin asientos libres.',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20'
+          },
+          {
+            icon: Plane,
+            label: 'Cupos disponibles',
+            value: filteredData.filter((item) => Number(item.disponibilidad) > 0).length,
+            description: 'Vuelos listos para reservar.',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+          }
+        ]}
+      />
+
+      {/* Bloqueos temporales de TODA la agencia — solo destino + cuenta
+          regresiva, nunca datos de pasajero, para que cualquier usuario sepa
+          que un cupo en 0 tiene un bloqueo de un compañero esperando
+          confirmación y pueda decidir si esperar o no. */}
+      {blockedReservations.length > 0 && (
+        <div className="rounded-2xl border border-amber-100 dark:border-amber-950/30 bg-amber-50/10 dark:bg-amber-950/5 p-5 shadow-xs">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock3 className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-amber-900 dark:text-amber-200">Reservas bloqueadas temporalmente</h2>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                {blockedReservations.length} reserva{blockedReservations.length > 1 ? 's' : ''} de tu agencia esperando confirmación. El cupo se liberará automáticamente al vencer.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {blockedReservations.map((item) => {
+              const expiry = formatExpiry(item.Bloqueo_Expira_At);
+              return (
+                <div
+                  key={item.Pedido_ID || item.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-250/30 dark:border-amber-900/10 bg-white dark:bg-zinc-900 px-4 py-3 shadow-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.Vuelo_Destino || '—'}</p>
+                    <p className="truncate text-[10px] text-zinc-400 dark:text-zinc-550 font-mono mt-0.5">{item.Pedido_ID}</p>
+                  </div>
+                  {expiry && (
+                    <span className={`flex shrink-0 items-center gap-1 text-xs font-bold ${expiry.color}`}>
+                      <Clock3 className="h-3 w-3" />
+                      {expiry.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
@@ -476,8 +586,8 @@ export default function Availability() {
       </Card>
 
       {/* Modal de Reserva individual */}
-      <Modal title={`Reservar: ${selectedProduct?.codigo_cupo || ''} - ${selectedProduct?.destino || ''}`} open={modalOpen} onClose={closeReservationModal}>
-        <div className="max-h-[calc(100vh-500px)] overflow-y-auto">
+      <Modal title={`Reservar: ${selectedProduct?.codigo_cupo || ''} - ${selectedProduct?.destino || ''}`} open={modalOpen} onClose={closeReservationModal} size="2xl">
+        <div>
           <form onSubmit={handleSubmitReservation} className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="grid grid-cols-2 gap-3 text-sm">

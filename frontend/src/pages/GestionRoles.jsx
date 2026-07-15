@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Search, Shield, Check, X, UserCheck, RefreshCw, BarChart3 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Search, Shield, X, UserCheck, RefreshCw, BarChart3, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import RoleService from '../services/roleService';
 import PermissionService from '../services/permissionService';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { useAgencies } from '../hooks/useAgencies';
+import { MODULES, ACTIONS } from '../lib/permissionModules.js';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -16,27 +19,20 @@ const emptyRole = {
     code: '',
     description: '',
     is_system: false,
-    is_active: true
+    is_active: true,
+    // null = rol global (todas las agencias); un agency_id fuerza el rol a
+    // esa agencia únicamente. El backend re-fuerza esto igual si quien crea
+    // el rol es agency_admin (siempre queda scopeado a la suya).
+    agency_id: null,
 };
 
-// Módulos disponibles para agrupar permisos
-const MODULES = [
-    { value: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { value: 'users', label: 'Usuarios', icon: '👥' },
-    { value: 'agencies', label: 'Agencias', icon: '🏢' },
-    { value: 'products', label: 'Productos', icon: '📦' },
-    { value: 'reservations', label: 'Reservas', icon: '📅' },
-    { value: 'notifications', label: 'Notificaciones', icon: '🔔' },
-    { value: 'settings', label: 'Configuración', icon: '⚙️' },
-    { value: 'white_label', label: 'Diseño', icon: '🎨' },
-    { value: 'email', label: 'Email', icon: '📧' },
-    { value: 'ai', label: 'Inteligencia Artificial', icon: '🤖' },
-    { value: 'permissions', label: 'Permisos', icon: '🔐' },
-    { value: 'roles', label: 'Roles', icon: '🛡️' },
-    { value: 'reports', label: 'Reportes', icon: '📈' }
-];
-
 export default function GestionRoles() {
+    const { user, can } = useAuth();
+    const isSuperAdmin = user?.role === 'admin';
+    const { data: agenciesData } = useAgencies();
+    const agencies = agenciesData?.data || [];
+    const agencyName = (id) => agencies.find(a => a.id === id)?.name || 'Agencia desconocida';
+
     const [roles, setRoles] = useState([]);
     const [permissions, setPermissions] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -104,7 +100,8 @@ export default function GestionRoles() {
             code: role.code || '',
             description: role.description || '',
             is_system: role.is_system ?? false,
-            is_active: role.is_active ?? true
+            is_active: role.is_active ?? true,
+            agency_id: role.agency_id || null,
         });
         setEditingId(role.id);
         setShowModal(true);
@@ -113,7 +110,7 @@ export default function GestionRoles() {
     const openPermissions = async (role) => {
         setSelectedRole(role);
         try {
-            const response = await PermissionService.getRolePermissions(role.id);
+            const response = await RoleService.getRolePermissions(role.id);
             const rolePermissionIds = (response.data || []).map(p => p.id);
             setSelectedPermissions(rolePermissionIds);
             setShowPermissionsModal(true);
@@ -229,7 +226,7 @@ export default function GestionRoles() {
 
     const handleSavePermissions = async () => {
         try {
-            await PermissionService.assignPermissionsToRole(selectedRole.id, selectedPermissions);
+            await RoleService.assignPermissionsToRole(selectedRole.id, selectedPermissions);
             Swal.fire({
                 icon: 'success',
                 title: 'Guardado',
@@ -255,17 +252,12 @@ export default function GestionRoles() {
         );
     };
 
-    const toggleModulePermissions = (moduleValue) => {
-        const modulePermissions = permissions
-            .filter(p => p.module === moduleValue)
-            .map(p => p.id);
-
-        const allSelected = modulePermissions.every(id => selectedPermissions.includes(id));
-
+    const toggleModuleRow = (permissionIds) => {
+        const allSelected = permissionIds.every(id => selectedPermissions.includes(id));
         if (allSelected) {
-            setSelectedPermissions(prev => prev.filter(id => !modulePermissions.includes(id)));
+            setSelectedPermissions(prev => prev.filter(id => !permissionIds.includes(id)));
         } else {
-            setSelectedPermissions(prev => [...new Set([...prev, ...modulePermissions])]);
+            setSelectedPermissions(prev => [...new Set([...prev, ...permissionIds])]);
         }
     };
 
@@ -275,13 +267,30 @@ export default function GestionRoles() {
         r.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Agrupar permisos por módulo
-    const permissionsByModule = MODULES.map(module => ({
-        ...module,
-        permissions: permissions.filter(p => p.module === module.value)
-    })).filter(m => m.permissions.length > 0);
+    // Matriz módulo x acción — cada celda es el permiso real (id) que existe
+    // para ese módulo+acción, o null si nunca se sembró/creó ese permiso
+    // puntual (celda vacía, no seleccionable). Resuelve directamente el
+    // pedido de "ver pero no modificar/eliminar": cada acción es su propio
+    // checkbox independiente en vez de un solo toggle por módulo.
+    const permissionMatrix = MODULES.map(module => {
+        const row = ACTIONS.map(action => permissions.find(p => p.module === module.value && p.action === action.value) || null);
+        return { ...module, row };
+    }).filter(m => m.row.some(Boolean));
+
+    const matrixPermissionIds = new Set(permissionMatrix.flatMap(m => m.row.filter(Boolean).map(p => p.id)));
+    const otherPermissions = permissions.filter(p => !matrixPermissionIds.has(p.id));
 
     const totalPages = Math.ceil(pagination.total / pagination.limit);
+
+    if (!can('ROLES_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -307,26 +316,31 @@ export default function GestionRoles() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={BarChart3}
-                    label="Total roles"
-                    value={pagination.total}
-                    description="Cantidad total de roles."
-                />
-                <StatCard
-                    icon={Shield}
-                    label="Del sistema"
-                    value={roles.filter(r => r.is_system).length}
-                    description="Roles del sistema (no eliminables)."
-                />
-                <StatCard
-                    icon={Users}
-                    label="Personalizados"
-                    value={roles.filter(r => !r.is_system).length}
-                    description="Roles personalizados."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: BarChart3,
+                        label: 'Total roles',
+                        value: pagination.total,
+                        description: 'Cantidad total de roles.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: Shield,
+                        label: 'Del sistema',
+                        value: roles.filter(r => r.is_system).length,
+                        description: 'Roles del sistema (no eliminables).',
+                        color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+                    },
+                    {
+                        icon: Users,
+                        label: 'Personalizados',
+                        value: roles.filter(r => !r.is_system).length,
+                        description: 'Roles personalizados.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                ]}
+            />
 
             <div className="bg-white rounded-2xl border border-slate-200">
                 {/* Búsqueda */}
@@ -355,6 +369,7 @@ export default function GestionRoles() {
                                 <TableHead className="text-center">Código</TableHead>
                                 <TableHead className="text-center">Descripción</TableHead>
                                 <TableHead className="text-center">Tipo</TableHead>
+                                <TableHead className="text-center">Agencia</TableHead>
                                 <TableHead className="text-center">Estado</TableHead>
                                 <TableHead className="text-center">Acciones</TableHead>
                             </TableRow>
@@ -362,7 +377,7 @@ export default function GestionRoles() {
                         <TableBody>
                             {filteredRoles.length === 0 ? (
                                 <TableRow>
-                                    <TableCell className="text-center py-10" colSpan={6}>
+                                    <TableCell className="text-center py-10" colSpan={7}>
                                         {searchTerm ? 'No se encontraron roles' : 'No hay roles registrados'}
                                     </TableCell>
                                 </TableRow>
@@ -387,6 +402,13 @@ export default function GestionRoles() {
                                             <Badge variant={role.is_system ? 'default' : 'success'}>
                                                 {role.is_system ? 'Sistema' : 'Personalizado'}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            {role.agency_id ? (
+                                                <Badge variant="outline" className="w-fit text-[10px]">{agencyName(role.agency_id)}</Badge>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">Global</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant={role.is_active ? 'success' : 'danger'}>
@@ -476,6 +498,29 @@ export default function GestionRoles() {
                         />
                     </div>
 
+                    {/* Un admin puede elegir agencia (o dejarlo global); un agency_admin
+                        siempre crea/edita para su propia agencia — el backend lo
+                        fuerza igual, así que ni se le muestra el selector. */}
+                    {isSuperAdmin && (
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-600">Agencia</label>
+                            <select
+                                value={formState.agency_id || ''}
+                                onChange={(e) => setFormState(prev => ({ ...prev, agency_id: e.target.value || null }))}
+                                disabled={formState.is_system}
+                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <option value="">Global (todas las agencias)</option>
+                                {agencies.map(a => (
+                                    <option key={a.id} value={a.id}>{a.name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Un rol de una agencia solo lo pueden ver/asignar usuarios de esa misma agencia.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
@@ -497,60 +542,89 @@ export default function GestionRoles() {
                 </form>
             </Modal>
 
-            {/* Modal de permisos del rol */}
-            <Modal title={`Permisos de: ${selectedRole?.name || ''}`} open={showPermissionsModal} onClose={() => setShowPermissionsModal(false)}>
+            {/* Modal de permisos del rol — matriz módulo x acción */}
+            <Modal title={`Permisos de: ${selectedRole?.name || ''}`} open={showPermissionsModal} onClose={() => setShowPermissionsModal(false)} size="xl">
                 <div className="space-y-4">
-                    <p className="text-sm text-slate-600">Selecciona los permisos que tendrá este rol. Los permisos están agrupados por módulo.</p>
+                    <p className="text-sm text-slate-600">
+                        Marcá qué puede hacer este rol en cada área — por ejemplo, tildá "Ver" sin tildar "Editar" ni "Eliminar" para un acceso de solo consulta.
+                    </p>
 
-                    <div className="max-h-[400px] overflow-y-auto space-y-4 pr-2">
-                        {permissionsByModule.map(module => {
-                            const modulePermissionIds = module.permissions.map(p => p.id);
-                            const selectedCount = modulePermissionIds.filter(id => selectedPermissions.includes(id)).length;
-                            const allSelected = selectedCount === modulePermissionIds.length;
-                            const someSelected = selectedCount > 0 && !allSelected;
+                    <div className="max-h-[450px] overflow-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-slate-50 z-10">
+                                <tr>
+                                    <th className="text-left px-3 py-2 font-medium text-slate-600 border-b border-slate-200">Módulo</th>
+                                    {ACTIONS.map(a => (
+                                        <th key={a.value} className="px-2 py-2 text-center font-medium text-slate-600 border-b border-slate-200 whitespace-nowrap">{a.label}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {permissionMatrix.map(module => {
+                                    const rowIds = module.row.filter(Boolean).map(p => p.id);
+                                    const rowAllSelected = rowIds.length > 0 && rowIds.every(id => selectedPermissions.includes(id));
+                                    return (
+                                        <tr key={module.value} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                                            <td className="px-3 py-2 whitespace-nowrap">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleModuleRow(rowIds)}
+                                                    className="flex items-center gap-1.5 text-slate-900 hover:underline"
+                                                    title={rowAllSelected ? 'Destildar toda la fila' : 'Tildar toda la fila'}
+                                                >
+                                                    <span>{module.icon}</span>
+                                                    <span className="font-medium">{module.label}</span>
+                                                </button>
+                                            </td>
+                                            {module.row.map((perm, i) => (
+                                                <td key={ACTIONS[i].value} className="px-2 py-2 text-center">
+                                                    {perm ? (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedPermissions.includes(perm.id)}
+                                                            onChange={() => togglePermission(perm.id)}
+                                                            title={perm.name}
+                                                            className="rounded"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-slate-200">—</span>
+                                                    )}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
 
-                            return (
-                                <div key={module.value} className="border border-slate-200 rounded-xl overflow-hidden">
-                                    <div
-                                        className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200 cursor-pointer hover:bg-slate-100"
-                                        onClick={() => toggleModulePermissions(module.value)}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">{module.icon}</span>
-                                            <span className="font-medium text-slate-900">{module.label}</span>
-                                            <span className="text-xs text-slate-500">({selectedCount}/{module.permissions.length})</span>
-                                        </div>
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${allSelected ? 'bg-slate-900 border-slate-900' : someSelected ? 'border-slate-900' : 'border-slate-300'}`}>
-                                            {allSelected && <Check className="w-3 h-3 text-white" />}
-                                            {someSelected && <div className="w-2 h-2 bg-slate-900 rounded-sm" />}
-                                        </div>
-                                    </div>
-                                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {module.permissions.map(permission => (
-                                            <label key={permission.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedPermissions.includes(permission.id)}
-                                                    onChange={() => togglePermission(permission.id)}
-                                                    className="rounded"
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-medium text-slate-900 truncate">{permission.name}</div>
-                                                    <div className="text-xs text-slate-500 font-mono truncate">{permission.code}</div>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {permissionsByModule.length === 0 && (
+                        {permissionMatrix.length === 0 && (
                             <div className="text-center py-8 text-slate-500">
                                 No hay permisos disponibles. Primero crea permisos en la sección de Permisos.
                             </div>
                         )}
                     </div>
+
+                    {otherPermissions.length > 0 && (
+                        <div>
+                            <p className="text-xs font-medium text-slate-500 mb-2">Otros permisos (módulo/acción no estándar)</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2">
+                                {otherPermissions.map(permission => (
+                                    <label key={permission.id} className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedPermissions.includes(permission.id)}
+                                            onChange={() => togglePermission(permission.id)}
+                                            className="rounded"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-slate-900 truncate">{permission.name}</div>
+                                            <div className="text-xs text-slate-500 font-mono truncate">{permission.code}</div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
                         <Button variant="secondary" type="button" onClick={() => setShowPermissionsModal(false)}>

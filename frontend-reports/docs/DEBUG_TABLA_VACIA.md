@@ -4,7 +4,11 @@
 
 ### **1. Backend - Logs de Debug Agregados**
 - ✅ **Debug en `/api/detalle-destinos`**: Logs detallados del proceso
+<<<<<<< HEAD
+- ✅ **Lógica simplificada**: Removí complejidad innecesaria
+=======
 - ✅ **Lógica simplificada**: Removí complejidad innecesaria 
+>>>>>>> main
 - ✅ **Endpoint de prueba**: `/api/test-detalle-simple` para verificar datos básicos
 
 ### **2. Frontend - Debug Agregado**
@@ -39,7 +43,11 @@ curl -X POST https://panel-cupos.onrender.com/api/test-detalle-simple \
 curl -X POST https://panel-cupos.onrender.com/api/detalle-destinos \
   -H "Content-Type: application/json" \
   -d '{
+<<<<<<< HEAD
+    "userId": "tu-user-id",
+=======
     "userId": "tu-user-id", 
+>>>>>>> main
     "filters": {}
   }'
 ```
@@ -89,7 +97,11 @@ filters: {}  // Sin filtros para ver todos los datos
 🔍 DEBUG - Datos cargados - cupos: 0, pasajeros: 0
 ```
 
+<<<<<<< HEAD
+**Solución**:
+=======
 **Solución**: 
+>>>>>>> main
 1. Verificar que los archivos estén subidos en Supabase Storage
 2. Verificar que los nombres de archivo coincidan
 3. Re-subir archivos si es necesario

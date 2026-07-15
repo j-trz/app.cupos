@@ -7,15 +7,20 @@ import { useState, useEffect } from 'react';
 import {
     Bot, Plus, Edit2, Trash2, TestTube, Key,
     Activity, MessageSquare, Save, X, Eye, EyeOff, RefreshCw,
+<<<<<<< HEAD
+    Zap, CheckCircle, Lock
+=======
     Zap, CheckCircle, Sparkles
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import AIService from '../services/aiService';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import ExpertsTab from '../components/AIExperts/ExpertsTab';
@@ -154,23 +159,24 @@ const PROVIDER_TYPES = [
 
 const TABS = [
     { id: 'providers', label: 'Proveedores', icon: Key },
+<<<<<<< HEAD
+=======
     { id: 'actions', label: 'Acciones', icon: Zap },
     { id: 'experts', label: 'Expertos', icon: Sparkles },
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
     { id: 'stats', label: 'Estadísticas', icon: Activity },
     { id: 'logs', label: 'Logs', icon: MessageSquare }
 ];
 
 export default function AIConfig() {
+    const { can } = useAuth();
     const [activeTab, setActiveTab] = useState('providers');
     const [providers, setProviders] = useState([]);
-    const [actions, setActions] = useState([]);
     const [stats, setStats] = useState(null);
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showProviderForm, setShowProviderForm] = useState(false);
-    const [showActionForm, setShowActionForm] = useState(false);
     const [editingProvider, setEditingProvider] = useState(null);
-    const [editingAction, setEditingAction] = useState(null);
     const [showApiKey, setShowApiKey] = useState(false);
     const [testResult, setTestResult] = useState(null);
     const [statsDays, setStatsDays] = useState(30);
@@ -187,18 +193,7 @@ export default function AIConfig() {
         is_default: false
     };
 
-    const emptyAction = {
-        name: '',
-        description: '',
-        action_type: 'api_call',
-        endpoint: '',
-        method: 'GET',
-        parameters: {},
-        is_active: true
-    };
-
     const [providerForm, setProviderForm] = useState(emptyProvider);
-    const [actionForm, setActionForm] = useState(emptyAction);
 
     useEffect(() => {
         loadData();
@@ -210,9 +205,6 @@ export default function AIConfig() {
             if (activeTab === 'providers') {
                 const response = await AIService.getProviders();
                 setProviders(response.providers || []);
-            } else if (activeTab === 'actions') {
-                const response = await AIService.getActions();
-                setActions(response.actions || []);
             } else if (activeTab === 'stats') {
                 const response = await AIService.getStats(statsDays);
                 setStats(response.stats);
@@ -279,55 +271,6 @@ export default function AIConfig() {
         }
     };
 
-    const handleSaveAction = async (e) => {
-        e.preventDefault();
-        try {
-            // Parsear parameters si es string
-            const formData = {
-                ...actionForm,
-                parameters: typeof actionForm.parameters === 'string'
-                    ? JSON.parse(actionForm.parameters || '{}')
-                    : actionForm.parameters
-            };
-
-            if (editingAction) {
-                await AIService.updateAction(editingAction.id, formData);
-                Swal.fire('Actualizado', 'Acción actualizada correctamente', 'success');
-            } else {
-                await AIService.createAction(formData);
-                Swal.fire('Creada', 'Acción creada correctamente', 'success');
-            }
-            setShowActionForm(false);
-            setEditingAction(null);
-            setActionForm(emptyAction);
-            loadData();
-        } catch (error) {
-            Swal.fire('Error', error.message || 'Error al guardar acción', 'error');
-        }
-    };
-
-    const handleDeleteAction = async (action) => {
-        const result = await Swal.fire({
-            title: '¿Eliminar acción?',
-            text: `¿Estás seguro de eliminar ${action.name}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc2626',
-            confirmButtonText: 'Eliminar',
-            cancelButtonText: 'Cancelar'
-        });
-
-        if (result.isConfirmed) {
-            try {
-                await AIService.deleteAction(action.id);
-                Swal.fire('Eliminada', 'Acción eliminada correctamente', 'success');
-                loadData();
-            } catch (error) {
-                Swal.fire('Error', error.message || 'Error al eliminar', 'error');
-            }
-        }
-    };
-
     const openEditProvider = (provider) => {
         setEditingProvider(provider);
         setProviderForm({
@@ -337,14 +280,15 @@ export default function AIConfig() {
         setShowProviderForm(true);
     };
 
-    const openEditAction = (action) => {
-        setEditingAction(action);
-        setActionForm({
-            ...action,
-            parameters: JSON.stringify(action.parameters, null, 2)
-        });
-        setShowActionForm(true);
-    };
+    if (!can('AI_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -364,26 +308,24 @@ export default function AIConfig() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={Bot}
-                    label="Proveedores"
-                    value={providers.length}
-                    description="Proveedores de IA configurados."
-                />
-                <StatCard
-                    icon={Zap}
-                    label="Acciones"
-                    value={actions.length}
-                    description="Acciones del agente IA."
-                />
-                <StatCard
-                    icon={MessageSquare}
-                    label="Sesiones"
-                    value={stats?.total_sessions || 0}
-                    description="Total de sesiones de chat."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: Bot,
+                        label: 'Proveedores',
+                        value: providers.length,
+                        description: 'Proveedores de IA configurados.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: MessageSquare,
+                        label: 'Sesiones',
+                        value: stats?.total_sessions || 0,
+                        description: 'Total de sesiones de chat.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                ]}
+            />
 
             {/* Tabs */}
             <div className="flex flex-wrap gap-2 border-b border-slate-200">
@@ -644,6 +586,8 @@ export default function AIConfig() {
                         </div>
                     )}
 
+<<<<<<< HEAD
+=======
                     {/* Tab: Acciones */}
                     {activeTab === 'actions' && (
                         <div className="space-y-4">
@@ -797,6 +741,7 @@ export default function AIConfig() {
                     {/* Tab: Expertos */}
                     {activeTab === 'experts' && <ExpertsTab />}
 
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
                     {/* Tab: Estadísticas */}
                     {activeTab === 'stats' && stats && (
                         <div className="space-y-6">

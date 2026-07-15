@@ -9,9 +9,10 @@ import { useGeneralReport, useUserMetrics } from '../hooks/useReports';
 import { useAuth } from '../contexts/AuthContext';
 import ReservationService from '../services/reservationService';
 import NotificationService from '../services/notificationService';
+import { ReportService } from '../services/reportService.js';
 import DashboardCharts from '../components/DashboardCharts';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
@@ -299,9 +300,12 @@ const Dashboard = () => {
 
   const isAdmin = user?.role === 'admin' || user?.role === 'agency_admin';
 
-  const filters = { dateRange: 'month', agency: undefined };
-  const { data: reports, isLoading: isLoadingReports } = useGeneralReport(filters);
+  const { data: reports, isLoading: isLoadingReports } = useGeneralReport({});
   const { data: userMetrics, isLoading: isLoadingUserMetrics } = useUserMetrics();
+
+  const [destinoVentas, setDestinoVentas] = useState({ labels: [], data: [] });
+  const [evolucionPasajeros, setEvolucionPasajeros] = useState({ labels: [], data: [] });
+  const [loadingCharts, setLoadingCharts] = useState(false);
 
   const fetchReservations = useCallback(async () => {
     setLoading(true);
@@ -314,6 +318,45 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, []);
+
+  // Gráficos del panel admin: mismos datos que Reportes.jsx (destino/evolución
+  // de pasajeros), pero acotados exclusivamente a la agencia del usuario que
+  // ve el Dashboard — a diferencia de Reportes.jsx, acá nunca se agregan
+  // todas las agencias.
+  const fetchDashboardCharts = useCallback(async () => {
+    setLoadingCharts(true);
+    try {
+      const filtrosAgencia = user?.agencia ? { Agencia: user.agencia } : {};
+      const [detalle, evolucion] = await Promise.all([
+        ReportService.getDetalleDestinosPost(filtrosAgencia),
+        ReportService.getEvolucionPasajerosPost(filtrosAgencia, 'mes'),
+      ]);
+
+      const rows = Array.isArray(detalle?.data) ? detalle.data : [];
+      const ventaPorDestino = new Map();
+      rows.forEach((row) => {
+        const destino = row?.Destino || 'Sin destino';
+        const venta = parseFloat(row?.Venta) || 0;
+        ventaPorDestino.set(destino, (ventaPorDestino.get(destino) || 0) + venta);
+      });
+      const topDestinos = Array.from(ventaPorDestino.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+      setDestinoVentas({
+        labels: topDestinos.map(([destino]) => destino),
+        data: topDestinos.map(([, venta]) => Math.round(venta)),
+      });
+
+      setEvolucionPasajeros({
+        labels: Array.isArray(evolucion?.labels) ? evolucion.labels : [],
+        data: Array.isArray(evolucion?.values) ? evolucion.values : [],
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingCharts(false);
+    }
+  }, [user?.agencia]);
 
   const fetchNotifications = useCallback(async () => {
     setLoadingNotifs(true);
@@ -330,11 +373,16 @@ const Dashboard = () => {
   useEffect(() => {
     fetchReservations();
     if (!isAdmin) fetchNotifications();
+    if (isAdmin) fetchDashboardCharts();
   }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchReservations(), !isAdmin && fetchNotifications()].filter(Boolean));
+    await Promise.all([
+      fetchReservations(),
+      !isAdmin && fetchNotifications(),
+      isAdmin && fetchDashboardCharts(),
+    ].filter(Boolean));
     setRefreshing(false);
   };
 
@@ -359,6 +407,18 @@ const Dashboard = () => {
   const blocked = reservations.filter((r) => r.estado === 'bloqueo_temporal').length;
   const pending = reservations.filter((r) => r.estado === 'pendiente').length;
 
+  // Reservas exclusivamente de la propia agencia del usuario (para el panel
+  // admin) — `listReservations` puede traer todo el sistema si el rol es
+  // admin puro, así que se filtra en el cliente para no mezclar agencias.
+  const ownAgencyReservations = user?.agencia
+    ? reservations.filter((r) => (r.agencia || '').toLowerCase() === user.agencia.toLowerCase())
+    : reservations;
+  const reservationStatus = [
+    { name: 'Confirmadas', value: ownAgencyReservations.filter((r) => r.estado === 'confirmada' || r.estado === 'confirmado').length },
+    { name: 'Pendientes', value: ownAgencyReservations.filter((r) => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length },
+    { name: 'Canceladas', value: ownAgencyReservations.filter((r) => r.estado === 'cancelada' || r.estado === 'cancelado').length },
+  ].filter((s) => s.value > 0);
+
   /* ── vista admin ── */
   if (isAdmin) {
     return (
@@ -374,25 +434,25 @@ const Dashboard = () => {
           }
         />
         {isLoadingReports ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid gap-4 grid-cols-3">
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-24" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard icon={Calendar} label="Total Reservas" value={reports?.totalReservations || 0} description="Reservas en el sistema" />
-            <StatCard icon={CreditCard} label="Ventas Totales" value={formatCurrency(reports?.totalSales || 0)} description="Ventas confirmadas" />
-            <StatCard icon={CheckCircle} label="Usuarios Activos" value={reports?.activeUsers || 0} description="Últimos 30 días" />
-            <StatCard icon={Plane} label="Disponibilidad Promedio" value={`${reports?.avgAvailability || 0}%`} description="Cupos disponibles" />
-          </div>
+          <StatsHero
+            stats={[
+              { icon: Calendar, label: 'Total Pasajeros', value: reports?.totalPassengers || 0, description: 'Pasajeros confirmados', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+              { icon: CreditCard, label: 'Ventas Totales', value: formatCurrency(reports?.totalSales || 0), description: 'Ventas confirmadas', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
+              { icon: Plane, label: 'Disponibilidad Promedio', value: `${reports?.avgAvailability || 0}%`, description: 'Cupos disponibles', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
+            ]}
+          />
         )}
         <DashboardCharts
-          reports={reports}
-          dateRange={filters.dateRange}
-          agencyFilter={filters.agency}
-          onDateRangeChange={() => { }}
-          onAgencyFilterChange={() => { }}
+          destinoVentas={destinoVentas}
+          evolucionPasajeros={evolucionPasajeros}
+          reservationStatus={reservationStatus}
+          isLoading={loadingCharts}
         />
       </div>
     );
@@ -421,38 +481,44 @@ const Dashboard = () => {
 
       {/* Stat cards */}
       {isLoadingUserMetrics ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid gap-4 grid-cols-3">
+          {[...Array(3)].map((_, i) => (
             <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-20" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={Calendar}
-            label="Mis reservas"
-            value={reservations.length || userMetrics?.totalReservations || 0}
-            description="Total creadas"
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="Confirmadas"
-            value={confirmed || userMetrics?.confirmedReservations || 0}
-            description="Reservas confirmadas"
-          />
-          <StatCard
-            icon={Clock}
-            label="Bloqueos temporales"
-            value={blocked || userMetrics?.pendingReservations || 0}
-            description="Pendientes de doc. contable"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Mis ventas"
-            value={formatCurrency(userMetrics?.totalSales || 0)}
-            description="Ventas confirmadas"
-          />
-        </div>
+        <StatsHero
+          stats={[
+            {
+              icon: Calendar,
+              label: 'Mis reservas',
+              value: reservations.length || userMetrics?.totalReservations || 0,
+              description: 'Total creadas',
+              color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+            },
+            {
+              icon: CheckCircle,
+              label: 'Confirmadas',
+              value: confirmed || userMetrics?.confirmedReservations || 0,
+              description: 'Reservas confirmadas',
+              color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+            },
+            {
+              icon: Clock,
+              label: 'Bloqueos temporales',
+              value: blocked || userMetrics?.pendingReservations || 0,
+              description: 'Pendientes de doc. contable',
+              color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+            },
+            {
+              icon: TrendingUp,
+              label: 'Mis ventas',
+              value: formatCurrency(userMetrics?.totalSales || 0),
+              description: 'Ventas confirmadas',
+              color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+            },
+          ]}
+        />
       )}
 
       {/* Widget de bloqueos urgentes */}

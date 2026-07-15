@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import { Button } from './ui/Button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/Card';
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/Table';
 import { Badge } from './ui/Badge';
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
@@ -44,7 +44,11 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
         // XLSX.read entiende tanto binarios .xlsx/.xls reales como texto CSV
         // (a diferencia de PapaParse, que solo puede leer CSV) — un solo
         // parser para los tres formatos que la zona de drop dice aceptar.
-        const workbook = XLSX.read(e.target.result, { type: 'array' });
+        // cellDates:true hace que una celda con formato de fecha llegue como
+        // objeto Date en vez del número de serie interno de Excel (ej.
+        // 45993) — sin esto, validateProductRow rechazaba cualquier fecha
+        // cargada con formato de fecha real (no como texto plano).
+        const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
@@ -107,14 +111,12 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
   const previewColumns = PRODUCT_IMPORT_COLUMNS.map((c) => c.key);
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle>Carga Masiva de Productos</CardTitle>
-        <CardDescription>
-          Subí un archivo .xlsx, .xls o .csv con la información de múltiples productos. Descargá la plantilla desde el botón "Descargar Plantilla" si no sabés qué columnas usar.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="w-full mx-auto">
+      <p className="text-sm text-slate-500 mb-6">
+        Subí un archivo .xlsx, .xls o .csv con la información de múltiples productos. Descargá la plantilla desde el botón "Descargar Plantilla" si no sabés qué columnas usar.
+      </p>
+
+      <div className="space-y-6">
         {/* Zona de arrastre */}
         <div
           {...getRootProps()}
@@ -221,8 +223,9 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
             </p>
           </div>
         )}
-      </CardContent>
-      <CardFooter className="flex justify-between">
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cerrar
         </Button>
@@ -232,8 +235,8 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
         >
           {uploadStatus === 'uploading' ? 'Subiendo...' : `Importar ${validRows.length || ''} producto(s)`}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 };
 
