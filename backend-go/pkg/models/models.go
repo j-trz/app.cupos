@@ -340,8 +340,57 @@ type AIMessage struct {
 	UserID     uuid.UUID      `gorm:"type:uuid" json:"user_id"`
 	Role       string         `json:"role"`
 	Content    string         `json:"content"`
+	ToolCalls  datatypes.JSON `gorm:"column:tool_calls" json:"tool_calls,omitempty"`
 	TokenUsage datatypes.JSON `gorm:"column:token_usage" json:"token_usage"`
 	CreatedAt  time.Time      `json:"created_at"`
+}
+
+// AIExpert es un agente de IA con base de conocimiento propia ("experto"),
+// configurado y nombrado por cada agencia — scopeado por Agencia igual que
+// Product/Reservation.
+type AIExpert struct {
+	ID          uuid.UUID          `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Agencia     string             `gorm:"not null;index" json:"agencia"`
+	Name        string             `gorm:"not null" json:"name"`
+	Description string             `json:"description"`
+	// Persona es tono/personalidad opcional, se agrega al system prompt del
+	// turno cuando se consulta a este experto.
+	Persona   string             `json:"persona"`
+	IsActive  bool               `gorm:"default:true" json:"is_active"`
+	CreatedBy uuid.UUID          `gorm:"type:uuid" json:"created_by"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
+	Documents []AIExpertDocument `gorm:"foreignKey:ExpertID" json:"documents,omitempty"`
+}
+
+// AIExpertDocument: el archivo original NUNCA se persiste (no hay filesystem
+// persistente en el runtime serverless) — se convierte a Markdown en memoria
+// al momento de subirlo y solo se guarda el resultado.
+type AIExpertDocument struct {
+	ID              uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ExpertID        uuid.UUID `gorm:"type:uuid;not null;index" json:"expert_id"`
+	FileName        string    `json:"file_name"`
+	SourceType      string    `gorm:"column:source_type" json:"source_type"` // pdf | docx | txt | md | url
+	SourceURL       string    `gorm:"column:source_url" json:"source_url,omitempty"`
+	ContentMarkdown string    `gorm:"type:text;column:content_markdown" json:"content_markdown"`
+	CharCount       int       `gorm:"column:char_count" json:"char_count"`
+	Status          string    `gorm:"default:'ready'" json:"status"` // processing | ready | error
+	ErrorMessage    string    `gorm:"column:error_message" json:"error_message,omitempty"`
+	CreatedBy       uuid.UUID `gorm:"type:uuid" json:"created_by"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// AIExpertChunk: fragmentos de un documento para búsqueda por texto (pg_trgm),
+// generados solo cuando el conocimiento total del experto supera el umbral de
+// inyección directa (ver expertKnowledgeThreshold en ai_handler.go).
+type AIExpertChunk struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ExpertID   uuid.UUID `gorm:"type:uuid;not null;index" json:"expert_id"`
+	DocumentID uuid.UUID `gorm:"type:uuid;not null;index" json:"document_id"`
+	ChunkIndex int       `gorm:"column:chunk_index" json:"chunk_index"`
+	Content    string    `gorm:"type:text" json:"content"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // AvailabilityTransfer representa una cesión de disponibilidad entre agencias

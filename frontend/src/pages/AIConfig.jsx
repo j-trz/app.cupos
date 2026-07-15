@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import {
     Bot, Plus, Edit2, Trash2, TestTube, Key,
     Activity, MessageSquare, Save, X, Eye, EyeOff, RefreshCw,
-    Zap, CheckCircle
+    Zap, CheckCircle, Sparkles
 } from 'lucide-react';
 import AIService from '../services/aiService';
 import { Card } from '../components/ui/Card.jsx';
@@ -18,6 +18,7 @@ import PageHeader from '../components/ui/PageHeader.jsx';
 import StatCard from '../components/ui/StatCard.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import ExpertsTab from '../components/AIExperts/ExpertsTab';
 import Swal from 'sweetalert2';
 
 // Logos SVG inline para cada proveedor
@@ -154,6 +155,7 @@ const PROVIDER_TYPES = [
 const TABS = [
     { id: 'providers', label: 'Proveedores', icon: Key },
     { id: 'actions', label: 'Acciones', icon: Zap },
+    { id: 'experts', label: 'Expertos', icon: Sparkles },
     { id: 'stats', label: 'Estadísticas', icon: Activity },
     { id: 'logs', label: 'Logs', icon: MessageSquare }
 ];
@@ -791,6 +793,9 @@ export default function AIConfig() {
                             )}
                         </div>
                     )}
+
+                    {/* Tab: Expertos */}
+                    {activeTab === 'experts' && <ExpertsTab />}
 
                     {/* Tab: Estadísticas */}
                     {activeTab === 'stats' && stats && (

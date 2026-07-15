@@ -50,6 +50,9 @@ func InitDB() {
 		&models.AISession{},
 		&models.AIMessage{},
 		&models.ProductSharedAgency{},
+		&models.AIExpert{},
+		&models.AIExpertDocument{},
+		&models.AIExpertChunk{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -199,6 +202,11 @@ func runSQLMigrations(db *gorm.DB) {
 		// causando "column neto_1 does not exist" al editar un pasajero.
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS neto_1 numeric DEFAULT 0;`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS precio_venta numeric DEFAULT 0;`,
+		// Expertos de IA: búsqueda por texto en los chunks de conocimiento sin
+		// depender de pgvector (no confirmado en el proveedor de Postgres
+		// gestionado) — pg_trgm es una extensión estándar de Postgres.
+		`CREATE EXTENSION IF NOT EXISTS pg_trgm;`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_expert_chunks_content_trgm ON ai_expert_chunks USING gin (content gin_trgm_ops);`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

@@ -1,5 +1,6 @@
 import { Bot, User, Copy, Check, AlertCircle, Sparkles, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import AIChatItineraryResult from './AIChatItineraryResult';
 
 const TOOL_LABELS = {
     buscar_productos:  '🔍 Buscando productos',
@@ -11,6 +12,9 @@ const TOOL_LABELS = {
     cancelar_reserva:  '🗑️ Cancelando reserva',
     estadisticas:      '📊 Cargando estadísticas',
     buscar_usuarios:   '👤 Buscando usuarios',
+    generar_itinerario_pdf: '🧾 Generando itinerario',
+    detalle_ruta:           '🗺️ Obteniendo detalle de ruta',
+    consultar_experto:      '🧠 Consultando a un experto',
 };
 
 export default function AIChatMessage({ message, isUser, timestamp, toolCalls, isError, imagePreview, imagePreviews }) {
@@ -100,6 +104,9 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
 
                     {/* Texto */}
                     <div className="whitespace-pre-wrap break-words leading-relaxed">{message}</div>
+
+                    {/* Resultado enriquecido de tools de itinerario (si corresponde) */}
+                    {!isUser && <AIChatItineraryResult toolCalls={toolCalls} />}
 
                     {/* Footer */}
                     {!isUser && (
