@@ -198,6 +198,25 @@ func UploadAIExpertDocument(c *gin.Context) {
 		}
 		fileName = header.Filename
 		markdown, sourceType, convErr = services.ConvertToMarkdown(fileName, raw)
+
+		// Fallback de OCR vía IA: un PDF sin capa de texto (típicamente
+		// escaneado) no se puede leer con extracción de texto normal — en
+		// vez de darlo por perdido, se intenta transcribirlo con el
+		// proveedor de IA activo de la agencia (ver ocrPDFWithAI).
+		if convErr != nil && sourceType == "pdf" {
+			if ocrText, ocrErr := ocrPDFWithAI(raw); ocrErr == nil && strings.TrimSpace(ocrText) != "" {
+				markdown = ocrText
+				if len(markdown) > services.MaxExpertMarkdownBytes {
+					markdown = markdown[:services.MaxExpertMarkdownBytes]
+				}
+				convErr = nil
+			} else if ocrErr != nil {
+				// Reemplaza el error genérico de "sin capa de texto" por el
+				// motivo específico del fallback (más accionable: qué
+				// proveedor está activo, o el error real de la API).
+				convErr = ocrErr
+			}
+		}
 	} else {
 		var input struct {
 			URL string `json:"url"`
