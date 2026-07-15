@@ -229,9 +229,17 @@ func UploadAIExpertDocument(c *gin.Context) {
 		return
 	}
 
-	if convErr == nil {
-		reindexExpertChunks(expert.ID)
+	if convErr != nil {
+		// El documento igual queda guardado (status "error", para que se vea
+		// en el listado con su motivo) pero la request en sí debe fallar con
+		// un status de error — si respondiéramos 201 acá, el frontend nunca
+		// entra a su bloque de manejo de error y el usuario no se entera de
+		// que la conversión falló (parece que "no pasó nada").
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": doc.ErrorMessage, "document": doc})
+		return
 	}
+
+	reindexExpertChunks(expert.ID)
 	c.JSON(http.StatusCreated, doc)
 }
 

@@ -213,6 +213,9 @@ export default function AIConfig() {
             } else if (activeTab === 'actions') {
                 const response = await AIService.getActions();
                 setActions(response.actions || []);
+            } else if (activeTab === 'experts') {
+                // ExpertsTab maneja su propia carga — no-op acá, solo para
+                // que el spinner de isLoading no quede en true de más.
             } else if (activeTab === 'stats') {
                 const response = await AIService.getStats(statsDays);
                 setStats(response.stats);

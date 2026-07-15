@@ -24,6 +24,10 @@ export default function ExpertsTab() {
     const [editingExpert, setEditingExpert] = useState(null);
     const [form, setForm] = useState(emptyExpert);
     const [expandedId, setExpandedId] = useState(null);
+    // Conteo de documentos por experto, refrescado por ExpertDocumentsPanel
+    // apenas se sube/borra un documento — evita esperar a un reload completo
+    // de la lista de expertos para que la tarjeta refleje el cambio.
+    const [docCounts, setDocCounts] = useState({});
 
     const loadExperts = async () => {
         setIsLoading(true);
@@ -140,9 +144,14 @@ export default function ExpertsTab() {
                                 </div>
                             </div>
                             <p className="text-sm text-gray-500 mb-2">{expert.description || 'Sin descripción'}</p>
-                            <div className="text-xs text-gray-400 mb-2">
-                                {(expert.documents || []).length} documento{(expert.documents || []).length === 1 ? '' : 's'}
-                            </div>
+                            {(() => {
+                                const count = docCounts[expert.id] ?? (expert.documents || []).length;
+                                return (
+                                    <div className="text-xs text-gray-400 mb-2">
+                                        {count} documento{count === 1 ? '' : 's'}
+                                    </div>
+                                );
+                            })()}
 
                             <button
                                 onClick={() => setExpandedId(expandedId === expert.id ? null : expert.id)}
@@ -152,7 +161,12 @@ export default function ExpertsTab() {
                                 {expandedId === expert.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             </button>
 
-                            {expandedId === expert.id && <ExpertDocumentsPanel expertId={expert.id} />}
+                            {expandedId === expert.id && (
+                                <ExpertDocumentsPanel
+                                    expertId={expert.id}
+                                    onDocumentsChanged={(count) => setDocCounts((prev) => ({ ...prev, [expert.id]: count }))}
+                                />
+                            )}
                         </Card>
                     ))}
                 </div>
