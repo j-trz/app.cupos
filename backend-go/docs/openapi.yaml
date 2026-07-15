@@ -1,0 +1,1934 @@
+openapi: 3.0.3
+info:
+  title: Sistema de Gestión de Cupos — API
+  description: >
+    API REST del backend en Go para gestión de cupos, reservas, grupos, cesiones,
+    reportes, RBAC, notificaciones e IA. Ver `API.md` para la guía en prosa.
+
+    Autenticación por JWT Bearer (24 h). La mayoría de los endpoints requieren
+    además un permiso RBAC con código `MODULO_ACCION`; el rol `admin` tiene bypass total.
+  version: 1.0.0
+  contact:
+    name: Sistema de Gestión de Cupos
+servers:
+  - url: http://localhost:5002/api
+    description: Desarrollo local
+  - url: https://{host}/api
+    description: Producción
+    variables:
+      host:
+        default: app-cupos-8uxo.vercel.app
+tags:
+  - name: Auth
+  - name: Cron
+  - name: Products
+  - name: Orders
+  - name: Passengers
+  - name: Groups
+  - name: Transfers
+  - name: Reports
+  - name: Settings
+  - name: Export
+  - name: AI
+  - name: Data
+  - name: Agencies
+  - name: WhiteLabel
+  - name: RBAC
+  - name: Notifications
+  - name: EmailConfig
+  - name: Logs
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login y emisión de JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Alta de usuario (rol agency_user)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '200':
+          description: Usuario creado y token emitido
+          content:
+            application/json:
+              schema: { type: object }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /auth/profile:
+    get:
+      tags: [Auth]
+      summary: Perfil del usuario autenticado
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  profile: { $ref: '#/components/schemas/Profile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me/permissions:
+    get:
+      tags: [Auth, RBAC]
+      summary: Códigos de permiso efectivos del usuario
+      responses:
+        '200':
+          description: Lista de códigos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { type: string }
+
+  /cron/expire-reservations:
+    get:
+      tags: [Cron]
+      summary: Avisa y expira reservas en bloqueo temporal
+      description: Protegido por header `X-Cron-Secret` (no usa JWT).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CronSecret'
+      responses:
+        '200':
+          description: Resultado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  warned: { type: integer }
+                  expired: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /cron/check-deadlines:
+    get:
+      tags: [Cron]
+      summary: Envía recordatorios de deadlines operativos
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CronSecret'
+      responses:
+        '200':
+          description: Resultado
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /products/:
+    get:
+      tags: [Products]
+      summary: Lista productos accesibles
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+    post:
+      tags: [Products]
+      summary: Crea un producto
+      description: 'Requiere permiso: PRODUCTS_CREATE'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Product' }
+      responses:
+        '201': { description: Creado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IntId'
+    get:
+      tags: [Products]
+      summary: Detalle de producto
+      responses:
+        '200':
+          description: Producto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Products]
+      summary: Actualiza un producto (PRODUCTS_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Product' }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Products]
+      summary: Elimina un producto (PRODUCTS_DELETE)
+      responses:
+        '200': { description: Eliminado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /products/bulk:
+    post:
+      tags: [Products]
+      summary: Importación masiva de productos (PRODUCTS_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/Product' }
+      responses:
+        '200': { description: Resultado por fila }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /products/{id}/shared-agencies:
+    parameters:
+      - $ref: '#/components/parameters/IntId'
+    get:
+      tags: [Products]
+      summary: Agencias con las que se comparte el producto
+      responses:
+        '200':
+          description: Códigos de agencia
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+    post:
+      tags: [Products]
+      summary: Comparte el producto con una agencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agencia]
+              properties:
+                agencia: { type: string }
+      responses:
+        '200': { description: Compartido }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /products/{id}/shared-agencies/{agencia}:
+    delete:
+      tags: [Products]
+      summary: Deja de compartir el producto con una agencia
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+        - name: agencia
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/:
+    get:
+      tags: [Orders]
+      summary: Lista reservas (filtradas por rol/agencia)
+      responses:
+        '200':
+          description: Lista de reservas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Reservation' }
+    post:
+      tags: [Orders]
+      summary: Crea una reserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReservationInput' }
+      responses:
+        '201': { description: Creada }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/blocked:
+    get:
+      tags: [Orders]
+      summary: Reservas en bloqueo_temporal de la agencia
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Reservation' }
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IntId'
+    get:
+      tags: [Orders]
+      summary: Detalle de reserva con pasajeros
+      responses:
+        '200':
+          description: Reserva
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Orders]
+      summary: Actualiza una reserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Reservation' }
+      responses:
+        '200': { description: Actualizada }
+    delete:
+      tags: [Orders]
+      summary: Elimina una reserva (RESERVATIONS_DELETE)
+      responses:
+        '200': { description: Eliminada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/{id}/doc-contable:
+    put:
+      tags: [Orders]
+      summary: Agrega documento contable (confirma la reserva)
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_contable]
+              properties:
+                doc_contable: { type: string }
+      responses:
+        '200': { description: Confirmada }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /orders/{id}/confirm:
+    post:
+      tags: [Orders]
+      summary: Confirma la reserva
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+      responses:
+        '200': { description: Confirmada }
+
+  /orders/{id}/cancel-request:
+    put:
+      tags: [Orders]
+      summary: Solicita la cancelación de la reserva
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+      responses:
+        '200': { description: Solicitud registrada }
+
+  /orders/{id}/cancel-request/resolve:
+    put:
+      tags: [Orders]
+      summary: Resuelve la solicitud de cancelación (RESERVATIONS_DELETE)
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveDecision' }
+      responses:
+        '200': { description: Resuelta }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/{id}/passengers:
+    post:
+      tags: [Passengers]
+      summary: Agrega un pasajero
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PassengerInput' }
+      responses:
+        '201': { description: Creado }
+
+  /orders/{id}/passengers/{passengerId}:
+    put:
+      tags: [Passengers]
+      summary: Asigna ticket/precio a un pasajero
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+        - $ref: '#/components/parameters/PassengerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                numero_ticket: { type: string }
+                precio_venta: { type: number }
+                neto_1: { type: number }
+                doc_contable: { type: string }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [Passengers]
+      summary: Elimina un pasajero
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+        - $ref: '#/components/parameters/PassengerId'
+      responses:
+        '200': { description: Eliminado }
+
+  /orders/{id}/passengers/{passengerId}/full:
+    put:
+      tags: [Passengers]
+      summary: Edita todos los datos de un pasajero
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+        - $ref: '#/components/parameters/PassengerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PassengerInput' }
+      responses:
+        '200': { description: Actualizado }
+
+  /orders/{id}/passengers/{passengerId}/duplicate:
+    post:
+      tags: [Passengers]
+      summary: Duplica un pasajero
+      parameters:
+        - $ref: '#/components/parameters/IntId'
+        - $ref: '#/components/parameters/PassengerId'
+      responses:
+        '201': { description: Duplicado }
+
+  /groups/:
+    get:
+      tags: [Groups]
+      summary: Lista grupos
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Group' }
+    post:
+      tags: [Groups]
+      summary: Crea un grupo (GROUPS_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Group' }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /groups/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IntId'
+    get:
+      tags: [Groups]
+      summary: Detalle de grupo
+      responses:
+        '200':
+          description: Grupo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Group' }
+    put:
+      tags: [Groups]
+      summary: Actualiza un grupo (GROUPS_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Group' }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [Groups]
+      summary: Elimina un grupo (GROUPS_DELETE)
+      responses:
+        '200': { description: Eliminado }
+
+  /groups/request:
+    post:
+      tags: [Groups]
+      summary: Solicitud de grupo con opciones de itinerario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GroupRequestInput' }
+      responses:
+        '201': { description: Solicitud creada }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /groups/{id}/send-quote:
+    post:
+      tags: [Groups]
+      summary: Envía la cotización (GROUPS_UPDATE)
+      parameters: [ { $ref: '#/components/parameters/IntId' } ]
+      responses:
+        '200': { description: Cotizada }
+
+  /groups/{id}/accept:
+    post:
+      tags: [Groups]
+      summary: Acepta la cotización
+      parameters: [ { $ref: '#/components/parameters/IntId' } ]
+      responses:
+        '200': { description: Aceptada }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /groups/{id}/confirm:
+    post:
+      tags: [Groups]
+      summary: Confirma el grupo (GROUPS_UPDATE)
+      parameters: [ { $ref: '#/components/parameters/IntId' } ]
+      responses:
+        '200': { description: Confirmado }
+
+  /groups/{id}/request-cancellation:
+    post:
+      tags: [Groups]
+      summary: Solicita cancelar un grupo confirmado
+      parameters: [ { $ref: '#/components/parameters/IntId' } ]
+      responses:
+        '200': { description: Solicitud registrada }
+
+  /groups/{id}/resolve-cancellation:
+    post:
+      tags: [Groups]
+      summary: Resuelve la cancelación (GROUPS_UPDATE)
+      parameters: [ { $ref: '#/components/parameters/IntId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveDecision' }
+      responses:
+        '200': { description: Resuelta }
+
+  /transfers:
+    get:
+      tags: [Transfers]
+      summary: Cesiones del usuario/agencia
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AvailabilityTransfer' }
+    post:
+      tags: [Transfers]
+      summary: Crea una cesión (TRANSFERS_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferInput' }
+      responses:
+        '201': { description: Creada }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /transfers/all:
+    get:
+      tags: [Transfers]
+      summary: Todas las cesiones (TRANSFERS_VIEW)
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AvailabilityTransfer' }
+
+  /transfers/{id}/reclaim:
+    post:
+      tags: [Transfers]
+      summary: Recupera disponibilidad de un espejo (TRANSFERS_CREATE)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Recuperada }
+
+  /reports/stats:
+    get:
+      tags: [Reports]
+      summary: Totales del sistema (REPORTS_VIEW)
+      responses:
+        '200': { description: Métricas }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/{report}:
+    get:
+      tags: [Reports]
+      summary: Reportes GET varios (REPORTS_VIEW)
+      description: >
+        Incluye: evolution, agency-share, destinations-detail, evolution-revenue,
+        occupancy, top-products, risk-alerts, cancellations, grupos,
+        metrics-summary, metrics-by-destination, forecast-sales, fields.
+      parameters:
+        - name: report
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [evolution, agency-share, destinations-detail, evolution-revenue, occupancy, top-products, risk-alerts, cancellations, grupos, metrics-summary, metrics-by-destination, forecast-sales, fields]
+      responses:
+        '200': { description: Datos del reporte }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Reports]
+      summary: Reportes POST legacy con filtros (REPORTS_VIEW)
+      description: >
+        Incluye: dashboard-data, evolucion-agencias, agencias-data,
+        detalle-destinos, destinos-compania, evolucion-pasajeros,
+        evolucion-por-cupo, share-por-cupo, por-salida.
+      parameters:
+        - name: report
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [dashboard-data, evolucion-agencias, agencias-data, detalle-destinos, destinos-compania, evolucion-pasajeros, evolucion-por-cupo, share-por-cupo, por-salida]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportFilterRequest' }
+      responses:
+        '200': { description: Datos del reporte }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settings/:
+    get:
+      tags: [Settings]
+      summary: Lista de ajustes (SETTINGS_VIEW)
+      responses:
+        '200':
+          description: Ajustes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SystemSetting' }
+
+  /settings/{key}:
+    put:
+      tags: [Settings]
+      summary: Upsert de un ajuste (SETTINGS_UPDATE)
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {}
+      responses:
+        '200':
+          description: Ajuste guardado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemSetting' }
+
+  /export/csv/{entityType}:
+    get:
+      tags: [Export]
+      summary: Exporta un CSV por tipo de entidad
+      parameters:
+        - name: entityType
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /backup:
+    get:
+      tags: [Export]
+      summary: Respaldo de datos (BACKUP_VIEW)
+      responses:
+        '200': { description: Backup }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /ai/chat:
+    post:
+      tags: [AI]
+      summary: Chat con el asistente (function calling)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200': { description: Respuesta del asistente }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /ai/providers:
+    get:
+      tags: [AI]
+      summary: Lista proveedores LLM (AI_VIEW)
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AIProvider' }
+    post:
+      tags: [AI]
+      summary: Crea proveedor (AI_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AIProvider' }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /ai/providers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    put:
+      tags: [AI]
+      summary: Actualiza proveedor (AI_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AIProvider' }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [AI]
+      summary: Elimina proveedor (AI_UPDATE)
+      responses:
+        '200': { description: Eliminado }
+
+  /ai/providers/{id}/test:
+    post:
+      tags: [AI]
+      summary: Prueba la conexión del proveedor (AI_UPDATE)
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Resultado de la prueba }
+
+  /ai/sessions:
+    get:
+      tags: [AI]
+      summary: Sesiones de chat del usuario
+      responses:
+        '200': { description: Lista de sesiones }
+
+  /ai/sessions/{id}/messages:
+    get:
+      tags: [AI]
+      summary: Mensajes de una sesión
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Mensajes }
+
+  /ai/sessions/{id}:
+    delete:
+      tags: [AI]
+      summary: Elimina una sesión
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Eliminada }
+
+  /ai/sessions/{id}/title:
+    put:
+      tags: [AI]
+      summary: Renombra una sesión
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+      responses:
+        '200': { description: Renombrada }
+
+  /ai/experts:
+    get:
+      tags: [AI]
+      summary: Lista expertos de la agencia
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AIExpert' }
+    post:
+      tags: [AI]
+      summary: Crea un experto (agency_admin o admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AIExpertInput' }
+      responses:
+        '201': { description: Creado }
+
+  /ai/experts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [AI]
+      summary: Detalle de experto
+      responses:
+        '200':
+          description: Experto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AIExpert' }
+    put:
+      tags: [AI]
+      summary: Actualiza experto (agency_admin o admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AIExpertInput' }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [AI]
+      summary: Elimina experto (agency_admin o admin)
+      responses:
+        '200': { description: Eliminado }
+
+  /ai/experts/{id}/documents:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [AI]
+      summary: Lista documentos del experto
+      responses:
+        '200': { description: Documentos }
+    post:
+      tags: [AI]
+      summary: Sube un documento (agency_admin o admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Documento agregado }
+
+  /ai/experts/{id}/documents/{docId}:
+    delete:
+      tags: [AI]
+      summary: Elimina un documento (agency_admin o admin)
+      parameters:
+        - $ref: '#/components/parameters/UuidId'
+        - name: docId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+
+  /ai/stats:
+    get:
+      tags: [AI]
+      summary: Estadísticas de uso de IA
+      description: 'Acceso: AI_VIEW o AdminOnly (conflicto de merge sin resolver en main).'
+      responses:
+        '200': { description: Estadísticas }
+
+  /ai/logs:
+    get:
+      tags: [AI]
+      summary: Logs de IA
+      description: 'Acceso: AI_VIEW o AdminOnly (conflicto de merge sin resolver en main).'
+      responses:
+        '200': { description: Logs }
+
+  /data/:
+    get:
+      tags: [Data]
+      summary: Lee filas de una tabla
+      parameters:
+        - name: table
+          in: query
+          required: true
+          schema: { type: string }
+        - name: filters
+          in: query
+          required: false
+          description: JSON con pares campo/valor
+          schema: { type: string }
+      responses:
+        '200': { description: Filas }
+    post:
+      tags: [Data]
+      summary: Ejecuta una operación CRUD dinámica
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CRUDInput' }
+      responses:
+        '200': { description: OK }
+        '201': { description: Creado }
+    put:
+      tags: [Data]
+      summary: Ejecuta una operación CRUD dinámica
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CRUDInput' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Data]
+      summary: Ejecuta una operación CRUD dinámica
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CRUDInput' }
+      responses:
+        '200': { description: OK }
+
+  /agencies/:
+    get:
+      tags: [Agencies]
+      summary: Lista agencias
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Agency' }
+    post:
+      tags: [Agencies]
+      summary: Crea agencia (AGENCIES_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Agency' }
+      responses:
+        '201': { description: Creada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /agencies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    put:
+      tags: [Agencies]
+      summary: Actualiza agencia (AGENCIES_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Agency' }
+      responses:
+        '200': { description: Actualizada }
+    delete:
+      tags: [Agencies]
+      summary: Elimina agencia (AGENCIES_DELETE)
+      responses:
+        '200': { description: Eliminada }
+
+  /white-label/config:
+    get:
+      tags: [WhiteLabel]
+      summary: Config de marca de la agencia
+      responses:
+        '200': { description: Config }
+    post:
+      tags: [WhiteLabel]
+      summary: Crea config (WHITE_LABEL_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Creada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /white-label/config/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    put:
+      tags: [WhiteLabel]
+      summary: Actualiza config (WHITE_LABEL_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Actualizada }
+    delete:
+      tags: [WhiteLabel]
+      summary: Elimina config (WHITE_LABEL_UPDATE)
+      responses:
+        '200': { description: Eliminada }
+
+  /users/:
+    get:
+      tags: [RBAC]
+      summary: Lista usuarios (USERS_VIEW)
+      responses:
+        '200': { description: Lista }
+    post:
+      tags: [RBAC]
+      summary: Crea usuario (USERS_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserInput' }
+      responses:
+        '201': { description: Creado }
+
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [RBAC]
+      summary: Detalle de usuario (USERS_VIEW)
+      responses:
+        '200': { description: Usuario }
+    put:
+      tags: [RBAC]
+      summary: Actualiza usuario (USERS_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Profile' }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [RBAC]
+      summary: Elimina usuario (USERS_DELETE)
+      responses:
+        '200': { description: Eliminado }
+
+  /users/{id}/status:
+    put:
+      tags: [RBAC]
+      summary: Activa/desactiva la cuenta (USERS_UNLOCK)
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Estado actualizado }
+
+  /roles/:
+    get:
+      tags: [RBAC]
+      summary: Lista roles (ROLES_VIEW)
+      responses:
+        '200': { description: Lista }
+    post:
+      tags: [RBAC]
+      summary: Crea rol (ROLES_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Role' }
+      responses:
+        '201': { description: Creado }
+
+  /roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [RBAC]
+      summary: Detalle de rol (ROLES_VIEW)
+      responses:
+        '200': { description: Rol }
+    put:
+      tags: [RBAC]
+      summary: Actualiza rol (ROLES_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Role' }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [RBAC]
+      summary: Elimina rol (ROLES_DELETE)
+      responses:
+        '200': { description: Eliminado }
+
+  /roles/{id}/users:
+    get:
+      tags: [RBAC]
+      summary: Usuarios de un rol (ROLES_VIEW)
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Lista }
+
+  /roles/{id}/permissions:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [RBAC]
+      summary: Permisos de un rol (ROLES_VIEW)
+      responses:
+        '200': { description: Lista }
+    post:
+      tags: [RBAC]
+      summary: Asigna permisos a un rol (ROLES_ASSIGN_PERMISSIONS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                permissions:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { description: Asignados }
+
+  /permissions/:
+    get:
+      tags: [RBAC]
+      summary: Lista permisos (PERMISSIONS_VIEW)
+      responses:
+        '200': { description: Lista }
+    post:
+      tags: [RBAC]
+      summary: Crea permiso (PERMISSIONS_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Permission' }
+      responses:
+        '201': { description: Creado }
+
+  /permissions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [RBAC]
+      summary: Detalle de permiso (PERMISSIONS_VIEW)
+      responses:
+        '200': { description: Permiso }
+    put:
+      tags: [RBAC]
+      summary: Actualiza permiso (PERMISSIONS_UPDATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Permission' }
+      responses:
+        '200': { description: Actualizado }
+    delete:
+      tags: [RBAC]
+      summary: Elimina permiso (PERMISSIONS_DELETE)
+      responses:
+        '200': { description: Eliminado }
+
+  /user-roles:
+    post:
+      tags: [RBAC]
+      summary: Asigna un rol a un usuario (ROLES_ASSIGN_PERMISSIONS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, role_id]
+              properties:
+                user_id: { type: string, format: uuid }
+                role_id: { type: string, format: uuid }
+      responses:
+        '200': { description: Asignado }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Lista notificaciones del usuario
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+    post:
+      tags: [Notifications]
+      summary: Crea una notificación (NOTIFICATIONS_CREATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Notification' }
+      responses:
+        '201': { description: Creada }
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Cantidad de notificaciones no leídas
+      responses:
+        '200': { description: Contador }
+
+  /notifications/read-all:
+    put:
+      tags: [Notifications]
+      summary: Marca todas como leídas
+      responses:
+        '200': { description: OK }
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: Marca una notificación como leída
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: OK }
+
+  /notifications/{id}/hide:
+    put:
+      tags: [Notifications]
+      summary: Oculta una notificación
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: OK }
+
+  /notifications/{id}:
+    delete:
+      tags: [Notifications]
+      summary: Elimina una notificación (NOTIFICATIONS_DELETE)
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Eliminada }
+
+  /notification-config/templates:
+    get:
+      tags: [Notifications]
+      summary: Lista plantillas de notificación in-app
+      responses:
+        '200': { description: Lista }
+
+  /notification-config/templates/{id}:
+    put:
+      tags: [Notifications]
+      summary: Edita una plantilla de notificación
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationTemplateInput' }
+      responses:
+        '200': { description: Actualizada }
+
+  /notification-config/templates/{id}/preview:
+    get:
+      tags: [Notifications]
+      summary: Previsualiza una plantilla de notificación
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Preview }
+
+  /email-config/config:
+    get:
+      tags: [EmailConfig]
+      summary: Config SMTP de la agencia
+      responses:
+        '200': { description: Config }
+    post:
+      tags: [EmailConfig]
+      summary: Crea config SMTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailSMTPConfig' }
+      responses:
+        '201': { description: Creada }
+
+  /email-config/config/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    put:
+      tags: [EmailConfig]
+      summary: Actualiza config SMTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Actualizada }
+    delete:
+      tags: [EmailConfig]
+      summary: Elimina config SMTP
+      responses:
+        '200': { description: Eliminada }
+
+  /email-config/test:
+    post:
+      tags: [EmailConfig]
+      summary: Prueba la conexión SMTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SMTPTestInput' }
+      responses:
+        '200': { description: Resultado }
+
+  /email-config/send-test:
+    post:
+      tags: [EmailConfig]
+      summary: Envía un email de prueba
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to_email]
+              properties:
+                to_email: { type: string, format: email }
+      responses:
+        '200': { description: Enviado }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /email-config/templates:
+    get:
+      tags: [EmailConfig]
+      summary: Lista plantillas de email
+      responses:
+        '200': { description: Lista }
+
+  /email-config/templates/{id}:
+    put:
+      tags: [EmailConfig]
+      summary: Edita una plantilla de email
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Actualizada }
+
+  /email-config/templates/{id}/preview:
+    get:
+      tags: [EmailConfig]
+      summary: Previsualiza una plantilla de email
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: Preview }
+
+  /backoffice/importar-pasajeros:
+    get:
+      tags: [Logs]
+      summary: Utilidad de importación de pasajeros
+      responses:
+        '200': { description: OK }
+
+  /logs:
+    get:
+      tags: [Logs]
+      summary: Registro de auditoría (LOGS_VIEW)
+      responses:
+        '200':
+          description: Logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SystemLog' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IntId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    UuidId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PassengerId:
+      name: passengerId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    CronSecret:
+      name: X-Cron-Secret
+      in: header
+      required: true
+      description: Debe coincidir con la variable de entorno CRON_SECRET.
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Petición inválida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No autenticado o token inválido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Permisos insuficientes
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+
+    LoginResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        token: { type: string }
+        user: { $ref: '#/components/schemas/Profile' }
+
+    RegisterInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        nombre: { type: string }
+        apellido: { type: string }
+        telefono: { type: string }
+        agencia: { type: string }
+
+    Profile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        password: { type: string, writeOnly: true }
+        nombre: { type: string }
+        apellido: { type: string }
+        telefono: { type: string }
+        agencia: { type: string }
+        admin: { type: boolean }
+        activo: { type: boolean }
+        role: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateUserInput:
+      allOf:
+        - $ref: '#/components/schemas/Profile'
+        - type: object
+          properties:
+            role_id: { type: string, format: uuid, nullable: true }
+
+    Product:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        codigo_cupo: { type: string }
+        destino: { type: string }
+        compania: { type: string }
+        disponibilidad: { type: integer }
+        cupo: { type: integer }
+        vendidos: { type: integer }
+        fecha_salida: { type: string, format: date-time, nullable: true }
+        fecha_regreso: { type: string, format: date-time, nullable: true }
+        precio: { type: number }
+        neto_1: { type: number }
+        op: { type: number }
+        ruta: { type: string }
+        pnr: { type: string }
+        ficha: { type: string }
+        temporada: { type: string }
+        tipo_producto: { type: string }
+        bloqueo_temporal_minutos: { type: integer }
+        carryon: { type: boolean }
+        handbag: { type: boolean }
+        checkedbag: { type: boolean }
+        inf_fare: { type: number }
+        chd_fare: { type: number }
+        is_blocked_for_sale: { type: boolean }
+        servicio: { type: string }
+        notas_externas: { type: string }
+        notas_internas: { type: string }
+        agencia: { type: string }
+        restricted_agency: { type: string }
+        source_agency: { type: string }
+        transfer_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Reservation:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        product_id: { type: integer, format: int64 }
+        created_by: { type: string, format: uuid }
+        estado:
+          type: string
+          enum: [bloqueo_temporal, confirmada, solicitud_cancelacion, cancelada, expirada, cedido]
+        bloqueo_expira_at: { type: string, format: date-time, nullable: true }
+        precio_venta: { type: number }
+        neto_1: { type: number }
+        pedido_id: { type: string }
+        agencia: { type: string }
+        contacto_nombre: { type: string }
+        contacto_email: { type: string }
+        contacto_telefono: { type: string }
+        doc_contable: { type: string }
+        passengers:
+          type: array
+          items: { $ref: '#/components/schemas/Passenger' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ReservationInput:
+      allOf:
+        - $ref: '#/components/schemas/Reservation'
+        - type: object
+          properties:
+            passengers:
+              type: array
+              items: { $ref: '#/components/schemas/PassengerInput' }
+
+    Passenger:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        reservation_id: { type: integer, format: int64 }
+        pedido_id: { type: string }
+        nombre: { type: string }
+        apellido: { type: string }
+        documento: { type: string }
+        nacimiento: { type: string, format: date-time, nullable: true }
+        nacionalidad: { type: string }
+        tipo_pasajero: { type: string }
+        nro: { type: integer, description: '1 = venta, 0 = acompañante' }
+        estado: { type: string }
+        numero_ticket: { type: string }
+        precio_venta: { type: number }
+        neto_1: { type: number }
+        doc_contable: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PassengerInput:
+      type: object
+      properties:
+        nombre: { type: string }
+        apellido: { type: string }
+        documento: { type: string }
+        nacimiento: { type: string, description: 'YYYY-MM-DD o RFC3339' }
+        nacionalidad: { type: string }
+        tipo_pasajero: { type: string }
+        precio_venta: { type: number, nullable: true }
+        neto_1: { type: number, nullable: true }
+        doc_contable: { type: string }
+
+    Group:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        solicitud_id: { type: string, format: uuid, nullable: true }
+        opcion_numero: { type: integer }
+        vendedor: { type: string, format: uuid }
+        agency: { type: string }
+        itinerario: { type: string }
+        destino: { type: string }
+        compania: { type: string }
+        condiciones: { type: string }
+        cantidad_lugares: { type: integer }
+        cantidad_liberados: { type: integer }
+        salida: { type: string, format: date-time, nullable: true }
+        regreso: { type: string, format: date-time, nullable: true }
+        neto_01: { type: number }
+        vencimiento_cotizacion: { type: string, format: date-time, nullable: true }
+        estado_cotizacion:
+          type: string
+          enum: [pendiente, cotizada, aceptada, rechazada]
+        estado_reservar:
+          type: string
+          enum: ['', confirmada, cancelacion_solicitada, cancelada]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    GroupRequestInput:
+      type: object
+      required: [cantidad_lugares, opciones]
+      properties:
+        cantidad_lugares: { type: integer, minimum: 1 }
+        notas_vendedor: { type: string }
+        opciones:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              itinerario: { type: string }
+              notas: { type: string }
+
+    TransferInput:
+      type: object
+      required: [product_id, target_agency, quantity]
+      properties:
+        product_id: { type: integer, format: int64 }
+        target_agency: { type: string }
+        quantity: { type: integer, minimum: 1 }
+
+    AvailabilityTransfer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: integer, format: int64 }
+        source_agency: { type: string }
+        target_agency: { type: string }
+        quantity: { type: integer }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ResolveDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, decline]
+        notas: { type: string }
+
+    ReportFilterRequest:
+      type: object
+      properties:
+        userId: { type: string }
+        granularidad: { type: string }
+        filters:
+          type: object
+          additionalProperties: true
+
+    SystemSetting:
+      type: object
+      properties:
+        key: { type: string }
+        value: {}
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CRUDInput:
+      type: object
+      required: [table, operation]
+      properties:
+        table: { type: string }
+        operation:
+          type: string
+          enum: [insert, update, delete]
+        data:
+          type: object
+          additionalProperties: true
+        id: {}
+
+    Agency:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        website: { type: string }
+        color: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Role:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        description: { type: string }
+        is_system: { type: boolean }
+        is_active: { type: boolean }
+        agency_id: { type: string, format: uuid, nullable: true }
+
+    Permission:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        module: { type: string }
+        action: { type: string }
+        description: { type: string }
+        is_active: { type: boolean }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        title: { type: string }
+        message: { type: string }
+        icon: { type: string }
+        color: { type: string }
+        priority: { type: string }
+        target_user_id: { type: string, format: uuid, nullable: true }
+        target_role: { type: string }
+        target_agency: { type: string }
+        is_read: { type: boolean }
+        is_hidden: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    NotificationTemplateInput:
+      type: object
+      properties:
+        title: { type: string }
+        message: { type: string }
+        icon: { type: string }
+        color: { type: string }
+        extra_emails: { type: string }
+
+    EmailSMTPConfig:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        agency_id: { type: string, format: uuid, nullable: true }
+        smtp_host: { type: string }
+        smtp_port: { type: integer }
+        smtp_user: { type: string }
+        smtp_pass: { type: string }
+        smtp_secure: { type: boolean }
+        email_from: { type: string }
+        is_active: { type: boolean }
+
+    SMTPTestInput:
+      type: object
+      properties:
+        smtp_host: { type: string }
+        smtp_port: { type: integer }
+        smtp_user: { type: string }
+        smtp_pass: { type: string }
+        smtp_secure: { type: boolean }
+
+    AIProvider:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        display_name: { type: string }
+        provider_type: { type: string }
+        api_key: { type: string, writeOnly: true }
+        api_endpoint: { type: string }
+        base_url: { type: string }
+        default_model: { type: string }
+        temperature: { type: number }
+        max_tokens: { type: integer }
+        is_active: { type: boolean }
+        is_default: { type: boolean }
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        sessionId: { type: string }
+        providerId: { type: string }
+        imageBase64: { type: string }
+        imageMime: { type: string }
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              base64: { type: string }
+              mime: { type: string }
+              name: { type: string }
+        pageContext:
+          type: object
+          properties:
+            page: { type: string }
+            visibleItems:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+
+    AIExpert:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        agencia: { type: string }
+        name: { type: string }
+        description: { type: string }
+        persona: { type: string }
+        is_active: { type: boolean }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AIExpertInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        persona: { type: string }
+        is_active: { type: boolean }
+        agencia: { type: string }
+
+    SystemLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        level: { type: string }
+        source: { type: string }
+        method: { type: string }
+        path: { type: string }
+        status_code: { type: integer }
+        message: { type: string }
+        details: { type: string }
+        user_id: { type: string, format: uuid, nullable: true }
+        agencia: { type: string }
+        duration_ms: { type: integer }
+        created_at: { type: string, format: date-time }
