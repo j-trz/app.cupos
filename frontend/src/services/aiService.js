@@ -9,6 +9,7 @@ class AIService {
   /**
    * Enviar mensaje al asistente IA con soporte para múltiples imágenes/adjuntos
    */
+<<<<<<< HEAD
   static async sendMessage(message, sessionId = null, images = [], providerId = null, pageContext = null) {
     const payload = { message };
     if (sessionId) payload.sessionId = sessionId;
@@ -17,6 +18,13 @@ class AIService {
     // permite a la IA responder sobre lo que el usuario ve y resolver
     // referencias posicionales ("la primera opción").
     if (pageContext && pageContext.page) payload.pageContext = pageContext;
+=======
+  static async sendMessage(message, sessionId = null, images = [], providerId = null, expertId = null) {
+    const payload = { message };
+    if (sessionId) payload.sessionId = sessionId;
+    if (providerId) payload.providerId = providerId;
+    if (expertId) payload.expertId = expertId;
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
     if (images && images.length > 0) {
       // Envía todas las imágenes cargadas
@@ -122,6 +130,48 @@ class AIService {
     if (userId) url += `&userId=${userId}`;
     if (sessionId) url += `&sessionId=${sessionId}`;
     return ApiClient.get(url);
+  }
+
+  // ==========================================
+  // Expertos (bases de conocimiento por agencia)
+  // ==========================================
+
+  /** Listar expertos de la propia agencia (admin puede filtrar con ?agencia=) */
+  static async getExperts(agencia = null) {
+    const url = agencia ? `/ai/experts?agencia=${encodeURIComponent(agencia)}` : '/ai/experts';
+    return ApiClient.get(url);
+  }
+
+  static async getExpert(expertId) {
+    return ApiClient.get(`/ai/experts/${expertId}`);
+  }
+
+  static async createExpert(data) {
+    return ApiClient.post('/ai/experts', data);
+  }
+
+  static async updateExpert(expertId, data) {
+    return ApiClient.put(`/ai/experts/${expertId}`, data);
+  }
+
+  static async deleteExpert(expertId) {
+    return ApiClient.delete(`/ai/experts/${expertId}`);
+  }
+
+  /** Sube un documento de conocimiento (PDF/DOCX/TXT/MD) a un experto */
+  static async uploadExpertDocument(expertId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return ApiClient.post(`/ai/experts/${expertId}/documents`, formData);
+  }
+
+  /** Agrega conocimiento a un experto a partir de una URL pública */
+  static async addExpertDocumentFromUrl(expertId, url) {
+    return ApiClient.post(`/ai/experts/${expertId}/documents`, { url });
+  }
+
+  static async deleteExpertDocument(expertId, docId) {
+    return ApiClient.delete(`/ai/experts/${expertId}/documents/${docId}`);
   }
 }
 

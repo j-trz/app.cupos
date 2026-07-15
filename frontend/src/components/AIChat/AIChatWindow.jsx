@@ -5,11 +5,19 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import { X, Minus, RotateCcw, Settings, Trash2, MessageSquarePlus, Bot } from 'lucide-react';
 import AIService from '../../services/aiService';
+=======
+import { Minus, RotateCcw, Settings, MessageSquarePlus, Bot, Maximize2 } from 'lucide-react';
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 import AIChatMessage from './AIChatMessage';
 import AIChatInput from './AIChatInput';
+import AIChatSessionsSidebar from './AIChatSessionsSidebar';
+import ExpertPicker from './ExpertPicker';
+import useAIChat from '../../hooks/useAIChat';
 import { useAuth } from '../../contexts/AuthContext';
+<<<<<<< HEAD
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { useAIPageContext } from '../../contexts/AIPageContext.jsx';
 
@@ -23,75 +31,50 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [error, setError] = useState(null);
+=======
+
+export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
     const [showSessions, setShowSessions] = useState(false);
     const messagesEndRef = useRef(null);
+
+    const {
+        messages,
+        sessions,
+        currentSessionId,
+        isLoading,
+        isTyping,
+        error,
+        selectedExpertId,
+        setSelectedExpertId,
+        loadSessions,
+        loadSessionMessages,
+        handleNewSession,
+        handleSendMessage,
+        handleDeleteSession,
+    } = useAIChat();
 
     // Cargar sesiones al abrir
     useEffect(() => {
         if (isOpen && sessions.length === 0) {
             loadSessions();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
     // Auto-scroll cuando hay nuevos mensajes
     useEffect(() => {
-        scrollToBottom();
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    const loadSessions = async () => {
-        try {
-            const response = await AIService.getSessions();
-            setSessions(response.sessions || []);
-
-            // Si hay sesiones, cargar la más reciente
-            if (response.sessions?.length > 0 && !currentSessionId) {
-                const latestSession = response.sessions[0];
-                loadSessionMessages(latestSession.id);
-            } else if (response.sessions?.length === 0) {
-                // Mensaje de bienvenida
-                setMessages([{
-                    id: 'welcome',
-                    role: 'assistant',
-                    content: '¡Hola! 👋 Soy tu asistente de IA para Gestión de Cupos. Puedo ayudarte a:\n\n• Buscar y gestionar reservas\n• Consultar disponibilidad de vuelos y productos\n• Crear nuevos productos\n• Obtener estadísticas\n• Y mucho más...\n\n¿En qué puedo ayudarte hoy?',
-                    created_at: new Date().toISOString()
-                }]);
-            }
-        } catch (err) {
-            console.error('Error al cargar sesiones:', err);
-            setError('No se pudieron cargar las sesiones de chat');
-        }
-    };
-
-    const loadSessionMessages = async (sessionId) => {
-        try {
-            setIsLoading(true);
-            setCurrentSessionId(sessionId);
-            const response = await AIService.getSessionMessages(sessionId);
-            setMessages(response.messages || []);
-            setShowSessions(false);
-        } catch (err) {
-            console.error('Error al cargar mensajes:', err);
-            setError('No se pudieron cargar los mensajes');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleNewSession = () => {
-        setCurrentSessionId(null);
-        setMessages([{
-            id: 'welcome',
-            role: 'assistant',
-            content: '¡Hola! 👋 Soy tu asistente de IA para Gestión de Cupos. ¿En qué puedo ayudarte hoy?',
-            created_at: new Date().toISOString()
-        }]);
+    const handleSelectSession = (sessionId) => {
+        loadSessionMessages(sessionId);
         setShowSessions(false);
     };
 
+<<<<<<< HEAD
     const handleSendMessage = async (content, attachments = []) => {
         // Normalizar los adjuntos para asegurar que sea un arreglo
         const activeAttachments = Array.isArray(attachments) ? attachments : (attachments ? [attachments] : []);
@@ -168,30 +151,16 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
         } finally {
             setIsTyping(false);
         }
+=======
+    const handleNewSessionClick = () => {
+        handleNewSession();
+        setShowSessions(false);
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
     };
 
-    const handleDeleteSession = async (sessionId, e) => {
-        e.stopPropagation();
-        if (!confirm('¿Eliminar esta conversación?')) return;
-
-        try {
-            await AIService.deleteSession(sessionId);
-            setSessions(prev => prev.filter(s => s.id !== sessionId));
-
-            if (currentSessionId === sessionId) {
-                handleNewSession();
-            }
-        } catch (err) {
-            console.error('Error al eliminar sesión:', err);
-        }
+    const handleExpand = () => {
+        navigate(currentSessionId ? `/asistente?session=${currentSessionId}` : '/asistente');
     };
-
-    const { config } = useWhiteLabel();
-
-    // Colores dinámicos desde WhiteLabelContext
-    const primaryColor = config?.colors?.primary || '#3b82f6';
-    const surfaceColor = config?.colors?.surface || '#ffffff';
-    const backgroundColor = config?.colors?.background || '#fafafa';
 
     return (
         <div className="w-[380px] h-[580px] bg-white dark:bg-zinc-900 rounded-xl shadow-xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
@@ -212,7 +181,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                 <div className="flex items-center gap-1">
                     {/* Nueva conversación */}
                     <button
-                        onClick={handleNewSession}
+                        onClick={handleNewSessionClick}
                         className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                         title="Nueva conversación"
                     >
@@ -228,8 +197,22 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         <RotateCcw className="w-4 h-4" />
                     </button>
 
+<<<<<<< HEAD
                     {/* Configuración (requiere permiso de IA) */}
                     {can('AI_UPDATE') && (
+=======
+                    {/* Expandir a pantalla completa */}
+                    <button
+                        onClick={handleExpand}
+                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        title="Expandir a pantalla completa"
+                    >
+                        <Maximize2 className="w-4 h-4" />
+                    </button>
+
+                    {/* Configuración (solo admin) */}
+                    {user?.role === 'admin' && (
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
                         <button
                             onClick={() => window.location.href = '/config-ia'}
                             className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -250,36 +233,21 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                 </div>
             </div>
 
+            {/* Selector de experto (solo si la agencia configuró alguno) */}
+            <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+                <ExpertPicker selectedExpertId={selectedExpertId} onSelectExpert={setSelectedExpertId} compact />
+            </div>
+
             {/* Panel de sesiones */}
             {showSessions && (
                 <div className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 max-h-36 overflow-y-auto shrink-0">
-                    <div className="p-2">
-                        <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-1">Conversaciones recientes</p>
-                        {sessions.length === 0 ? (
-                            <p className="text-sm text-zinc-400 px-2 py-3 text-center">Sin conversaciones</p>
-                        ) : (
-                            sessions.slice(0, 5).map(session => (
-                                <div
-                                    key={session.id}
-                                    onClick={() => loadSessionMessages(session.id)}
-                                    className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors my-0.5 ${currentSessionId === session.id
-                                        ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
-                                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                                        }`}
-                                >
-                                    <span className="text-sm truncate flex-1">
-                                        {session.title || 'Nueva conversación'}
-                                    </span>
-                                    <button
-                                        onClick={(e) => handleDeleteSession(session.id, e)}
-                                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-600 rounded-md transition-colors"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                    <AIChatSessionsSidebar
+                        sessions={sessions.slice(0, 5)}
+                        currentSessionId={currentSessionId}
+                        onSelectSession={handleSelectSession}
+                        onDeleteSession={handleDeleteSession}
+                        compact
+                    />
                 </div>
             )}
 
@@ -349,7 +317,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
 
             {/* Input */}
             <AIChatInput
-                onSendMessage={handleSendMessage}
+                onSendMessage={(content, attachments) => handleSendMessage(content, attachments, onNewMessage)}
                 isLoading={isLoading || isTyping}
                 placeholder="Escribe tu mensaje..."
             />

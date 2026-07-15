@@ -217,8 +217,25 @@ func main() {
 				ai.GET("/sessions/:id/messages", handlers.GetSessionMessages)
 				ai.DELETE("/sessions/:id", handlers.DeleteSession)
 				ai.PUT("/sessions/:id/title", handlers.UpdateSessionTitle)
+<<<<<<< HEAD
 				ai.GET("/stats", middleware.RequirePermission("AI_VIEW"), handlers.GetAIStats)
 				ai.GET("/logs", middleware.RequirePermission("AI_VIEW"), handlers.GetAILogs)
+=======
+				ai.GET("/stats", middleware.AdminOnly(), handlers.GetAIStats)
+				ai.GET("/logs", middleware.AdminOnly(), handlers.GetAILogs)
+
+				// Expertos: bases de conocimiento por agencia (cualquier rol
+				// autenticado puede listar/usar los de su propia agencia;
+				// gestionarlos requiere agency_admin o admin)
+				ai.GET("/experts", handlers.ListAIExperts)
+				ai.POST("/experts", middleware.AgencyAdminOrAdmin(), handlers.CreateAIExpert)
+				ai.GET("/experts/:id", handlers.GetAIExpert)
+				ai.PUT("/experts/:id", middleware.AgencyAdminOrAdmin(), handlers.UpdateAIExpert)
+				ai.DELETE("/experts/:id", middleware.AgencyAdminOrAdmin(), handlers.DeleteAIExpert)
+				ai.POST("/experts/:id/documents", middleware.AgencyAdminOrAdmin(), handlers.UploadAIExpertDocument)
+				ai.GET("/experts/:id/documents", handlers.ListAIExpertDocuments)
+				ai.DELETE("/experts/:id/documents/:docId", middleware.AgencyAdminOrAdmin(), handlers.DeleteAIExpertDocument)
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 			}
 
 			// CRUD Dinámico (Data)

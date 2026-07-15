@@ -30,6 +30,7 @@ import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
 import NotificationTemplates from './pages/NotificationTemplates';
 import AIConfig from './pages/AIConfig';
+import AIChatPage from './pages/AIChatPage';
 import Reportes from './pages/Reportes';
 import LogsDelSitio from './pages/LogsDelSitio';
 import GestionNominas from './pages/GestionNominas';
@@ -323,6 +324,17 @@ function App() {
                         <Layout>
                           <TestPage />
                         </Layout>
+                      }
+                    />
+                    {/* Chat de IA a pantalla completa — fuera de <Layout> a
+                        propósito, para maximizar el espacio (sin sidebar ni
+                        header del sistema) y no montar el widget flotante */}
+                    <Route
+                      path="/asistente"
+                      element={
+                        <ProtectedRoute>
+                          <AIChatPage />
+                        </ProtectedRoute>
                       }
                     />
                   </Routes>

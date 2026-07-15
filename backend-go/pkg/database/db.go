@@ -52,7 +52,13 @@ func InitDB() {
 		&models.AISession{},
 		&models.AIMessage{},
 		&models.ProductSharedAgency{},
+<<<<<<< HEAD
 		&models.Group{},
+=======
+		&models.AIExpert{},
+		&models.AIExpertDocument{},
+		&models.AIExpertChunk{},
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -519,12 +525,20 @@ func runSQLMigrations(db *gorm.DB) {
 		// causando "column neto_1 does not exist" al editar un pasajero.
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS neto_1 numeric DEFAULT 0;`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS precio_venta numeric DEFAULT 0;`,
+<<<<<<< HEAD
 		// Resolución de solicitudes de cancelación (aprobar/rechazar con notas)
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS pre_cancel_estado VARCHAR(50) DEFAULT '';`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancelacion_notas TEXT DEFAULT '';`,
 		// RBAC granular: roles personalizados por agencia + acción explícita por permiso
 		`ALTER TABLE roles ADD COLUMN IF NOT EXISTS agency_id UUID REFERENCES agencies(id);`,
 		`ALTER TABLE permissions ADD COLUMN IF NOT EXISTS action VARCHAR(20) DEFAULT '';`,
+=======
+		// Expertos de IA: búsqueda por texto en los chunks de conocimiento sin
+		// depender de pgvector (no confirmado en el proveedor de Postgres
+		// gestionado) — pg_trgm es una extensión estándar de Postgres.
+		`CREATE EXTENSION IF NOT EXISTS pg_trgm;`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_expert_chunks_content_trgm ON ai_expert_chunks USING gin (content gin_trgm_ops);`,
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

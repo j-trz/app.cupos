@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -38,6 +39,7 @@ type ChatRequest struct {
 	ImageBase64 string            `json:"imageBase64"` // base64 sin prefijo data:... (retrocompatibilidad)
 	ImageMime   string            `json:"imageMime"`   // "image/jpeg", "image/png", etc. (retrocompatibilidad)
 	Images      []ImageAttachment `json:"images"`      // Soporte para múltiples adjuntos
+<<<<<<< HEAD
 	// PageContext describe en qué pantalla está el usuario y qué tiene
 	// visible en este momento (ver AIPageContext.jsx en el frontend). Es
 	// efímero: se usa solo para armar el prompt de este turno, nunca se
@@ -67,6 +69,9 @@ type VisibleItemInput struct {
 type UIAction struct {
 	Type    string                 `json:"type"`
 	Payload map[string]interface{} `json:"payload"`
+=======
+	ExpertID    string            `json:"expertId"`    // Experto elegido explícitamente por el usuario (opcional)
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 }
 
 type userCtx struct {
@@ -81,7 +86,11 @@ type userCtx struct {
 // SYSTEM PROMPT
 // ─────────────────────────────────────────────
 
+<<<<<<< HEAD
 func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
+=======
+func buildSystemPrompt(u userCtx, experts []models.AIExpert) string {
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	roleDesc := map[string]string{
 		"admin":        "Administrador con acceso total al sistema",
 		"agency_admin": "Administrador de agencia",
@@ -92,6 +101,7 @@ func buildSystemPrompt(u userCtx, pageCtx *PageContextInput) string {
 		roleDesc = "Agente de viajes"
 	}
 
+<<<<<<< HEAD
 	permisos := `PODÉS HACER (si te preguntan "qué podés hacer" / "qué sabés hacer", respondé con una lista COMPLETA y concreta basada en esto — nunca una respuesta vaga tipo "puedo ayudarte con reservas", nunca digas que no podés cambiar de pantalla o ejecutar acciones si más abajo figura que sí podés):
 - Buscar productos/cupos disponibles por destino, compañía, tipo o código, y decirte la disponibilidad real
 - Ver el detalle de tus propias reservas (fechas, estado, pasajeros, ficha, ticket)
@@ -105,6 +115,30 @@ NO PODÉS HACER (si te preguntan, decilo con total claridad, no lo disimules ni 
 - Cambiar configuración del sistema, precios de productos, o datos de otros usuarios/agencias
 - Modificar, corregir o eliminar una reserva ya creada (solo la podés crear; para editarla el usuario tiene que ir a la pantalla correspondiente)
 - Ver reservas o datos de un usuario/agencia que no sea la del usuario que te está hablando`
+=======
+	expertsSection := ""
+	if len(experts) > 0 {
+		var lines []string
+		for _, e := range experts {
+			desc := e.Description
+			if desc == "" {
+				desc = "sin descripción"
+			}
+			lines = append(lines, fmt.Sprintf("- %s: %s", e.Name, desc))
+		}
+		expertsSection = fmt.Sprintf(`
+EXPERTOS DISPONIBLES (bases de conocimiento configuradas por tu agencia):
+%s
+Si el usuario pregunta algo que podría responderse con el conocimiento de alguno de estos expertos (políticas, FAQs, manuales, procedimientos internos, etc.), usá la tool "consultar_experto" pasando el nombre exacto del experto y la pregunta del usuario. No inventes contenido de estos temas sin haber consultado al experto primero.
+`, strings.Join(lines, "\n"))
+	}
+
+	permisos := `Puedes ayudar con:
+- Buscar productos/cupos disponibles y verificar disponibilidad
+- Ver tus propias reservas
+- Crear nuevas reservas
+- Leer múltiples documentos de identidad (DNI, pasaportes) simultáneamente para extraer datos de pasajeros y realizar reservas masivas`
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
 	if u.Role == "admin" || u.Role == "agency_admin" {
 		permisos += `
@@ -211,6 +245,12 @@ FLUJO PARA CONSULTAR RESERVAS (fechas, estado, pasajeros, precios — IMPORTANTE
 3. Si el usuario tiene varias reservas y no especificó cuál, mostrale la lista (de mis_reservas) para que elija, en vez de asumir cuál es.
 4. Recién con el resultado real de la herramienta en mano, respondé la pregunta puntual del usuario usando esos datos — no repitas toda la reserva si te preguntó solo una cosa puntual (ej. solo la fecha de salida).
 
+ITINERARIO EN PDF Y DETALLE DE RUTA (IMPORTANTE):
+- Si te piden el itinerario, el "PDF del viaje", o un comprobante de una reserva, usá "generar_itinerario_pdf".
+- Si te piden el detalle de vuelos/ruta "para copiar y pegar" en un email o WhatsApp, usá "detalle_ruta".
+- En ambos casos, identificá la reserva por el número de pedido/localizador o por destino/nombre — NUNCA le pidas al usuario el ID interno.
+- Si la herramienta devuelve un campo "error", transmitíselo tal cual al usuario (puede ser que no exista, que sea ambigua, o que necesites pedirle que precise cuál); si devuelve "tipo", ya se generó correctamente y el sistema le muestra la tarjeta correspondiente — no repitas todos los datos en el texto, con confirmar que está listo alcanza.
+
 %s
 
 FLUJO PARA CREAR RESERVA (IMPORTANTE - seguir exactamente):
@@ -264,9 +304,14 @@ MEMORIA DE CONVERSACIÓN (MUY IMPORTANTE):
 - Si ya tienes nombre, documento u otros datos del pasajero, no los pidas de nuevo.
 - Avanza siempre hacia el siguiente paso pendiente.
 %s
+<<<<<<< HEAD
 
 Responde siempre en español, de forma clara y concisa.`,
 		agenciaLabel, u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, pageContextSection)
+=======
+Responde siempre en español, de forma clara y concisa.`,
+		u.Nombre, u.Email, roleDesc, u.Role, u.Agencia, u.ID, permisos, expertsSection)
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 }
 
 // ─────────────────────────────────────────────
@@ -288,6 +333,7 @@ type ToolDef struct {
 	Parameters  ToolParam `json:"parameters"`
 }
 
+<<<<<<< HEAD
 // knownPage es una pantalla a la que la IA puede navegar con el tool
 // navegar_a_pantalla — RequireRole vacío significa que cualquier rol
 // autenticado puede ir ahí.
@@ -335,6 +381,9 @@ var knownPageKeys = func() []string {
 }()
 
 func getTools(role string) []ToolDef {
+=======
+func getTools(role string, experts []models.AIExpert) []ToolDef {
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 	tools := []ToolDef{
 		{
 			Name:        "buscar_productos",
@@ -392,6 +441,7 @@ func getTools(role string) []ToolDef {
 			},
 		},
 		{
+<<<<<<< HEAD
 			Name:        "abrir_modal_reserva",
 			Description: "Abre el formulario visual de reserva en la pantalla actual del usuario, para un producto puntual — todavía NO crea la reserva, el usuario la confirma manualmente después desde el formulario real. Preferir esto sobre crear_reserva cuando hay CONTEXTO DE PANTALLA con el formulario disponible y el usuario no pidió explícitamente que reserves sin que él confirme.",
 			Parameters: ToolParam{
@@ -482,6 +532,31 @@ func getTools(role string) []ToolDef {
 				Type:       "object",
 				Properties: map[string]ToolParam{"grupo_id": {Type: "string", Description: "ID numérico del grupo"}},
 				Required:   []string{"grupo_id"},
+=======
+			Name: "generar_itinerario_pdf",
+			Description: "Genera los datos para armar el itinerario de vuelo en PDF de UNA reserva propia del usuario " +
+				"(o de su agencia si es agency_admin/admin). Identificá la reserva por el número de pedido/localizador " +
+				"si el usuario lo mencionó, o por destino/nombre de contacto si no. NUNCA le pidas al usuario el ID " +
+				"interno de la reserva — si no tenés con qué identificarla, usá mis_reservas primero o preguntá el destino/pedido.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"identificador": {Type: "string", Description: "Número de pedido/localizador, ID interno (si ya lo conocés de otra tool), o destino/nombre de contacto para buscar la reserva"},
+				},
+				Required: []string{"identificador"},
+			},
+		},
+		{
+			Name: "detalle_ruta",
+			Description: "Devuelve el detalle de vuelos/ruta de UNA reserva propia del usuario, en formato tabla, " +
+				"'listo para copiar y pegar' en un email o WhatsApp. Mismo criterio de identificación que generar_itinerario_pdf.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"identificador": {Type: "string", Description: "Número de pedido/localizador, ID interno, o destino/nombre de contacto"},
+				},
+				Required: []string{"identificador"},
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 			},
 		},
 	}
@@ -629,6 +704,25 @@ func getTools(role string) []ToolDef {
 		)
 	}
 
+	if len(experts) > 0 {
+		names := make([]string, 0, len(experts))
+		for _, e := range experts {
+			names = append(names, e.Name)
+		}
+		tools = append(tools, ToolDef{
+			Name:        "consultar_experto",
+			Description: "Consulta la base de conocimiento de un experto configurado por tu agencia (políticas, FAQs, manuales, procedimientos) para responder preguntas sobre ese contenido específico.",
+			Parameters: ToolParam{
+				Type: "object",
+				Properties: map[string]ToolParam{
+					"experto":  {Type: "string", Enum: names, Description: "Nombre exacto del experto a consultar"},
+					"pregunta": {Type: "string", Description: "Pregunta del usuario a responder con el conocimiento de ese experto"},
+				},
+				Required: []string{"experto", "pregunta"},
+			},
+		})
+	}
+
 	return tools
 }
 
@@ -646,6 +740,228 @@ func sanitizeReservationForUser(r *models.Reservation) {
 	r.Neto1 = 0
 	r.TransferID = nil
 	r.OriginalAgency = ""
+}
+
+// ─────────────────────────────────────────────
+// ITINERARIO / DETALLE DE RUTA (generar_itinerario_pdf, detalle_ruta)
+// ─────────────────────────────────────────────
+
+// DTOs de salida explícitos y deliberadamente acotados: este documento se
+// comparte con el pasajero/cliente, así que es MÁS restrictivo que
+// sanitizeReservationForUser (nunca incluye neto, op, transfer_id, notas
+// internas, doc_contable — ni siquiera para agency_admin).
+type itinerarioReservaDTO struct {
+	ID               uint   `json:"id"`
+	PedidoID         string `json:"pedido_id"`
+	Estado           string `json:"estado"`
+	ContactoNombre   string `json:"contacto_nombre"`
+	ContactoEmail    string `json:"contacto_email"`
+	ContactoTelefono string `json:"contacto_telefono"`
+	Agencia          string `json:"agencia"`
+}
+
+type itinerarioProductoDTO struct {
+	ID           uint   `json:"id"`
+	CodigoCupo   string `json:"codigo_cupo"`
+	Destino      string `json:"destino"`
+	Compania     string `json:"compania"`
+	FechaSalida  string `json:"fecha_salida"`
+	FechaRegreso string `json:"fecha_regreso"`
+	// Ruta se pasa cruda (string tal cual en Product.Ruta): el parser rico
+	// (JSON estructurado o texto GDS con heurísticas) ya vive en el frontend
+	// (ItineraryTable.parseRuta) y no debe reimplementarse acá.
+	Ruta string `json:"ruta"`
+}
+
+type itinerarioPasajeroDTO struct {
+	Nombre       string `json:"nombre"`
+	Apellido     string `json:"apellido"`
+	Documento    string `json:"documento"`
+	Nacionalidad string `json:"nacionalidad"`
+	TipoPasajero string `json:"tipo_pasajero"`
+	NumeroTicket string `json:"numero_ticket,omitempty"`
+}
+
+// buildPasajerosDTO arma la lista de pasajeros de una reserva, con fallback a
+// los campos *Pasajero sueltos de Reservation para reservas viejas creadas
+// sin desglose de pasajeros (ver comentario de Reservation.Passengers).
+func buildPasajerosDTO(reserva *models.Reservation) []itinerarioPasajeroDTO {
+	var passengers []models.Passenger
+	database.DB.Where("reservation_id = ?", reserva.ID).Order("nro desc, id asc").Find(&passengers)
+
+	if len(passengers) > 0 {
+		out := make([]itinerarioPasajeroDTO, 0, len(passengers))
+		for _, p := range passengers {
+			out = append(out, itinerarioPasajeroDTO{
+				Nombre: p.Nombre, Apellido: p.Apellido, Documento: p.Documento,
+				Nacionalidad: p.Nacionalidad, TipoPasajero: p.TipoPasajero, NumeroTicket: p.NumeroTicket,
+			})
+		}
+		return out
+	}
+	if reserva.NombrePasajero != "" {
+		return []itinerarioPasajeroDTO{{
+			Nombre: reserva.NombrePasajero, Apellido: reserva.ApellidoPasajero,
+			Documento: reserva.DocumentoPasajero, Nacionalidad: reserva.NacionalidadPasajero,
+			TipoPasajero: reserva.TipoPasajero,
+		}}
+	}
+	return []itinerarioPasajeroDTO{}
+}
+
+// resolveReservaParaItinerario busca UNA reserva accesible por el usuario a
+// partir de un identificador en texto libre (ID interno, pedido_id/localizador,
+// o texto libre como destino/nombre). El scope de propiedad/agencia se aplica
+// SIEMPRE dentro de la propia query SQL — así una reserva ajena es
+// indistinguible de una que no existe, ni siquiera vía el resultado crudo de
+// la tool se puede inferir que existe una reserva de otro usuario (mismo
+// criterio que detalle_reserva/GetReservationByID, pero "buscar primero,
+// autorizar después" no es aceptable acá porque el mensaje de error es lo
+// único que puede filtrar información).
+func resolveReservaParaItinerario(identificador string, u userCtx) (*models.Reservation, *models.Product, string) {
+	identificador = strings.TrimSpace(identificador)
+	if identificador == "" {
+		return nil, nil, "Necesito el número de pedido/localizador, o el destino de la reserva, para poder buscarla."
+	}
+
+	scoped := func() *gorm.DB {
+		q := database.DB.Model(&models.Reservation{})
+		if isRegularUser(u.Role) {
+			q = q.Where("created_by = ?", u.ID)
+		} else if u.Role == "agency_admin" {
+			q = q.Where(
+				"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?))",
+				u.Agencia, u.Agencia,
+			)
+		}
+		return q
+	}
+
+	var reservas []models.Reservation
+	seen := make(map[uint]bool)
+	addUnique := func(list []models.Reservation) {
+		for _, r := range list {
+			if !seen[r.ID] {
+				seen[r.ID] = true
+				reservas = append(reservas, r)
+			}
+		}
+	}
+
+	// 1) ID interno (si la IA ya lo obtuvo de mis_reservas/detalle_reserva antes)
+	// y 2) Pedido/localizador (parcial, case-insensitive) — se corren SIEMPRE
+	// ambas, en vez de solo intentar la segunda si la primera no dio
+	// resultados: un pedido_id que por coincidencia sea puramente numérico
+	// podría matchear el ID interno de OTRA reserva distinta, y devolver esa
+	// silenciosamente sería peor que declarar la ambigüedad y pedir precisar.
+	if id, err := strconv.ParseUint(identificador, 10, 64); err == nil {
+		var porID []models.Reservation
+		scoped().Where("id = ?", id).Limit(2).Find(&porID)
+		addUnique(porID)
+	}
+	like := "%" + strings.ToLower(identificador) + "%"
+	var porPedido []models.Reservation
+	scoped().Where("LOWER(pedido_id) LIKE ?", like).Order("created_at desc").Limit(6).Find(&porPedido)
+	addUnique(porPedido)
+
+	// 3) Texto libre: destino del producto, o nombre de contacto/pasajero
+	// (solo si las búsquedas exactas de arriba no encontraron nada)
+	if len(reservas) == 0 {
+		var porTexto []models.Reservation
+		scoped().Where(
+			"product_id IN (SELECT id FROM products WHERE LOWER(destino) LIKE ?) OR "+
+				"LOWER(contacto_nombre) LIKE ? OR LOWER(nombre_pasajero) LIKE ? OR LOWER(apellido_pasajero) LIKE ?",
+			like, like, like, like,
+		).Order("created_at desc").Limit(6).Find(&porTexto)
+		addUnique(porTexto)
+	}
+
+	if len(reservas) == 0 {
+		return nil, nil, fmt.Sprintf("No encontré ninguna reserva tuya que coincida con \"%s\".", identificador)
+	}
+	if len(reservas) > 1 {
+		var opciones []string
+		for _, r := range reservas {
+			var p models.Product
+			database.DB.Select("destino", "fecha_salida").First(&p, r.ProductID)
+			salida := ""
+			if p.FechaSalida != nil {
+				salida = p.FechaSalida.Format("02/01/2006")
+			}
+			opciones = append(opciones, fmt.Sprintf("Pedido %s (%s, salida %s)", r.PedidoID, p.Destino, salida))
+		}
+		return nil, nil, fmt.Sprintf(
+			"Encontré más de una reserva que podría coincidir con \"%s\": %s. Pedile al usuario que confirme el número de pedido o la fecha.",
+			identificador, strings.Join(opciones, "; "),
+		)
+	}
+
+	reserva := reservas[0]
+	var product models.Product
+	database.DB.First(&product, reserva.ProductID) // puede no existir / no tener Ruta — se maneja en el caller
+
+	return &reserva, &product, ""
+}
+
+// ─────────────────────────────────────────────
+// EXPERTOS — consulta de conocimiento (consultar_experto)
+// ─────────────────────────────────────────────
+
+// expertKnowledgeThreshold: por debajo de este total de caracteres de
+// conocimiento, se inyecta el Markdown completo de todos los documentos del
+// experto directo en el resultado de la tool (máxima calidad, apropiado para
+// el volumen típico de un experto de agencia — FAQs/manuales/políticas). Por
+// encima, se usan los chunks pre-calculados (ver reindexExpertChunks en
+// ai_expert_handler.go) y búsqueda por texto con pg_trgm.
+const expertKnowledgeThreshold = 50000
+const expertChunkSize = 1000
+const expertChunkOverlap = 150
+const expertChunkResultLimit = 8
+const expertChunkMinSimilarity = 0.15
+
+// gatherExpertKnowledge arma el conocimiento a devolver para consultar_experto:
+// todo el contenido si el experto está bajo el umbral, o los chunks más
+// relevantes a la pregunta (similarity de pg_trgm) si ya fue troceado.
+func gatherExpertKnowledge(expert models.AIExpert, pregunta string) (string, error) {
+	var chunkCount int64
+	database.DB.Model(&models.AIExpertChunk{}).Where("expert_id = ?", expert.ID).Count(&chunkCount)
+
+	if chunkCount == 0 {
+		var docs []models.AIExpertDocument
+		database.DB.Where("expert_id = ? AND status = 'ready'", expert.ID).Find(&docs)
+		if len(docs) == 0 {
+			return "", fmt.Errorf("este experto todavía no tiene documentos cargados")
+		}
+		var parts []string
+		for _, d := range docs {
+			parts = append(parts, fmt.Sprintf("## %s\n%s", d.FileName, d.ContentMarkdown))
+		}
+		return strings.Join(parts, "\n\n"), nil
+	}
+
+	// word_similarity(A, B) (pg_trgm) mide cuánto matchea A contra la MEJOR
+	// subcadena de B, independiente del largo de B — a diferencia de
+	// similarity() plano (comparación de trigramas del string completo),
+	// que da puntajes artificialmente bajos al comparar una pregunta corta
+	// contra un chunk largo aunque sí sea relevante. El piso mínimo evita
+	// devolver los "menos malos" chunks cuando en realidad ninguno es
+	// relevante (la IA no debe recibir contenido random etiquetado como
+	// "conocimiento" del experto).
+	var chunks []models.AIExpertChunk
+	database.DB.Raw(
+		`SELECT * FROM ai_expert_chunks
+		 WHERE expert_id = ? AND word_similarity(?, content) > ?
+		 ORDER BY word_similarity(?, content) DESC LIMIT ?`,
+		expert.ID, pregunta, expertChunkMinSimilarity, pregunta, expertChunkResultLimit,
+	).Scan(&chunks)
+	if len(chunks) == 0 {
+		return "", fmt.Errorf("no se encontró conocimiento relevante para esa pregunta")
+	}
+	var parts []string
+	for _, c := range chunks {
+		parts = append(parts, c.Content)
+	}
+	return strings.Join(parts, "\n\n---\n\n"), nil
 }
 
 // ─────────────────────────────────────────────
@@ -827,6 +1143,96 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 			sanitizeReservationForUser(&reserva)
 		}
 		b, _ := json.Marshal(reserva)
+		return string(b)
+
+	case "generar_itinerario_pdf":
+		identificador, _ := args["identificador"].(string)
+		reserva, product, errMsg := resolveReservaParaItinerario(identificador, u)
+		if errMsg != "" {
+			b, _ := json.Marshal(map[string]string{"error": errMsg})
+			return string(b)
+		}
+		result := map[string]interface{}{
+			"tipo": "itinerario_pdf",
+			"reserva": itinerarioReservaDTO{
+				ID: reserva.ID, PedidoID: reserva.PedidoID, Estado: reserva.Estado,
+				ContactoNombre: reserva.ContactoNombre, ContactoEmail: reserva.ContactoEmail,
+				ContactoTelefono: reserva.ContactoTelefono, Agencia: reserva.Agencia,
+			},
+			"pasajeros": buildPasajerosDTO(reserva),
+		}
+		if product != nil && product.ID != 0 {
+			pDTO := itinerarioProductoDTO{
+				ID: product.ID, CodigoCupo: product.CodigoCupo, Destino: product.Destino,
+				Compania: product.Compania, Ruta: product.Ruta,
+			}
+			if product.FechaSalida != nil {
+				pDTO.FechaSalida = product.FechaSalida.Format("02/01/2006")
+			}
+			if product.FechaRegreso != nil {
+				pDTO.FechaRegreso = product.FechaRegreso.Format("02/01/2006")
+			}
+			result["producto"] = pDTO
+			if product.Ruta == "" {
+				result["nota"] = "Esta reserva no tiene ruta de vuelos cargada; el itinerario se genera solo con los datos de pasajero y reserva."
+			}
+		} else {
+			result["nota"] = "No se encontró el producto asociado a esta reserva; el itinerario se genera solo con los datos de pasajero."
+		}
+		b, _ := json.Marshal(result)
+		return string(b)
+
+	case "detalle_ruta":
+		identificador, _ := args["identificador"].(string)
+		reserva, product, errMsg := resolveReservaParaItinerario(identificador, u)
+		if errMsg != "" {
+			b, _ := json.Marshal(map[string]string{"error": errMsg})
+			return string(b)
+		}
+		reservaInfo := map[string]string{"pedido_id": reserva.PedidoID}
+		result := map[string]interface{}{
+			"tipo":    "detalle_ruta",
+			"reserva": reservaInfo,
+		}
+		if product != nil && product.ID != 0 {
+			result["ruta"] = product.Ruta
+			reservaInfo["destino"] = product.Destino
+			reservaInfo["codigo_cupo"] = product.CodigoCupo
+			if product.Ruta == "" {
+				result["nota"] = "Esta reserva no tiene el detalle de ruta cargado."
+			}
+		} else {
+			result["ruta"] = ""
+			result["nota"] = "No se encontró el producto asociado a esta reserva."
+		}
+		b, _ := json.Marshal(result)
+		return string(b)
+
+	case "consultar_experto":
+		expertName, _ := args["experto"].(string)
+		pregunta, _ := args["pregunta"].(string)
+		if expertName == "" {
+			return `{"error": "Falta indicar qué experto consultar"}`
+		}
+
+		var expert models.AIExpert
+		q := database.DB.Where("LOWER(name) = LOWER(?) AND is_active = true", expertName)
+		if u.Role != "admin" {
+			q = q.Where("LOWER(agencia) = LOWER(?)", u.Agencia)
+		}
+		// Revalidación server-side obligatoria: nunca confiar en que el enum
+		// de la tool ya venía filtrado por agencia (mismo criterio defensivo
+		// que el resto de las tools).
+		if err := q.First(&expert).Error; err != nil {
+			return `{"error": "No se encontró un experto activo con ese nombre en tu agencia"}`
+		}
+
+		knowledge, err := gatherExpertKnowledge(expert, pregunta)
+		if err != nil {
+			b, _ := json.Marshal(map[string]string{"error": err.Error()})
+			return string(b)
+		}
+		b, _ := json.Marshal(map[string]string{"experto": expert.Name, "conocimiento": knowledge})
 		return string(b)
 
 	case "crear_reserva":
@@ -1892,8 +2298,40 @@ func Chat(c *gin.Context) {
 			Find(&history)
 	}
 
+<<<<<<< HEAD
 	systemPrompt := buildSystemPrompt(u, req.PageContext)
 	tools := getTools(role)
+=======
+	// Expertos activos visibles para el usuario (scopeados a su agencia,
+	// salvo admin que ve los de todas) — se ofrecen como una tool más
+	// (consultar_experto), no como un sistema paralelo.
+	var experts []models.AIExpert
+	expertsQuery := database.DB.Where("is_active = true")
+	if role != "admin" {
+		expertsQuery = expertsQuery.Where("LOWER(agencia) = LOWER(?)", u.Agencia)
+	}
+	expertsQuery.Find(&experts)
+
+	systemPrompt := buildSystemPrompt(u, experts)
+	tools := getTools(role, experts)
+
+	// Si el usuario eligió explícitamente un experto (selector en el chat),
+	// se lo indica al modelo para que priorice consultarlo en este turno —
+	// pero siempre a través de la misma tool consultar_experto, sin inyectar
+	// su conocimiento directo acá (una sola vía de acceso al conocimiento,
+	// con la revalidación de agencia que ya hace executeTool).
+	if req.ExpertID != "" {
+		for _, e := range experts {
+			if e.ID.String() == req.ExpertID {
+				systemPrompt += fmt.Sprintf(
+					"\n\nEXPERTO SELECCIONADO POR EL USUARIO: \"%s\". Priorizá consultar su conocimiento (tool consultar_experto con experto=\"%s\") para responder en este turno.",
+					e.Name, e.Name,
+				)
+				break
+			}
+		}
+	}
+>>>>>>> 022c2322cf247f00ad16c1b2b3df271b6e7c3542
 
 	// Construir mensaje inicial del usuario (con o sin imagen/es)
 	var userContent interface{}
@@ -2211,9 +2649,15 @@ func Chat(c *gin.Context) {
 			ID: uuid.New(), SessionID: sessionID, UserID: userID,
 			Role: "user", Content: req.Message,
 		})
+		var toolCallsJSON datatypes.JSON
+		if len(toolCallsSummary) > 0 {
+			if b, err := json.Marshal(toolCallsSummary); err == nil {
+				toolCallsJSON = datatypes.JSON(b)
+			}
+		}
 		database.DB.Create(&models.AIMessage{
 			ID: uuid.New(), SessionID: sessionID, UserID: userID,
-			Role: "assistant", Content: finalContent,
+			Role: "assistant", Content: finalContent, ToolCalls: toolCallsJSON,
 		})
 
 		// Auto-trim por volumen: si la sesión supera maxSessionMessages, borrar los más viejos

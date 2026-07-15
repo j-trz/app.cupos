@@ -16,6 +16,7 @@ const navItems = [
   { label: 'Disponibilidad', path: '/availability', icon: Plane },
   { label: 'Solicitudes', path: '/requests', icon: ClipboardList },
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
+  { label: 'Asistente IA', path: '/asistente', icon: Bot },
 ];
 
 // Admin-only items — cada uno declara el permiso MODULO_ACCION que lo
