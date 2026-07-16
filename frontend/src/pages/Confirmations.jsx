@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, XCircle, FileText } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
+import ItineraryPDF from '../components/ItineraryPDF.jsx';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
+import Modal from '../components/Modal.jsx';
 
 const statusLabel = (status) => status || 'Confirmado';
 
@@ -26,6 +28,39 @@ export default function Confirmations() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [routeModal, setRouteModal] = useState(null); // { codigo_cupo, destino, ruta }
+  const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
+  const [pdfLoadingId, setPdfLoadingId] = useState(null);
+  const [filters, setFilters] = useState({ temporada: '', destino: '', desde: '', hasta: '' });
+
+  const temporadaOptions = useMemo(
+    () => Array.from(new Set(data.map((d) => d.Temporada).filter(Boolean))).sort(),
+    [data]
+  );
+  const destinoOptions = useMemo(
+    () => Array.from(new Set(data.map((d) => d.Vuelo_Destino).filter(Boolean))).sort(),
+    [data]
+  );
+
+  const filteredData = useMemo(() => {
+    const desdeDate = filters.desde ? new Date(`${filters.desde}T00:00:00`) : null;
+    const hastaDate = filters.hasta ? new Date(`${filters.hasta}T23:59:59`) : null;
+
+    return data.filter((item) => {
+      if (filters.temporada && (item.Temporada || '') !== filters.temporada) return false;
+      if (filters.destino && (item.Vuelo_Destino || '') !== filters.destino) return false;
+
+      if (desdeDate || hastaDate) {
+        const salidaDate = item.Vuelo_Salida ? new Date(item.Vuelo_Salida) : null;
+        if (desdeDate && (!salidaDate || salidaDate < desdeDate)) return false;
+        if (hastaDate && (!salidaDate || salidaDate > hastaDate)) return false;
+      }
+
+      return true;
+    });
+  }, [data, filters]);
+
+  const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
+  const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
 
   const stats = useMemo(
     () => [
@@ -34,12 +69,14 @@ export default function Confirmations() {
         value: data.length,
         icon: CheckCircle2,
         description: 'Reservas ya confirmadas en el sistema.',
+        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
       },
       {
         label: 'Últimas confirmaciones',
         value: data.slice(-3).length,
         icon: TrendingUp,
         description: 'Confirmaciones registradas recientemente.',
+        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
       },
     ],
     [data],
@@ -94,6 +131,35 @@ export default function Confirmations() {
     }
   };
 
+  // getConfirmations() trae un solo par nombre/apellido por pedido (no el
+  // array completo de pasajeros) — para el itinerario buscamos el detalle
+  // completo bajo demanda; si falla, degradamos al único pasajero que ya
+  // tenemos en vez de romper.
+  const handleShowItinerary = async (item) => {
+    setPdfLoadingId(item.id);
+    const fallbackPassengers = [{ nombre: item.Nombre_Pasajero, apellido: item.Apellido_Pasajero }];
+    try {
+      const full = await ReservationService.getReservationById(item.id);
+      const passengers = Array.isArray(full?.passengers) && full.passengers.length > 0
+        ? full.passengers
+        : fallbackPassengers;
+      setPdfModalData({
+        reservation: { pedido_id: item.Pedido_ID, estado: item.Estado },
+        passengers,
+        product: { ruta: item.Ruta, destino: item.Vuelo_Destino, fecha_salida: item.Vuelo_Salida, pnr: item.Pnr, carryon: item.CarryOn, handbag: item.HandBag, checkedbag: item.CheckedBag },
+      });
+    } catch (error) {
+      console.error('Error al obtener el detalle de la reserva para el itinerario:', error);
+      setPdfModalData({
+        reservation: { pedido_id: item.Pedido_ID, estado: item.Estado },
+        passengers: fallbackPassengers,
+        product: { ruta: item.Ruta, destino: item.Vuelo_Destino, fecha_salida: item.Vuelo_Salida, pnr: item.Pnr, carryon: item.CarryOn, handbag: item.HandBag, checkedbag: item.CheckedBag },
+      });
+    } finally {
+      setPdfLoadingId(null);
+    }
+  };
+
   const formatDate = formatDateOnly;
 
   return (
@@ -114,17 +180,57 @@ export default function Confirmations() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {stats.map((item) => (
-          <StatCard
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            value={item.value}
-            description={item.description}
-          />
-        ))}
-      </div>
+      <StatsHero stats={stats} />
+
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Temporada</label>
+            <select
+              value={filters.temporada}
+              onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas</option>
+              {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Destino</label>
+            <select
+              value={filters.destino}
+              onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Salida desde</label>
+            <input
+              type="date"
+              value={filters.desde}
+              onChange={(e) => setFilters((f) => ({ ...f, desde: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Salida hasta</label>
+            <input
+              type="date"
+              value={filters.hasta}
+              onChange={(e) => setFilters((f) => ({ ...f, hasta: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+      </Card>
 
       <Card>
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
@@ -160,14 +266,14 @@ export default function Confirmations() {
                   Cargando confirmaciones...
                 </TableCell>
               </TableRow>
-            ) : data.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <TableRow>
                 <TableCell className="text-center py-10" colSpan={13}>
-                  No hay confirmaciones registradas.
+                  {hasActiveFilters ? 'No hay confirmaciones que coincidan con los filtros.' : 'No hay confirmaciones registradas.'}
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item, index) => (
+              filteredData.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="text-center font-medium">{item.Pedido_ID}</TableCell>
                   <TableCell className="text-center">{item.Agencia || '—'}</TableCell>
@@ -198,15 +304,26 @@ export default function Confirmations() {
                     <Badge variant="success">{statusLabel(item.Estado)}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleRequestCancellation(item)}
-                      title="Solicitar cancelación de esta reserva"
-                    >
-                      <XCircle className="h-3 w-3 mr-1" />
-                      Solicitar cancelación
-                    </Button>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleRequestCancellation(item)}
+                        title="Solicitar cancelación de esta reserva"
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleShowItinerary(item)}
+                        disabled={pdfLoadingId === item.id}
+                        title="Generar itinerario PDF"
+                      >
+                        <FileText className="h-4 w-4 text-blue-600" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -237,6 +354,17 @@ export default function Confirmations() {
           </div>
         </div>
       )}
+
+      {/* Modal Itinerario PDF */}
+      <Modal title="Itinerario PDF" open={!!pdfModalData} onClose={() => setPdfModalData(null)} size="3xl">
+        {pdfModalData && (
+          <ItineraryPDF
+            reservation={pdfModalData.reservation}
+            passengers={pdfModalData.passengers}
+            product={pdfModalData.product}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { UploadCloud } from 'react-feather';
 
 export default function Layout({ children, filtrosAnclados, onLogout, onFilesUploaded }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
-  
+
   return (
     <div className="min-h-screen bg-white flex flex-col w-full">
       <header

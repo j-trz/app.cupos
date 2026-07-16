@@ -8,7 +8,7 @@
 ## ✅ Solución Implementada
 
 ### Problema Original:
-- `api-login.js` usaba `SUPABASE_SERVICE_KEY` 
+- `api-login.js` usaba `SUPABASE_SERVICE_KEY`
 - `api-upload.js` usaba `SUPABASE_SERVICE_KEY` para autenticación
 - Incompatibilidad entre generación y verificación de tokens
 

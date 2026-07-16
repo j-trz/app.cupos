@@ -30,14 +30,6 @@ export class PermissionService {
   static async deletePermission(id) {
     return await ApiClient.delete(`/permissions/${id}`);
   }
-
-  static async assignPermissionToRole(roleId, permissionId) {
-    return await ApiClient.post(`/roles/${roleId}/permissions/${permissionId}`);
-  }
-
-  static async removePermissionFromRole(roleId, permissionId) {
-    return await ApiClient.delete(`/roles/${roleId}/permissions/${permissionId}`);
-  }
 }
 
 export default PermissionService;

@@ -10,7 +10,7 @@
 
 ### Backend (`backend/api/api-logic.js`)
 1. **Endpoint `/api/evolucion-pasajeros`** - Añadido filtrado completo
-2. **Endpoint `/api/destinos-compania`** - Mejorada normalización de filtros  
+2. **Endpoint `/api/destinos-compania`** - Mejorada normalización de filtros
 3. **Corrección sintaxis** - Arreglado cierre de llaves incorrecto
 
 ## 🧪 Testing Local (Backend Ya Corriendo)
@@ -33,7 +33,7 @@ npm run dev
 
 ### Paso 3: Casos de Prueba
 1. **Filtro por Temporada**: Seleccionar "Verano 2026" - TODOS los gráficos deben filtrar
-2. **Filtro por Destino**: Seleccionar "RIO" - TODOS los gráficos deben filtrar  
+2. **Filtro por Destino**: Seleccionar "RIO" - TODOS los gráficos deben filtrar
 3. **Filtros Combinados**: Temporada + Destino - Datos consistentes en todos los gráficos
 
 ### ✅ Resultado Esperado
@@ -82,7 +82,7 @@ import { getFields, getDetalleDestinos, getEvolucionPasajeros, getAgenciasData, 
 
 Tu app ahora tiene:
 ✅ **Sistema de filtros consistente y funcional**
-✅ **Backend seguro con rate limiting y sanitización**  
+✅ **Backend seguro con rate limiting y sanitización**
 ✅ **Subida de archivos robusta a Supabase**
 ✅ **Login seguro con JWT tokens**
 ✅ **UI optimizada para mejor visualización**

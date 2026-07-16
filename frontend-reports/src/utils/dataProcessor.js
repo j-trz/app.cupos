@@ -260,7 +260,7 @@ export async function getAgenciasData(filters = {}) {
             console.log(`[Depuración agencias][Filtro] Valores originales de Temporada que normalizan a '${fn}':`, originales);
         });
     }
- 
+
     // Filtro inclusivo con log de descarte detallado, ignorando 'Tipo Servicio' y 'Tipo de servicio'
     let rows = pasajerosData.filter((row, idx) => {
         let pasa = true;
@@ -958,7 +958,7 @@ export async function getDestinos(filters = {}) {
         }
     });
 
-    // --- Por compañía (sin comparativos): filtrar compañías con más de 2 caracteres --- 
+    // --- Por compañía (sin comparativos): filtrar compañías con más de 2 caracteres ---
     const vendidosCompania = {};
     const disponiblesCompania = {};
     const canceladosCompania = {};

@@ -81,7 +81,7 @@ function App() {
     }
     return filtrosRequest;
   };
-  
+
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED') {
@@ -166,7 +166,7 @@ function App() {
       if (!userId) return;
       try {
         const filtrosRequest = buildFiltersRequest(filters);
-        
+
         const evolucionPasajeros = await getEvolucionPasajeros({ userId, filters: filtrosRequest, granularidad: evolucionGranularidad });
         setChartData(evolucionPasajeros || { labels: [], datasets: [] });
       } catch (err) {
@@ -271,9 +271,9 @@ function App() {
       setIsFilterLoading(true);
       setIsLoading(true);
       setLoadingMessage('🚀 Procesando filtros y obteniendo datos...');
-      
+
       const filtrosRequest = buildFiltersRequest(filters);
-      
+
       // Enviar arrays tal cual en filters; el backend soporta arrays o cadenas separadas por coma/semicolon.
       // No incluir 'comparar' en los requests para evitar que el backend lo tome como un filtro inválido.
 
@@ -296,7 +296,7 @@ function App() {
       console.log('🔍 Debug FE -> BE detalle-destinos REQUEST:', JSON.stringify(requestBodyPreview, null, 2));
 
       setLoadingMessage('📊 Cargando datos principales en paralelo...');
-      
+
       // Peticiones paralelas (incluye por-salida)
       const [evolucionPasajeros, detalleDestinos, porSalida] = await Promise.all([
         getEvolucionPasajeros({ userId, filters: filtrosRequest, granularidad: evolucionGranularidad }),
@@ -370,7 +370,7 @@ function App() {
       const rowsDet = (detalleDestinos?.data || []);
       const uniqueDestinos = Array.from(new Set(rowsDet.map(d => d.Destino || 'Sin destino')));
       const uniqueTemporadas = Array.from(new Set(rowsDet.map(d => d.Temporada || 'Sin temporada')));
-      
+
       const buildComparativoDestino = (key, labelDefault) => {
         if (uniqueTemporadas.length > 1) {
           return {
@@ -396,7 +396,7 @@ function App() {
           }]
         };
       };
-      
+
       setDestinosVendidos(buildComparativoDestino('Lugares vendidos', 'Vendidos'));
       setDestinosDisponibles(buildComparativoDestino('Cupos tomados', 'Cupos tomados'));
       setDestinosCancelados(buildComparativoDestino('Lugares cancelados', 'Cancelados'));
@@ -406,7 +406,7 @@ function App() {
       setCuposTomadosPorDestino(buildComparativoDestino('Cupos tomados', 'Cupos tomados'));
 
       setLoadingMessage('📈 Cargando gráficos adicionales en paralelo...');
-      
+
       const additionalData = await getAdditionalChartData({
         userId,
         filters: filtrosRequest,
@@ -417,7 +417,7 @@ function App() {
       if (additionalData.destinosCompania) {
         const dc = additionalData.destinosCompania;
         const isComparativo = (obj) => obj && Array.isArray(obj.seasons) && obj.seasons.length > 1 && Array.isArray(obj.datasets);
-        
+
         // Vendidos
         setCompaniaVendidos(
           isComparativo(dc.vendidosPorCompaniaComparativo)
@@ -482,11 +482,11 @@ function App() {
       }
 
       setLoadingMessage('✅ ¡Datos cargados con optimizaciones de caché!');
-      
+
       if (additionalData.errors?.length) {
         console.warn('Algunos gráficos no se pudieron cargar:', additionalData.errors);
       }
-      
+
       setTimeout(() => {
         setIsLoading(false);
         setIsFilterLoading(false);
@@ -529,7 +529,7 @@ function App() {
 
   return (
     <Layout filtrosAnclados={filtrosAnclados} onLogout={handleLogout} onFilesUploaded={handleFilesUploaded}>
-      
+
 
       {/* Loader pantalla completa */}
       {isLoading && (

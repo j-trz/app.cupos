@@ -32,7 +32,7 @@ console.log(`🔍 DEBUG - Comparando temporada: "${cupoTemporada}" vs filtros: [
 
 ## Endpoints Corregidos
 ✅ `/api/detalle-destinos`
-✅ `/api/destinos-compania`  
+✅ `/api/destinos-compania`
 ✅ `/api/dashboard-data`
 ✅ `/api/evolucion-pasajeros` (ya estaba corregido)
 ✅ `/api/evolucion-agencias` (ya estaba corregido)

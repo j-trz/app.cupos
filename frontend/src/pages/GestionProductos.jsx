@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
@@ -16,7 +16,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -40,6 +40,7 @@ const formatMoney = (value) => {
 
 const GestionProductos = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({ agencia: '', destino: '', compania: '', temporada: '', tipo_producto: '', estado: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
@@ -53,13 +54,23 @@ const GestionProductos = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: agencies = [] } = useAgencies();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const agencyName = (code) => agencies.find((a) => a.code === code)?.name || code || '—';
   // scope=management: además del catálogo compartido y lo restringido a mi
   // agencia, también trae lo que YO cedí a otra agencia (source_agency) —
   // así la agencia cedente sigue viendo y gestionando lo que dio, aunque en
   // Disponibilidad (reserva real) ya no le aparezca.
-  const { data: productsResult, isLoading, isError } = useProducts({ search: searchTerm, scope: 'management' });
+  const { data: productsResult, isLoading, isError, isFetching } = useProducts({ search: searchTerm, scope: 'management' });
+
+  if (!can('PRODUCTS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
   // El backend devuelve el array "pelado" (no { data: [...] }) — igual que
   // consumen /products el resto de las pantallas (Nóminas, Disponibilidad,
   // Reservas). Sin este fallback, products.data siempre daba undefined y la
@@ -69,6 +80,47 @@ const GestionProductos = () => {
     : Array.isArray(productsResult?.data)
       ? productsResult.data
       : [];
+
+  // Opciones de los selects de filtro — se calculan sobre TODO el catálogo
+  // (sin aplicar los filtros todavía), para que no se vayan achicando a
+  // medida que el usuario filtra.
+  const agenciaOptions = useMemo(
+    () => Array.from(new Set(products.map((p) => p.agencia).filter(Boolean))).sort(),
+    [products]
+  );
+  const destinoOptions = useMemo(
+    () => Array.from(new Set(products.map((p) => p.destino).filter(Boolean))).sort(),
+    [products]
+  );
+  const companiaOptions = useMemo(
+    () => Array.from(new Set(products.map((p) => p.compania).filter(Boolean))).sort(),
+    [products]
+  );
+  const temporadaOptions = useMemo(
+    () => Array.from(new Set(products.map((p) => p.temporada).filter(Boolean))).sort(),
+    [products]
+  );
+  const tipoOptions = useMemo(
+    () => Array.from(new Set(products.map((p) => p.tipo_producto).filter(Boolean))).sort(),
+    [products]
+  );
+
+  const hasActiveFilters = !!(filters.agencia || filters.destino || filters.compania || filters.temporada || filters.tipo_producto || filters.estado);
+  const clearFilters = () => setFilters({ agencia: '', destino: '', compania: '', temporada: '', tipo_producto: '', estado: '' });
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (filters.agencia && p.agencia !== filters.agencia) return false;
+      if (filters.destino && p.destino !== filters.destino) return false;
+      if (filters.compania && p.compania !== filters.compania) return false;
+      if (filters.temporada && p.temporada !== filters.temporada) return false;
+      if (filters.tipo_producto && p.tipo_producto !== filters.tipo_producto) return false;
+      if (filters.estado === 'bloqueado' && !p.is_blocked_for_sale) return false;
+      if (filters.estado === 'disponible' && p.is_blocked_for_sale) return false;
+      return true;
+    });
+  }, [products, filters]);
+
   const createProductMutation = useCreateProductMutation();
   const updateProductMutation = useUpdateProduct();
   const deleteProductMutation = useDeleteProduct();
@@ -274,6 +326,14 @@ const GestionProductos = () => {
         icon={Package}
         action={
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+              disabled={isFetching}
+              title="Actualizar catálogo"
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
             <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
               <Download className="h-4 w-4 mr-2" />
               Descargar Plantilla
@@ -294,7 +354,7 @@ const GestionProductos = () => {
         title="Carga Masiva de Productos"
         open={isBulkUploadOpen}
         onClose={() => setIsBulkUploadOpen(false)}
-        size="3xl"
+        size="5xl"
       >
         <ProductBulkUpload
           onUpload={handleBulkUpload}
@@ -306,7 +366,7 @@ const GestionProductos = () => {
         title={editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
         open={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingProduct(null); }}
-        size="xl"
+        size="4xl"
       >
         <ProductForm
           onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
@@ -319,8 +379,8 @@ const GestionProductos = () => {
         />
       </Modal>
 
-      {/* Barra de búsqueda */}
-      <div className="flex items-center gap-4 mb-6">
+      {/* Barra de búsqueda y filtros */}
+      <div className="flex flex-col gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -330,12 +390,87 @@ const GestionProductos = () => {
             className="pl-8"
           />
         </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Agencia</label>
+            <select
+              value={filters.agencia}
+              onChange={(e) => setFilters((f) => ({ ...f, agencia: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas</option>
+              {agenciaOptions.map((a) => <option key={a} value={a}>{agencyName(a)}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Destino</label>
+            <select
+              value={filters.destino}
+              onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Compañía</label>
+            <select
+              value={filters.compania}
+              onChange={(e) => setFilters((f) => ({ ...f, compania: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas</option>
+              {companiaOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Temporada</label>
+            <select
+              value={filters.temporada}
+              onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas</option>
+              {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Tipo</label>
+            <select
+              value={filters.tipo_producto}
+              onChange={(e) => setFilters((f) => ({ ...f, tipo_producto: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              {tipoOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Estado</label>
+            <select
+              value={filters.estado}
+              onChange={(e) => setFilters((f) => ({ ...f, estado: e.target.value }))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              <option value="disponible">Disponible</option>
+              <option value="bloqueado">Bloqueado</option>
+            </select>
+          </div>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabla de productos */}
       {isLoading ? (
         <SkeletonTable columns={8} rows={5} />
-      ) : products.length > 0 ? (
+      ) : filteredProducts.length > 0 ? (
         <Card>
           <div className="overflow-x-auto">
             <TableComponent>
@@ -356,6 +491,10 @@ const GestionProductos = () => {
                   <TableHead>Cupo</TableHead>
                   <TableHead>Salida</TableHead>
                   <TableHead>Regreso</TableHead>
+                  <TableHead>Venc. Pago</TableHead>
+                  <TableHead>Nominación</TableHead>
+                  <TableHead>Emisión</TableHead>
+                  <TableHead>Entrada en gastos</TableHead>
                   <TableHead>Bloqueo (min)</TableHead>
                   <TableHead>Precio ADT</TableHead>
                   <TableHead>Precio INF</TableHead>
@@ -368,7 +507,7 @@ const GestionProductos = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
+                {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>
                     <TableCell>{product.tipo_producto || '—'}</TableCell>
@@ -435,6 +574,10 @@ const GestionProductos = () => {
                     <TableCell>{product.cupo || '—'}</TableCell>
                     <TableCell>{formatDate(product.fecha_salida)}</TableCell>
                     <TableCell>{formatDate(product.fecha_regreso)}</TableCell>
+                    <TableCell>{formatDate(product.vencimiento_pago)}</TableCell>
+                    <TableCell>{formatDate(product.nomination_date)}</TableCell>
+                    <TableCell>{formatDate(product.fecha_emision)}</TableCell>
+                    <TableCell>{formatDate(product.fecha_gastos)}</TableCell>
                     <TableCell>{product.bloqueo_temporal_minutos || '—'}</TableCell>
                     <TableCell>{formatMoney(product.precio)}</TableCell>
                     <TableCell>{formatMoney(product.inf_fare)}</TableCell>
@@ -480,6 +623,17 @@ const GestionProductos = () => {
             </TableComponent>
           </div>
         </Card>
+      ) : products.length > 0 ? (
+        <EmptyState
+          title="Sin resultados"
+          description="Ningún producto coincide con los filtros seleccionados."
+          icon="🔍"
+          action={
+            <Button variant="outline" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          }
+        />
       ) : (
         <EmptyState
           title="No hay productos"

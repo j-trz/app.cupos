@@ -57,7 +57,13 @@ const adaptRequest = (item) => ({
   Fecha_Registro: item.Fecha_Registro || item.fecha_registro || item.created_at || '',
   Vuelo_Codigo: item.Vuelo_Codigo || item.vuelo_codigo || item.product?.codigo_cupo || '',
   Vuelo_Compania: item.Vuelo_Compania || item.vuelo_compania || item.product?.compania || '',
-  Vuelo_Precio: item.Vuelo_Precio || item.vuelo_precio || item.product?.precio || '',
+  // El precio del pasajero principal (passengers[0].precio_venta) es la
+  // fuente de verdad — es el campo que se corrige desde "Editar Pasajero" en
+  // Nóminas/Reservas. item.Vuelo_Precio/vuelo_precio son una foto fija tomada
+  // al momento de la reserva y nunca se actualizan después, así que usarlos
+  // primero hacía que Confirmaciones mostrara un precio viejo aunque ya se
+  // hubiera corregido el del pasajero.
+  Vuelo_Precio: item.passengers?.[0]?.precio_venta || item.precio_venta || item.Vuelo_Precio || item.vuelo_precio || item.product?.precio || '',
   Usuario_Email: item.Usuario_Email || item.usuario_email || '',
   Pnr: item.Pnr || item.pnr || item.product?.pnr || '',
   Ficha: item.Ficha || item.ficha || item.ficha_venta || '',
@@ -196,6 +202,19 @@ class ReservationService {
     };
   }
 
+  // Reservas en bloqueo_temporal de TODA la agencia (no solo las propias) —
+  // el backend ya filtra por agencia y solo devuelve pedido/destino/vencimiento,
+  // nunca datos del pasajero de otro usuario.
+  static async getBlockedReservations() {
+    const result = await ApiClient.get('/orders/blocked');
+    return toArray(result).map((r) => ({
+      id: r.id,
+      Pedido_ID: r.pedido_id,
+      Vuelo_Destino: r.vuelo_destino,
+      Bloqueo_Expira_At: r.bloqueo_expira_at,
+    }));
+  }
+
   static async getConfirmations() {
     const result = await ApiClient.get('/orders');
     const all = toArray(result);
@@ -233,6 +252,17 @@ class ReservationService {
       return result;
     } catch (error) {
       console.error(`Error requesting cancellation for ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Aprobar o rechazar una solicitud de cancelación pendiente (solo admin)
+  static async resolveCancellation(id, decision, notas) {
+    try {
+      const result = await ApiClient.put(`/orders/${id}/cancel-request/resolve`, { decision, notas });
+      return result;
+    } catch (error) {
+      console.error(`Error resolving cancellation for ${id}:`, error);
       throw error;
     }
   }

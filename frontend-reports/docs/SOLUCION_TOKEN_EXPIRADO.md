@@ -7,7 +7,7 @@
 - **Causa**: JWT tokens de Supabase expiran (por defecto 1 hora)
 - **Impacto**: Usuario debe hacer login cada hora
 
-### 2. **Error 500 con Token Válido** 
+### 2. **Error 500 con Token Válido**
 - **Síntoma**: Error 500 incluso con token recién generado
 - **Causa**: Posible problema en configuración de Supabase Storage o variables de entorno
 - **Impacto**: Upload no funciona aunque autenticación sea correcta
@@ -36,7 +36,7 @@ useEffect(() => {
 // En App.jsx - Verifica token cada 5 minutos
 useEffect(() => {
   if (!token) return;
-  
+
   const checkAndRefreshToken = async () => {
     const session = await supabase.auth.getSession();
     if (session.data.session && session.data.session.access_token !== token) {
@@ -44,7 +44,7 @@ useEffect(() => {
       localStorage.setItem('token', session.data.session.access_token);
     }
   };
-  
+
   const interval = setInterval(checkAndRefreshToken, 5 * 60 * 1000);
   return () => clearInterval(interval);
 }, [token]);
@@ -107,7 +107,7 @@ NODE_ENV=production
    CREATE POLICY "Allow upload for authenticated users" ON storage.objects
    FOR INSERT TO authenticated
    WITH CHECK (bucket_id = 'archivos-cupos');
-   
+
    -- Permitir update para usuarios autenticados
    CREATE POLICY "Allow update for authenticated users" ON storage.objects
    FOR UPDATE TO authenticated

@@ -10,16 +10,16 @@ const LoadingSpinner = ({ message = "Cargando datos...", fullScreen = false }) =
             <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600 mx-auto"></div>
             <div className="absolute inset-0 w-16 h-16 border-2 border-indigo-300 rounded-full animate-ping mx-auto mt-2"></div>
           </div>
-          
+
           {/* Mensaje */}
           <div className="text-lg font-semibold text-gray-700 mb-2">{message}</div>
           <div className="text-sm text-gray-500">Por favor espera...</div>
-          
+
           {/* Barra de progreso animada */}
           <div className="w-64 h-2 bg-gray-200 rounded-full mt-6 mx-auto overflow-hidden">
             <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full animate-pulse"></div>
           </div>
-          
+
           {/* Puntos animados */}
           <div className="flex justify-center space-x-2 mt-6">
             <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>

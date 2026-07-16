@@ -47,9 +47,10 @@ func warnExpiringReservations(now time.Time) int {
 
 	for i := range reservations {
 		r := &reservations[i]
-		services.NotifyUser(r.CreatedBy, nil, "warning", "Tu reserva está por vencer",
+		services.NotifyUserByCode(r.CreatedBy, nil, r.Agencia, "reservation_expiring_soon", "Tu reserva está por vencer",
 			fmt.Sprintf("La reserva del pedido %s vence en menos de %d minutos. Confirmala o el cupo se liberará automáticamente.",
-				r.PedidoID, int(warningWindow.Minutes())))
+				r.PedidoID, int(warningWindow.Minutes())),
+			map[string]string{"pedido_id": r.PedidoID, "minutos": fmt.Sprintf("%d", int(warningWindow.Minutes()))})
 
 		if recipient := services.ResolveReservationRecipientEmail(r.CreatedBy); recipient != "" {
 			if err := services.SendTemplateEmail(r.Agencia, "reservation_expiring_soon", recipient, map[string]string{
@@ -57,7 +58,9 @@ func warnExpiringReservations(now time.Time) int {
 				"contacto_nombre": r.NombrePasajero,
 				"minutos":         fmt.Sprintf("%d", int(warningWindow.Minutes())),
 			}); err != nil {
-				services.LogFailure("email", fmt.Sprintf("No se pudo enviar aviso de vencimiento para pedido %s: %s", r.PedidoID, err.Error()))
+				services.LogFailure("email",
+					fmt.Sprintf("No se pudo enviar el aviso de vencimiento para el pedido %s", r.PedidoID),
+					fmt.Sprintf("pedido=%s error=%s", r.PedidoID, err.Error()))
 			}
 		}
 
@@ -92,17 +95,21 @@ func expireOverdueReservations(now time.Time) int {
 		database.DB.Model(&models.Reservation{}).Where("id = ?", r.ID).Update("estado", models.EstadoExpirada)
 		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", r.ID).Update("estado", models.EstadoExpirada)
 
-		services.NotifyUser(r.CreatedBy, nil, "warning", "Tu reserva expiró",
-			fmt.Sprintf("La reserva del pedido %s expiró por vencimiento del bloqueo temporal y el cupo fue liberado.", r.PedidoID))
-		services.NotifyRole("admin", nil, "warning", "Reserva expirada",
-			fmt.Sprintf("La reserva del pedido %s (agencia %s) expiró automáticamente por vencimiento de bloqueo", r.PedidoID, r.Agencia))
+		services.NotifyUserByCode(r.CreatedBy, nil, r.Agencia, "reservation_expired_user", "Tu reserva expiró",
+			fmt.Sprintf("La reserva del pedido %s expiró por vencimiento del bloqueo temporal y el cupo fue liberado.", r.PedidoID),
+			map[string]string{"pedido_id": r.PedidoID})
+		services.NotifyRoleByCode("admin", nil, "reservation_expired_admin", "Reserva expirada",
+			fmt.Sprintf("La reserva del pedido %s (agencia %s) expiró automáticamente por vencimiento de bloqueo", r.PedidoID, r.Agencia),
+			map[string]string{"pedido_id": r.PedidoID, "agencia": r.Agencia})
 
 		if recipient := services.ResolveReservationRecipientEmail(r.CreatedBy); recipient != "" {
 			if err := services.SendTemplateEmail(r.Agencia, "reservation_expired", recipient, map[string]string{
 				"pedido_id":       r.PedidoID,
 				"contacto_nombre": r.NombrePasajero,
 			}); err != nil {
-				services.LogFailure("email", fmt.Sprintf("No se pudo enviar email de expiración para pedido %s: %s", r.PedidoID, err.Error()))
+				services.LogFailure("email",
+					fmt.Sprintf("No se pudo enviar el email de expiración para el pedido %s", r.PedidoID),
+					fmt.Sprintf("pedido=%s error=%s", r.PedidoID, err.Error()))
 			}
 		}
 

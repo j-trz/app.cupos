@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
 import ReservationService from '../services/reservationService';
+import { useAuth } from '../contexts/AuthContext';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryPDF from '../components/ItineraryPDF.jsx';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 
@@ -47,19 +49,6 @@ const formatMoney = (value) => {
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const formatExpiry = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  const now = new Date();
-  const diffMs = date - now;
-  if (diffMs <= 0) return { label: 'Expirado', color: 'text-red-600' };
-  const diffH = Math.floor(diffMs / 3600000);
-  const diffM = Math.floor((diffMs % 3600000) / 60000);
-  if (diffH < 1) return { label: `${diffM}m restantes`, color: 'text-orange-500' };
-  if (diffH < 24) return { label: `${diffH}h ${diffM}m restantes`, color: 'text-yellow-600' };
-  return { label: `${Math.floor(diffH / 24)}d restantes`, color: 'text-green-600' };
-};
-
 const getEstadoVariant = (estado) => {
   if (estado === 'confirmado' || estado === 'confirmada') return 'success';
   if (estado === 'procesando') return 'warning';
@@ -81,6 +70,13 @@ const getEstadoLabel = (estado) => ({
   expirada: 'Expirada',
   cedido: 'Cedido a otra agencia',
 }[estado] || estado || '—');
+
+// Comparación de códigos de agencia case/espacio-insensible — igual que el
+// backend (strings.EqualFold en product_handler.go). Sin esto, una diferencia
+// de mayúsculas entre el código de agencia del producto y el de la reserva
+// (mismo código, distinta forma guardada históricamente) hacía ver
+// "Compartido — de X" en reservas que en realidad son 100% propias.
+const sameAgency = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
 
 // Explota una reserva (pedido) en filas — una por pasajero. Contacto y
 // pasajero quedan separados: el contacto es quien figura en la reserva, cada
@@ -137,6 +133,8 @@ function Field({ label, required, hint, children }) {
 const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function GestionReservas() {
+  const { can } = useAuth();
+  useCountdownTick(); // hace que la cuenta regresiva de vencimiento avance sola
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -370,6 +368,40 @@ export default function GestionReservas() {
     }
   };
 
+  // Aprobar/rechazar una solicitud de cancelación pendiente (solo admin) —
+  // pide notas opcionales antes de confirmar la decisión.
+  const handleResolveCancellation = async (r, decision) => {
+    const isApprove = decision === 'approve';
+    const { value: notas, isConfirmed } = await Swal.fire({
+      title: isApprove ? '¿Aprobar la cancelación?' : '¿Rechazar la cancelación?',
+      text: isApprove
+        ? `Se cancelará el pedido ${r.pedido_id} y se liberará el cupo.`
+        : `El pedido ${r.pedido_id} volverá a su estado anterior.`,
+      input: 'textarea',
+      inputLabel: 'Notas (opcional)',
+      inputPlaceholder: 'Motivo o comentario para dejar registrado...',
+      icon: isApprove ? 'warning' : 'question',
+      showCancelButton: true,
+      confirmButtonText: isApprove ? 'Aprobar' : 'Rechazar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: isApprove ? '#059669' : '#d33',
+    });
+    if (!isConfirmed) return;
+
+    try {
+      await ReservationService.resolveCancellation(r.id, decision, notas || '');
+      Swal.fire({
+        icon: 'success',
+        title: isApprove ? 'Cancelación aprobada' : 'Cancelación rechazada',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo resolver la solicitud' });
+    }
+  };
+
   // Elimina el pasajero de ESA fila únicamente — un pedido puede tener varios
   // pasajeros y cada uno es su propio ticket individual una vez reservado,
   // aunque se hayan creado juntos. Solo si es el último pasajero del pedido
@@ -449,6 +481,16 @@ export default function GestionReservas() {
     [filtered]
   );
 
+  if (!can('RESERVATIONS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -468,18 +510,31 @@ export default function GestionReservas() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard icon={BarChart3} label="Total reservas" value={filtered.length}
-          description={estadoFilter !== 'Todas' ? `Filtrado: ${getEstadoLabel(estadoFilter)}` : 'Cantidad total'} />
-        <StatCard icon={Ticket} label="Pasajeros" value={totalPassengers}
-          description="Tickets individuales (incluye acompañantes)" />
-        <StatCard icon={CheckCircle} label="Confirmadas"
-          value={filtered.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada').length}
-          description="Reservas confirmadas" />
-        <StatCard icon={Calendar} label="Pendientes"
-          value={filtered.filter(r => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length}
-          description="En proceso" />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            icon: Ticket,
+            label: 'Pasajeros',
+            value: totalPassengers,
+            description: 'Tickets individuales',
+            color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+          },
+          {
+            icon: CheckCircle,
+            label: 'Confirmadas',
+            value: filtered.filter(r => r.estado === 'confirmado' || r.estado === 'confirmada').length,
+            description: 'Reservas confirmadas',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+          {
+            icon: Calendar,
+            label: 'Pendientes',
+            value: filtered.filter(r => r.estado === 'bloqueo_temporal' || r.estado === 'procesando').length,
+            description: 'En proceso',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+        ]}
+      />
 
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
@@ -608,7 +663,7 @@ export default function GestionReservas() {
                       // stock, sin fila espejo): esta reserva la tomó otra
                       // agencia distinta a la dueña del producto.
                       const ownerAgencia = products.find(p => p.id === r.product_id)?.agencia;
-                      return ownerAgencia && r.agencia && r.agencia !== ownerAgencia ? (
+                      return ownerAgencia && r.agencia && !sameAgency(r.agencia, ownerAgencia) ? (
                         <Badge variant="outline" className="w-fit text-[10px]">
                           Compartido — de {agencyName(ownerAgencia)}
                         </Badge>
@@ -646,7 +701,17 @@ export default function GestionReservas() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
-                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && (
+                      {r.estado === 'solicitud_cancelacion' && (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => handleResolveCancellation(r, 'approve')} title="Aprobar cancelación">
+                            <ThumbsUp className="h-4 w-4 text-emerald-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleResolveCancellation(r, 'decline')} title="Rechazar cancelación">
+                            <ThumbsDown className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </>
+                      )}
+                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && (
                         <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar pedido completo">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         </Button>
@@ -664,7 +729,16 @@ export default function GestionReservas() {
                         <Button variant="ghost" size="sm" onClick={() => {
                           const reservation = r;
                           const passengers = [row]; // Pasamos el pasajero de esta fila
-                          const product = { ruta: r.vuelo_ruta, destino: r.vuelo_destino };
+                          const liveProduct = products.find(p => p.id === r.product_id);
+                          const product = {
+                            ruta: r.vuelo_ruta,
+                            destino: r.vuelo_destino,
+                            fecha_salida: r.vuelo_salida,
+                            pnr: liveProduct?.pnr,
+                            carryon: liveProduct?.carryon,
+                            handbag: liveProduct?.handbag,
+                            checkedbag: liveProduct?.checkedbag,
+                          };
                           setPdfModalData({ reservation, passengers, product });
                         }} title="Generar Itinerario">
                           <FileText className="h-4 w-4 text-blue-600" />

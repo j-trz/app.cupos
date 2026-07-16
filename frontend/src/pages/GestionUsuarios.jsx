@@ -6,16 +6,18 @@ import Button from '../components/ui/Button.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import UserForm from '../components/UserForm';
-import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle, Lock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
 
 const GestionUsuarios = () => {
+  const { can } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -90,7 +92,7 @@ const GestionUsuarios = () => {
   const handleEditUser = (user) => {
     setEditingUser(user);
     setSelectedPermissions(user.permissions || []);
-    setSelectedRole(user.roleId || user.rol);
+    setSelectedRole(user.role_id || null);
     setIsModalOpen(true);
   };
 
@@ -114,6 +116,16 @@ const GestionUsuarios = () => {
 
   const activeCount = users.filter(u => u.activo).length;
   const inactiveCount = users.length - activeCount;
+
+  if (!can('USERS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
 
   if (isError) {
     return (
@@ -150,26 +162,31 @@ const GestionUsuarios = () => {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={Users}
-          label="Total usuarios"
-          value={users.length}
-          description="Cantidad total de usuarios registrados."
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Activos"
-          value={activeCount}
-          description="Usuarios con estado activo."
-        />
-        <StatCard
-          icon={XCircle}
-          label="Inactivos"
-          value={inactiveCount}
-          description="Usuarios con estado inactivo."
-        />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            icon: Users,
+            label: 'Total usuarios',
+            value: users.length,
+            description: 'Cantidad total de usuarios registrados.',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+          },
+          {
+            icon: CheckCircle,
+            label: 'Activos',
+            value: activeCount,
+            description: 'Usuarios con estado activo.',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+          {
+            icon: XCircle,
+            label: 'Inactivos',
+            value: inactiveCount,
+            description: 'Usuarios con estado inactivo.',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+        ]}
+      />
 
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
@@ -225,7 +242,12 @@ const GestionUsuarios = () => {
                     {user.nombre} {user.apellido}
                   </TableCell>
                   <TableCell className="text-center">{user.email}</TableCell>
-                  <TableCell className="text-center">{user.role}</TableCell>
+                  <TableCell className="text-center">
+                    {user.role_name || user.role}
+                    {user.role_name && (
+                      <span className="block text-xs text-slate-400">{user.role}</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">{user.agencia || '—'}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant={user.activo ? 'success' : 'danger'}>

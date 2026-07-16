@@ -7,15 +7,16 @@ import { useState, useEffect } from 'react';
 import {
     Bot, Plus, Edit2, Trash2, TestTube, Key,
     Activity, MessageSquare, Save, X, Eye, EyeOff, RefreshCw,
-    Zap, CheckCircle, Sparkles
+    Zap, CheckCircle, Lock, Sparkles
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import AIService from '../services/aiService';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import ExpertsTab from '../components/AIExperts/ExpertsTab';
@@ -154,23 +155,20 @@ const PROVIDER_TYPES = [
 
 const TABS = [
     { id: 'providers', label: 'Proveedores', icon: Key },
-    { id: 'actions', label: 'Acciones', icon: Zap },
     { id: 'experts', label: 'Expertos', icon: Sparkles },
     { id: 'stats', label: 'Estadísticas', icon: Activity },
     { id: 'logs', label: 'Logs', icon: MessageSquare }
 ];
 
 export default function AIConfig() {
+    const { can } = useAuth();
     const [activeTab, setActiveTab] = useState('providers');
     const [providers, setProviders] = useState([]);
-    const [actions, setActions] = useState([]);
     const [stats, setStats] = useState(null);
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showProviderForm, setShowProviderForm] = useState(false);
-    const [showActionForm, setShowActionForm] = useState(false);
     const [editingProvider, setEditingProvider] = useState(null);
-    const [editingAction, setEditingAction] = useState(null);
     const [showApiKey, setShowApiKey] = useState(false);
     const [testResult, setTestResult] = useState(null);
     const [statsDays, setStatsDays] = useState(30);
@@ -187,18 +185,7 @@ export default function AIConfig() {
         is_default: false
     };
 
-    const emptyAction = {
-        name: '',
-        description: '',
-        action_type: 'api_call',
-        endpoint: '',
-        method: 'GET',
-        parameters: {},
-        is_active: true
-    };
-
     const [providerForm, setProviderForm] = useState(emptyProvider);
-    const [actionForm, setActionForm] = useState(emptyAction);
 
     useEffect(() => {
         loadData();
@@ -210,9 +197,6 @@ export default function AIConfig() {
             if (activeTab === 'providers') {
                 const response = await AIService.getProviders();
                 setProviders(response.providers || []);
-            } else if (activeTab === 'actions') {
-                const response = await AIService.getActions();
-                setActions(response.actions || []);
             } else if (activeTab === 'experts') {
                 // ExpertsTab maneja su propia carga — no-op acá, solo para
                 // que el spinner de isLoading no quede en true de más.
@@ -282,55 +266,6 @@ export default function AIConfig() {
         }
     };
 
-    const handleSaveAction = async (e) => {
-        e.preventDefault();
-        try {
-            // Parsear parameters si es string
-            const formData = {
-                ...actionForm,
-                parameters: typeof actionForm.parameters === 'string'
-                    ? JSON.parse(actionForm.parameters || '{}')
-                    : actionForm.parameters
-            };
-
-            if (editingAction) {
-                await AIService.updateAction(editingAction.id, formData);
-                Swal.fire('Actualizado', 'Acción actualizada correctamente', 'success');
-            } else {
-                await AIService.createAction(formData);
-                Swal.fire('Creada', 'Acción creada correctamente', 'success');
-            }
-            setShowActionForm(false);
-            setEditingAction(null);
-            setActionForm(emptyAction);
-            loadData();
-        } catch (error) {
-            Swal.fire('Error', error.message || 'Error al guardar acción', 'error');
-        }
-    };
-
-    const handleDeleteAction = async (action) => {
-        const result = await Swal.fire({
-            title: '¿Eliminar acción?',
-            text: `¿Estás seguro de eliminar ${action.name}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc2626',
-            confirmButtonText: 'Eliminar',
-            cancelButtonText: 'Cancelar'
-        });
-
-        if (result.isConfirmed) {
-            try {
-                await AIService.deleteAction(action.id);
-                Swal.fire('Eliminada', 'Acción eliminada correctamente', 'success');
-                loadData();
-            } catch (error) {
-                Swal.fire('Error', error.message || 'Error al eliminar', 'error');
-            }
-        }
-    };
-
     const openEditProvider = (provider) => {
         setEditingProvider(provider);
         setProviderForm({
@@ -340,14 +275,15 @@ export default function AIConfig() {
         setShowProviderForm(true);
     };
 
-    const openEditAction = (action) => {
-        setEditingAction(action);
-        setActionForm({
-            ...action,
-            parameters: JSON.stringify(action.parameters, null, 2)
-        });
-        setShowActionForm(true);
-    };
+    if (!can('AI_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -367,26 +303,24 @@ export default function AIConfig() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={Bot}
-                    label="Proveedores"
-                    value={providers.length}
-                    description="Proveedores de IA configurados."
-                />
-                <StatCard
-                    icon={Zap}
-                    label="Acciones"
-                    value={actions.length}
-                    description="Acciones del agente IA."
-                />
-                <StatCard
-                    icon={MessageSquare}
-                    label="Sesiones"
-                    value={stats?.total_sessions || 0}
-                    description="Total de sesiones de chat."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: Bot,
+                        label: 'Proveedores',
+                        value: providers.length,
+                        description: 'Proveedores de IA configurados.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: MessageSquare,
+                        label: 'Sesiones',
+                        value: stats?.total_sessions || 0,
+                        description: 'Total de sesiones de chat.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                ]}
+            />
 
             {/* Tabs */}
             <div className="flex flex-wrap gap-2 border-b border-slate-200">
@@ -634,156 +568,6 @@ export default function AIConfig() {
 
                                         <div className="flex justify-end gap-2 pt-4 border-t">
                                             <Button type="button" variant="outline" onClick={() => setShowProviderForm(false)}>
-                                                Cancelar
-                                            </Button>
-                                            <Button type="submit">
-                                                <Save className="w-4 h-4 mr-2" />
-                                                Guardar
-                                            </Button>
-                                        </div>
-                                    </form>
-                                </Card>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Tab: Acciones */}
-                    {activeTab === 'actions' && (
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-lg font-semibold">Acciones del Agente IA</h2>
-                                <Button onClick={() => { setShowActionForm(true); setEditingAction(null); setActionForm(emptyAction); }}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Agregar Acción
-                                </Button>
-                            </div>
-
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {actions.length === 0 ? (
-                                    <Card className="p-6 text-center text-gray-500 md:col-span-3">
-                                        No hay acciones configuradas.
-                                    </Card>
-                                ) : (
-                                    actions.map(action => (
-                                        <Card key={action.id} className="p-4">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <Zap className={`w-5 h-5 ${action.is_active ? 'text-yellow-500' : 'text-gray-400'}`} />
-                                                    <h3 className="font-semibold">{action.name}</h3>
-                                                </div>
-                                                <div className="flex gap-1">
-                                                    <button onClick={() => openEditAction(action)} className="p-1 text-gray-400 hover:text-blue-500">
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => handleDeleteAction(action)} className="p-1 text-gray-400 hover:text-red-500">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <p className="text-sm text-gray-500 mb-2">{action.description}</p>
-                                            <div className="flex items-center gap-2 text-xs text-gray-400">
-                                                <span className="px-2 py-0.5 bg-gray-100 rounded">{action.action_type}</span>
-                                                <span className="px-2 py-0.5 bg-gray-100 rounded">{action.method}</span>
-                                            </div>
-                                        </Card>
-                                    ))
-                                )}
-                            </div>
-
-                            {/* Formulario de acción */}
-                            {showActionForm && (
-                                <Card className="p-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-semibold">
-                                            {editingAction ? 'Editar Acción' : 'Nueva Acción'}
-                                        </h3>
-                                        <button onClick={() => setShowActionForm(false)} className="text-gray-400 hover:text-gray-600">
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                    </div>
-
-                                    <form onSubmit={handleSaveAction} className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">Nombre</label>
-                                                <Input
-                                                    required
-                                                    value={actionForm.name}
-                                                    onChange={(e) => setActionForm({ ...actionForm, name: e.target.value })}
-                                                    placeholder="Ej: search_reservations"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">Tipo</label>
-                                                <select
-                                                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800"
-                                                    value={actionForm.action_type}
-                                                    onChange={(e) => setActionForm({ ...actionForm, action_type: e.target.value })}
-                                                >
-                                                    <option value="api_call">API Call</option>
-                                                    <option value="database_query">Database Query</option>
-                                                    <option value="custom_function">Custom Function</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium mb-1">Descripción</label>
-                                                <textarea
-                                                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800"
-                                                    rows={2}
-                                                    value={actionForm.description}
-                                                    onChange={(e) => setActionForm({ ...actionForm, description: e.target.value })}
-                                                    placeholder="Descripción de lo que hace la acción..."
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">Endpoint</label>
-                                                <Input
-                                                    value={actionForm.endpoint}
-                                                    onChange={(e) => setActionForm({ ...actionForm, endpoint: e.target.value })}
-                                                    placeholder="/api/reservations"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">Método</label>
-                                                <select
-                                                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800"
-                                                    value={actionForm.method}
-                                                    onChange={(e) => setActionForm({ ...actionForm, method: e.target.value })}
-                                                >
-                                                    <option value="GET">GET</option>
-                                                    <option value="POST">POST</option>
-                                                    <option value="PUT">PUT</option>
-                                                    <option value="DELETE">DELETE</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium mb-1">Parámetros (JSON)</label>
-                                                <textarea
-                                                    className="w-full px-3 py-2 border rounded-lg font-mono text-sm bg-white dark:bg-gray-800"
-                                                    rows={4}
-                                                    value={typeof actionForm.parameters === 'string' ? actionForm.parameters : JSON.stringify(actionForm.parameters, null, 2)}
-                                                    onChange={(e) => setActionForm({ ...actionForm, parameters: e.target.value })}
-                                                    placeholder='{"param1": "description"}'
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={actionForm.is_active}
-                                                onChange={(e) => setActionForm({ ...actionForm, is_active: e.target.checked })}
-                                            />
-                                            <span className="text-sm">Activa</span>
-                                        </label>
-
-                                        <div className="flex justify-end gap-2 pt-4 border-t">
-                                            <Button type="button" variant="outline" onClick={() => setShowActionForm(false)}>
                                                 Cancelar
                                             </Button>
                                             <Button type="submit">

@@ -1,14 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy, Plus } from 'lucide-react';
+import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy, Plus, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
 import ReservationService from '../services/reservationService';
+import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import Modal from '../components/Modal.jsx';
@@ -106,6 +107,25 @@ const getEstadoLabel = (estado) => ({
   solicitud_cancelacion: 'Sol. Cancelación',
   procesando: 'Procesando',
 }[estado] || estado || '—');
+
+// Comparación de códigos de agencia case/espacio-insensible — igual que el
+// backend (strings.EqualFold) en product_handler.go. Sin esto, una diferencia
+// de mayúsculas entre Product.Agencia y Reservation.Agencia (mismo código,
+// distinta forma guardada históricamente) hacía ver "Compartido — otra
+// agencia" en reservas que en realidad son 100% propias de esa agencia.
+const sameAgency = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
+// Adulto/Menor/Infante -> ADT/CHD/INF, la nomenclatura estándar de la industria.
+const TIPO_PASAJERO_CODES = { Adulto: 'ADT', Menor: 'CHD', Infante: 'INF' };
+
+const countPassengerTypes = (passengerRows) => {
+  const counts = { ADT: 0, CHD: 0, INF: 0 };
+  passengerRows.forEach((row) => {
+    const code = TIPO_PASAJERO_CODES[row.tipoPasajero];
+    if (code) counts[code]++;
+  });
+  return counts;
+};
 
 // ─── Excel export ────────────────────────────────────────────────────────────
 // Una fila por pasajero (no por reserva), con absolutamente todos los datos.
@@ -234,6 +254,8 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
     [reservations]
   );
 
+  const tipoCounts = useMemo(() => countPassengerTypes(passengerRows), [passengerRows]);
+
   return (
     <Card className="overflow-hidden">
       {/* Header row — always visible */}
@@ -262,8 +284,10 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Pasajeros</p>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{passengerRows.length}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">ADT · CHD · INF</p>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {tipoCounts.ADT} · {tipoCounts.CHD} · {tipoCounts.INF}
+            </p>
           </div>
           <div className="hidden sm:flex gap-2 flex-wrap">
             <Badge variant="success" className="text-xs">
@@ -296,6 +320,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                 <TableHead>Tipo</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Agencia</TableHead>
+                <TableHead>Origen</TableHead>
                 <TableHead>Contacto</TableHead>
                 <TableHead>Email Contacto</TableHead>
                 <TableHead>Tel. Contacto</TableHead>
@@ -332,24 +357,21 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                     </Badge>
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">
+                    {agencyName(row.agencia)}
+                  </TableCell>
+                  <TableCell>
                     {row.originalAgency ? (
-                      <div className="flex flex-col gap-1">
-                        <span>{agencyName(row.agencia)}</span>
-                        <Badge variant="outline" className="w-fit text-[10px]">
-                          Cupo de {agencyName(row.originalAgency)}
-                        </Badge>
-                      </div>
-                    ) : product?.agencia && row.agencia && row.agencia !== product.agencia ? (
+                      <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                        Cupo de {agencyName(row.originalAgency)}
+                      </Badge>
+                    ) : product?.agencia && row.agencia && !sameAgency(row.agencia, product.agencia) ? (
                       // Producto compartido (visibilidad multi-agencia, mismo
                       // stock): esta reserva la tomó otra agencia, no la dueña.
-                      <div className="flex flex-col gap-1">
-                        <span>{agencyName(row.agencia)}</span>
-                        <Badge variant="outline" className="w-fit text-[10px]">
-                          Compartido — reservado por otra agencia
-                        </Badge>
-                      </div>
+                      <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                        Compartido — otra agencia
+                      </Badge>
                     ) : (
-                      agencyName(row.agencia)
+                      <span className="text-zinc-300 dark:text-zinc-600" title="Producto propio">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>
@@ -416,11 +438,13 @@ const EMPTY_PASSENGER_FORM = {
 };
 
 export default function GestionNominas() {
+  const { can } = useAuth();
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState({ temporada: '', destino: '', desde: '', hasta: '' });
   const [editingRow, setEditingRow] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_PASSENGER_FORM);
   const [savingPassenger, setSavingPassenger] = useState(false);
@@ -613,17 +637,62 @@ export default function GestionNominas() {
     return map;
   }, [reservations]);
 
-  // Products that have at least one reservation, filtered by search
+  // Productos con al menos una reserva — insumo para las opciones de los
+  // filtros de Temporada/Destino (no cambian según lo que ya esté filtrado).
+  const productsWithReservations = useMemo(
+    () => Object.keys(grouped).map((pid) => products.find((p) => String(p.id) === pid)).filter(Boolean),
+    [grouped, products]
+  );
+  const temporadaOptions = useMemo(
+    () => Array.from(new Set(productsWithReservations.map((p) => p.temporada).filter(Boolean))).sort(),
+    [productsWithReservations]
+  );
+  const destinoOptions = useMemo(
+    () => Array.from(new Set(productsWithReservations.map((p) => p.destino).filter(Boolean))).sort(),
+    [productsWithReservations]
+  );
+
+  // Products that have at least one reservation, filtered por búsqueda,
+  // temporada, destino y rango de fecha de salida. Por defecto sólo se
+  // muestran las salidas que todavía no ocurrieron; si el usuario define
+  // explícitamente "desde"/"hasta" se levanta esa restricción para permitir
+  // traer el histórico (ej. para consultar una salida ya cumplida).
   const filteredProductIds = useMemo(() => {
+    const hasExplicitDateFilter = !!(filters.desde || filters.hasta);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const desdeDate = filters.desde ? new Date(`${filters.desde}T00:00:00`) : null;
+    const hastaDate = filters.hasta ? new Date(`${filters.hasta}T23:59:59`) : null;
+
     return Object.keys(grouped).filter((pid) => {
-      if (!search.trim()) return true;
       const product = products.find((p) => String(p.id) === pid);
-      const destino = (product?.destino || '').toLowerCase();
-      const codigo = (product?.codigo_cupo || '').toLowerCase();
-      const q = search.toLowerCase();
-      return destino.includes(q) || codigo.includes(q);
+
+      if (search.trim()) {
+        const destino = (product?.destino || '').toLowerCase();
+        const codigo = (product?.codigo_cupo || '').toLowerCase();
+        const q = search.toLowerCase();
+        if (!destino.includes(q) && !codigo.includes(q)) return false;
+      }
+
+      if (filters.temporada && (product?.temporada || '') !== filters.temporada) return false;
+      if (filters.destino && (product?.destino || '') !== filters.destino) return false;
+
+      const fechaSalidaRaw = product?.fecha_salida || product?.salida;
+      const salidaDate = fechaSalidaRaw ? new Date(fechaSalidaRaw) : null;
+
+      if (hasExplicitDateFilter) {
+        if (desdeDate && (!salidaDate || salidaDate < desdeDate)) return false;
+        if (hastaDate && (!salidaDate || salidaDate > hastaDate)) return false;
+      } else if (salidaDate && salidaDate < today) {
+        return false;
+      }
+
+      return true;
     });
-  }, [grouped, products, search]);
+  }, [grouped, products, search, filters]);
+
+  const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
+  const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
 
   // Stats
   const totalProducts = Object.keys(grouped).length;
@@ -636,6 +705,16 @@ export default function GestionNominas() {
     () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
     [reservations]
   );
+
+  if (!can('RESERVATIONS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -671,43 +750,98 @@ export default function GestionNominas() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 sm:grid-cols-4 gap-4">
-        <StatCard
-          label="Productos con reservas"
-          value={loading ? '—' : totalProducts}
-          icon={Package}
-          description="Productos que tienen al menos una reserva."
-        />
-        <StatCard
-          label="Total reservas"
-          value={loading ? '—' : totalReservations}
-          icon={ClipboardList}
-          description="Cantidad total de reservas registradas."
-        />
-        <StatCard
-          label="Pasajeros"
-          value={loading ? '—' : totalPassengers}
-          icon={Users}
-          description="Pasajeros desglosados (incluye acompañantes)."
-        />
-        <StatCard
-          label="Confirmadas"
-          value={loading ? '—' : totalConfirmed}
-          icon={CheckCircle2}
-          description="Reservas en estado confirmado."
-        />
-      </div>
+      <StatsHero
+        stats={[
+          {
+            label: 'Productos con reservas',
+            value: loading ? '—' : totalProducts,
+            icon: Package,
+            description: 'Productos que tienen al menos una reserva.',
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+          },
+          {
+            label: 'Pasajeros',
+            value: loading ? '—' : totalPassengers,
+            icon: Users,
+            description: 'Pasajeros desglosados (incluye acompañantes).',
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+          },
+          {
+            label: 'Confirmadas',
+            value: loading ? '—' : totalConfirmed,
+            icon: CheckCircle2,
+            description: 'Reservas en estado confirmado.',
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+          },
+        ]}
+      />
 
       {/* Search/filter */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Filtrar por destino o código de cupo..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
-        />
+      <div className="flex flex-col gap-3">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Filtrar por destino o código de cupo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Temporada</label>
+            <select
+              value={filters.temporada}
+              onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            >
+              <option value="">Todas</option>
+              {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Destino</label>
+            <select
+              value={filters.destino}
+              onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            >
+              <option value="">Todos</option>
+              {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida desde</label>
+            <input
+              type="date"
+              value={filters.desde}
+              onChange={(e) => setFilters((f) => ({ ...f, desde: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida hasta</label>
+            <input
+              type="date"
+              value={filters.hasta}
+              onChange={(e) => setFilters((f) => ({ ...f, hasta: e.target.value }))}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          {filters.desde || filters.hasta
+            ? 'Mostrando histórico según el rango de fechas seleccionado.'
+            : 'Por defecto solo se muestran las salidas que todavía no ocurrieron. Filtrá por fecha para consultar el histórico.'}
+        </p>
       </div>
 
       {/* Error state */}

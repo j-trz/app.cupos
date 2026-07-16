@@ -1,41 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Shield, Plus, Edit, Trash2, Search, Filter, Key, CheckCircle, XCircle, RefreshCw, BarChart3 } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Search, Filter, Key, CheckCircle, XCircle, RefreshCw, BarChart3, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PermissionService from '../services/permissionService';
+import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
-import StatCard from '../components/ui/StatCard.jsx';
+import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import { MODULES, ACTIONS, getModuleLabel } from '../lib/permissionModules.js';
 
 const emptyPermission = {
     name: '',
     code: '',
     module: '',
+    action: '',
     description: '',
     is_active: true
 };
 
-// Módulos disponibles del sistema
-const MODULES = [
-    { value: 'dashboard', label: 'Dashboard' },
-    { value: 'users', label: 'Usuarios' },
-    { value: 'agencies', label: 'Agencias' },
-    { value: 'products', label: 'Productos' },
-    { value: 'reservations', label: 'Reservas' },
-    { value: 'notifications', label: 'Notificaciones' },
-    { value: 'settings', label: 'Configuración' },
-    { value: 'white_label', label: 'Diseño' },
-    { value: 'email', label: 'Email' },
-    { value: 'ai', label: 'Inteligencia Artificial' },
-    { value: 'permissions', label: 'Permisos' },
-    { value: 'roles', label: 'Roles' },
-    { value: 'reports', label: 'Reportes' }
-];
-
 export default function GestionPermisos() {
+    const { can } = useAuth();
     const [permissions, setPermissions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -88,6 +75,7 @@ export default function GestionPermisos() {
             name: permission.name || '',
             code: permission.code || '',
             module: permission.module || '',
+            action: permission.action || '',
             description: permission.description || '',
             is_active: permission.is_active ?? true
         });
@@ -179,12 +167,17 @@ export default function GestionPermisos() {
         p.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const getModuleLabel = (moduleValue) => {
-        const module = MODULES.find(m => m.value === moduleValue);
-        return module ? module.label : moduleValue;
-    };
-
     const totalPages = Math.ceil(pagination.total / pagination.limit);
+
+    if (!can('PERMISSIONS_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -210,26 +203,31 @@ export default function GestionPermisos() {
                 }
             />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={BarChart3}
-                    label="Total permisos"
-                    value={pagination.total}
-                    description="Cantidad total de permisos."
-                />
-                <StatCard
-                    icon={CheckCircle}
-                    label="Activos"
-                    value={permissions.filter(p => p.is_active).length}
-                    description="Permisos activos en el sistema."
-                />
-                <StatCard
-                    icon={XCircle}
-                    label="Inactivos"
-                    value={permissions.filter(p => !p.is_active).length}
-                    description="Permisos inactivos."
-                />
-            </div>
+            <StatsHero
+                stats={[
+                    {
+                        icon: BarChart3,
+                        label: 'Total permisos',
+                        value: pagination.total,
+                        description: 'Cantidad total de permisos.',
+                        color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+                    },
+                    {
+                        icon: CheckCircle,
+                        label: 'Activos',
+                        value: permissions.filter(p => p.is_active).length,
+                        description: 'Permisos activos en el sistema.',
+                        color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+                    },
+                    {
+                        icon: XCircle,
+                        label: 'Inactivos',
+                        value: permissions.filter(p => !p.is_active).length,
+                        description: 'Permisos inactivos.',
+                        color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+                    },
+                ]}
+            />
 
             <div className="bg-white rounded-2xl border border-slate-200">
                 {/* Filtros */}
@@ -419,6 +417,25 @@ export default function GestionPermisos() {
                                 <option key={m.value} value={m.value}>{m.label}</option>
                             ))}
                         </select>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                            Acción
+                        </label>
+                        <select
+                            value={formState.action}
+                            onChange={(e) => setFormState(prev => ({ ...prev, action: e.target.value }))}
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        >
+                            <option value="">Sin acción específica</option>
+                            {ACTIONS.map(a => (
+                                <option key={a.value} value={a.value}>{a.label}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Determina en qué columna aparece este permiso en la matriz de Roles.
+                        </p>
                     </div>
 
                     <div>

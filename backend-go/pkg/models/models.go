@@ -8,24 +8,24 @@ import (
 )
 
 type Profile struct {
-	ID                uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Email             string    `gorm:"unique;not null" json:"email"`
+	ID    uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	Email string    `gorm:"unique;not null" json:"email"`
 	// Password nunca se persiste (gorm:"-"): solo se usa para recibir el valor
 	// en texto plano del request y hashearlo hacia EncryptedPassword.
-	Password          string    `gorm:"-" json:"password,omitempty" binding:"required"`
-	EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"`
-	Nombre            string    `json:"nombre"`
-	Apellido          string    `json:"apellido"`
-	Telefono          string    `json:"telefono"`
-	Agencia           string    `json:"agencia"`
-	Admin             bool      `gorm:"default:false" json:"admin"`
+	Password          string `gorm:"-" json:"password,omitempty" binding:"required"`
+	EncryptedPassword string `gorm:"column:encrypted_password" json:"-"`
+	Nombre            string `json:"nombre"`
+	Apellido          string `json:"apellido"`
+	Telefono          string `json:"telefono"`
+	Agencia           string `json:"agencia"`
+	Admin             bool   `gorm:"default:false" json:"admin"`
 	// IsActive es un campo propio, distinto de Admin (antes ToggleUserStatus
 	// reusaba la columna "admin" como proxy de "activo", lo cual mezclaba
 	// privilegio de administrador con habilitación de la cuenta).
-	IsActive          bool      `gorm:"default:true" json:"activo"`
-	Role              string    `gorm:"default:'agency_user'" json:"role"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	IsActive  bool      `gorm:"default:true" json:"activo"`
+	Role      string    `gorm:"default:'agency_user'" json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Product struct {
@@ -83,8 +83,21 @@ type Product struct {
 	// TransferID vincula un producto-espejo de cesión con su AvailabilityTransfer
 	// de origen, para poder auditar el movimiento completo.
 	TransferID *uuid.UUID `gorm:"type:uuid;column:transfer_id" json:"transfer_id,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	// Deadlines operativos del cupo (mismos nombres de columna que Group, para
+	// que el cron de avisos de vencimiento trate ambos modelos de forma
+	// uniforme).
+	VencimientoPago *time.Time `gorm:"column:vencimiento_pago" json:"vencimiento_pago"`
+	NominationDate  *time.Time `gorm:"column:nomination_date" json:"nomination_date"`
+	FechaEmision    *time.Time `gorm:"column:fecha_emision" json:"fecha_emision"`
+	FechaGastos     *time.Time `gorm:"column:fecha_gastos" json:"fecha_gastos"`
+	// AvisoXEnviado evita repetir el recordatorio de vencimiento en cada
+	// corrida del cron una vez que ya se avisó ese deadline puntual.
+	AvisoPagoEnviado       bool      `gorm:"column:aviso_pago_enviado;default:false" json:"-"`
+	AvisoNominacionEnviado bool      `gorm:"column:aviso_nominacion_enviado;default:false" json:"-"`
+	AvisoEmisionEnviado    bool      `gorm:"column:aviso_emision_enviado;default:false" json:"-"`
+	AvisoGastosEnviado     bool      `gorm:"column:aviso_gastos_enviado;default:false" json:"-"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 // Estados posibles de Reservation.Estado (antes convivían "confirmado"/"confirmada" como
@@ -134,12 +147,22 @@ type Reservation struct {
 	DocContableExpiresAt *time.Time `json:"doc_contable_expires_at"`
 	// ExpirationWarningSentAt evita reenviar el aviso de "por vencer" en cada corrida del cron.
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
-	CreatedAt               time.Time  `json:"created_at"`
-	UpdatedAt               time.Time  `json:"updated_at"`
+	// PreCancelEstado guarda el estado que tenía la reserva justo antes de que
+	// se pidiera su cancelación, para poder restaurarlo exactamente si un admin
+	// rechaza la solicitud (ver ResolveCancellation en order_handler.go).
+	PreCancelEstado string `gorm:"column:pre_cancel_estado" json:"pre_cancel_estado,omitempty"`
+	// CancelacionNotas son las notas que carga el admin al aprobar/rechazar
+	// una solicitud de cancelación.
+	CancelacionNotas string    `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 	// Passengers son los pasajeros desglosados de la reserva (puede haber más de
 	// uno). Si viene vacío, la UI debe usar los campos *Pasajero de arriba como
 	// fallback (reservas creadas sin desglose de pasajeros).
 	Passengers []Passenger `gorm:"foreignKey:ReservationID" json:"passengers,omitempty"`
+
+	// Associations
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 // Passenger es la unidad real de "cupo aéreo": cada pasajero ocupa 1 lugar y
@@ -168,6 +191,92 @@ type Passenger struct {
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
+
+	// Associations
+	Reservation Reservation `gorm:"foreignKey:ReservationID" json:"reservation,omitempty"`
+}
+
+// Estados de la máquina de 2 fases de Group (ver comentario en el struct):
+// EstadoCotizacion avanza pendiente -> cotizada -> aceptada|rechazada;
+// EstadoReservar solo aplica una vez aceptada la cotización.
+const (
+	GroupCotizacionPendiente = "pendiente"
+	GroupCotizacionCotizada  = "cotizada"
+	GroupCotizacionAceptada  = "aceptada"
+	GroupCotizacionRechazada = "rechazada"
+
+	GroupReservarConfirmada            = "confirmada"
+	GroupReservarCancelacionSolicitada = "cancelacion_solicitada"
+	GroupReservarCancelada             = "cancelada"
+)
+
+// Group representa una cotización de vuelo "a medida" (grupo), distinta del
+// catálogo fijo de Product: nace de una solicitud de usuario (uno o más
+// itinerarios candidatos) o de una carga directa del admin, pasa por una
+// cotización que el usuario debe aceptar, y recién luego de la confirmación
+// del admin se activan los datos operativos (nominación, emisión, gastos).
+type Group struct {
+	ID uint `gorm:"primaryKey" json:"id"`
+
+	// SolicitudID agrupa las N líneas nacidas de UNA misma solicitud (una fila
+	// por opción de itinerario) — permite mostrarlas juntas y que aceptar una
+	// opción rechace automáticamente a sus hermanas. Nil en grupos que el
+	// admin carga sueltos, sin pasar por el flujo de solicitud de usuario.
+	SolicitudID  *uuid.UUID `gorm:"type:uuid;column:solicitud_id;index" json:"solicitud_id,omitempty"`
+	OpcionNumero int        `gorm:"column:opcion_numero" json:"opcion_numero,omitempty"`
+
+	// Vendedor es el usuario dueño de esta cotización: quien la solicitó, o el
+	// usuario que el admin eligió al cargar un grupo de cero (para que solo
+	// ese usuario pueda ver/aceptar esa cotización puntual).
+	Vendedor uuid.UUID `gorm:"type:uuid;column:vendedor;index" json:"vendedor"`
+	Agency   string    `gorm:"column:agency" json:"agency"`
+
+	NotasVendedor     string `gorm:"column:notas_vendedor" json:"notas_vendedor"`
+	Itinerario        string `gorm:"column:itinerario" json:"itinerario"`
+	Ficha             string `gorm:"column:ficha" json:"ficha"`
+	Destino           string `gorm:"column:destino" json:"destino"`
+	Compania          string `gorm:"column:compania" json:"compania"`
+	Condiciones       string `gorm:"column:condiciones" json:"condiciones"`
+	NotasInternas     string `gorm:"column:notas_internas" json:"notas_internas,omitempty"`
+	NotasExternas     string `gorm:"column:notas_externas" json:"notas_externas,omitempty"`
+	IDAerolinea       string `gorm:"column:id_aerolinea" json:"id_aerolinea"`
+	CantidadLugares   int    `gorm:"column:cantidad_lugares" json:"cantidad_lugares"`
+	CantidadLiberados int    `gorm:"column:cantidad_liberados" json:"cantidad_liberados"`
+
+	Salida  *time.Time `gorm:"column:salida" json:"salida"`
+	Regreso *time.Time `gorm:"column:regreso" json:"regreso"`
+
+	PnrAirline   string  `gorm:"column:pnr_airline" json:"pnr_airline"`
+	PnrAgency    string  `gorm:"column:pnr_agency" json:"pnr_agency"`
+	Neto01       float64 `gorm:"column:neto_01" json:"neto_01"`
+	NetoLiberado float64 `gorm:"column:neto_liberado" json:"neto_liberado"`
+
+	VencimientoPago       *time.Time `gorm:"column:vencimiento_pago" json:"vencimiento_pago"`
+	NominationDate        *time.Time `gorm:"column:nomination_date" json:"nomination_date"`
+	VencimientoCotizacion *time.Time `gorm:"column:vencimiento_cotizacion" json:"vencimiento_cotizacion"`
+	FechaEmision          *time.Time `gorm:"column:fecha_emision" json:"fecha_emision"`
+	FechaGastos           *time.Time `gorm:"column:fecha_gastos" json:"fecha_gastos"`
+
+	// Máquina de estados de 2 fases — ver constantes GroupCotizacion*/GroupReservar* arriba.
+	EstadoCotizacion string `gorm:"column:estado_cotizacion;default:'pendiente'" json:"estado_cotizacion"`
+	EstadoReservar   string `gorm:"column:estado_reservar" json:"estado_reservar"`
+
+	// Espejo de Reservation.PreCancelEstado/CancelacionNotas: permite
+	// restaurar el estado previo si el admin rechaza una solicitud de
+	// cancelación en vez de aprobarla.
+	PreCancelEstadoReservar string `gorm:"column:pre_cancel_estado_reservar" json:"pre_cancel_estado_reservar,omitempty"`
+	CancelacionNotas        string `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
+
+	// AvisoXEnviado evita repetir el recordatorio de vencimiento en cada
+	// corrida del cron una vez que ya se avisó ese deadline puntual (ver
+	// deadline_cron_handler.go).
+	AvisoPagoEnviado       bool `gorm:"column:aviso_pago_enviado;default:false" json:"-"`
+	AvisoNominacionEnviado bool `gorm:"column:aviso_nominacion_enviado;default:false" json:"-"`
+	AvisoEmisionEnviado    bool `gorm:"column:aviso_emision_enviado;default:false" json:"-"`
+	AvisoGastosEnviado     bool `gorm:"column:aviso_gastos_enviado;default:false" json:"-"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Agency struct {
@@ -234,10 +343,14 @@ type SystemLog struct {
 }
 
 type Permission struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Name        string    `gorm:"not null" json:"name"`
-	Code        string    `gorm:"unique;not null" json:"code"`
-	Module      string    `gorm:"not null" json:"module"`
+	ID     uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Name   string    `gorm:"not null" json:"name"`
+	Code   string    `gorm:"unique;not null" json:"code"`
+	Module string    `gorm:"not null" json:"module"`
+	// Action es el sufijo de Code en minúsculas (view|create|update|delete|
+	// confirm|export|unlock|assign) — permite matchear module+action sin
+	// parsear el string de Code.
+	Action      string    `json:"action"`
 	Description string    `json:"description"`
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -251,8 +364,12 @@ type Role struct {
 	Description string    `json:"description"`
 	IsSystem    bool      `gorm:"default:false" json:"is_system"`
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	// AgencyID nulo = rol global/de sistema, disponible para cualquier
+	// agencia. No nulo = rol personalizado de esa agencia únicamente (solo
+	// lo ve/edita/asigna un admin o el agency_admin de esa misma agencia).
+	AgencyID  *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 type UserRole struct {
@@ -271,15 +388,15 @@ type RolePermission struct {
 type EmailSMTPConfig struct {
 	ID         uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AgencyID   *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
-	SMTPHost   string    `json:"smtp_host"`
-	SMTPPort   int       `json:"smtp_port"`
-	SMTPUser   string    `json:"smtp_user"`
-	SMTPPass   string    `json:"smtp_pass"`
-	SMTPSecure bool      `gorm:"default:false" json:"smtp_secure"`
-	EmailFrom  string    `json:"email_from"`
-	IsActive   bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	SMTPHost   string     `json:"smtp_host"`
+	SMTPPort   int        `json:"smtp_port"`
+	SMTPUser   string     `json:"smtp_user"`
+	SMTPPass   string     `json:"smtp_pass"`
+	SMTPSecure bool       `gorm:"default:false" json:"smtp_secure"`
+	EmailFrom  string     `json:"email_from"`
+	IsActive   bool       `gorm:"default:true" json:"is_active"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 // EmailTemplate define el asunto/cuerpo de un email transaccional identificado
@@ -294,6 +411,29 @@ type EmailTemplate struct {
 	AgencyID  *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+// NotificationTemplate permite personalizar el título/mensaje de las
+// notificaciones internas (campana in-app), análogo a EmailTemplate pero para
+// NotifyUser/NotifyRole/NotifyAgency/NotifyBroadcast en vez de emails.
+type NotificationTemplate struct {
+	ID       uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Code     string     `gorm:"not null;index" json:"code"`
+	Name     string     `json:"name"`
+	Title    string     `json:"title"`
+	Message  string     `json:"message"`
+	Icon     string     `json:"icon"`
+	Color    string     `json:"color"`
+	Priority string     `json:"priority"`
+	AgencyID *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	// ExtraEmails son casillas de correo adicionales (separadas por coma/salto
+	// de línea/punto y coma) que reciben este mismo título/mensaje por email,
+	// además de la notificación in-app al rol correspondiente — pensado para
+	// que ops/operaciones reciba los avisos de vencimiento sin ser un usuario
+	// del sistema. Vacío = sin casillas extra (comportamiento de siempre).
+	ExtraEmails string    `gorm:"column:extra_emails" json:"extra_emails,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type AIProvider struct {
@@ -311,19 +451,6 @@ type AIProvider struct {
 	IsDefault    bool      `gorm:"default:false" json:"is_default"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type AIAction struct {
-	ID          uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Name        string         `gorm:"unique;not null" json:"name"`
-	Description string         `json:"description"`
-	ActionType  string         `gorm:"column:action_type;default:'api_call'" json:"action_type"`
-	Endpoint    string         `json:"endpoint"`
-	Method      string         `gorm:"default:'GET'" json:"method"`
-	Parameters  datatypes.JSON `json:"parameters"`
-	IsActive    bool           `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 type AISession struct {

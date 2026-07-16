@@ -104,7 +104,7 @@ cd backend
 npm audit
 npm audit fix
 
-# Frontend  
+# Frontend
 cd frontend
 npm audit
 npm audit fix

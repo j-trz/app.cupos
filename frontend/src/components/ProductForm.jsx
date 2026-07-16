@@ -49,6 +49,10 @@ const EMPTY_FORM = {
   is_blocked_for_sale: false,
   notas_internas: '',
   notas_externas: '',
+  vencimiento_pago: '',
+  nomination_date: '',
+  fecha_emision: '',
+  fecha_gastos: '',
 };
 
 function toFormValues(product) {
@@ -81,6 +85,10 @@ function toFormValues(product) {
     is_blocked_for_sale: product.is_blocked_for_sale ?? false,
     notas_internas: product.notas_internas || '',
     notas_externas: product.notas_externas || '',
+    vencimiento_pago: fmt(product.vencimiento_pago),
+    nomination_date: fmt(product.nomination_date),
+    fecha_emision: fmt(product.fecha_emision),
+    fecha_gastos: fmt(product.fecha_gastos),
   };
 }
 
@@ -113,6 +121,10 @@ function toPayload(form) {
     is_blocked_for_sale: form.is_blocked_for_sale,
     notas_internas: form.notas_internas,
     notas_externas: form.notas_externas,
+    vencimiento_pago: form.vencimiento_pago || null,
+    nomination_date: form.nomination_date || null,
+    fecha_emision: form.fecha_emision || null,
+    fecha_gastos: form.fecha_gastos || null,
   };
 }
 
@@ -149,7 +161,7 @@ const ProductForm = ({
   };
 
   const field = (id, label, type = 'text', opts = {}) => (
-    <div className="space-y-1">
+    <div className={`space-y-1 ${opts.className || ''}`}>
       <Label htmlFor={id}>{label}{opts.required ? ' *' : ''}</Label>
       <Input
         id={id}
@@ -195,7 +207,7 @@ const ProductForm = ({
         {/* Identificación */}
         <div>
           {sectionLabel('Identificación')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {isEditing ? (
               <div className="space-y-1">
                 <Label htmlFor="codigo_cupo">Código de Cupo</Label>
@@ -209,7 +221,7 @@ const ProductForm = ({
                 </div>
               </div>
             )}
-            <div className="space-y-1">
+            <div className="space-y-1 col-span-2">
               <Label htmlFor="agencia">Agencia Dueña *</Label>
               <select
                 id="agencia"
@@ -246,19 +258,30 @@ const ProductForm = ({
         {/* Fechas y cupo */}
         <div>
           {sectionLabel('Fechas y cupo')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('fecha_salida', 'Fecha de Salida', 'date')}
             {field('fecha_regreso', 'Fecha de Regreso', 'date')}
             {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
-            {field('bloqueo_temporal_minutos', 'Bloqueo Temporal (min)', 'number', { min: '0', placeholder: '60' })}
+            {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60' })}
+          </div>
+        </div>
+
+        {/* Vencimientos operativos */}
+        <div>
+          {sectionLabel('Vencimientos operativos')}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {field('vencimiento_pago', 'Vencimiento de pago', 'date')}
+            {field('nomination_date', 'Fecha de nominación', 'date')}
+            {field('fecha_emision', 'Fecha de emisión', 'date')}
+            {field('fecha_gastos', 'Fecha entrada en gastos', 'date')}
           </div>
         </div>
 
         {/* Precios */}
         <div>
           {sectionLabel('Precios')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('precio', 'Precio ADT', 'number', { step: '0.01', min: '0' })}
             {field('inf_fare', 'Precio INF', 'number', { step: '0.01', min: '0' })}
             {field('chd_fare', 'Precio CHD', 'number', { step: '0.01', min: '0' })}
@@ -270,19 +293,19 @@ const ProductForm = ({
         {/* Clasificación */}
         <div>
           {sectionLabel('Clasificación')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('ruta', rutaLabel)}
             {field('pnr', 'PNR')}
             {field('ficha', 'Ficha')}
             {field('temporada', 'Temporada')}
-            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje, Excursión...' })}
+            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje...', className: 'col-span-2' })}
           </div>
         </div>
 
         {/* Notas */}
         <div>
           {sectionLabel('Notas')}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="notas_externas">Notas externas</Label>
               <Textarea

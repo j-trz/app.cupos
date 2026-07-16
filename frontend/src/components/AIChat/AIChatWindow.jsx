@@ -12,10 +12,12 @@ import AIChatSessionsSidebar from './AIChatSessionsSidebar';
 import ExpertPicker from './ExpertPicker';
 import useAIChat from '../../hooks/useAIChat';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAIPageContext } from '../../contexts/AIPageContext.jsx';
 
 export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
     const navigate = useNavigate();
+    const { pageContext, dispatchUIActions } = useAIPageContext();
     const [showSessions, setShowSessions] = useState(false);
     const messagesEndRef = useRef(null);
 
@@ -56,6 +58,19 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     const handleNewSessionClick = () => {
         handleNewSession();
         setShowSessions(false);
+    };
+
+    // Reacciona a lo que la IA haya pedido ejecutar en pantalla (navegar,
+    // abrir el modal de reserva, completar el formulario de pasajeros) —
+    // esta lógica vive acá (no en useAIChat) porque depende del router y del
+    // contexto de pantalla, ninguno de los cuales le concierne al hook
+    // compartido con la página de chat a pantalla completa.
+    const handleAIResponse = (response) => {
+        const navigateAction = (response.ui_actions || []).find((a) => a?.type === 'navigate' && a.payload?.path);
+        if (navigateAction) {
+            navigate(navigateAction.payload.path);
+        }
+        dispatchUIActions(response.ui_actions);
     };
 
     const handleExpand = () => {
@@ -106,8 +121,8 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         <Maximize2 className="w-4 h-4" />
                     </button>
 
-                    {/* Configuración (solo admin) */}
-                    {user?.role === 'admin' && (
+                    {/* Configuración (requiere permiso de IA) */}
+                    {can('AI_UPDATE') && (
                         <button
                             onClick={() => window.location.href = '/config-ia'}
                             className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -212,7 +227,11 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
 
             {/* Input */}
             <AIChatInput
-                onSendMessage={(content, attachments) => handleSendMessage(content, attachments, onNewMessage)}
+                onSendMessage={(content, attachments) => handleSendMessage(content, attachments, {
+                    onNewMessage,
+                    pageContext,
+                    onResponse: handleAIResponse,
+                })}
                 isLoading={isLoading || isTyping}
                 placeholder="Escribe tu mensaje..."
             />

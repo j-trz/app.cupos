@@ -6,7 +6,7 @@ import Swal from 'sweetalert2';
 import {
     Palette, Type, MousePointer, Layout, Sidebar as SidebarIcon,
     Save, Download, Upload, RefreshCw, Check, Building2, Mail, FileText, Eye,
-    Image, Link
+    Image, Link, Lock, Phone, MapPin, MessageSquare
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -46,7 +46,7 @@ const SECTION_PAD = "space-y-6";
 
 // ─── Default config ───────────────────────────────────────────
 const DEFAULT_CONFIG = {
-    identity: { agency_name: '', contact_email: '', slogan: '', logoUrl: '', faviconUrl: '' },
+    identity: { agency_name: '', contact_email: '', slogan: '', logoUrl: '', faviconUrl: '', phone: '', address: '', pdf_footer_message: '¡Estimado pasajero, le deseamos un muy buen viaje!', pdf_show_logo: true },
     colors: {
         primary: '#3b82f6', secondary: '#64748b', background: '#ffffff',
         surface: '#f8fafc', text_primary: '#0f172a', text_secondary: '#64748b',
@@ -66,7 +66,8 @@ const tabs = [
     { id: 'buttons', label: 'Botones', icon: MousePointer },
     { id: 'sidebar', label: 'Sidebar', icon: SidebarIcon },
     { id: 'layout', label: 'Layout', icon: Layout },
-    { id: 'legal', label: 'Legal', icon: FileText },
+    { id: 'legal', label: 'Legal', icon: Link },
+    { id: 'itinerary', label: 'Itinerario PDF', icon: FileText },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -107,7 +108,7 @@ function PreviewButton({ config, label = 'Botón Primario' }) {
 // ═══════════════════════════════════════════════════════════════
 
 export default function WhiteLabelConfig() {
-    const { user } = useAuth();
+    const { user, can } = useAuth();
     const { config: appConfig, refresh } = useWhiteLabel();
     const [activeTab, setActiveTab] = useState('identity');
     const [config, setConfig] = useState(null);
@@ -227,6 +228,16 @@ export default function WhiteLabelConfig() {
 
     if (loading) {
         return <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div></div>;
+    }
+
+    if (!can('WHITE_LABEL_VIEW')) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Lock className="h-12 w-12 text-slate-300 mb-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+                <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+            </div>
+        );
     }
 
     const c = config?.colors || DEFAULT_CONFIG.colors;
@@ -589,6 +600,81 @@ export default function WhiteLabelConfig() {
                                                 <input type="url" value={config.legal.privacyUrl || ''} onChange={e => up('legal', 'privacyUrl', e.target.value)}
                                                     className={`${INPUT_CLASSES} pl-10`} placeholder="https://..." />
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ───────── ITINERARY PDF ───────── */}
+                            {activeTab === 'itinerary' && (
+                                <div className={SECTION_PAD}>
+                                    <div>
+                                        <h3 className="text-base font-semibold text-slate-900 mb-1">Itinerario PDF</h3>
+                                        <p className="text-sm text-slate-500 mb-4">Datos de contacto y mensaje que aparecen en el itinerario impreso del viajero.</p>
+                                    </div>
+
+                                    {/* Mini preview del header del PDF */}
+                                    <div className="rounded-xl overflow-hidden border border-slate-200 mb-6">
+                                        <div style={{ background: c.primary, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                                                {id.pdf_show_logo !== false && id.logoUrl ? (
+                                                    <img src={id.logoUrl} alt="Logo" style={{ height: 40, width: 'auto', objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.15)', padding: 4 }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                                                ) : (
+                                                    <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>✈️</div>
+                                                )}
+                                                <div>
+                                                    <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{id.agency_name || 'Nombre de la agencia'}</div>
+                                                    {id.contact_email && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{id.contact_email}</div>}
+                                                    {id.phone && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{id.phone}</div>}
+                                                </div>
+                                            </div>
+                                            <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 16px', textAlign: 'center', minWidth: 110 }}>
+                                                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10 }}>Nro Reserva</div>
+                                                <div style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: '0.04em' }}>ABC123</div>
+                                            </div>
+                                        </div>
+                                        <div style={{ background: '#f8fafc', padding: '10px 20px', fontSize: 11, color: '#64748b', borderTop: `3px solid ${c.primary}` }}>
+                                            <span style={{ fontWeight: 600, color: c.primary }}>Información general — </span>
+                                            {id.pdf_footer_message || 'Mensaje para el viajero...'}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Teléfono de contacto</label>
+                                            <div className="relative">
+                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <input type="text" value={id.phone || ''} onChange={e => up('identity', 'phone', e.target.value)}
+                                                    className={`${INPUT_CLASSES} pl-10`} placeholder="+54 11 1234-5678" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Dirección física</label>
+                                            <div className="relative">
+                                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <input type="text" value={id.address || ''} onChange={e => up('identity', 'address', e.target.value)}
+                                                    className={`${INPUT_CLASSES} pl-10`} placeholder="Av. Corrientes 1234, CABA" />
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Mensaje para el viajero (footer del PDF)</label>
+                                            <div className="relative">
+                                                <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                                <textarea value={id.pdf_footer_message || ''} onChange={e => up('identity', 'pdf_footer_message', e.target.value)}
+                                                    className={`${INPUT_CLASSES} pl-10 resize-none`} rows={3}
+                                                    placeholder="¡Estimado pasajero, le deseamos un muy buen viaje!..." />
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="flex items-center gap-3 cursor-pointer select-none">
+                                                <div className="relative">
+                                                    <input type="checkbox" className="sr-only" checked={id.pdf_show_logo !== false}
+                                                        onChange={e => up('identity', 'pdf_show_logo', e.target.checked)} />
+                                                    <div className={`w-10 h-5 rounded-full transition-colors ${id.pdf_show_logo !== false ? 'bg-slate-900' : 'bg-slate-300'}`}></div>
+                                                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${id.pdf_show_logo !== false ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                                </div>
+                                                <span className="text-sm font-medium text-slate-700">Mostrar logo de la agencia en el PDF</span>
+                                            </label>
                                         </div>
                                     </div>
                                 </div>

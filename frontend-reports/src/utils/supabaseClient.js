@@ -77,4 +77,3 @@ export async function ensureSessionFresh() {
 export async function uploadToBucket() {
   throw new Error('Modo local: usa el modal de carga de archivos para subir Excel.');
 }
-

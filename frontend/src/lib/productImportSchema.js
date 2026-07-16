@@ -34,6 +34,33 @@ export const PRODUCT_IMPORT_COLUMNS = [
 
 const TIPOS_PRODUCTO_VALIDOS = ['Aereo', 'Hotel', 'Crucero'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Día 0 del calendario de Excel (1899-12-30, ya contempla el bug del año
+// bisiesto 1900 de Excel) — se usa como respaldo si por algún motivo una
+// celda de fecha llega como número de serie crudo en vez de Date.
+const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
+
+// coerceDateToISO acepta lo que puede llegar de una celda de Excel con
+// formato de fecha: un objeto Date (XLSX.read con cellDates:true, ver
+// ProductBulkUpload.jsx), un número de serie de Excel (respaldo), o un
+// string "YYYY-MM-DD" ya normalizado (CSV o celda de texto). Usa los
+// getters UTC de Date porque SheetJS arma el Date a partir de UTC — leerlo
+// con getters locales corre el día para atrás en cualquier huso horario
+// detrás de UTC (ej. Uruguay, UTC-3), que es justo el bug reportado.
+function coerceDateToISO(raw) {
+  let date = null;
+  if (raw instanceof Date) {
+    date = raw;
+  } else if (typeof raw === 'number' && Number.isFinite(raw)) {
+    date = new Date(EXCEL_EPOCH_MS + raw * 86400000);
+  }
+  if (date) {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return String(raw).trim();
+}
 
 export function coerceBoolean(value) {
   if (typeof value === 'boolean') return value;
@@ -74,7 +101,7 @@ export function validateProductRow(row, validAgencyCodes = []) {
       }
       normalized[col.key] = n;
     } else if (col.type === 'date') {
-      const s = String(raw).trim();
+      const s = coerceDateToISO(raw);
       if (!DATE_RE.test(s)) {
         errors.push(`"${col.key}" debe tener formato YYYY-MM-DD (vino "${raw}")`);
         continue;
