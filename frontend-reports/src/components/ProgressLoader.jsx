@@ -1,11 +1,7 @@
 import React from 'react';
 
 const ProgressLoader = ({ message, progress = 0, showProgress = false, fullScreen = false }) => {
-<<<<<<< HEAD
   const containerClass = fullScreen
-=======
-  const containerClass = fullScreen 
->>>>>>> main
     ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
     : "flex items-center justify-center p-4";
 
@@ -22,39 +18,23 @@ const ProgressLoader = ({ message, progress = 0, showProgress = false, fullScree
               </div>
             )}
           </div>
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> main
           {/* Mensaje dinámico */}
           <div className="text-center">
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
               {message || 'Cargando...'}
             </h3>
-<<<<<<< HEAD
 
             {/* Barra de progreso */}
             {showProgress && (
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
-=======
-            
-            {/* Barra de progreso */}
-            {showProgress && (
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
->>>>>>> main
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
             )}
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> main
             {/* Tips de optimización */}
             <p className="text-sm text-gray-500 mt-2">
               {progress < 30 && "🔄 Cargando datos desde caché..."}
