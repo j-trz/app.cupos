@@ -45,9 +45,9 @@ func ConvertToMarkdown(fileName string, raw []byte) (markdown string, sourceType
 	ext := strings.ToLower(filepath.Ext(fileName))
 	switch ext {
 	case ".md", ".markdown":
-		markdown, sourceType = string(raw), "md"
+		markdown, sourceType = strings.TrimSpace(string(raw)), "md"
 	case ".txt":
-		markdown, sourceType = string(raw), "txt"
+		markdown, sourceType = strings.TrimSpace(string(raw)), "txt"
 	case ".html", ".htm":
 		sourceType = "html"
 		markdown, err = convertHTMLToMarkdown(string(raw))
@@ -62,6 +62,9 @@ func ConvertToMarkdown(fileName string, raw []byte) (markdown string, sourceType
 	}
 	if err != nil {
 		return "", sourceType, err
+	}
+	if markdown == "" {
+		return "", sourceType, fmt.Errorf("el archivo está vacío — no hay contenido para cargar como conocimiento")
 	}
 	if len(markdown) > MaxExpertMarkdownBytes {
 		markdown = markdown[:MaxExpertMarkdownBytes]
@@ -153,7 +156,11 @@ func convertHTMLToMarkdown(html string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("no se pudo convertir el HTML a Markdown: %w", err)
 	}
-	return strings.TrimSpace(result), nil
+	result = strings.TrimSpace(result)
+	if result == "" {
+		return "", fmt.Errorf("no se encontró texto para extraer — puede ser una página que renderiza su contenido con JavaScript, sin texto en el HTML servido")
+	}
+	return result, nil
 }
 
 // convertPDFToMarkdown extrae el texto plano de cada página. No hay OCR: un

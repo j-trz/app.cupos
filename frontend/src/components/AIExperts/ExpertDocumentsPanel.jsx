@@ -18,7 +18,7 @@ const STATUS_BADGE = {
     error: { variant: 'danger', label: 'Error', icon: AlertCircle },
 };
 
-export default function ExpertDocumentsPanel({ expertId }) {
+export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
     const [documents, setDocuments] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -29,7 +29,9 @@ export default function ExpertDocumentsPanel({ expertId }) {
         setIsLoading(true);
         try {
             const response = await AIService.getExpert(expertId);
-            setDocuments(response.documents || []);
+            const docs = response.documents || [];
+            setDocuments(docs);
+            onDocumentsChanged?.(docs.length);
         } catch (error) {
             console.error('Error al cargar documentos:', error);
         } finally {
@@ -48,10 +50,14 @@ export default function ExpertDocumentsPanel({ expertId }) {
         setIsUploading(true);
         try {
             await AIService.uploadExpertDocument(expertId, file);
-            await loadDocuments();
         } catch (error) {
             Swal.fire('Error', error.message || 'No se pudo subir el documento', 'error');
         } finally {
+            // Recargar siempre: aunque la conversión haya fallado, el
+            // documento igual queda guardado con status "error" y su motivo
+            // — el usuario tiene que poder verlo en la lista, no solo el
+            // popup de error que ya vio.
+            await loadDocuments();
             setIsUploading(false);
             e.target.value = '';
         }
@@ -64,10 +70,10 @@ export default function ExpertDocumentsPanel({ expertId }) {
         try {
             await AIService.addExpertDocumentFromUrl(expertId, url);
             setUrlInput('');
-            await loadDocuments();
         } catch (error) {
             Swal.fire('Error', error.message || 'No se pudo agregar la URL', 'error');
         } finally {
+            await loadDocuments();
             setIsUploading(false);
         }
     };
@@ -134,15 +140,20 @@ export default function ExpertDocumentsPanel({ expertId }) {
                     {documents.map((doc) => {
                         const status = STATUS_BADGE[doc.status] || STATUS_BADGE.ready;
                         return (
-                            <li key={doc.id} className="flex items-center justify-between gap-2 text-sm bg-gray-50 dark:bg-zinc-800 rounded-lg px-3 py-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <FileText className="w-4 h-4 text-gray-400 shrink-0" />
-                                    <span className="truncate">{doc.file_name}</span>
-                                    <Badge variant={status.variant}>{status.label}</Badge>
+                            <li key={doc.id} className="bg-gray-50 dark:bg-zinc-800 rounded-lg px-3 py-2">
+                                <div className="flex items-center justify-between gap-2 text-sm">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                                        <span className="truncate">{doc.file_name}</span>
+                                        <Badge variant={status.variant}>{status.label}</Badge>
+                                    </div>
+                                    <button onClick={() => handleDelete(doc)} className="p-1 text-gray-400 hover:text-red-500 shrink-0" title="Eliminar">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
-                                <button onClick={() => handleDelete(doc)} className="p-1 text-gray-400 hover:text-red-500 shrink-0" title="Eliminar">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {doc.status === 'error' && doc.error_message && (
+                                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{doc.error_message}</p>
+                                )}
                             </li>
                         );
                     })}

@@ -198,6 +198,25 @@ func UploadAIExpertDocument(c *gin.Context) {
 		}
 		fileName = header.Filename
 		markdown, sourceType, convErr = services.ConvertToMarkdown(fileName, raw)
+
+		// Fallback de OCR vía IA: un PDF sin capa de texto (típicamente
+		// escaneado) no se puede leer con extracción de texto normal — en
+		// vez de darlo por perdido, se intenta transcribirlo con el
+		// proveedor de IA activo de la agencia (ver ocrPDFWithAI).
+		if convErr != nil && sourceType == "pdf" {
+			if ocrText, ocrErr := ocrPDFWithAI(raw); ocrErr == nil && strings.TrimSpace(ocrText) != "" {
+				markdown = ocrText
+				if len(markdown) > services.MaxExpertMarkdownBytes {
+					markdown = markdown[:services.MaxExpertMarkdownBytes]
+				}
+				convErr = nil
+			} else if ocrErr != nil {
+				// Reemplaza el error genérico de "sin capa de texto" por el
+				// motivo específico del fallback (más accionable: qué
+				// proveedor está activo, o el error real de la API).
+				convErr = ocrErr
+			}
+		}
 	} else {
 		var input struct {
 			URL string `json:"url"`
@@ -229,9 +248,17 @@ func UploadAIExpertDocument(c *gin.Context) {
 		return
 	}
 
-	if convErr == nil {
-		reindexExpertChunks(expert.ID)
+	if convErr != nil {
+		// El documento igual queda guardado (status "error", para que se vea
+		// en el listado con su motivo) pero la request en sí debe fallar con
+		// un status de error — si respondiéramos 201 acá, el frontend nunca
+		// entra a su bloque de manejo de error y el usuario no se entera de
+		// que la conversión falló (parece que "no pasó nada").
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": doc.ErrorMessage, "document": doc})
+		return
 	}
+
+	reindexExpertChunks(expert.ID)
 	c.JSON(http.StatusCreated, doc)
 }
 
