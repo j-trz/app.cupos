@@ -5,11 +5,13 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Link2, Trash2, FileText, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, Link2, Trash2, FileText, Loader2, CheckCircle2, AlertCircle, Pencil, Save } from 'lucide-react';
 import AIService from '../../services/aiService';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Badge from '../ui/Badge.jsx';
+import Textarea from '../ui/Textarea';
+import Modal from '../Modal';
 import Swal from 'sweetalert2';
 
 const STATUS_BADGE = {
@@ -24,6 +26,11 @@ export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
     const [isUploading, setIsUploading] = useState(false);
     const [urlInput, setUrlInput] = useState('');
     const fileInputRef = useRef(null);
+    // Documento en edición manual del contenido ya ingerido (ej. para
+    // corregir un error de transcripción de OCR sin resubir el archivo).
+    const [editingDoc, setEditingDoc] = useState(null);
+    const [editContent, setEditContent] = useState('');
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     const loadDocuments = async () => {
         setIsLoading(true);
@@ -97,6 +104,25 @@ export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
         }
     };
 
+    const openEdit = (doc) => {
+        setEditingDoc(doc);
+        setEditContent(doc.content_markdown || '');
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingDoc) return;
+        setIsSavingEdit(true);
+        try {
+            await AIService.updateExpertDocument(expertId, editingDoc.id, editContent);
+            setEditingDoc(null);
+            await loadDocuments();
+        } catch (error) {
+            Swal.fire('Error', error.message || 'No se pudo guardar el contenido', 'error');
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
+
     return (
         <div className="space-y-3 border-t border-slate-200 pt-3 mt-3">
             <div className="flex flex-col sm:flex-row gap-2">
@@ -147,9 +173,14 @@ export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
                                         <span className="truncate">{doc.file_name}</span>
                                         <Badge variant={status.variant}>{status.label}</Badge>
                                     </div>
-                                    <button onClick={() => handleDelete(doc)} className="p-1 text-gray-400 hover:text-red-500 shrink-0" title="Eliminar">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button onClick={() => openEdit(doc)} className="p-1 text-gray-400 hover:text-blue-500" title="Editar contenido">
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => handleDelete(doc)} className="p-1 text-gray-400 hover:text-red-500" title="Eliminar">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                                 {doc.status === 'error' && doc.error_message && (
                                     <p className="mt-1 text-xs text-red-600 dark:text-red-400">{doc.error_message}</p>
@@ -159,6 +190,35 @@ export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
                     })}
                 </ul>
             )}
+
+            <Modal
+                title={editingDoc ? `Editar contenido — ${editingDoc.file_name}` : 'Editar contenido'}
+                open={!!editingDoc}
+                onClose={() => setEditingDoc(null)}
+                size="3xl"
+            >
+                <div className="space-y-3">
+                    <p className="text-xs text-gray-500">
+                        Este es el texto en Markdown que el asistente usa como conocimiento — corregilo acá si detectaste un error
+                        (por ejemplo, de una transcripción de OCR) sin tener que resubir el archivo entero.
+                    </p>
+                    <Textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="min-h-[50vh] font-mono text-xs"
+                        disabled={isSavingEdit}
+                    />
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setEditingDoc(null)} disabled={isSavingEdit}>
+                            Cancelar
+                        </Button>
+                        <Button type="button" onClick={handleSaveEdit} disabled={isSavingEdit || !editContent.trim()}>
+                            <Save className="w-4 h-4 mr-1.5" />
+                            Guardar
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

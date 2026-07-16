@@ -166,6 +166,11 @@ class AIService {
   static async deleteExpertDocument(expertId, docId) {
     return ApiClient.delete(`/ai/experts/${expertId}/documents/${docId}`);
   }
+
+  /** Corrige a mano el contenido ya ingerido de un documento (ej. un error de OCR) */
+  static async updateExpertDocument(expertId, docId, contentMarkdown) {
+    return ApiClient.put(`/ai/experts/${expertId}/documents/${docId}`, { content_markdown: contentMarkdown });
+  }
 }
 
 export default AIService;

@@ -298,6 +298,40 @@ func DeleteAIExpertDocument(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// UpdateAIExpertDocument permite corregir a mano el contenido ya ingerido de
+// un documento (ej. un error de transcripción de OCR en un PDF escaneado),
+// sin tener que borrar y resubir el archivo entero.
+func UpdateAIExpertDocument(c *gin.Context) {
+	expert, ok := findExpertScoped(c, c.Param("id"))
+	if !ok {
+		return
+	}
+	docID := c.Param("docId")
+
+	var doc models.AIExpertDocument
+	if err := database.DB.Where("id = ? AND expert_id = ?", docID, expert.ID).First(&doc).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Documento no encontrado"})
+		return
+	}
+
+	var input struct {
+		ContentMarkdown string `json:"content_markdown"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.ContentMarkdown) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "El contenido no puede estar vacío"})
+		return
+	}
+
+	doc.ContentMarkdown = input.ContentMarkdown
+	doc.CharCount = len(input.ContentMarkdown)
+	doc.Status = "ready"
+	doc.ErrorMessage = ""
+	database.DB.Save(&doc)
+
+	reindexExpertChunks(expert.ID)
+	c.JSON(http.StatusOK, doc)
+}
+
 // reindexExpertChunks recalcula los chunks de búsqueda por texto de un
 // experto tras agregar/eliminar un documento: si el conocimiento total sigue
 // bajo expertKnowledgeThreshold no hacen falta chunks (se borran los que

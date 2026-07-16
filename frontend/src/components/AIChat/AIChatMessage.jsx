@@ -1,6 +1,58 @@
 import { Bot, User, Copy, Check, AlertCircle, Sparkles, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import AIChatItineraryResult from './AIChatItineraryResult';
+
+// Componentes de Markdown para la respuesta del asistente: la burbuja de
+// chat es angosta (max-w-[78%]), así que los headers/listas de un artículo
+// largo se ven exagerados acá — se estilizan más chicos y compactos que el
+// default de un renderer de Markdown pensado para una página.
+const MARKDOWN_COMPONENTS = {
+    h1: ({ children }) => <h1 className="text-sm font-semibold mt-2 mb-1 first:mt-0">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-sm font-semibold mt-2 mb-1 first:mt-0">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-[13px] font-semibold mt-1.5 mb-1 first:mt-0">{children}</h3>,
+    p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
+    ul: ({ children }) => <ul className="list-disc pl-4 space-y-0.5 mb-1.5 last:mb-0">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal pl-4 space-y-0.5 mb-1.5 last:mb-0">{children}</ol>,
+    li: ({ children }) => <li className="pl-0.5">{children}</li>,
+    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+    a: ({ children, href }) => (
+        <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2 text-blue-600 dark:text-blue-400 hover:text-blue-500">
+            {children}
+        </a>
+    ),
+    blockquote: ({ children }) => (
+        <blockquote className="border-l-2 border-zinc-300 dark:border-zinc-600 pl-2 my-1.5 text-zinc-600 dark:text-zinc-400">
+            {children}
+        </blockquote>
+    ),
+    // react-markdown v9+ ya no manda un prop "inline" al componente code —
+    // se infiere: un bloque con ``` viene con className "language-xxx" (aunque
+    // no tenga lenguaje declarado, su contenido de texto igual trae un \n
+    // final), mientras que un span inline de una sola línea nunca lo tiene.
+    code: ({ className, children }) => {
+        const isBlock = /language-/.test(className || '') || String(children).includes('\n');
+        return isBlock ? (
+            <code className="font-mono text-[13px]">{children}</code>
+        ) : (
+            <code className="bg-zinc-200 dark:bg-zinc-700 rounded px-1 py-0.5 font-mono text-[13px]">{children}</code>
+        );
+    },
+    pre: ({ children }) => (
+        <pre className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 my-1.5 overflow-x-auto">
+            {children}
+        </pre>
+    ),
+    hr: () => <hr className="my-2 border-zinc-200 dark:border-zinc-700" />,
+    table: ({ children }) => (
+        <div className="overflow-x-auto my-1.5">
+            <table className="text-[13px] border-collapse">{children}</table>
+        </div>
+    ),
+    th: ({ children }) => <th className="border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-left font-semibold">{children}</th>,
+    td: ({ children }) => <td className="border border-zinc-300 dark:border-zinc-600 px-2 py-1">{children}</td>,
+};
 
 const TOOL_LABELS = {
     buscar_productos:  '🔍 Buscando productos',
@@ -103,7 +155,15 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
                     )}
 
                     {/* Texto */}
-                    <div className="whitespace-pre-wrap break-words leading-relaxed">{message}</div>
+                    {isUser ? (
+                        <div className="whitespace-pre-wrap break-words leading-relaxed">{message}</div>
+                    ) : (
+                        <div className="break-words leading-relaxed [&>*:last-child]:mb-0">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                                {message}
+                            </ReactMarkdown>
+                        </div>
+                    )}
 
                     {/* Resultado enriquecido de tools de itinerario (si corresponde) */}
                     {!isUser && <AIChatItineraryResult toolCalls={toolCalls} />}
