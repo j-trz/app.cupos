@@ -59,11 +59,7 @@ curl http://localhost:3001/health
    - 📝 **Anotar**: Cantidad de datos en `labels` array
 
 2. **Test 5**: Evolución con filtro temporada
-<<<<<<< HEAD
    - Endpoint: `POST /api/evolucion-pasajeros`
-=======
-   - Endpoint: `POST /api/evolucion-pasajeros` 
->>>>>>> main
    - Body: `{"userId": "TU_ID", "Temporada": "Verano 2026"}`
    - 📝 **Comparar**: Debe tener MENOS datos que Test 4
 
@@ -76,11 +72,7 @@ curl http://localhost:3001/health
 
 ### ✅ CORRECCIÓN FUNCIONANDO:
 - Test 4 (sin filtros): 10+ elementos en `labels`
-<<<<<<< HEAD
 - Test 5 (con filtro): 3-5 elementos en `labels`
-=======
-- Test 5 (con filtro): 3-5 elementos en `labels` 
->>>>>>> main
 - Test 6 (con filtro): 2-4 elementos en `labels`
 - Los arrays son DIFERENTES entre tests
 
@@ -129,11 +121,7 @@ Content-Type: application/json
 Si quieres verificar rápido que funciona:
 
 1. Ejecutar Test 4 → Anotar cantidad de labels: `X`
-<<<<<<< HEAD
 2. Ejecutar Test 5 → Anotar cantidad de labels: `Y`
-=======
-2. Ejecutar Test 5 → Anotar cantidad de labels: `Y`  
->>>>>>> main
 3. Si `Y < X` → ✅ **FUNCIONA!**
 4. Si `Y = X` → ❌ **AÚN HAY BUG**
 

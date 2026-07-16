@@ -10,26 +10,15 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
   useEffect(() => {
     // No crear el gráfico si está en loading o si no hay referencia al canvas
     if (isLoading || !chartRef.current) return;
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> main
     // Registrar el plugin para doughnut y bar (necesario para mostrar etiquetas en barras redondeadas)
     if ((chartType === 'doughnut' || chartType === 'bar') && !Chart.registry.plugins.get('datalabels')) {
       Chart.register(ChartDataLabels);
     }
-<<<<<<< HEAD
 
     // Verificar nuevamente que el canvas existe antes de obtener el contexto
     if (!chartRef.current) return;
 
-=======
-    
-    // Verificar nuevamente que el canvas existe antes de obtener el contexto
-    if (!chartRef.current) return;
-    
->>>>>>> main
     const ctx = chartRef.current.getContext('2d');
     if (chartInstanceRef.current) {
       chartInstanceRef.current.destroy();
@@ -217,11 +206,7 @@ export default function DashboardChart({ chartData, chartType = 'bar', title, is
   const hasValues = Array.isArray(safeChartData.values) && safeChartData.values.length > 0;
   const hasDatasets = Array.isArray(safeChartData.datasets) && safeChartData.datasets.length > 0;
   const hasData = hasLabels && (hasValues || hasDatasets);
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> main
   if (isLoading) {
     return (
       <div className="w-full bg-white rounded-lg shadow-md p-4 mb-4 border border-[#304D85] relative">

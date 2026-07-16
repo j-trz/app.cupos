@@ -61,26 +61,16 @@
    - Seleccionar "Free" para empezar
 
 5. **Variables de Entorno (Environment Variables):**
-<<<<<<< HEAD
 
    Agregar las siguientes (sin comillas en los valores):
 
-=======
-   
-   Agregar las siguientes (sin comillas en los valores):
-   
->>>>>>> main
    ```
    SUPABASE_URL=https://tuproyecto.supabase.co
    SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
    JWT_SECRET=genera_una_clave_segura_aleatoria
    NODE_ENV=production
    ```
-<<<<<<< HEAD
 
-=======
-   
->>>>>>> main
    **IMPORTANTE**: NO agregues PORT, Render lo asigna automáticamente
 
 6. **Deploy:**
@@ -130,11 +120,7 @@ Deberías ver:
    ```
 
 4. **Variables de Entorno:**
-<<<<<<< HEAD
 
-=======
-   
->>>>>>> main
    Agregar en Vercel:
    ```
    VITE_API_URL=https://panel-cupos.onrender.com
@@ -190,11 +176,7 @@ Si la URL del backend cambió:
 
 ### Error de CORS
 
-<<<<<<< HEAD
 **Síntomas:**
-=======
-**Síntomas:** 
->>>>>>> main
 - "Access to fetch... has been blocked by CORS policy"
 
 **Solución:**
@@ -294,11 +276,7 @@ npm run preview # preview de producción
 
 4. **Backups:** Considera hacer backups regulares de Supabase
 
-<<<<<<< HEAD
 5. **Costos:**
-=======
-5. **Costos:** 
->>>>>>> main
    - Vercel: Gratis para proyectos personales
    - Render: Gratis con limitaciones (servicio se apaga tras inactividad)
    - Supabase: Gratis hasta 500MB de storage y 2GB de transferencia

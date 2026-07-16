@@ -102,11 +102,7 @@ const additionalData = await getAdditionalChartData({ userId, filters });
 - 📈 **Mejora**: 60-70% reducción
 
 #### **Cargas Posteriores (Con Caché)**
-<<<<<<< HEAD
 - ✅ **Esperado**: 1-3 segundos
-=======
-- ✅ **Esperado**: 1-3 segundos  
->>>>>>> main
 - ✅ **Antes**: 8-12 segundos
 - 📈 **Mejora**: 80-90% reducción
 

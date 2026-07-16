@@ -64,22 +64,14 @@ const results = await Promise.allSettled(filePromises);
 router.post('/api/dashboard-data', async (req, res) => {
   // 1. Cargar datos una sola vez (con caché)
   const { cuposData, pasajerosData } = await loadDataFromBucket(userId);
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> main
   // 2. Procesamiento paralelo de todos los reportes
   const promises = [
     generateFieldsData(),
     generateEvolucionPasajeros(),
     generateDetalleDestinos()
   ];
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> main
   const results = await Promise.all(promises);
   // Devolver todo en una respuesta
 });
@@ -99,11 +91,7 @@ router.post('/api/dashboard-data', async (req, res) => {
 ```javascript
 // ❌ Problemático: 8-12 segundos total
 const data1 = await getEvolucionPasajeros();     // 3s
-<<<<<<< HEAD
 const data2 = await getDetalleDestinos();        // 3s
-=======
-const data2 = await getDetalleDestinos();        // 3s  
->>>>>>> main
 const data3 = await getAgenciasData();           // 2s
 const data4 = await getEvolucionAgencias();      // 2s
 const data5 = await getDestinosCompania();       // 2s
@@ -253,11 +241,7 @@ const results = await Promise.allSettled(promises);
 
 ### **Listo para Deploy**
 - [x] Backend optimizado
-<<<<<<< HEAD
 - [x] Frontend optimizado
-=======
-- [x] Frontend optimizado  
->>>>>>> main
 - [x] Documentación completa
 - [x] Estrategias de fallback
 

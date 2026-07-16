@@ -66,7 +66,20 @@ export default function useAIChat({ initialSessionId = null } = {}) {
         setMessages([{ ...WELCOME_MESSAGE, created_at: new Date().toISOString() }]);
     }, []);
 
-    const handleSendMessage = useCallback(async (content, attachments = [], onNewMessage) => {
+    // options: { onNewMessage, pageContext, onResponse }
+    // - onNewMessage(content): se llama con el texto de la respuesta, para
+    //   que el widget flotante actualice su badge de "no leído".
+    // - pageContext: contexto efímero de la pantalla actual (ver
+    //   AIPageContext.jsx) — se reenvía tal cual al backend para que la IA
+    //   pueda responder sobre lo que el usuario ve y resolver referencias
+    //   posicionales ("la primera opción").
+    // - onResponse(response): se llama con la respuesta cruda del backend
+    //   ANTES de tocar el estado de mensajes, para que el llamador pueda
+    //   reaccionar a cosas ajenas al chat en sí (ej. `response.ui_actions` —
+    //   navegar de pantalla, abrir un modal) sin que este hook tenga que
+    //   saber nada de React Router ni del contexto de pantalla.
+    const handleSendMessage = useCallback(async (content, attachments = [], options = {}) => {
+        const { onNewMessage, pageContext, onResponse } = options;
         const activeAttachments = Array.isArray(attachments) ? attachments : (attachments ? [attachments] : []);
 
         const userMessage = {
@@ -82,7 +95,11 @@ export default function useAIChat({ initialSessionId = null } = {}) {
         setError(null);
 
         try {
-            const response = await AIService.sendMessage(content, currentSessionId, activeAttachments, null, selectedExpertId);
+            const response = await AIService.sendMessage(content, currentSessionId, activeAttachments, null, selectedExpertId, pageContext);
+
+            if (onResponse) {
+                onResponse(response);
+            }
 
             if (!currentSessionId && response.sessionId) {
                 setCurrentSessionId(response.sessionId);
