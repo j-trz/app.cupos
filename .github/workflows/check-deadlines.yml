@@ -10,11 +10,17 @@ on:
     - cron: '0 12 * * *'
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   check-deadlines:
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnóstico temporal
+      - uses: actions/checkout@v4
+        with:
+          ref: diag/cron-debug
+      - name: Diagnóstico temporal (commitea el resultado al repo)
         run: |
           {
             echo "BACKEND_URL length: ${#BACKEND_URL}"
@@ -26,15 +32,13 @@ jobs:
             echo "HTTP_CODE=$code"
             echo "BODY:"
             cat /tmp/resp.txt
-          } > /tmp/diag.txt 2>&1
-          cat /tmp/diag.txt
+          } > diag_output.txt 2>&1
+          cat diag_output.txt
+          git config user.name "diag-bot"
+          git config user.email "diag-bot@users.noreply.github.com"
+          git add diag_output.txt
+          git commit -m "diag output"
+          git push origin HEAD:diag/cron-debug
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-      - name: Subir diagnóstico como artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cron-diag
-          path: /tmp/diag.txt
-          retention-days: 1
