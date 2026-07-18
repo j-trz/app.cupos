@@ -14,7 +14,27 @@ jobs:
   check-deadlines:
     runs-on: ubuntu-latest
     steps:
-      - name: Llamar al endpoint de chequeo de vencimientos
+      - name: Diagnóstico temporal
         run: |
-          curl -sf -X GET "${{ secrets.BACKEND_URL }}/api/cron/check-deadlines" \
-            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
+          {
+            echo "BACKEND_URL length: ${#BACKEND_URL}"
+            echo "CRON_SECRET length: ${#CRON_SECRET}"
+            echo "BACKEND_URL: ${BACKEND_URL}"
+            echo "---"
+            code=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X GET "${BACKEND_URL}/api/cron/check-deadlines" \
+              -H "X-Cron-Secret: ${CRON_SECRET}")
+            echo "HTTP_CODE=$code"
+            echo "BODY:"
+            cat /tmp/resp.txt
+          } > /tmp/diag.txt 2>&1
+          cat /tmp/diag.txt
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      - name: Subir diagnóstico como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cron-diag
+          path: /tmp/diag.txt
+          retention-days: 1
