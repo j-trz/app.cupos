@@ -231,6 +231,7 @@ func main() {
 				ai.POST("/experts/:id/documents", middleware.AgencyAdminOrAdmin(), handlers.UploadAIExpertDocument)
 				ai.GET("/experts/:id/documents", handlers.ListAIExpertDocuments)
 				ai.DELETE("/experts/:id/documents/:docId", middleware.AgencyAdminOrAdmin(), handlers.DeleteAIExpertDocument)
+				ai.PUT("/experts/:id/documents/:docId", middleware.AgencyAdminOrAdmin(), handlers.UpdateAIExpertDocument)
 			}
 
 			// CRUD Dinámico (Data)
