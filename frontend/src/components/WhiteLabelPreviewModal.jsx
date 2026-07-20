@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Monitor, Smartphone, Mail, LayoutDashboard, Eye } from 'lucide-react';
+import { X, Monitor, Smartphone, Mail, LayoutDashboard, Eye, FileText, PlaneTakeoff } from 'lucide-react';
 import Button from './ui/Button.jsx';
 
 function PreviewSidebarPreview({ config, collapsed }) {
@@ -96,34 +96,69 @@ function PreviewCardPreview({ config }) {
     );
 }
 
-function PreviewLoginPreview({ config }) {
+function PreviewItineraryPreview({ config }) {
+    const id = config?.identity || {};
     const c = config?.colors || {};
-    const f = config?.fonts || {};
-    const b = config?.buttons || {};
-    const radiusMap = { sm: '6px', md: '8px', lg: '12px', xl: '16px', full: '9999px' };
+    const primaryColor = c.primary || '#3b82f6';
+    const logoUrl = id.pdf_logo_url || id.logoUrl || '';
 
     return (
-        <div className="flex items-center justify-center min-h-[300px] rounded-xl" style={{ backgroundColor: c.background || '#ffffff', fontFamily: f.body }}>
-            <div className="w-full max-w-sm p-6 rounded-xl border" style={{ backgroundColor: c.surface || '#ffffff', borderColor: c.border || '#e2e8f0' }}>
-                <div className="text-center mb-6">
-                    <div className="h-12 w-12 rounded-lg mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: c.primary || '#3b82f6' }}>
-                        <Eye className="h-6 w-6 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold" style={{ color: c.text_primary || '#0f172a', fontFamily: f.heading }}>
-                        {config?.identity?.agency_name || 'Mi Agencia'}
-                    </h2>
-                    <p className="text-sm mt-1" style={{ color: c.text_secondary || '#64748b' }}>
-                        {config?.identity?.slogan || 'Inicia sesión para continuar'}
-                    </p>
+        <div className="bg-white mx-auto p-4 md:p-6 w-full max-w-2xl border shadow-sm rounded-lg" style={{ color: '#1e293b', fontSize: '12px', fontFamily: config?.fonts?.body }}>
+            <div className="flex justify-between items-center border-b pb-4 mb-4" style={{ borderColor: c.border || '#e2e8f0' }}>
+                <div className="flex items-center gap-3">
+                    {id.pdf_show_logo !== false && logoUrl ? (
+                        <img src={logoUrl} alt="Logo" className="h-8 object-contain" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    ) : (
+                        <div className="h-8 w-8 rounded bg-slate-200 flex items-center justify-center text-lg">✈️</div>
+                    )}
                 </div>
-                <div className="space-y-3">
-                    <input type="text" placeholder="Email" className="w-full px-3 py-2 text-sm rounded-md border" style={{ backgroundColor: c.background, borderColor: c.border, color: c.text_primary, fontFamily: f.body }} readOnly />
-                    <input type="password" placeholder="Contraseña" className="w-full px-3 py-2 text-sm rounded-md border" style={{ backgroundColor: c.background, borderColor: c.border, color: c.text_primary, fontFamily: f.body }} readOnly />
-                    <button className="w-full py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90" style={{
-                        backgroundColor: c.primary || '#3b82f6',
-                        borderRadius: radiusMap[b.borderRadius] || '8px',
-                        fontWeight: b.fontWeight || '500',
-                    }}>Iniciar sesión</button>
+                <div className="text-base font-bold" style={{ color: primaryColor, fontFamily: config?.fonts?.heading }}>Detalle de Itinerario</div>
+            </div>
+
+            <div className="flex justify-between items-start border rounded-lg p-3 mb-4" style={{ borderColor: c.border || '#e2e8f0' }}>
+                <div>
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase">Pasajero(s)</div>
+                    <div className="text-sm font-bold mt-1">Juan Pérez</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase">Código de Reserva</div>
+                    <div className="text-sm font-bold mt-1">ABC123</div>
+                    <div className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 bg-green-100 text-green-800">Confirmado</div>
+                </div>
+            </div>
+
+            <div className="border rounded-lg p-4 mb-4" style={{ borderColor: c.border || '#e2e8f0' }}>
+                <div className="flex items-start gap-3 border-b pb-3 mb-3" style={{ borderColor: c.border || '#e2e8f0' }}>
+                    <PlaneTakeoff size={18} style={{ color: primaryColor }} />
+                    <div>
+                        <div className="text-sm font-bold">BUE (Ezeiza) → MIA (Miami)</div>
+                        <div className="text-xs text-slate-500 mt-1">American Airlines - AA 900</div>
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                    <div>
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase">Salida</div>
+                        <div className="text-xs mt-1">15OCT25</div>
+                        <div className="text-sm font-bold">20:30</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase">Llegada (+1)</div>
+                        <div className="text-xs mt-1">16OCT25</div>
+                        <div className="text-sm font-bold">04:40</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase">Duración</div>
+                        <div className="text-xs mt-1">9h 10m</div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="text-center pt-4 border-t mt-4" style={{ borderColor: c.border || '#e2e8f0' }}>
+                <div className="text-xs text-slate-600 whitespace-pre-line">{id.pdf_footer_message || 'Mensaje para el viajero...'}</div>
+                <div className="text-xs text-slate-400 mt-2 font-medium">
+                    {id.address && <>{id.address}</>}
+                    {id.phone && <>{id.address ? ' · ' : ''}Tel: {id.phone}</>}
+                    {id.contact_email && <>{(id.address || id.phone) ? ' · ' : ''}{id.contact_email}</>}
                 </div>
             </div>
         </div>
@@ -170,7 +205,7 @@ function PreviewEmailPreview({ config }) {
 
 const previewModes = [
     { id: 'sidebar', label: 'Sidebar', icon: LayoutDashboard },
-    { id: 'login', label: 'Login', icon: Eye },
+    { id: 'itinerary', label: 'Itinerario PDF', icon: FileText },
     { id: 'card', label: 'Tarjeta', icon: LayoutDashboard },
     { id: 'email', label: 'Email', icon: Mail },
 ];
@@ -236,9 +271,9 @@ export default function WhiteLabelPreviewModal({ open, onClose, config }) {
                             </div>
                         </div>
                     )}
-                    {mode === 'login' && (
-                        <div className="bg-white rounded-xl shadow-lg p-6">
-                            <PreviewLoginPreview config={config} />
+                    {mode === 'itinerary' && (
+                        <div className="bg-slate-50 rounded-xl p-6">
+                            <PreviewItineraryPreview config={config} />
                         </div>
                     )}
                     {mode === 'card' && (

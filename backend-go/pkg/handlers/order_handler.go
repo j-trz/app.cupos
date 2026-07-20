@@ -480,6 +480,14 @@ func ConfirmReservation(c *gin.Context) {
 		return
 	}
 
+	// Las reservas expiradas volvieron al stock; no se pueden reactivar.
+	if reservation.Estado == models.EstadoExpirada ||
+		reservation.Estado == models.EstadoCancelada ||
+		reservation.Estado == models.EstadoSolicitudCancelacion {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No se puede confirmar una reserva expirada, cancelada o en solicitud de cancelación."})
+		return
+	}
+
 	reservation.Estado = models.EstadoConfirmada
 	database.DB.Save(&reservation)
 	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).
@@ -514,7 +522,10 @@ func DeleteReservation(c *gin.Context) {
 	found := false
 	if err := database.DB.First(&reservation, id).Error; err == nil {
 		found = true
-		// Devolver disponibilidad
+	}
+	// Devolver disponibilidad solo si el cron NO lo hizo ya.
+	// Las reservas expiradas ya tuvieron su stock devuelto por expireOverdueReservations.
+	if found && reservation.Estado != models.EstadoExpirada {
 		var passengersCount int64
 		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
 		if passengersCount == 0 {
@@ -523,8 +534,8 @@ func DeleteReservation(c *gin.Context) {
 
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("disponibilidad + ?", passengersCount),
-				"vendidos":       gorm.Expr("vendidos - ?", passengersCount),
+				"disponibilidad": gorm.Expr("GREATEST(0, disponibilidad + ?)", passengersCount),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
 			})
 	}
 
@@ -649,8 +660,13 @@ func AddDocContable(c *gin.Context) {
 		return
 	}
 
-	if reservation.Estado == models.EstadoCancelada || reservation.Estado == models.EstadoSolicitudCancelacion || reservation.Estado == models.EstadoExpirada {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No se puede confirmar una reserva cancelada, expirada o en solicitud de cancelación."})
+	if reservation.Estado == models.EstadoExpirada {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "La reserva expiró y ya no es válida. No se puede asignar documento contable."})
+		return
+	}
+
+	if reservation.Estado == models.EstadoCancelada || reservation.Estado == models.EstadoSolicitudCancelacion {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No se puede confirmar una reserva cancelada o en solicitud de cancelación."})
 		return
 	}
 
@@ -882,6 +898,15 @@ func UpdatePassengerTicket(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// No se puede editar un pasajero cuya reserva expiró.
+	var parentReservation models.Reservation
+	if err := database.DB.First(&parentReservation, reservationID).Error; err == nil {
+		if parentReservation.Estado == models.EstadoExpirada {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "La reserva expiró y ya no es válida. No se puede modificar el pasajero."})
+			return
+		}
 	}
 
 	updates := map[string]interface{}{}

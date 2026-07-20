@@ -46,7 +46,7 @@ const SECTION_PAD = "space-y-6";
 
 // ─── Default config ───────────────────────────────────────────
 const DEFAULT_CONFIG = {
-    identity: { agency_name: '', contact_email: '', slogan: '', logoUrl: '', faviconUrl: '', phone: '', address: '', pdf_footer_message: '¡Estimado pasajero, le deseamos un muy buen viaje!', pdf_show_logo: true },
+    identity: { agency_name: '', contact_email: '', slogan: '', logoUrl: '', faviconUrl: '', phone: '', address: '', pdf_footer_message: '¡Estimado pasajero, le deseamos un muy buen viaje!', pdf_show_logo: true, pdf_logo_url: '' },
     colors: {
         primary: '#3b82f6', secondary: '#64748b', background: '#ffffff',
         surface: '#f8fafc', text_primary: '#0f172a', text_secondary: '#64748b',
@@ -617,8 +617,8 @@ export default function WhiteLabelConfig() {
                                     <div className="rounded-xl overflow-hidden border border-slate-200 mb-6">
                                         <div style={{ background: c.primary, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-                                                {id.pdf_show_logo !== false && id.logoUrl ? (
-                                                    <img src={id.logoUrl} alt="Logo" style={{ height: 40, width: 'auto', objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.15)', padding: 4 }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                                                {id.pdf_show_logo !== false && (id.pdf_logo_url || id.logoUrl) ? (
+                                                    <img src={id.pdf_logo_url || id.logoUrl} alt="Logo" style={{ height: 40, width: 'auto', objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.15)', padding: 4 }} onError={e => { e.currentTarget.style.display = 'none'; }} />
                                                 ) : (
                                                     <div style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>✈️</div>
                                                 )}
@@ -675,6 +675,14 @@ export default function WhiteLabelConfig() {
                                                 </div>
                                                 <span className="text-sm font-medium text-slate-700">Mostrar logo de la agencia en el PDF</span>
                                             </label>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="mb-1 block text-xs font-medium text-slate-600">Logo específico para PDF (URL)</label>
+                                            <div className="relative">
+                                                <Image className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <input type="text" value={id.pdf_logo_url || ''} onChange={e => up('identity', 'pdf_logo_url', e.target.value)}
+                                                    className={`${INPUT_CLASSES} pl-10`} placeholder="Dejar en blanco para usar el logo principal del sitio" />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
