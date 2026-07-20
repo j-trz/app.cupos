@@ -130,7 +130,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
   const { config } = useWhiteLabel();
 
   const primaryColor = config?.colors?.primary || '#304D85';
-  const agencyName = config?.identity?.agency_name || '';
   const agencyEmail = config?.identity?.contact_email || '';
   const logoUrl = config?.identity?.pdf_logo_url || config?.identity?.logoUrl || '';
   const agencyPhone = config?.identity?.phone || '';
@@ -314,7 +313,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                 const logoSrc = AIRLINE_LOGOS[code] || FALLBACK_LOGO;
                 const originName = AIRPORTS[(vuelo.origen || '').toUpperCase().trim()] || vuelo.origen || '';
                 const destName = AIRPORTS[(vuelo.destino || '').toUpperCase().trim()] || vuelo.destino || '';
-                
+
                 const LegIcon = i === 0 ? PlaneTakeoff : i === total - 1 ? PlaneLanding : Plane;
                 const duracion = computeDuration(vuelo, referenceYear);
                 const salidaHora = displayHHmm(parseHHmm(vuelo.salida)) || vuelo.salida || '';
@@ -419,7 +418,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
         <div className="footer">
           <p style={{ whiteSpace: 'pre-line', marginBottom: '1rem', color: '#0f172a' }}>{pdfFooterMessage}</p>
           <p>
-            {agencyName} {agencyAddress ? ` - ${agencyAddress}` : ''} 
+            {agencyAddress ? ` - ${agencyAddress}` : ''}
             {agencyPhone ? ` - Tel: ${agencyPhone}` : ''}
             {agencyEmail ? ` - ${agencyEmail}` : ''}
           </p>
