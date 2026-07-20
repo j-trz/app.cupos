@@ -685,7 +685,7 @@ export default function GestionReservas() {
                       <button type="button" onClick={() => openTicketModal(row)} className="text-xs font-mono text-slate-700 hover:underline">
                         {row.numeroTicket}
                       </button>
-                    ) : row.passengerId ? (
+                    ) : (row.passengerId && row.estado !== 'expirada' && row.estado !== 'cancelada') ? (
                       <button type="button" onClick={() => openTicketModal(row)}
                         className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 underline">
                         <Ticket className="h-3 w-3" /> Asignar
@@ -711,7 +711,7 @@ export default function GestionReservas() {
                           </Button>
                         </>
                       )}
-                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && (
+                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && r.estado !== 'expirada' && r.estado !== 'cancelada' && (
                         <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar pedido completo">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         </Button>

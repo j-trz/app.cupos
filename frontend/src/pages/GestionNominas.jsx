@@ -267,7 +267,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </span>
 
-        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-4 gap-1 sm:gap-4 items-center">
+        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-4 items-center">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
               {product?.destino || 'Destino desconocido'}
@@ -280,7 +280,13 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
           <div className="hidden sm:block">
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Salida</p>
             <p className="text-sm text-zinc-700 dark:text-zinc-300">
-              {formatDate(product?.fecha_salida || product?.salida)}
+              {formatDate(product?.fecha_salida || product?.salida) || '—'}
+            </p>
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Temporada</p>
+            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+              {product?.temporada || '—'}
             </p>
           </div>
           <div className="hidden sm:block">
@@ -319,6 +325,8 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                 <TableHead>Nacionalidad</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Salida</TableHead>
+                <TableHead>Temporada</TableHead>
                 <TableHead>Agencia</TableHead>
                 <TableHead>Origen</TableHead>
                 <TableHead>Contacto</TableHead>
@@ -355,6 +363,12 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                     <Badge variant={getBadgeVariant(row.estado)}>
                       {getEstadoLabel(row.estado)}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                    {formatDate(product?.fecha_salida || product?.salida) || '—'}
+                  </TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                    {product?.temporada || '—'}
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">
                     {agencyName(row.agencia)}
@@ -479,9 +493,11 @@ export default function GestionNominas() {
           ? productsResult.data
           : [];
 
-      // "cedido" es una línea de auditoría de la agencia cedente (stock que
-      // salió de su pool), no un pasajero real — no corresponde en la nómina.
-      setReservations(orders.filter((r) => r.estado !== 'cedido'));
+      // Excluimos de la nómina:
+      // - "cedido": línea de auditoría de cesión saliente, no es un pasajero real.
+      // - "expirada": el bloqueo temporal venció, el stock ya fue devuelto al
+      //   producto por el cron. No pertenece a la nómina operativa.
+      setReservations(orders.filter((r) => r.estado !== 'cedido' && r.estado !== 'expirada'));
       setProducts(prods);
     } catch (err) {
       console.error('Error loading nominas data:', err);

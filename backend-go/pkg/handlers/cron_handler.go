@@ -88,9 +88,16 @@ func expireOverdueReservations(now time.Time) int {
 		}
 		database.DB.Model(&models.Product{}).Where("id = ?", r.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("disponibilidad + ?", passengersCount),
-				"vendidos":       gorm.Expr("vendidos - ?", passengersCount),
+				// GREATEST(0, ...) evita disponibilidad negativa en edge cases
+				// (ej. si la cesión ya devolvió ese stock por otro camino).
+				"disponibilidad": gorm.Expr("GREATEST(0, disponibilidad + ?)", passengersCount),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
 			})
+		database.DB.Create(&models.SystemLog{
+			Level:   "info",
+			Source:  "cron",
+			Message: fmt.Sprintf("Vencimiento: se liberaron %d lugar(es) del producto %d (pedido %s)", passengersCount, r.ProductID, r.PedidoID),
+		})
 
 		database.DB.Model(&models.Reservation{}).Where("id = ?", r.ID).Update("estado", models.EstadoExpirada)
 		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", r.ID).Update("estado", models.EstadoExpirada)
