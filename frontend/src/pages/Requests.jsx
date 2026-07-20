@@ -372,6 +372,8 @@ export default function Requests() {
                   <TableCell className="text-center">
                     {item.Doc_Contable ? (
                       <span className="text-xs font-mono text-green-700 bg-green-50 px-2 py-1 rounded">{item.Doc_Contable}</span>
+                    ) : (item.Estado?.toLowerCase() === 'cancelada' || item.Estado?.toLowerCase() === 'cancelado' || item.Estado?.toLowerCase() === 'solicitud_cancelacion' || item.Estado?.toLowerCase() === 'expirada') ? (
+                      <span className="text-slate-400">—</span>
                     ) : (
                       <Button
                         size="sm"

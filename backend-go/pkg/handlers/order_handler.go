@@ -649,6 +649,11 @@ func AddDocContable(c *gin.Context) {
 		return
 	}
 
+	if reservation.Estado == models.EstadoCancelada || reservation.Estado == models.EstadoSolicitudCancelacion || reservation.Estado == models.EstadoExpirada {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No se puede confirmar una reserva cancelada, expirada o en solicitud de cancelación."})
+		return
+	}
+
 	var input struct {
 		DocContable string `json:"doc_contable"`
 	}
@@ -808,7 +813,7 @@ func GetBlockedReservations(c *gin.Context) {
 	agenciaRaw, _ := agenciaVal.(string)
 	agencia := services.ResolveAgencyCode(agenciaRaw)
 
-	query := database.DB.Model(&models.Reservation{}).Where("estado = ?", models.EstadoBloqueoTemporal)
+	query := database.DB.Preload("Product").Model(&models.Reservation{}).Where("estado = ?", models.EstadoBloqueoTemporal)
 	if role != "admin" {
 		query = query.Where("LOWER(agencia) = LOWER(?)", agencia)
 	}
@@ -823,6 +828,8 @@ func GetBlockedReservations(c *gin.Context) {
 			"pedido_id":         r.PedidoID,
 			"vuelo_destino":     r.VueloDestino,
 			"bloqueo_expira_at": r.BloqueoExpiraAt,
+			"vuelo_salida":      r.VueloSalida,
+			"temporada":         r.Product.Temporada,
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{"data": result})
