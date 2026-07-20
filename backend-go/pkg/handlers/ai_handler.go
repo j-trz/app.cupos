@@ -110,7 +110,11 @@ func buildSystemPrompt(u userCtx, pageCtx *PageContextInput, experts []models.AI
 		expertsSection = fmt.Sprintf(`
 EXPERTOS DISPONIBLES (bases de conocimiento configuradas por tu agencia):
 %s
-Si el usuario pregunta algo que podría responderse con el conocimiento de alguno de estos expertos (políticas, FAQs, manuales, procedimientos internos, etc.), usá la tool "consultar_experto" pasando el nombre exacto del experto y la pregunta del usuario. No inventes contenido de estos temas sin haber consultado al experto primero.
+
+INSTRUCCIONES CRÍTICAS PARA CONSULTAR EXPERTOS:
+1. LLAMADO OBLIGATORIO: Si el usuario pregunta algo sobre políticas de cancelación, FAQs, manuales de aerolíneas/hoteles o cualquier tema de competencia de alguno de estos expertos, usá SIEMPRE la tool "consultar_experto" pasando el nombre exacto del experto y la pregunta del usuario. Nunca intentes adivinar ni responder de memoria sobre estas regulaciones.
+2. PROHIBIDO INVENTAR: Si el conocimiento devuelto por la tool no contiene la respuesta, o si la tool retorna un error, responde diciendo clara y honestamente que no dispones de esa información en los manuales de la agencia. No inventes ni supongas nada.
+3. TONO DE MAESTRO EXPLICATIVO: Tu tono de respuesta al usar la información de los expertos debe ser el de un maestro/tutor. Explica los conceptos de forma súper detallada y didáctica, paso a paso, con paciencia y total claridad. Desglosa los pasos, explica los requisitos o el porqué de las cosas para que el usuario aprenda perfectamente.
 `, strings.Join(lines, "\n"))
 	}
 
@@ -2306,7 +2310,12 @@ func Chat(c *gin.Context) {
 		for _, e := range experts {
 			if e.ID.String() == req.ExpertID {
 				systemPrompt += fmt.Sprintf(
-					"\n\nEXPERTO SELECCIONADO POR EL USUARIO: \"%s\". Priorizá consultar su conocimiento (tool consultar_experto con experto=\"%s\") para responder en este turno.",
+					"\n\n[INSTRUCCIÓN CRÍTICA DE EXPERTO]"+
+					"\nEl usuario ha seleccionado explícitamente al experto: \"%s\"."+
+					"\nDebes comportarte con el tono y conocimiento de este experto. Sigue estas directivas estrictamente:"+
+					"\n1. LLAMADO OBLIGATORIO: Llama inmediatamente a la tool \"consultar_experto\" con experto=\"%s\" y la pregunta del usuario para obtener la documentación y responder en base a ella. No intentes responder desde tu memoria."+
+					"\n2. PROHIBIDO INVENTAR: Si el conocimiento devuelto por la tool no contiene la respuesta, o si la tool retorna un error, responde diciendo clara y honestamente que no dispones de esa información en los manuales de la agencia. No inventes ni supongas nada."+
+					"\n3. TONO DE MAESTRO EXPLICATIVO: Tu tono de respuesta debe ser el de un maestro/tutor. Explica los conceptos de forma súper detallada y didáctica, paso a paso, con paciencia y claridad. No te limites a dar respuestas cortas de una línea o a copiar y pegar; desglosa los pasos, explica los requisitos o el porqué de las cosas para que el usuario aprenda.",
 					e.Name, e.Name,
 				)
 				break

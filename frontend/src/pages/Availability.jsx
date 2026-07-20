@@ -426,17 +426,33 @@ export default function Availability() {
               return (
                 <div
                   key={item.Pedido_ID || item.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-250/30 dark:border-amber-900/10 bg-white dark:bg-zinc-900 px-4 py-3 shadow-xs"
+                  className="flex flex-col justify-between gap-2.5 rounded-xl border border-amber-250/30 dark:border-amber-900/10 bg-white dark:bg-zinc-900 p-4 shadow-sm"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.Vuelo_Destino || '—'}</p>
-                    <p className="truncate text-[10px] text-zinc-400 dark:text-zinc-550 font-mono mt-0.5">{item.Pedido_ID}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">{item.Vuelo_Destino || '—'}</p>
+                      <p className="truncate text-[10px] text-zinc-400 dark:text-zinc-550 font-mono mt-0.5">{item.Pedido_ID}</p>
+                    </div>
+                    {expiry && (
+                      <span className={`flex shrink-0 items-center gap-1 text-xs font-bold ${expiry.color}`}>
+                        <Clock3 className="h-3 w-3" />
+                        {expiry.label}
+                      </span>
+                    )}
                   </div>
-                  {expiry && (
-                    <span className={`flex shrink-0 items-center gap-1 text-xs font-bold ${expiry.color}`}>
-                      <Clock3 className="h-3 w-3" />
-                      {expiry.label}
-                    </span>
+                  {(item.Vuelo_Salida || item.Temporada) && (
+                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-500 dark:text-zinc-400">
+                      {item.Vuelo_Salida && (
+                        <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-medium">
+                          Salida: {formatDate(item.Vuelo_Salida)}
+                        </span>
+                      )}
+                      {item.Temporada && (
+                        <span className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-md font-medium border border-amber-100 dark:border-amber-900/30">
+                          {item.Temporada}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               );

@@ -159,22 +159,25 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     .map((p) => `${p.nombre || ''} ${p.apellido || ''}`.trim())
     .filter(Boolean);
 
+  const headingFont = config?.fonts?.heading || 'Inter';
+  const bodyFont = config?.fonts?.body || 'Inter';
+  const monoFont = config?.fonts?.mono || 'JetBrains Mono';
+
   // CSS escopeada a .itinerary-content — un <style> con selector "body" acá
   // se aplicaría a TODA la página mientras el modal está abierto (un <style>
   // no queda contenido a su posición en el DOM), rompiendo el tamaño de letra
   // y color de fondo del resto de la app. Por eso todo cuelga de esta clase.
   const cssStyles = `
-    .itinerary-content { font-family: 'Inter', sans-serif; max-width: 900px; margin: 0 auto; padding: 8px 4px 24px; background: white; color: #1e293b; font-size: 12px; line-height: 1.5; }
+    .itinerary-content { font-family: "${bodyFont}", "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 8px 4px 24px; background: white; color: #1e293b; font-size: 12px; line-height: 1.5; }
     .itinerary-content * { box-sizing: border-box; }
     .itin-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; gap: 16px; flex-wrap: wrap; }
     .itin-header-left { display: flex; align-items: center; gap: 12px; }
     .itin-logo { height: 40px; width: auto; object-fit: contain; }
-    .itin-agency-name { font-size: 16px; font-weight: 700; color: #1e293b; }
-    .itin-title { font-size: 18px; font-weight: 800; color: ${primaryColor}; }
+    .itin-title { font-family: "${headingFont}", "Inter", sans-serif; font-size: 18px; font-weight: 800; color: ${primaryColor}; }
     .itin-info-bar { display: flex; justify-content: space-between; align-items: flex-start; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
     .itin-info-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
     .itin-info-value { font-size: 14px; font-weight: 700; color: #0f172a; }
-    .itin-section-title { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+    .itin-section-title { font-family: "${headingFont}", "Inter", sans-serif; font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
     .itin-segments-box { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
     .itin-segment { padding: 16px 18px; }
     .itin-segment + .itin-segment { border-top: 1px solid #f1f5f9; }
@@ -188,16 +191,26 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     .itin-grid-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
     .itin-grid-value { font-size: 12px; color: #334155; }
     .itin-grid-time { font-size: 13px; font-weight: 700; color: #0f172a; }
-    .itin-baggage-row { display: flex; flex-wrap: wrap; gap: 18px; padding-top: 10px; border-top: 1px dashed #e2e8f0; }
-    .itin-baggage-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; }
-    .itin-baggage-ok { color: #15803d; }
-    .itin-baggage-no { color: #94a3b8; text-decoration: line-through; text-decoration-thickness: 2px; }
     .itin-connection { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 500; color: #64748b; }
-    .itin-footer { text-align: center; margin-top: 8px; }
+    
+    .itin-baggage-section { margin-top: 24px; margin-bottom: 24px; }
+    .itin-baggage-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .itin-baggage-card { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .itin-baggage-card.included { border-left: 4px solid #166534; background: #f0fdf4; }
+    .itin-baggage-card.not-included { border-left: 4px solid #94a3b8; opacity: 0.6; }
+    .bag-icon { color: #475569; }
+    .itin-baggage-card.included .bag-icon { color: #166534; }
+    .bag-details { display: flex; flex-direction: column; }
+    .bag-title { font-size: 11px; font-weight: 600; color: #1e293b; }
+    .bag-status { font-size: 9px; font-weight: 700; color: #64748b; margin-top: 2px; }
+    .itin-baggage-card.included .bag-status { color: #166534; }
+
+    .itin-footer { text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
     .itin-footer-body { font-size: 11px; color: #475569; line-height: 1.7; white-space: pre-line; }
     .itin-footer-agency { font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 8px; }
     @media (max-width: 600px) {
       .itin-grid { grid-template-columns: 1fr; }
+      .itin-baggage-container { grid-template-columns: 1fr; }
     }
     @media print { .no-print { display: none !important; } @page { size: A4; margin: 15mm; } }
   `;
@@ -205,10 +218,66 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     const content = document.querySelector('.itinerary-content')?.innerHTML || '';
-    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Itinerario – ${codigoReserva}</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'); * { margin: 0; padding: 0; } ${cssStyles}</style></head><body><div class="itinerary-content">${content}</div></body></html>`);
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Itinerario – ${codigoReserva}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700&family=Lato:wght@400;700&family=Nunito:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+          :root {
+            --font-heading: "${headingFont}", ui-sans-serif, system-ui, sans-serif;
+            --font-body: "${bodyFont}", ui-sans-serif, system-ui, sans-serif;
+            --font-mono: "${monoFont}", ui-monospace, monospace;
+          }
+          * { margin: 0; padding: 0; }
+          ${cssStyles}
+        </style>
+      </head>
+      <body>
+        <div class="itinerary-content">${content}</div>
+        <script>
+          window.addEventListener('load', () => {
+            const images = document.getElementsByTagName('img');
+            let loadedCount = 0;
+            const totalImages = images.length;
+            if (totalImages === 0) {
+              window.print();
+              window.close();
+            } else {
+              for (let i = 0; i < totalImages; i++) {
+                if (images[i].complete) {
+                  loadedCount++;
+                  if (loadedCount === totalImages) {
+                    window.print();
+                    window.close();
+                  }
+                } else {
+                  images[i].addEventListener('load', () => {
+                    loadedCount++;
+                    if (loadedCount === totalImages) {
+                      window.print();
+                      window.close();
+                    }
+                  });
+                  images[i].addEventListener('error', () => {
+                    loadedCount++;
+                    if (loadedCount === totalImages) {
+                      window.print();
+                      window.close();
+                    }
+                  });
+                }
+              }
+            }
+          });
+        </script>
+      </body>
+      </html>
+    `);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 350);
   };
 
   return (
@@ -233,7 +302,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
             {pdfShowLogo && logoUrl ? (
               <img src={logoUrl} alt={agencyName} className="itin-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             ) : null}
-            {agencyName && <div className="itin-agency-name">{agencyName}</div>}
           </div>
           <div className="itin-title">Detalle de Itinerario</div>
         </div>
@@ -330,20 +398,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                           <div className="itin-grid-value">{duracion || 'N/A'}</div>
                         </div>
                       </div>
-
-                      {i === 0 && hasBaggageInfo && (
-                        <div className="itin-baggage-row">
-                          <span className={`itin-baggage-item ${carryOn ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
-                            <Backpack size={14} /> Equipaje de mano
-                          </span>
-                          <span className={`itin-baggage-item ${handBag ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
-                            <ShoppingBag size={14} /> Artículo personal
-                          </span>
-                          <span className={`itin-baggage-item ${checkedBag ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
-                            <Luggage size={14} /> Equipaje en bodega
-                          </span>
-                        </div>
-                      )}
                     </div>
                     {connectionEl}
                   </div>
@@ -353,14 +407,43 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
           </>
         )}
 
+        {/* Franquicia de Equipaje */}
+        {hasBaggageInfo && (
+          <div className="itin-baggage-section">
+            <div className="itin-section-title">Franquicia de Equipaje</div>
+            <div className="itin-baggage-container">
+              <div className={`itin-baggage-card ${carryOn ? 'included' : 'not-included'}`}>
+                <Backpack className="w-5 h-5 bag-icon" />
+                <div className="bag-details">
+                  <span className="bag-title">Equipaje de mano</span>
+                  <span className="bag-status">{carryOn ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
+                </div>
+              </div>
+              <div className={`itin-baggage-card ${handBag ? 'included' : 'not-included'}`}>
+                <ShoppingBag className="w-5 h-5 bag-icon" />
+                <div className="bag-details">
+                  <span className="bag-title">Artículo personal</span>
+                  <span className="bag-status">{handBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
+                </div>
+              </div>
+              <div className={`itin-baggage-card ${checkedBag ? 'included' : 'not-included'}`}>
+                <Luggage className="w-5 h-5 bag-icon" />
+                <div className="bag-details">
+                  <span className="bag-title">Equipaje en bodega</span>
+                  <span className="bag-status">{checkedBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="itin-footer">
           <div className="itin-footer-body">{pdfFooterMessage}</div>
           <div className="itin-footer-agency">
-            {agencyName}
-            {agencyAddress && <> · {agencyAddress}</>}
-            {agencyPhone && <> · Tel: {agencyPhone}</>}
-            {agencyEmail && <> · {agencyEmail}</>}
+            {agencyAddress && <>{agencyAddress}</>}
+            {agencyPhone && <>{agencyAddress ? ' · ' : ''}Tel: {agencyPhone}</>}
+            {agencyEmail && <>{(agencyAddress || agencyPhone) ? ' · ' : ''}{agencyEmail}</>}
           </div>
         </div>
       </div>

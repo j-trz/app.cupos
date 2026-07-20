@@ -212,6 +212,8 @@ class ReservationService {
       Pedido_ID: r.pedido_id,
       Vuelo_Destino: r.vuelo_destino,
       Bloqueo_Expira_At: r.bloqueo_expira_at,
+      Vuelo_Salida: r.vuelo_salida,
+      Temporada: r.temporada,
     }));
   }
 
