@@ -129,7 +129,7 @@ function computeDuration(vuelo, referenceYear) {
 export default function ItineraryPDF({ reservation, passengers = [], product }) {
   const { config } = useWhiteLabel();
 
-  const primaryColor = config?.colors?.primary || '#2c4b8b';
+  const primaryColor = config?.colors?.primary || '#304D85';
   const agencyName = config?.identity?.agency_name || '';
   const agencyEmail = config?.identity?.contact_email || '';
   const logoUrl = config?.identity?.pdf_logo_url || config?.identity?.logoUrl || '';
@@ -139,14 +139,10 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     'Estimado cliente, te deseamos un muy buen viaje! Favor verificá la documentación con la cual estarás viajando (visas y vacunas si fueran necesarias). No olvides solicitarle a tu asesor que ingrese tu número de viajero frecuente en la reserva. Te aconsejamos hacer el web check-in con anticipación. ¡Gracias por elegirnos!';
   const pdfShowLogo = config?.identity?.pdf_show_logo !== false;
 
-  // El código de reserva que le sirve al pasajero es el PNR de la aerolínea,
-  // no el ID interno del pedido (que solo tiene sentido puertas adentro).
   const codigoReserva = product?.pnr || reservation?.pnr || reservation?.pedido_id || '—';
   const estadoLabel = ESTADO_LABELS[reservation?.estado] || null;
-  const estadoColors = ESTADO_COLORS[estadoLabel] || { bg: '#f3f4f6', text: '#374151' };
+  const estadoColors = ESTADO_COLORS[estadoLabel] || { bg: '#dcfce7', text: '#166534' };
 
-  // parseRuta (compartido con "Ver Ruta") entiende tanto el formato moderno
-  // (JSON con { vuelos: [...] }) como el texto plano de GDS histórico.
   const vuelos = parseRuta(product?.ruta);
   const referenceYear = product?.fecha_salida ? new Date(product.fecha_salida).getFullYear() : new Date().getFullYear();
 
@@ -159,60 +155,50 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     .map((p) => `${p.nombre || ''} ${p.apellido || ''}`.trim())
     .filter(Boolean);
 
-  const headingFont = config?.fonts?.heading || 'Inter';
-  const bodyFont = config?.fonts?.body || 'Inter';
-  const monoFont = config?.fonts?.mono || 'JetBrains Mono';
+  const headingFont = config?.fonts?.heading || 'Montserrat';
+  const bodyFont = config?.fonts?.body || 'Montserrat';
 
-  // CSS escopeada a .itinerary-content — un <style> con selector "body" acá
-  // se aplicaría a TODA la página mientras el modal está abierto (un <style>
-  // no queda contenido a su posición en el DOM), rompiendo el tamaño de letra
-  // y color de fondo del resto de la app. Por eso todo cuelga de esta clase.
   const cssStyles = `
-    .itinerary-content { font-family: "${bodyFont}", "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 8px 4px 24px; background: white; color: #1e293b; font-size: 12px; line-height: 1.5; }
+    .itinerary-content { font-family: "${bodyFont}", "Montserrat", sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; background: white; color: #0f172a; }
     .itinerary-content * { box-sizing: border-box; }
-    .itin-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; gap: 16px; flex-wrap: wrap; }
-    .itin-header-left { display: flex; align-items: center; gap: 12px; }
-    .itin-logo { height: 40px; width: auto; object-fit: contain; }
-    .itin-title { font-family: "${headingFont}", "Inter", sans-serif; font-size: 18px; font-weight: 800; color: ${primaryColor}; }
-    .itin-info-bar { display: flex; justify-content: space-between; align-items: flex-start; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
-    .itin-info-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-    .itin-info-value { font-size: 14px; font-weight: 700; color: #0f172a; }
-    .itin-section-title { font-family: "${headingFont}", "Inter", sans-serif; font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
-    .itin-segments-box { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
-    .itin-segment { padding: 16px 18px; }
-    .itin-segment + .itin-segment { border-top: 1px solid #f1f5f9; }
-    .itin-segment-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
-    .itin-leg-icon { color: ${primaryColor}; flex-shrink: 0; margin-top: 2px; }
-    .itin-airline-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
-    .itin-route-title { font-size: 13px; font-weight: 700; color: #0f172a; }
-    .itin-airline-line { font-size: 11px; color: #64748b; margin-top: 2px; }
-    .itin-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-left: auto; }
-    .itin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
-    .itin-grid-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-    .itin-grid-value { font-size: 12px; color: #334155; }
-    .itin-grid-time { font-size: 13px; font-weight: 700; color: #0f172a; }
-    .itin-connection { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 500; color: #64748b; }
-    
-    .itin-baggage-section { margin-top: 24px; margin-bottom: 24px; }
-    .itin-baggage-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    .itin-baggage-card { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
-    .itin-baggage-card.included { border-left: 4px solid #166534; background: #f0fdf4; }
-    .itin-baggage-card.not-included { border-left: 4px solid #94a3b8; opacity: 0.6; }
-    .bag-icon { color: #475569; }
-    .itin-baggage-card.included .bag-icon { color: #166534; }
-    .bag-details { display: flex; flex-direction: column; }
-    .bag-title { font-size: 11px; font-weight: 600; color: #1e293b; }
-    .bag-status { font-size: 9px; font-weight: 700; color: #64748b; margin-top: 2px; }
-    .itin-baggage-card.included .bag-status { color: #166534; }
-
-    .itin-footer { text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
-    .itin-footer-body { font-size: 11px; color: #475569; line-height: 1.7; white-space: pre-line; }
-    .itin-footer-agency { font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 8px; }
-    @media (max-width: 600px) {
-      .itin-grid { grid-template-columns: 1fr; }
-      .itin-baggage-container { grid-template-columns: 1fr; }
-    }
-    @media print { .no-print { display: none !important; } @page { size: A4; margin: 15mm; } }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #e2e8f0; }
+    .logo { height: 48px; object-fit: contain; }
+    .title { font-family: "${headingFont}", "Montserrat", sans-serif; font-size: 1.5rem; font-weight: 700; color: ${primaryColor}; }
+    .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .info-label { font-size: 0.875rem; font-weight: 600; color: #64748b; margin-bottom: 0.25rem; }
+    .info-value { font-size: 0.875rem; font-weight: 700; color: #0f172a; text-transform: uppercase; }
+    .section-title { font-family: "${headingFont}", "Montserrat", sans-serif; font-size: 1.1rem; font-weight: 700; color: ${primaryColor}; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; }
+    .flight-segment { display: grid; grid-template-columns: auto 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+    .flight-icon-col { display: flex; flex-direction: column; align-items: center; }
+    .flight-icon { color: ${primaryColor}; }
+    .flight-line { width: 2px; background-color: #e2e8f0; flex-grow: 1; margin: 0.5rem 0; min-height: 40px; }
+    .flight-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0rem; flex-wrap: wrap; gap: 0.5rem; }
+    .flight-route { display: flex; align-items: center; gap: 0.75rem; }
+    .airline-logo { height: 32px; width: 32px; object-fit: contain; border-radius: 0.5rem; background: #fff; border: 1px solid #e2e8f0; margin-bottom: 1rem; }
+    .route-text { font-size: 0.9rem; font-weight: 600; color: #0f172a; }
+    .route-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .badge { display: inline-flex; align-items: center; padding: 0.4rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .flight-info { font-size: 0.7rem; color: #64748b; margin-top: 0; margin-bottom: 1rem; }
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .detail-item { margin-bottom: 0.75rem; }
+    .detail-label { font-size: 0.8rem; color: #64748b; margin-bottom: 0.15rem; }
+    .detail-value { font-size: 0.7rem; font-weight: 600; color: #0f172a; }
+    .baggage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.25rem; }
+    .baggage-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; font-weight: 600; }
+    .baggage-included { color: #15803d; }
+    .baggage-excluded { color: #94a3b8; }
+    .baggage-excluded .baggage-label { text-decoration: line-through; text-decoration-thickness: 2px; }
+    .footer { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.875rem; }
+    .footer a { color: ${primaryColor}; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    .connection-badge { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background-color: #f1f5f9; color: #475569; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px dashed #cbd5e1; width: 100%; margin-bottom: 1.5rem; gap: 8px; }
+    .openjaw-badge { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background-color: #fff7ed; color: #c2410c; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px dashed #fdba74; width: 100%; margin-bottom: 1.5rem; gap: 8px; }
+    .mt-5 { margin-top: 1.25rem; }
+    .print-btn { display: flex; align-items: center; gap: 8px; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: opacity 0.2s; }
+    .print-btn:hover { opacity: 0.9; }
+    @media print { body { padding: 1rem; background: white; } .card { box-shadow: none; border: 1px solid #ccc; } .no-print { display: none !important; } }
+    @media (max-width: 600px) { .info-grid, .details-grid, .baggage-grid { grid-template-columns: 1fr; } .flight-header { flex-direction: column; align-items: flex-start; } }
   `;
 
   const handlePrint = () => {
@@ -225,12 +211,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
         <meta charset="utf-8">
         <title>Itinerario – ${codigoReserva}</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700&family=Lato:wght@400;700&family=Nunito:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
-          :root {
-            --font-heading: "${headingFont}", ui-sans-serif, system-ui, sans-serif;
-            --font-body: "${bodyFont}", ui-sans-serif, system-ui, sans-serif;
-            --font-mono: "${monoFont}", ui-monospace, monospace;
-          }
+          @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
           * { margin: 0; padding: 0; }
           ${cssStyles}
         </style>
@@ -285,7 +266,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
       <div className="no-print flex justify-end mb-4">
         <button
           onClick={handlePrint}
-          className="flex items-center gap-2 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-80 transition-opacity shadow-sm"
+          className="print-btn"
           style={{ backgroundColor: primaryColor }}
         >
           <Printer className="h-4 w-4" />
@@ -296,38 +277,36 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
       <style>{cssStyles}</style>
 
       <div className="itinerary-content">
-        {/* Header */}
-        <div className="itin-header">
-          <div className="itin-header-left">
-            {pdfShowLogo && logoUrl ? (
-              <img src={logoUrl} alt={agencyName} className="itin-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-            ) : null}
-          </div>
-          <div className="itin-title">Detalle de Itinerario</div>
+        <div className="header">
+          {pdfShowLogo && logoUrl ? (
+            <img src={logoUrl} alt={agencyName} className="logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          ) : (
+            <div className="logo" style={{ display: 'flex', alignItems: 'center', fontSize: '1.25rem', fontWeight: 'bold', color: primaryColor }}>{agencyName}</div>
+          )}
+          <div className="title">Detalle de Itinerario</div>
         </div>
 
-        {/* Pasajero(s) + Código de reserva */}
-        <div className="itin-info-bar">
-          <div>
-            <div className="itin-info-label">Pasajero(s)</div>
-            <div className="itin-info-value">{passengerNames.length > 0 ? passengerNames.join(', ') : '—'}</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="itin-info-label">Código de Reserva</div>
-            <div className="itin-info-value">{codigoReserva}</div>
-            {estadoLabel && (
-              <span className="itin-badge" style={{ background: estadoColors.bg, color: estadoColors.text, marginTop: 4 }}>
-                {estadoLabel}
-              </span>
-            )}
+        <div className="card">
+          <div className="info-grid">
+            <div>
+              <p className="info-label">Pasajero(s)</p>
+              <div>
+                <div style={{ marginBottom: 0 }}>
+                  <p className="info-value">{passengerNames.length > 0 ? passengerNames.join(', ') : '—'}</p>
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p className="info-label">Código de Reserva</p>
+              <p className="info-value">{codigoReserva}</p>
+            </div>
           </div>
         </div>
 
-        {/* Vuelos */}
         {vuelos.length > 0 && (
           <>
-            <div className="itin-section-title">Segmentos de Vuelo</div>
-            <div className="itin-segments-box">
+            <h2 className="section-title">Segmentos de Vuelo</h2>
+            <div className="card">
               {vuelos.map((vuelo, i) => {
                 const total = vuelos.length;
                 const code = (vuelo.compania || '').toUpperCase().trim();
@@ -335,9 +314,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                 const logoSrc = AIRLINE_LOGOS[code] || FALLBACK_LOGO;
                 const originName = AIRPORTS[(vuelo.origen || '').toUpperCase().trim()] || vuelo.origen || '';
                 const destName = AIRPORTS[(vuelo.destino || '').toUpperCase().trim()] || vuelo.destino || '';
-                // Primer tramo del itinerario = despegue inicial; último tramo
-                // = aterrizaje final; cualquier tramo intermedio = vuelo en
-                // curso (ícono genérico), como en un itinerario de aerolínea real.
+                
                 const LegIcon = i === 0 ? PlaneTakeoff : i === total - 1 ? PlaneLanding : Plane;
                 const duracion = computeDuration(vuelo, referenceYear);
                 const salidaHora = displayHHmm(parseHHmm(vuelo.salida)) || vuelo.salida || '';
@@ -349,16 +326,16 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                   if (vuelo.destino === sig.origen) {
                     if (sig.destino !== vuelo.origen) {
                       connectionEl = (
-                        <div className="itin-connection">
-                          <Clock3 size={14} />
+                        <div className="connection-badge">
+                          <Clock3 size={16} />
                           Cambio de avión en <strong>{AIRPORTS[(vuelo.destino || '').toUpperCase().trim()] || vuelo.destino}</strong>
                         </div>
                       );
                     }
                   } else {
                     connectionEl = (
-                      <div className="itin-connection" style={{ color: '#c2410c', background: '#fff7ed' }}>
-                        <ArrowRightLeft size={14} />
+                      <div className="openjaw-badge">
+                        <ArrowRightLeft size={16} />
                         Tramo terrestre: {AIRPORTS[(vuelo.destino || '').toUpperCase().trim()] || vuelo.destino} → {AIRPORTS[(sig.origen || '').toUpperCase().trim()] || sig.origen}
                       </div>
                     );
@@ -367,36 +344,68 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
 
                 return (
                   <div key={i}>
-                    <div className="itin-segment">
-                      <div className="itin-segment-top">
-                        <LegIcon size={18} className="itin-leg-icon" />
-                        <img src={logoSrc} alt={airlineName} className="itin-airline-logo" onError={(e) => { e.currentTarget.src = FALLBACK_LOGO; }} />
-                        <div>
-                          <div className="itin-route-title">{originName || vuelo.origen} → {destName || vuelo.destino}</div>
-                          <div className="itin-airline-line">{airlineName} - {vuelo.vuelo}</div>
-                        </div>
-                        {estadoLabel && (
-                          <span className="itin-badge" style={{ background: estadoColors.bg, color: estadoColors.text }}>
-                            {estadoLabel}
-                          </span>
-                        )}
+                    <div className="flight-segment">
+                      <div className="flight-icon-col">
+                        <LegIcon size={24} className="flight-icon" />
+                        {i < total - 1 ? <div className="flight-line"></div> : null}
                       </div>
+                      <div>
+                        <div className="flight-header">
+                          <div className="flight-route">
+                            <img src={logoSrc} alt={airlineName} className="airline-logo" onError={(e) => { e.currentTarget.src = FALLBACK_LOGO; }} />
+                            <div className="route-info">
+                              <span className="route-text">{originName || vuelo.origen} → {destName || vuelo.destino}</span>
+                              <span className="flight-info">{airlineName} - {vuelo.vuelo}</span>
+                            </div>
+                          </div>
+                          {estadoLabel && (
+                            <span className="badge" style={{ background: estadoColors.bg, color: estadoColors.text }}>
+                              {estadoLabel}
+                            </span>
+                          )}
+                        </div>
+                        <div className="details-grid">
+                          <div>
+                            <div className="detail-item">
+                              <p className="detail-label">Salida</p>
+                              <p className="detail-value">{displayFlightDate(vuelo.fechaSalida, referenceYear)}{salidaHora ? ` - ${salidaHora}` : ''}</p>
+                            </div>
+                            <div className="detail-item">
+                              <p className="detail-label">Cabina</p>
+                              <p className="detail-value">{vuelo.clase || 'Economy'}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="detail-item">
+                              <p className="detail-label">Llegada{vuelo.nextDay ? ' (+1)' : ''}</p>
+                              <p className="detail-value">{displayFlightDate(vuelo.fechaLlegada || vuelo.fechaSalida, referenceYear)}{llegadaHora ? ` - ${llegadaHora}` : ''}</p>
+                            </div>
+                            <div className="detail-item">
+                              <p className="detail-label">Duración</p>
+                              <p className="detail-value">{duracion || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
 
-                      <div className="itin-grid">
-                        <div>
-                          <div className="itin-grid-label">Salida</div>
-                          <div className="itin-grid-value">{displayFlightDate(vuelo.fechaSalida, referenceYear)}</div>
-                          {salidaHora && <div className="itin-grid-time">{salidaHora}</div>}
-                        </div>
-                        <div>
-                          <div className="itin-grid-label">Llegada{vuelo.nextDay ? ' (+1)' : ''}</div>
-                          <div className="itin-grid-value">{displayFlightDate(vuelo.fechaLlegada || vuelo.fechaSalida, referenceYear)}</div>
-                          {llegadaHora && <div className="itin-grid-time">{llegadaHora}</div>}
-                        </div>
-                        <div>
-                          <div className="itin-grid-label">Duración</div>
-                          <div className="itin-grid-value">{duracion || 'N/A'}</div>
-                        </div>
+                        {hasBaggageInfo && (
+                          <div className="detail-item mt-5">
+                            <p className="detail-label">Franquicia de equipaje</p>
+                            <div className="baggage-grid">
+                              <div className={`baggage-item ${handBag ? 'baggage-included' : 'baggage-excluded'}`}>
+                                <ShoppingBag size={16} />
+                                <span className="baggage-label">Artículo personal</span>
+                              </div>
+                              <div className={`baggage-item ${carryOn ? 'baggage-included' : 'baggage-excluded'}`}>
+                                <Backpack size={16} />
+                                <span className="baggage-label">Equipaje de mano</span>
+                              </div>
+                              <div className={`baggage-item ${checkedBag ? 'baggage-included' : 'baggage-excluded'}`}>
+                                <Luggage size={16} />
+                                <span className="baggage-label">Equipaje en bodega</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {connectionEl}
@@ -407,44 +416,16 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
           </>
         )}
 
-        {/* Franquicia de Equipaje */}
-        {hasBaggageInfo && (
-          <div className="itin-baggage-section">
-            <div className="itin-section-title">Franquicia de Equipaje</div>
-            <div className="itin-baggage-container">
-              <div className={`itin-baggage-card ${carryOn ? 'included' : 'not-included'}`}>
-                <Backpack className="w-5 h-5 bag-icon" />
-                <div className="bag-details">
-                  <span className="bag-title">Equipaje de mano</span>
-                  <span className="bag-status">{carryOn ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                </div>
-              </div>
-              <div className={`itin-baggage-card ${handBag ? 'included' : 'not-included'}`}>
-                <ShoppingBag className="w-5 h-5 bag-icon" />
-                <div className="bag-details">
-                  <span className="bag-title">Artículo personal</span>
-                  <span className="bag-status">{handBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                </div>
-              </div>
-              <div className={`itin-baggage-card ${checkedBag ? 'included' : 'not-included'}`}>
-                <Luggage className="w-5 h-5 bag-icon" />
-                <div className="bag-details">
-                  <span className="bag-title">Equipaje en bodega</span>
-                  <span className="bag-status">{checkedBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="itin-footer">
-          <div className="itin-footer-body">{pdfFooterMessage}</div>
-          <div className="itin-footer-agency">
-            {agencyAddress && <>{agencyAddress}</>}
-            {agencyPhone && <>{agencyAddress ? ' · ' : ''}Tel: {agencyPhone}</>}
-            {agencyEmail && <>{(agencyAddress || agencyPhone) ? ' · ' : ''}{agencyEmail}</>}
-          </div>
+        <div className="footer">
+          <p style={{ whiteSpace: 'pre-line', marginBottom: '1rem', color: '#0f172a' }}>{pdfFooterMessage}</p>
+          <p>
+            {agencyName} {agencyAddress ? ` - ${agencyAddress}` : ''} 
+            {agencyPhone ? ` - Tel: ${agencyPhone}` : ''}
+            {agencyEmail ? ` - ${agencyEmail}` : ''}
+          </p>
+          <p style={{ marginTop: '0.5rem' }}>
+            Verifique los requisitos de documentación en <a href="http://www.iatatravelcentre.com/" target="_blank" rel="noreferrer">iatatravelcentre.com</a>
+          </p>
         </div>
       </div>
     </div>
