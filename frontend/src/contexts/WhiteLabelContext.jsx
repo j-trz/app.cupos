@@ -15,6 +15,9 @@ const DEFAULT_CONFIG = {
         address: '',
         pdf_footer_message: '¡Estimado pasajero, le deseamos un muy buen viaje! Verificá los requisitos de documentación (visas y vacunas) antes de partir.',
         pdf_show_logo: true,
+        pdf_logo_url: '',
+        phone: '',
+        address: '',
     },
     colors: {
         primary: '#3b82f6',
@@ -159,7 +162,12 @@ export function WhiteLabelProvider({ children }) {
                         contact_email: dbConfig.identity?.contact_email || dbConfig.contact_email || '',
                         slogan: dbConfig.identity?.slogan || dbConfig.slogan || '',
                         logoUrl: dbConfig.identity?.logoUrl || dbConfig.logoUrl || '',
-                        faviconUrl: dbConfig.identity?.faviconUrl || dbConfig.faviconUrl || ''
+                        faviconUrl: dbConfig.identity?.faviconUrl || dbConfig.faviconUrl || '',
+                        phone: dbConfig.identity?.phone || dbConfig.phone || '',
+                        address: dbConfig.identity?.address || dbConfig.address || '',
+                        pdf_logo_url: dbConfig.identity?.pdf_logo_url || dbConfig.pdf_logo_url || '',
+                        pdf_footer_message: dbConfig.identity?.pdf_footer_message || dbConfig.pdf_footer_message || '',
+                        pdf_show_logo: dbConfig.identity?.pdf_show_logo ?? dbConfig.pdf_show_logo ?? true,
                     },
                     // colors/fonts: el backend (white_label_handler.go) guarda y devuelve
                     // un único JSON anidado (dbConfig.colors.primary, dbConfig.fonts.heading),
