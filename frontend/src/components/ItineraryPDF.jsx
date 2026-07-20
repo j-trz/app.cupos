@@ -130,6 +130,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
   const { config } = useWhiteLabel();
 
   const primaryColor = config?.colors?.primary || '#304D85';
+  const agencyName = config?.identity?.agency_name || '';
   const agencyEmail = config?.identity?.contact_email || '';
   const logoUrl = config?.identity?.pdf_logo_url || config?.identity?.logoUrl || '';
   const agencyPhone = config?.identity?.phone || '';
