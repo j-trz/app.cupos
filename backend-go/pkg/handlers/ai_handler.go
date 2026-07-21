@@ -1362,13 +1362,24 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 			return `{"error": "Solo administradores pueden cancelar reservas"}`
 		}
 		id, _ := args["reserva_id"].(string)
-		// Restaurar disponibilidad
+		// Restaurar disponibilidad solo si la reserva no estaba cancelada/expirada
 		var reserva models.Reservation
 		if database.DB.First(&reserva, id).Error == nil {
-			database.DB.Model(&models.Product{}).Where("id = ?", reserva.ProductID).
-				UpdateColumn("disponibilidad", gorm.Expr("disponibilidad + 1"))
+			if reserva.Estado != models.EstadoExpirada && reserva.Estado != models.EstadoCancelada {
+				var passengersCount int64
+				database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reserva.ID).Count(&passengersCount)
+				if passengersCount == 0 {
+					passengersCount = 1
+				}
+				database.DB.Model(&models.Product{}).Where("id = ?", reserva.ProductID).
+					Updates(map[string]interface{}{
+						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
+						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+					})
+			}
+			database.DB.Where("reservation_id = ?", reserva.ID).Delete(&models.Passenger{})
+			database.DB.Delete(&models.Reservation{}, id)
 		}
-		database.DB.Delete(&models.Reservation{}, id)
 		return fmt.Sprintf(`{"exito": true, "mensaje": "Reserva %s cancelada"}`, id)
 
 	case "estadisticas":

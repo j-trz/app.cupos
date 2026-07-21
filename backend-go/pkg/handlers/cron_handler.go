@@ -88,9 +88,7 @@ func expireOverdueReservations(now time.Time) int {
 		}
 		database.DB.Model(&models.Product{}).Where("id = ?", r.ProductID).
 			Updates(map[string]interface{}{
-				// GREATEST(0, ...) evita disponibilidad negativa en edge cases
-				// (ej. si la cesión ya devolvió ese stock por otro camino).
-				"disponibilidad": gorm.Expr("GREATEST(0, disponibilidad + ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
 				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
 			})
 		database.DB.Create(&models.SystemLog{

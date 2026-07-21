@@ -419,9 +419,9 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
         <div className="footer">
           <p style={{ whiteSpace: 'pre-line', marginBottom: '1rem', color: '#0f172a' }}>{pdfFooterMessage}</p>
           <p>
-            {agencyAddress ? ` - ${agencyAddress}` : ''}
-            {agencyPhone ? ` - Tel: ${agencyPhone}` : ''}
-            {agencyEmail ? ` - ${agencyEmail}` : ''}
+            {agencyAddress ? `  ${agencyAddress}` : ''}
+            {agencyPhone ? ` | Tel: ${agencyPhone} |` : ''}
+            {agencyEmail ? `  ${agencyEmail}` : ''}
           </p>
           <p style={{ marginTop: '0.5rem' }}>
             Verifique los requisitos de documentación en <a href="http://www.iatatravelcentre.com/" target="_blank" rel="noreferrer">iatatravelcentre.com</a>

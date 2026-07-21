@@ -523,9 +523,9 @@ func DeleteReservation(c *gin.Context) {
 	if err := database.DB.First(&reservation, id).Error; err == nil {
 		found = true
 	}
-	// Devolver disponibilidad solo si el cron NO lo hizo ya.
-	// Las reservas expiradas ya tuvieron su stock devuelto por expireOverdueReservations.
-	if found && reservation.Estado != models.EstadoExpirada {
+	// Devolver disponibilidad solo si el cron o una cancelación NO lo hizo ya.
+	// Las reservas expiradas o canceladas ya tuvieron su stock devuelto.
+	if found && reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada {
 		var passengersCount int64
 		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
 		if passengersCount == 0 {
@@ -534,7 +534,7 @@ func DeleteReservation(c *gin.Context) {
 
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("GREATEST(0, disponibilidad + ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
 				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
 			})
 	}
@@ -576,12 +576,15 @@ func DeletePassenger(c *gin.Context) {
 		return
 	}
 
-	// Liberar únicamente el lugar de este pasajero (no el pedido completo).
-	database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
-		Updates(map[string]interface{}{
-			"disponibilidad": gorm.Expr("disponibilidad + 1"),
-			"vendidos":       gorm.Expr("vendidos - 1"),
-		})
+	// Liberar únicamente el lugar de este pasajero si no estaba ya cancelado/expirado.
+	if reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada &&
+		passenger.Estado != models.EstadoExpirada && passenger.Estado != models.EstadoCancelada {
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
+			Updates(map[string]interface{}{
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + 1)) ELSE GREATEST(0, disponibilidad + 1) END"),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - 1)"),
+			})
+	}
 
 	if err := database.DB.Delete(&passenger).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar el pasajero."})
@@ -784,8 +787,8 @@ func ResolveCancellation(c *gin.Context) {
 		}
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("disponibilidad + ?", passengersCount),
-				"vendidos":       gorm.Expr("vendidos - ?", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
 			})
 		database.DB.Model(&reservation).Updates(map[string]interface{}{
 			"estado":            models.EstadoCancelada,

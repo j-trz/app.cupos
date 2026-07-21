@@ -282,7 +282,7 @@ func ReclaimTransfer(c *gin.Context) {
 
 	// Devolver al original
 	if err := tx.Model(&models.Product{}).Where("id = ?", originalProduct.ID).
-		Update("disponibilidad", gorm.Expr("disponibilidad + ?", qtyToReclaim)).Error; err != nil {
+		Update("disponibilidad", gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", qtyToReclaim, qtyToReclaim)).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar producto origen"})
 		return
