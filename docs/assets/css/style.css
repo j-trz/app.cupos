@@ -255,7 +255,7 @@ body {
 /* ---------- Mermaid diagrams ---------- */
 .content .mermaid {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   margin: 1.5rem 0;
   padding: 1.25rem;
   background: var(--bg-elevated);
@@ -263,7 +263,15 @@ body {
   border-radius: 0.75rem;
   overflow-x: auto;
 }
-.content .mermaid svg { max-width: 100%; height: auto; }
+/* El ancho real lo fija el JS del layout (a partir del viewBox del propio
+   SVG) para que un diagrama ancho con muchas ramas en paralelo no se achique
+   hasta volverse ilegible — acá solo se banca ese ancho con scroll
+   horizontal si no entra en la tarjeta. Antes de que corra el JS (o si algo
+   falla) el SVG cae a su comportamiento por defecto, sin romper el layout.
+   flex-shrink:0 es clave: sin esto, un flex item se encoge para entrar en
+   el contenedor aunque tenga un width explícito, y el ancho fijado por JS
+   quedaba ignorado. */
+.content .mermaid svg { height: auto; flex-shrink: 0; }
 
 /* ---------- Footer ---------- */
 .site-footer {
