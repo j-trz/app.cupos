@@ -23,7 +23,8 @@
     </a>
   </header>
 
-  <div class="layout">
+  {% assign has_toc = content contains "<h2" %}
+  <div class="layout{% unless has_toc %} layout-no-toc{% endunless %}">
     <nav class="sidebar" id="sidebar">
       <p class="sidebar-title">Documentación</p>
       <ul>
@@ -41,6 +42,13 @@
     <main id="content" class="content">
       {{ content }}
     </main>
+
+    {% if has_toc %}
+    <aside class="page-toc" id="page-toc">
+      <p class="page-toc-title">En esta página</p>
+      <ul id="page-toc-list"></ul>
+    </aside>
+    {% endif %}
   </div>
 
   <footer class="site-footer">
@@ -51,21 +59,52 @@
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      // kramdown+rouge dejan los bloques ```mermaid como texto plano dentro
-      // de <div class="language-mermaid">, sin ningún renderer real detrás
-      // — acá se reemplaza cada uno por un <div class="mermaid"> con el
-      // mismo contenido para que mermaid.js los dibuje como diagramas.
-      document.querySelectorAll('div.language-mermaid').forEach(function (block) {
-        var code = block.querySelector('code');
-        var text = code ? code.textContent : block.textContent;
+      // kramdown+rouge (el build real de GitHub Pages) dejan los bloques
+      // ```mermaid como texto plano dentro de <pre><code class="language-mermaid">,
+      // sin ningún renderer real detrás — acá se reemplaza cada uno por un
+      // <div class="mermaid"> con el mismo contenido para que mermaid.js los
+      // dibuje como diagramas. Se cubre también div.language-mermaid por si
+      // algún otro procesador markdown genera esa forma.
+      document.querySelectorAll('pre code.language-mermaid, div.language-mermaid').forEach(function (block) {
+        var host = block.tagName === 'CODE' ? block.closest('pre') : block;
         var div = document.createElement('div');
         div.className = 'mermaid';
-        div.textContent = text;
-        block.replaceWith(div);
+        div.textContent = block.textContent;
+        host.replaceWith(div);
       });
       if (window.mermaid) {
         var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'neutral', securityLevel: 'loose' });
+      }
+
+      // Índice "En esta página": lista los <h2> del artículo y resalta el
+      // que está en foco a medida que se scrollea (scrollspy simple).
+      var tocList = document.getElementById('page-toc-list');
+      if (tocList) {
+        var headings = document.querySelectorAll('.content h2[id]');
+        var links = [];
+        headings.forEach(function (h) {
+          var li = document.createElement('li');
+          var a = document.createElement('a');
+          a.href = '#' + h.id;
+          a.textContent = h.textContent;
+          li.appendChild(a);
+          tocList.appendChild(li);
+          links.push(a);
+        });
+        if ('IntersectionObserver' in window && links.length) {
+          var linkById = {};
+          links.forEach(function (a) { linkById[a.getAttribute('href').slice(1)] = a; });
+          var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+              var link = linkById[entry.target.id];
+              if (!link || !entry.isIntersecting) return;
+              links.forEach(function (a) { a.classList.remove('active'); });
+              link.classList.add('active');
+            });
+          }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+          headings.forEach(function (h) { observer.observe(h); });
+        }
       }
 
       var toggle = document.getElementById('nav-toggle');
