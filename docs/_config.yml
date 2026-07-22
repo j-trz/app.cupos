@@ -1,6 +1,6 @@
 title: form-cupos — Documentación
 description: Documentación técnica del sistema de gestión de cupos aéreos
-theme: jekyll-theme-cayman
 markdown: kramdown
 kramdown:
   input: GFM
+  syntax_highlighter: rouge

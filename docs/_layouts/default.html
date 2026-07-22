@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | default: site.title }} · {{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+  <a class="skip-link" href="#content">Saltar al contenido</a>
+
+  <header class="site-header">
+    <button class="nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <a class="brand" href="{{ '/' | relative_url }}">
+      <span class="brand-mark">✈️</span> form-cupos <span class="brand-sub">docs</span>
+    </a>
+    <a class="gh-link" href="https://github.com/j-trz/app.cupos" target="_blank" rel="noopener">
+      Repositorio ↗
+    </a>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar">
+      <p class="sidebar-title">Documentación</p>
+      <ul>
+        {% assign docs = site.pages | where_exp: "p", "p.title" | sort: "nav_order" %}
+        {% for p in docs %}
+          <li>
+            <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
+              {{ p.title }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <main id="content" class="content">
+      {{ content }}
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    Generado desde <code>docs/</code> en la rama <code>main</code> de
+    <a href="https://github.com/j-trz/app.cupos">j-trz/app.cupos</a>.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // kramdown+rouge dejan los bloques ```mermaid como texto plano dentro
+      // de <div class="language-mermaid">, sin ningún renderer real detrás
+      // — acá se reemplaza cada uno por un <div class="mermaid"> con el
+      // mismo contenido para que mermaid.js los dibuje como diagramas.
+      document.querySelectorAll('div.language-mermaid').forEach(function (block) {
+        var code = block.querySelector('code');
+        var text = code ? code.textContent : block.textContent;
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = text;
+        block.replaceWith(div);
+      });
+      if (window.mermaid) {
+        var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'neutral', securityLevel: 'loose' });
+      }
+
+      var toggle = document.getElementById('nav-toggle');
+      var sidebar = document.getElementById('sidebar');
+      if (toggle && sidebar) {
+        toggle.addEventListener('click', function () {
+          var open = sidebar.classList.toggle('open');
+          toggle.classList.toggle('open', open);
+          toggle.setAttribute('aria-expanded', String(open));
+        });
+        sidebar.querySelectorAll('a').forEach(function (link) {
+          link.addEventListener('click', function () {
+            sidebar.classList.remove('open');
+            toggle.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>
