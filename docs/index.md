@@ -1,12 +1,15 @@
 ---
-title: Documentación
+title: Inicio
+nav_order: 0
 ---
 
 # form-cupos — Documentación
 
-Documentación técnica del sistema de gestión de cupos aéreos (Go + React).
+Documentación técnica del **Sistema de Gestión de Cupos** (Go + React): cómo funciona cada módulo, qué endpoints y componentes lo implementan, y los diagramas de flujo reales detrás de cada validación y estado.
 
-- [Flujos de funcionalidades (backend)](FLUJOS_FUNCIONALIDADES.md) — autenticación, disponibilidad y reservas, cesión de cupos, grupos, RBAC, asistente IA, expiración automática, reportes, notificaciones y configuración. Incluye diagramas de flujo.
-- Frontend — próximamente.
+## Secciones
 
-Este sitio se genera directamente desde la carpeta `docs/` de la rama `main` del repositorio — cualquier `.md` que se agregue ahí (con su encabezado `title`) queda publicado automáticamente.
+- **[Flujos de Funcionalidades](FLUJOS_FUNCIONALIDADES.md)** — autenticación, disponibilidad y reservas, cesión de cupos, grupos, RBAC, asistente IA, expiración automática, reportes, notificaciones y configuración. Incluye diagramas de flujo para cada una.
+- **Frontend** — próximamente.
+
+> Este sitio se genera directamente desde la carpeta `docs/` de la rama `main` del repositorio — cualquier `.md` que se agregue ahí (con encabezado `title` y `nav_order`) queda publicado automáticamente en el menú de la izquierda.
