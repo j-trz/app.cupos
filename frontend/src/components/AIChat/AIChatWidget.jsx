@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { MessageSquare, X, Sparkles } from 'lucide-react';
 import AIChatWindow from './AIChatWindow';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AIChatWidget() {
     const [isOpen, setIsOpen] = useState(false);
@@ -14,6 +15,7 @@ export default function AIChatWidget() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [lastMessage, setLastMessage] = useState(null);
     const { config } = useWhiteLabel();
+    const { user } = useAuth();
 
     // Cargar último mensaje no leído
     useEffect(() => {
@@ -21,6 +23,13 @@ export default function AIChatWidget() {
             setUnreadCount(prev => prev + 1);
         }
     }, [lastMessage, isOpen]);
+
+    // La agencia del usuario puede haber desactivado el asistente (ver
+    // Agency.AIHabilitado, tab "Agencias" en AIConfig.jsx) — ai_habilitado
+    // viaja embebido en el perfil que devuelve Login/GetProfile.
+    if (user?.ai_habilitado === false) {
+        return null;
+    }
 
     const handleToggle = () => {
         setIsOpen(!isOpen);

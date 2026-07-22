@@ -109,6 +109,12 @@ const (
 	EstadoSolicitudCancelacion = "solicitud_cancelacion"
 	EstadoCancelada            = "cancelada"
 	EstadoExpirada             = "expirada"
+	// EstadoHoldTemporal marca un pre-hold de stock creado apenas el usuario
+	// elige cuántos pasajeros va a cargar, antes de tener datos de contacto o
+	// pasajeros reales — ver CreateHold/ReleaseHold en order_handler.go. Se
+	// mantiene separado de EstadoBloqueoTemporal para que no aparezca como
+	// reserva fantasma en listados admin ni dispare avisos de vencimiento.
+	EstadoHoldTemporal = "hold_temporal"
 	// EstadoCedida marca la línea que queda en la agencia cedente cuando cede
 	// disponibilidad a otra agencia — es un registro de auditoría del stock
 	// que salió de su pool, no una reserva de pasajero real.
@@ -121,6 +127,10 @@ type Reservation struct {
 	CreatedBy            uuid.UUID  `gorm:"type:uuid" json:"created_by"`
 	Estado               string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
 	BloqueoExpiraAt      *time.Time `json:"bloqueo_expira_at"`
+	// HoldPassengerCount es la cantidad de asientos que ocupa un pre-hold
+	// (EstadoHoldTemporal) antes de que existan Passengers reales — necesario
+	// para saber cuánto stock devolver si el hold se cancela o vence.
+	HoldPassengerCount int `gorm:"column:hold_passenger_count;default:0" json:"hold_passenger_count,omitempty"`
 	PrecioVenta          float64    `json:"precio_venta"`
 	Neto1                float64    `json:"neto_1"`
 	PedidoID             string     `gorm:"not null" json:"pedido_id"`
@@ -288,8 +298,11 @@ type Agency struct {
 	Website   string    `json:"website"`
 	Color     string    `gorm:"default:'#3b82f6'" json:"color"`
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// AIHabilitado permite que una agencia desactive el asistente de IA para
+	// todos sus usuarios (widget de chat + endpoint /ai/chat).
+	AIHabilitado bool      `gorm:"column:ai_habilitado;default:true" json:"ai_habilitado"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type WhiteLabelConfig struct {

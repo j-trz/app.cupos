@@ -44,7 +44,7 @@ export function AIPageProvider({ children }) {
       if (action.type === 'open_reservation_modal' && typeof handlers.openReservationModal === 'function') {
         handlers.openReservationModal(action.payload?.product_id);
       } else if (action.type === 'fill_passenger_form' && typeof handlers.fillPassengers === 'function') {
-        handlers.fillPassengers(action.payload?.passengers || []);
+        handlers.fillPassengers(action.payload?.passengers || [], { ficha_venta: action.payload?.ficha_venta });
       }
     });
   }, []);

@@ -1,3 +1,7 @@
+---
+title: Flujos de Funcionalidades
+---
+
 # Flujos de Funcionalidades
 
 Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** junto con su diagrama de flujo en formato [Mermaid](https://mermaid.js.org/). Cada sección incluye una breve descripción textual y un diagrama (`flowchart` o `stateDiagram-v2`) que refleja la lógica real implementada en el repositorio (validaciones, estados y endpoints).

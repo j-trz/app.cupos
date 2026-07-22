@@ -33,8 +33,9 @@ func ExpireReservations(c *gin.Context) {
 	now := time.Now()
 	warned := warnExpiringReservations(now)
 	expired := expireOverdueReservations(now)
+	holdsReleased := expireOverdueHolds(now)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "warned": warned, "expired": expired})
+	c.JSON(http.StatusOK, gin.H{"success": true, "warned": warned, "expired": expired, "holds_released": holdsReleased})
 }
 
 func warnExpiringReservations(now time.Time) int {
@@ -127,4 +128,32 @@ func expireOverdueReservations(now time.Time) int {
 		})
 	}
 	return len(reservations)
+}
+
+// expireOverdueHolds libera los pre-holds (hold_temporal) que vencieron sin
+// que el usuario llegara a confirmar la reserva — es el respaldo del botón
+// "cancelar"/cierre de modal (ReleaseHold), que ya libera el stock al
+// instante en el caso normal. Como todavía no hay datos de contacto/pasajero
+// reales, no corresponde notificar ni enviar email: se borra la fila directo.
+func expireOverdueHolds(now time.Time) int {
+	var holds []models.Reservation
+	database.DB.Where(
+		"estado = ? AND bloqueo_expira_at IS NOT NULL AND bloqueo_expira_at <= ?",
+		models.EstadoHoldTemporal, now,
+	).Find(&holds)
+
+	for i := range holds {
+		h := &holds[i]
+		count := h.HoldPassengerCount
+		if count <= 0 {
+			count = 1
+		}
+		database.DB.Model(&models.Product{}).Where("id = ?", h.ProductID).
+			Updates(map[string]interface{}{
+				"disponibilidad": gorm.Expr("GREATEST(0, disponibilidad + ?)", count),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", count),
+			})
+		database.DB.Delete(&models.Reservation{}, h.ID)
+	}
+	return len(holds)
 }
