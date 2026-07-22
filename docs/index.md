@@ -3,7 +3,7 @@ title: Inicio
 nav_order: 0
 ---
 
-# form-cupos — Documentación
+# Sistema de Gestión de Cupos — Documentación
 
 Documentación técnica del **Sistema de Gestión de Cupos** (Go + React): cómo funciona cada módulo, qué endpoints y componentes lo implementan, y los diagramas de flujo reales detrás de cada validación y estado.
 
@@ -11,5 +11,3 @@ Documentación técnica del **Sistema de Gestión de Cupos** (Go + React): cómo
 
 - **[Flujos de Funcionalidades](FLUJOS_FUNCIONALIDADES.md)** — autenticación, disponibilidad y reservas, cesión de cupos, grupos, RBAC, asistente IA, expiración automática, reportes, notificaciones y configuración. Incluye diagramas de flujo para cada una.
 - **[Frontend](FRONTEND.md)** — arquitectura de la SPA en React: stack, estructura de carpetas, enrutamiento, contextos, servicios, hooks y componentes clave.
-
-> Este sitio se genera directamente desde la carpeta `docs/` de la rama `main` del repositorio — cualquier `.md` que se agregue ahí (con encabezado `title` y `nav_order`) queda publicado automáticamente en el menú de la izquierda.
