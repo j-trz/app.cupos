@@ -7,7 +7,6 @@ nav_order: 5
 
 Este documento describe la arquitectura del **frontend** del Sistema de Gestión de Cupos: una **Single Page Application (SPA)** que vive en la carpeta `frontend/` y consume la API de Go (`backend-go/`). Cubre el stack tecnológico, la estructura de carpetas, el enrutamiento y el árbol de providers, las páginas, los contextos globales, la capa de servicios HTTP, los hooks de datos, los componentes clave, la internacionalización y el build/despliegue.
 
-> Los diagramas están escritos en [Mermaid](https://mermaid.js.org/) con etiquetas entre comillas dobles y sin colores, para máxima compatibilidad con los distintos renderizadores (GitHub, VS Code, este sitio). Las descripciones reflejan la implementación real en `frontend/src/`.
 
 ## Índice
 
