@@ -110,6 +110,8 @@ func init() {
 				orders.GET("", handlers.GetAllReservations)
 				orders.GET("/blocked", handlers.GetBlockedReservations)
 				orders.POST("", handlers.CreateReservation)
+				orders.POST("/hold", handlers.CreateHold)
+				orders.DELETE("/hold/:id", handlers.ReleaseHold)
 				orders.GET("/:id", handlers.GetReservationByID)
 				orders.PUT("/:id", handlers.UpdateReservation)
 				orders.PUT("/:id/doc-contable", handlers.AddDocContable)

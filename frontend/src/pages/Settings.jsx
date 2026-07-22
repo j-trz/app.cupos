@@ -109,6 +109,20 @@ export default function Settings() {
                 Tiempo que una reserva permanece bloqueada antes de expirar si no se confirma
               </p>
             </div>
+            <div>
+              <Label htmlFor="bloqueo_hold_minutos">Hold de stock al elegir cantidad de pasajeros (minutos)</Label>
+              <Input
+                id="bloqueo_hold_minutos"
+                type="number"
+                min="1"
+                value={settings.bloqueo_hold_minutos || '10'}
+                onChange={(e) => handleChange('bloqueo_hold_minutos', e.target.value)}
+                placeholder="10"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tiempo que se reserva el cupo apenas el usuario elige cuántos pasajeros va a cargar, antes de completar el formulario
+              </p>
+            </div>
           </CardContent>
         </Card>
 

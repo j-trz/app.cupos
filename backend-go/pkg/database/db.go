@@ -303,6 +303,7 @@ func seedSystemSettings(db *gorm.DB) {
 		"bloqueo_minutos_default": 60,
 		"ai_historial_horas":      4,
 		"dias_aviso_vencimientos": 3,
+		"bloqueo_hold_minutos":    10,
 	}
 	for key, value := range defaults {
 		var count int64
@@ -533,6 +534,10 @@ func runSQLMigrations(db *gorm.DB) {
 		// gestionado) — pg_trgm es una extensión estándar de Postgres.
 		`CREATE EXTENSION IF NOT EXISTS pg_trgm;`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_expert_chunks_content_trgm ON ai_expert_chunks USING gin (content gin_trgm_ops);`,
+		// Hold temporal de stock (pre-reserva de cupos mientras se completa el
+		// formulario de pasajeros) y apagado de IA por agencia.
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_passenger_count INT DEFAULT 0;`,
+		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS ai_habilitado BOOLEAN DEFAULT true;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

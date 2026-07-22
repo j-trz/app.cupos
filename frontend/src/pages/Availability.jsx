@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Download, MapPin, StickyNote } from 'lucide-react';
 import ItineraryTable from '../components/ItineraryTable';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
+import CountdownTimer from '../components/CountdownTimer.jsx';
 import ReservationService from '../services/reservationService';
 import BackofficeService from '../services/backofficeService';
 import { useAIPageContext } from '../contexts/AIPageContext.jsx';
@@ -45,6 +46,11 @@ export default function Availability() {
   const [notesModalProduct, setNotesModalProduct] = useState(null);
   // Bloqueos temporales propios (sección "¿espero o no?" — sin datos de pasajero)
   const [blockedReservations, setBlockedReservations] = useState([]);
+  // Pre-hold de stock activo mientras se completa el modal (id/pedidoId/expiresAt)
+  // — ver CreateHold en order_handler.go. null si el modal se abrió sin hold
+  // (ej. el Asistente IA abre el modal directo, sin pasar por este flujo).
+  const [hold, setHold] = useState(null);
+  const [holdExpired, setHoldExpired] = useState(false);
 
   useEffect(() => {
     fetchAvailability();
@@ -116,17 +122,77 @@ export default function Availability() {
   // ---- Reserva individual ----
   const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', tipo_pasajero: 'Adulto' };
 
+  // Abre el modal SIN hold — lo sigue usando el Asistente IA (abrir_modal_reserva),
+  // que no pasa por el flujo manual de "elegir cantidad" de abajo.
   const openReservationModal = (product) => {
     setSelectedProduct(product);
     setForm({ ...EMPTY_FORM, pedido_id: ReservationService.generatePedidoId(), passengers: [{ ...EMPTY_PASSENGER }] });
+    setHold(null);
+    setHoldExpired(false);
     setModalOpen(true);
   };
 
+  // Flujo manual: clic en el número de disponibilidad o en "Reservar" primero
+  // pregunta cuántos pasajeros, descuenta ese stock de inmediato (CreateHold)
+  // y recién ahí abre el modal ya pre-cargado con N bloques de pasajero y el
+  // cronómetro de 10 min corriendo — así nadie más se lleva esos cupos
+  // mientras el usuario completa los datos.
+  const promptPassengerCountAndHold = async (product) => {
+    const disponibles = Number(product.disponibilidad) || 0;
+    const { value: countStr } = await Swal.fire({
+      title: '¿Cuántos pasajeros?',
+      input: 'number',
+      inputLabel: `Hay ${disponibles} cupo(s) disponible(s) — se reservan al confirmar`,
+      inputValue: 1,
+      inputAttributes: { min: 1, max: String(disponibles), step: 1 },
+      showCancelButton: true,
+      confirmButtonText: 'Reservar cupo',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        const n = Number(value);
+        if (!value || !Number.isInteger(n) || n < 1) return 'Ingresá una cantidad válida.';
+        if (n > disponibles) return `Solo hay ${disponibles} cupo(s) disponible(s).`;
+      },
+    });
+    if (!countStr) return;
+    const count = Number(countStr);
+
+    try {
+      const holdInfo = await ReservationService.createHold(product.id, count);
+      setSelectedProduct(product);
+      setForm({
+        ...EMPTY_FORM,
+        pedido_id: holdInfo.pedidoId,
+        passengers: Array.from({ length: count }, () => ({ ...EMPTY_PASSENGER })),
+      });
+      setHold(holdInfo);
+      setHoldExpired(false);
+      setModalOpen(true);
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo reservar el cupo',
+        text: error.message || 'Puede que alguien más ya lo haya tomado. Se actualizó la disponibilidad.',
+      });
+      fetchAvailability();
+    }
+  };
+
   const closeReservationModal = () => {
+    if (hold?.id) {
+      ReservationService.releaseHold(hold.id);
+      fetchAvailability();
+    }
     setModalOpen(false);
     setSelectedProduct(null);
     setForm(EMPTY_FORM);
+    setHold(null);
+    setHoldExpired(false);
   };
+
+  const handleHoldExpire = useCallback(() => {
+    setHoldExpired(true);
+  }, []);
 
   // ---- Contexto de pantalla para el Asistente IA ----
   const { setPageContext, clearPageContext, registerActionHandlers } = useAIPageContext();
@@ -144,7 +210,10 @@ export default function Availability() {
   // El Asistente IA completa el formulario de pasajeros ya abierto (con
   // datos extraídos de una foto de DNI/pasaporte, o filas vacías si solo se
   // sabe la cantidad) — el usuario revisa y confirma manualmente después.
-  const handleAIFillPassengers = useCallback((passengers) => {
+  // Si el usuario ya le dio la ficha de venta en el chat, también viaja acá
+  // (nunca sale de una foto de documento, ver ai_handler.go) para no
+  // obligarlo a tipearla de nuevo en el formulario.
+  const handleAIFillPassengers = useCallback((passengers, extra) => {
     if (!Array.isArray(passengers) || passengers.length === 0) return;
     setForm((prev) => ({
       ...prev,
@@ -156,6 +225,7 @@ export default function Availability() {
         nacionalidad: p?.nacionalidad || '',
         tipo_pasajero: p?.tipo_pasajero || 'Adulto',
       })),
+      ...(extra?.ficha_venta ? { ficha_venta: extra.ficha_venta } : {}),
     }));
   }, []);
 
@@ -341,6 +411,7 @@ export default function Availability() {
         precio_venta: selectedProduct.precio,
         vuelo_codigo: selectedProduct.codigo_cupo,
         passengers: form.passengers,
+        hold_id: hold?.id || undefined,
       };
       const result = await ReservationService.submitReservation(payload);
       setForm((prev) => ({
@@ -353,10 +424,25 @@ export default function Availability() {
         html: `<p class="text-sm text-slate-600">Tu reserva fue bloqueada temporalmente.</p><p class="mt-2 font-mono text-lg font-bold text-slate-900">${result.referenceId || form.pedido_id}</p><p class="mt-1 text-xs text-slate-500">Guardá este número de pedido para seguimiento.</p>`,
         confirmButtonText: 'Entendido',
       });
-      closeReservationModal();
+      // La reserva ya consumió el hold en el backend (Estado dejó de ser
+      // hold_temporal) — se limpia el estado local sin volver a llamar a
+      // releaseHold, para no pisar la reserva recién creada.
+      setModalOpen(false);
+      setSelectedProduct(null);
+      setForm(EMPTY_FORM);
+      setHold(null);
+      setHoldExpired(false);
       await Promise.all([fetchAvailability(), fetchBlockedReservations()]);
     } catch (error) {
-      Swal.fire({ icon: 'error', title: 'Error al reservar', text: error.message || 'No se pudo crear la reserva.' });
+      const message = error.message || 'No se pudo crear la reserva.';
+      // El backend devuelve este texto cuando el hold venció/ya no existe
+      // (410) — no tiene sentido dejar reintentar el mismo submit.
+      if (hold?.id && /bloqueo temporal/i.test(message)) {
+        setHoldExpired(true);
+        Swal.fire({ icon: 'warning', title: 'El bloqueo temporal expiró', text: 'El cupo se liberó. Cerrá el formulario e intentá reservar de nuevo.' });
+      } else {
+        Swal.fire({ icon: 'error', title: 'Error al reservar', text: message });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -534,9 +620,17 @@ export default function Availability() {
                   <TableCell className="text-center">{item.destino}</TableCell>
                   <TableCell className="text-center">{item.compania}</TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={getAvailabilityVariant(Number(item.disponibilidad))}>
-                      {item.disponibilidad}
-                    </Badge>
+                    <button
+                      type="button"
+                      onClick={() => promptPassengerCountAndHold(item)}
+                      disabled={Number(item.disponibilidad) <= 0}
+                      title={Number(item.disponibilidad) <= 0 ? 'Sin disponibilidad' : 'Elegir cantidad de pasajeros y reservar'}
+                      className="disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <Badge variant={getAvailabilityVariant(Number(item.disponibilidad))}>
+                        {item.disponibilidad}
+                      </Badge>
+                    </button>
                   </TableCell>
                   <TableCell className="text-center">{formatDate(item.fecha_salida)}</TableCell>
                   <TableCell className="text-center">{formatDate(item.fecha_regreso)}</TableCell>
@@ -586,7 +680,7 @@ export default function Availability() {
                   <TableCell className="text-center">
                     <Button
                       size="sm"
-                      onClick={() => openReservationModal(item)}
+                      onClick={() => promptPassengerCountAndHold(item)}
                       disabled={Number(item.disponibilidad) <= 0}
                       title={Number(item.disponibilidad) <= 0 ? 'Sin disponibilidad' : 'Reservar este cupo'}
                     >
@@ -605,6 +699,24 @@ export default function Availability() {
       <Modal title={`Reservar: ${selectedProduct?.codigo_cupo || ''} - ${selectedProduct?.destino || ''}`} open={modalOpen} onClose={closeReservationModal} size="2xl">
         <div>
           <form onSubmit={handleSubmitReservation} className="space-y-4">
+            {hold?.expiresAt && (
+              <div className={`flex items-center justify-between gap-3 rounded-2xl border p-4 ${holdExpired ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}>
+                <div>
+                  <p className={`text-sm font-semibold ${holdExpired ? 'text-red-800' : 'text-emerald-800'}`}>
+                    {holdExpired ? 'El bloqueo temporal expiró' : `Cupo reservado para ${form.passengers.length} pasajero(s)`}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${holdExpired ? 'text-red-600' : 'text-emerald-700'}`}>
+                    {holdExpired
+                      ? 'El cupo se liberó. Cerrá el formulario y volvé a intentar.'
+                      : 'Completá los datos antes de que venza el cronómetro.'}
+                  </p>
+                </div>
+                <CountdownTimer expiresAt={hold.expiresAt} onExpire={handleHoldExpire} />
+              </div>
+            )}
+
+            <fieldset disabled={holdExpired} className="contents">
+
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-slate-500">Compañía:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.compania}</span></div>
@@ -675,7 +787,7 @@ export default function Availability() {
                       </div>
                     </div>
                     <div className="flex items-center justify-end mt-2">
-                      <Button variant="secondary" size="sm" onClick={() => handleRemovePassenger(index)} disabled={form.passengers.length === 1}>
+                      <Button variant="secondary" size="sm" onClick={() => handleRemovePassenger(index)} disabled={form.passengers.length === 1 || !!hold} title={hold ? 'La cantidad quedó fija al reservar el cupo — cancelá y volvé a empezar para cambiarla' : undefined}>
                         <X className="h-4 w-4 mr-1" />Eliminar
                       </Button>
                     </div>
@@ -683,7 +795,7 @@ export default function Availability() {
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" onClick={() => handleAddPassenger()}>
+                <Button variant="secondary" size="sm" onClick={() => handleAddPassenger()} disabled={!!hold} title={hold ? 'La cantidad quedó fija al reservar el cupo — cancelá y volvé a empezar para cambiarla' : undefined}>
                   <Plus className="h-4 w-4 mr-1" />Agregar Pasajero
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={handleImportPassengers} className="border-dashed">
@@ -706,11 +818,13 @@ export default function Availability() {
               </div>
             </fieldset>
 
+            </fieldset>
+
             <div id="confirm-section" className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
               <Button variant="secondary" type="button" onClick={closeReservationModal} disabled={submitting} className="mr-2">
-                <X className="h-4 w-4 mr-1" />Cancelar
+                <X className="h-4 w-4 mr-1" />{holdExpired ? 'Cerrar' : 'Cancelar'}
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || holdExpired}>
                 <ShoppingCart className="h-4 w-4 mr-1" />
                 {submitting ? 'Reservando...' : 'Confirmar Reserva'}
               </Button>

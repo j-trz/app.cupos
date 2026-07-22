@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // PassengerInput acepta nacimiento como string "YYYY-MM-DD" o RFC3339.
@@ -34,6 +35,168 @@ type PassengerInput struct {
 type ReservationInput struct {
 	models.Reservation
 	Passengers []PassengerInput `json:"passengers"`
+	// HoldID, si viene, referencia un pre-hold creado por CreateHold: en ese
+	// caso el stock ya fue descontado al crear el hold y esta llamada solo
+	// completa los datos reales de contacto/pasajeros sobre esa misma fila.
+	HoldID uint `json:"hold_id,omitempty"`
+}
+
+// canReserveProduct valida si el usuario puede reservar este producto: es
+// admin, es la agencia dueña, se lo cedieron puntualmente (RestrictedAgency)
+// o lo tiene compartido (ProductSharedAgency). Se usa tanto en CreateHold
+// como en CreateReservation para no duplicar el chequeo de acceso.
+func canReserveProduct(tx *gorm.DB, product *models.Product, role interface{}, userAgencia string) bool {
+	if role == "admin" {
+		return true
+	}
+	if product.Agencia != "" && strings.EqualFold(product.Agencia, userAgencia) {
+		return true
+	}
+	if product.RestrictedAgency != "" && strings.EqualFold(product.RestrictedAgency, userAgencia) {
+		return true
+	}
+	var count int64
+	tx.Model(&models.ProductSharedAgency{}).
+		Where("product_id = ? AND LOWER(agencia) = LOWER(?)", product.ID, userAgencia).
+		Count(&count)
+	return count > 0
+}
+
+// CreateHold descuenta de inmediato N lugares de un producto, antes de que
+// el usuario haya cargado ningún dato de pasajero, para que nadie más se
+// lleve esos cupos mientras completa el formulario. Vive `bloqueo_hold_minutos`
+// (default 10) y se convierte en una reserva real vía CreateReservation con
+// `hold_id`, o libera el stock si se cancela (ReleaseHold) o vence (cron).
+func CreateHold(c *gin.Context) {
+	var input struct {
+		ProductID      uint `json:"product_id"`
+		PassengerCount int  `json:"passenger_count"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.PassengerCount <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "passenger_count debe ser mayor a 0"})
+		return
+	}
+
+	userIDStr, _ := c.Get("userID")
+	role, _ := c.Get("role")
+	userAgenciaVal, _ := c.Get("agencia")
+	userAgenciaRaw, _ := userAgenciaVal.(string)
+	userAgencia := services.ResolveAgencyCode(userAgenciaRaw)
+
+	var createdBy uuid.UUID
+	if userIDStr != nil {
+		if uid, err := uuid.Parse(userIDStr.(string)); err == nil {
+			createdBy = uid
+		}
+	}
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var product models.Product
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, input.ProductID).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+
+	if !canReserveProduct(tx, &product, role, userAgencia) {
+		tx.Rollback()
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a este cupo"})
+		return
+	}
+
+	if product.Disponibilidad < input.PassengerCount {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente"})
+		return
+	}
+
+	product.Disponibilidad -= input.PassengerCount
+	product.Vendidos += input.PassengerCount
+	if err := tx.Save(&product).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+		return
+	}
+
+	holdMinutes := services.GetIntSetting("bloqueo_hold_minutos", 10)
+	expiresAt := time.Now().Add(time.Duration(holdMinutes) * time.Minute)
+
+	hold := models.Reservation{
+		ProductID:          input.ProductID,
+		CreatedBy:          createdBy,
+		Estado:             models.EstadoHoldTemporal,
+		BloqueoExpiraAt:    &expiresAt,
+		HoldPassengerCount: input.PassengerCount,
+		PedidoID:           fmt.Sprintf("PED-%d-%s", time.Now().Year(), uuid.New().String()[:8]),
+		Agencia:            userAgencia,
+	}
+	if err := tx.Create(&hold).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear el bloqueo temporal"})
+		return
+	}
+
+	tx.Commit()
+
+	c.JSON(http.StatusCreated, gin.H{
+		"id":                hold.ID,
+		"pedido_id":         hold.PedidoID,
+		"bloqueo_expira_at": hold.BloqueoExpiraAt,
+		"passenger_count":   hold.HoldPassengerCount,
+	})
+}
+
+// ReleaseHold cancela un pre-hold (EstadoHoldTemporal) devolviendo el stock
+// de inmediato, sin esperar la corrida del cron — se llama cuando el usuario
+// cierra el modal de carga de pasajeros sin llegar a confirmar la reserva.
+// Es idempotente: si el hold ya no existe o ya no está en hold_temporal
+// (venció por cron, o ya se completó), responde éxito sin hacer nada.
+func ReleaseHold(c *gin.Context) {
+	id := c.Param("id")
+	userIDStr, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	var hold models.Reservation
+	if err := database.DB.First(&hold, id).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	if hold.Estado != models.EstadoHoldTemporal {
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	if role != "admin" && userIDStr != nil {
+		if uid, err := uuid.Parse(userIDStr.(string)); err == nil && hold.CreatedBy != uid {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No podés liberar un bloqueo de otro usuario"})
+			return
+		}
+	}
+
+	count := hold.HoldPassengerCount
+	if count <= 0 {
+		count = 1
+	}
+	database.DB.Model(&models.Product{}).Where("id = ?", hold.ProductID).
+		Updates(map[string]interface{}{
+			"disponibilidad": gorm.Expr("GREATEST(0, disponibilidad + ?)", count),
+			"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", count),
+		})
+
+	database.DB.Delete(&models.Reservation{}, id)
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // parseDateFlexible acepta "YYYY-MM-DD" o RFC3339
@@ -103,6 +266,36 @@ func CreateReservation(c *gin.Context) {
 		}
 	}()
 
+	// Si viene de un pre-hold (CreateHold), se recupera esa misma fila en vez
+	// de crear una nueva y NO se vuelve a descontar stock (ya se hizo al
+	// crear el hold) — acá solo se completan los datos reales.
+	var existingHold *models.Reservation
+	if input.HoldID != 0 {
+		var hold models.Reservation
+		if err := tx.First(&hold, input.HoldID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusGone, gin.H{"error": "El bloqueo temporal ya no existe"})
+			return
+		}
+		if hold.Estado != models.EstadoHoldTemporal {
+			tx.Rollback()
+			c.JSON(http.StatusGone, gin.H{"error": "El bloqueo temporal ya fue utilizado o liberado"})
+			return
+		}
+		if hold.BloqueoExpiraAt == nil || hold.BloqueoExpiraAt.Before(time.Now()) {
+			tx.Rollback()
+			c.JSON(http.StatusGone, gin.H{"error": "El bloqueo temporal expiró y el cupo fue liberado"})
+			return
+		}
+		if role != "admin" && hold.CreatedBy != input.Reservation.CreatedBy {
+			tx.Rollback()
+			c.JSON(http.StatusForbidden, gin.H{"error": "Este bloqueo temporal pertenece a otro usuario"})
+			return
+		}
+		existingHold = &hold
+		input.ProductID = hold.ProductID
+	}
+
 	// 1. Obtener producto para validar disponibilidad y obtener datos
 	var product models.Product
 	if err := tx.First(&product, input.ProductID).Error; err != nil {
@@ -115,22 +308,10 @@ func CreateReservation(c *gin.Context) {
 	// puntualmente (RestrictedAgency) o compartido (ProductSharedAgency —
 	// mismo Disponibilidad, sin fila espejo). El admin puede reservar
 	// cualquiera.
-	if role != "admin" {
-		isOwner := product.Agencia != "" && strings.EqualFold(product.Agencia, userAgencia)
-		isRestrictedToMe := product.RestrictedAgency != "" && strings.EqualFold(product.RestrictedAgency, userAgencia)
-		isSharedWithMe := false
-		if !isOwner && !isRestrictedToMe {
-			var count int64
-			tx.Model(&models.ProductSharedAgency{}).
-				Where("product_id = ? AND LOWER(agencia) = LOWER(?)", product.ID, userAgencia).
-				Count(&count)
-			isSharedWithMe = count > 0
-		}
-		if !isOwner && !isRestrictedToMe && !isSharedWithMe {
-			tx.Rollback()
-			c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a este cupo"})
-			return
-		}
+	if !canReserveProduct(tx, &product, role, userAgencia) {
+		tx.Rollback()
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés acceso a este cupo"})
+		return
 	}
 
 	numPassengers := len(input.Passengers)
@@ -138,23 +319,36 @@ func CreateReservation(c *gin.Context) {
 		numPassengers = 1
 	}
 
-	if product.Disponibilidad < numPassengers {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente"})
-		return
+	if existingHold != nil {
+		// La cantidad quedó fija al crear el hold: si no coincide, el cliente
+		// está tratando de reservar más/menos lugares de los que en verdad
+		// tiene apartados.
+		if numPassengers != existingHold.HoldPassengerCount {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "La cantidad de pasajeros no coincide con el bloqueo temporal"})
+			return
+		}
+	} else {
+		if product.Disponibilidad < numPassengers {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente"})
+			return
+		}
+
+		// 2. Actualizar disponibilidad del producto
+		product.Disponibilidad -= numPassengers
+		product.Vendidos += numPassengers
+		if err := tx.Save(&product).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+			return
+		}
 	}
 
-	// 2. Actualizar disponibilidad del producto
-	product.Disponibilidad -= numPassengers
-	product.Vendidos += numPassengers
-	if err := tx.Save(&product).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
-		return
-	}
-
-	// Auto-generar pedido_id si no viene
-	if input.Reservation.PedidoID == "" {
+	// Auto-generar pedido_id si no viene (un hold ya trae el suyo propio)
+	if existingHold != nil {
+		input.Reservation.PedidoID = existingHold.PedidoID
+	} else if input.Reservation.PedidoID == "" {
 		input.Reservation.PedidoID = fmt.Sprintf("PED-%d-%s", time.Now().Year(),
 			uuid.New().String()[:8])
 	}
@@ -231,7 +425,18 @@ func CreateReservation(c *gin.Context) {
 		input.Reservation.OriginalAgency = product.SourceAgency
 	}
 
-	if err := tx.Create(&input.Reservation).Error; err != nil {
+	if existingHold != nil {
+		// Reescribe la misma fila del hold con los datos reales (Save hace un
+		// UPDATE de fila completa dado que el ID ya está seteado).
+		input.Reservation.ID = existingHold.ID
+		input.Reservation.CreatedAt = existingHold.CreatedAt
+		input.Reservation.HoldPassengerCount = 0
+		if err := tx.Save(&input.Reservation).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al confirmar la reserva: " + err.Error()})
+			return
+		}
+	} else if err := tx.Create(&input.Reservation).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear la reserva: " + err.Error()})
 		return
@@ -363,7 +568,10 @@ func GetAllReservations(c *gin.Context) {
 	agenciaRaw, _ := agenciaVal.(string)
 	agencia := services.ResolveAgencyCode(agenciaRaw)
 
-	query := database.DB.Preload("Passengers")
+	// Los pre-holds (hold_temporal) todavía no tienen datos de contacto/pasajero
+	// reales — no deben aparecer como fila fantasma mientras el usuario está
+	// completando el formulario.
+	query := database.DB.Preload("Passengers").Where("estado != ?", models.EstadoHoldTemporal)
 	if role == "agency_admin" {
 		// Además de lo reservado por mi propia agencia, también lo que OTRA
 		// agencia reservó sobre un producto que yo poseo (visibilidad

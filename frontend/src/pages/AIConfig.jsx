@@ -7,14 +7,16 @@ import { useState, useEffect } from 'react';
 import {
     Bot, Plus, Edit2, Trash2, TestTube, Key,
     Activity, MessageSquare, Save, X, Eye, EyeOff, RefreshCw,
-    Zap, CheckCircle, Lock, Sparkles
+    Zap, CheckCircle, Lock, Sparkles, Building2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AIService from '../services/aiService';
+import AgencyService from '../services/agencyService';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge.jsx';
+import { Checkbox } from '../components/ui/Checkbox.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
@@ -156,6 +158,7 @@ const PROVIDER_TYPES = [
 const TABS = [
     { id: 'providers', label: 'Proveedores', icon: Key },
     { id: 'experts', label: 'Expertos', icon: Sparkles },
+    { id: 'agencies', label: 'Agencias', icon: Building2 },
     { id: 'stats', label: 'Estadísticas', icon: Activity },
     { id: 'logs', label: 'Logs', icon: MessageSquare }
 ];
@@ -164,6 +167,7 @@ export default function AIConfig() {
     const { can } = useAuth();
     const [activeTab, setActiveTab] = useState('providers');
     const [providers, setProviders] = useState([]);
+    const [agencies, setAgencies] = useState([]);
     const [stats, setStats] = useState(null);
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -200,6 +204,9 @@ export default function AIConfig() {
             } else if (activeTab === 'experts') {
                 // ExpertsTab maneja su propia carga — no-op acá, solo para
                 // que el spinner de isLoading no quede en true de más.
+            } else if (activeTab === 'agencies') {
+                const response = await AgencyService.listAgencies();
+                setAgencies(Array.isArray(response) ? response : response?.data || []);
             } else if (activeTab === 'stats') {
                 const response = await AIService.getStats(statsDays);
                 setStats(response.stats);
@@ -273,6 +280,19 @@ export default function AIConfig() {
             api_key: '' // No cargar API key por seguridad
         });
         setShowProviderForm(true);
+    };
+
+    // Prende/apaga el asistente de IA para una agencia puntual (Agency.AIHabilitado)
+    // — algunas agencias no quieren usarlo. Se chequea también en el backend
+    // (Chat() en ai_handler.go), esto solo administra el flag.
+    const handleToggleAgencyAI = async (agency, next) => {
+        setAgencies((prev) => prev.map((a) => (a.id === agency.id ? { ...a, ai_habilitado: next } : a)));
+        try {
+            await AgencyService.updateAgency(agency.id, { ai_habilitado: next });
+        } catch (error) {
+            setAgencies((prev) => prev.map((a) => (a.id === agency.id ? { ...a, ai_habilitado: agency.ai_habilitado } : a)));
+            Swal.fire('Error', error.message || 'No se pudo actualizar la agencia', 'error');
+        }
     };
 
     if (!can('AI_VIEW')) {
@@ -583,6 +603,54 @@ export default function AIConfig() {
 
                     {/* Tab: Expertos */}
                     {activeTab === 'experts' && <ExpertsTab />}
+
+                    {/* Tab: Agencias — encendido/apagado del asistente por agencia */}
+                    {activeTab === 'agencies' && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-slate-900">Asistente por agencia</h2>
+                                    <p className="text-sm text-slate-500">Desactivá el asistente de IA para las agencias que no quieran usarlo.</p>
+                                </div>
+                                <Button variant="secondary" size="sm" onClick={loadData} title="Refrescar">
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <Card>
+                                <TableComponent>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Agencia</TableHead>
+                                            <TableHead>Código</TableHead>
+                                            <TableHead className="text-center">Asistente IA habilitado</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {agencies.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell className="text-center py-10" colSpan={3}>
+                                                    No hay agencias cargadas
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            agencies.map((agency) => (
+                                                <TableRow key={agency.id}>
+                                                    <TableCell>{agency.name}</TableCell>
+                                                    <TableCell className="font-mono text-xs text-slate-500">{agency.code}</TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Checkbox
+                                                            checked={agency.ai_habilitado !== false}
+                                                            onCheckedChange={(checked) => handleToggleAgencyAI(agency, checked)}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </TableComponent>
+                            </Card>
+                        </div>
+                    )}
 
                     {/* Tab: Estadísticas */}
                     {activeTab === 'stats' && stats && (

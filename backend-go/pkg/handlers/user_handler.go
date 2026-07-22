@@ -10,12 +10,26 @@ import (
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
+	"backend-go/pkg/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// profileWithAIFlag agrega `ai_habilitado` (resuelto desde la agencia del
+// perfil, no una columna propia de Profile) a la respuesta de Login/GetProfile
+// — así el frontend sabe si debe mostrar el widget de chat sin depender de
+// que la primera llamada a /ai/chat falle.
+type profileWithAIFlag struct {
+	models.Profile
+	AIHabilitado bool `json:"ai_habilitado"`
+}
+
+func withAIFlag(profile models.Profile) profileWithAIFlag {
+	return profileWithAIFlag{Profile: profile, AIHabilitado: services.ResolveAgencyAIHabilitado(profile.Agencia)}
+}
 
 type LoginInput struct {
 	Email    string `json:"email" binding:"required"`
@@ -74,7 +88,7 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"token":   tokenString,
-		"user":    profile,
+		"user":    withAIFlag(profile),
 	})
 }
 
@@ -86,7 +100,7 @@ func GetProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
+	c.JSON(http.StatusOK, gin.H{"success": true, "profile": withAIFlag(profile)})
 }
 
 // UpdateMyProfile allows the authenticated user to update their own profile fields.

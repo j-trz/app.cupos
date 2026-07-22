@@ -282,6 +282,7 @@ LECTURA DE DOCUMENTOS DE IDENTIDAD:
 - Confirma los datos extraídos brevemente y úsalos para la reserva.
 - La ficha de venta NUNCA viene en un DNI — aunque hayas extraído todo el resto de una imagen, siempre tenés que preguntarle al usuario la ficha de venta antes de reservar.
 - Si hay CONTEXTO DE PANTALLA con el formulario de reserva disponible, preferí llamar a completar_formulario_pasajeros con los datos extraídos (así el usuario ve y confirma el formulario ya completado) en vez de crear_reserva directo, salvo que el usuario haya pedido explícitamente que reserves sin confirmar nada.
+- Si en la MISMA conversación el usuario ya te dio la ficha de venta (antes o después de adjuntar el documento), pasásela también a completar_formulario_pasajeros en el argumento "ficha_venta" — así queda cargada en el formulario real y no tiene que volver a tipearla. Si todavía no la dio, llamá igual a completar_formulario_pasajeros con los pasajeros (sin ese argumento) y pedísela aparte; en cuanto la responda, podés volver a llamar a completar_formulario_pasajeros solo para completar ese campo.
 
 NAVEGACIÓN ENTRE PANTALLAS (IMPORTANTE):
 - Si el usuario pide ir a, ver, o que le muestres otra sección de la app (ej. "llevame a confirmaciones", "mostrame mis solicitudes", "andá a disponibilidad"), llamá a navegar_a_pantalla — nunca respondas que no podés cambiar de pantalla, esa herramienta existe justamente para eso.
@@ -463,6 +464,7 @@ func getTools(role string, experts []models.AIExpert) []ToolDef {
 						},
 					},
 					"cantidad_pasajeros": {Type: "string", Description: "Cantidad de filas de pasajero vacías a crear si todavía no se conocen los datos (ej. el usuario dijo 'somos 3' pero no dio nombres todavía). Ignorado si se manda 'pasajeros'."},
+					"ficha_venta":        {Type: "string", Description: "Ficha de venta, SOLO si el usuario ya la dio en la conversación (nunca viene de una foto de documento). Si la tenés, mandala acá para que quede cargada en el formulario y el usuario no tenga que tipearla de nuevo."},
 				},
 			},
 		},
@@ -1785,13 +1787,23 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 			}
 		}
 
+		payload := map[string]interface{}{"passengers": pasajeros}
+		fichaVenta := strField(args, "ficha_venta")
+		if fichaVenta != "" {
+			payload["ficha_venta"] = fichaVenta
+		}
 		if uiActions != nil {
 			*uiActions = append(*uiActions, UIAction{
 				Type:    "fill_passenger_form",
-				Payload: map[string]interface{}{"passengers": pasajeros},
+				Payload: payload,
 			})
 		}
-		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": fmt.Sprintf("Se completó el formulario con %d pasajero(s). El usuario ya lo puede revisar y confirmar.", len(pasajeros))})
+		msg := fmt.Sprintf("Se completó el formulario con %d pasajero(s).", len(pasajeros))
+		if fichaVenta != "" {
+			msg += " También se cargó la ficha de venta."
+		}
+		msg += " El usuario ya lo puede revisar y confirmar."
+		b, _ := json.Marshal(map[string]interface{}{"exito": true, "mensaje": msg})
 		return string(b)
 
 	case "mis_grupos":
@@ -2235,6 +2247,14 @@ func Chat(c *gin.Context) {
 	}
 	if u.Nombre == "" {
 		u.Nombre = u.Email
+	}
+
+	// Una agencia puede desactivar el asistente para todos sus usuarios (ver
+	// Agency.AIHabilitado / tab "Agencias" en AIConfig.jsx) — se chequea acá,
+	// no solo ocultando el widget, porque el endpoint es de acceso directo.
+	if !services.ResolveAgencyAIHabilitado(u.Agencia) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "El asistente de IA está desactivado para tu agencia."})
+		return
 	}
 
 	// Obtener proveedor
