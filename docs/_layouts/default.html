@@ -23,8 +23,7 @@
     </a>
   </header>
 
-  {% assign has_toc = content contains "<h2" %}
-  <div class="layout{% unless has_toc %} layout-no-toc{% endunless %}">
+  <div class="layout">
     <nav class="sidebar" id="sidebar">
       <p class="sidebar-title">Documentación</p>
       <ul>
@@ -34,6 +33,9 @@
             <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
               {{ p.title }}
             </a>
+            {% if p.url == page.url %}
+              <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
@@ -42,13 +44,6 @@
     <main id="content" class="content">
       {{ content }}
     </main>
-
-    {% if has_toc %}
-    <aside class="page-toc" id="page-toc">
-      <p class="page-toc-title">En esta página</p>
-      <ul id="page-toc-list"></ul>
-    </aside>
-    {% endif %}
   </div>
 
   <footer class="site-footer">
@@ -77,9 +72,10 @@
         mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'neutral', securityLevel: 'loose' });
       }
 
-      // Índice "En esta página": lista los <h2> del artículo y resalta el
+      // Ítems individuales de la página actual, anidados bajo su propio link
+      // en el sidebar principal: lista los <h2> del artículo y resalta el
       // que está en foco a medida que se scrollea (scrollspy simple).
-      var tocList = document.getElementById('page-toc-list');
+      var tocList = document.getElementById('sidebar-subnav');
       if (tocList) {
         var headings = document.querySelectorAll('.content h2[id]');
         var links = [];

@@ -115,16 +115,12 @@ body {
 /* ---------- Layout ---------- */
 /* Sin max-width/margin:auto acá a propósito: el sidebar debe quedar pegado
    al borde izquierdo real del viewport, no centrado dentro de un contenedor
-   angosto. El espacio de más en pantallas anchas lo usa el índice lateral
-   (.page-toc); el texto en sí mantiene su propio ancho de lectura cómodo
-   vía .content { max-width; margin: 0 auto }. */
+   angosto. El texto en sí mantiene su propio ancho de lectura cómodo vía
+   .content { max-width; margin: 0 auto }. */
 .layout {
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) 15rem;
-  width: 100%;
-}
-.layout.layout-no-toc {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  width: 100%;
 }
 
 .sidebar {
@@ -162,48 +158,32 @@ body {
   font-weight: 600;
 }
 
+/* Secciones (<h2>) de la página actual, anidadas bajo su propio link — se
+   generan por JS solo para la página abierta (ver <script> al final). */
+.sidebar-subnav {
+  list-style: none;
+  margin: 0.15rem 0 0.5rem;
+  padding: 0;
+}
+.sidebar-subnav li { margin: 0; }
+.sidebar-subnav a {
+  display: block;
+  padding: 0.3rem 0.65rem 0.3rem 1.5rem;
+  border-radius: 0.5rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.sidebar-subnav a:hover { background: var(--code-bg); text-decoration: underline; }
+.sidebar-subnav a.active { background: var(--accent-soft); font-weight: 700; }
+
 .content {
   min-width: 0;
   padding: 2.5rem 2.5rem 5rem;
   max-width: 860px;
   margin: 0 auto;
 }
-
-/* ---------- Índice "en esta página" ---------- */
-.page-toc {
-  position: sticky;
-  top: var(--header-h);
-  height: calc(100vh - var(--header-h));
-  overflow-y: auto;
-  padding: 1.75rem 1.25rem;
-  border-left: 1px solid var(--border);
-  font-size: 0.85rem;
-}
-.page-toc-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.page-toc ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-left: 1px solid var(--border);
-}
-.page-toc a {
-  display: block;
-  padding: 0.3rem 0 0.3rem 0.85rem;
-  margin-left: -1px;
-  border-left: 2px solid transparent;
-  color: var(--text-muted);
-  text-decoration: none;
-  line-height: 1.35;
-}
-.page-toc a:hover { color: var(--text); }
-.page-toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
 
 /* ---------- Typography ---------- */
 .content h1 {
@@ -295,16 +275,11 @@ body {
 .site-footer a { color: var(--text-muted); }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 1180px) {
-  .layout, .layout.layout-no-toc { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
-  .page-toc { display: none; }
-}
-
 @media (max-width: 860px) {
   .nav-toggle { display: flex; }
   .gh-link { display: none; }
 
-  .layout, .layout.layout-no-toc { display: block; }
+  .layout { display: block; }
 
   .sidebar {
     position: fixed;
