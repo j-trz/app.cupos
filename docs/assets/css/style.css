@@ -124,8 +124,8 @@ body::before {
   min-width: 0;
 }
 .brand-mark {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
   color: var(--accent);
   flex-shrink: 0;
   transform: rotate(90deg);
