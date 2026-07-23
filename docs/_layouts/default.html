@@ -33,19 +33,25 @@
   <div class="layout">
     <nav class="sidebar" id="sidebar">
       <p class="sidebar-title">Documentación</p>
-      <ul>
-        {% assign docs = site.pages | where_exp: "p", "p.title" | sort: "nav_order" %}
-        {% for p in docs %}
-          <li style="--i: {{ forloop.index0 }}">
-            <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
-              <span class="nav-index">{{ forloop.index0 | prepend: '00' | slice: -2, 2 }}</span>
-              <span class="nav-label">{{ p.title }}</span>
-            </a>
-            {% if p.url == page.url %}
-              <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
-            {% endif %}
-          </li>
-        {% endfor %}
+      {% assign docs = site.pages | where_exp: "p", "p.title" | sort: "nav_order" %}
+      {% assign prev_group = nil %}
+      {% for p in docs %}
+        {% if p.nav_group != prev_group %}
+          {% unless forloop.first %}</ul>{% endunless %}
+          <p class="sidebar-group">{{ p.nav_group }}</p>
+          <ul>
+          {% assign prev_group = p.nav_group %}
+        {% endif %}
+        <li style="--i: {{ forloop.index0 }}">
+          <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
+            <span class="nav-index">{{ forloop.index0 | prepend: '00' | slice: -2, 2 }}</span>
+            <span class="nav-label">{{ p.title }}</span>
+          </a>
+          {% if p.url == page.url %}
+            <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
+          {% endif %}
+        </li>
+      {% endfor %}
       </ul>
     </nav>
 
