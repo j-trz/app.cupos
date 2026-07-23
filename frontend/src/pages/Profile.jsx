@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Mail, UserCircle2, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Mail, UserCircle2, Shield, Building2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
+import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card.jsx';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
@@ -35,6 +37,8 @@ function getInitials(nombre, email) {
 }
 
 export default function Profile() {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState([]);
@@ -43,6 +47,12 @@ export default function Profile() {
   // until the Profile DB model gains those columns).
   const [form, setForm] = useState({ nombre: '', apellido: '', telefono: '' });
   const [saving, setSaving] = useState(false);
+
+  // Selector de agencia activa (solo visible si el usuario tiene más de una
+  // asignada) — GetProfile ya devuelve `agencies` con la propia + las
+  // adicionales que le haya asignado el superadmin vía UserAgeciesModal.
+  const [selectedAgency, setSelectedAgency] = useState('');
+  const [switchingAgency, setSwitchingAgency] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -56,6 +66,7 @@ export default function Profile() {
             apellido: p.apellido || '',
             telefono: p.telefono || '',
           });
+          setSelectedAgency(p.agencia || '');
         }
       } catch (error) {
         console.error('Error loading profile:', error);
@@ -119,6 +130,46 @@ export default function Profile() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Pisa Profile.Agencia en el servidor, pero el JWT ya emitido sigue
+  // teniendo la agencia vieja hasta el próximo login (el backend no lo
+  // reemite) — por eso se fuerza un logout inmediato después de confirmar.
+  async function handleSwitchAgency() {
+    if (!selectedAgency || selectedAgency === profile.agencia) return;
+
+    const confirm = await Swal.fire({
+      icon: 'warning',
+      title: '¿Cambiar de agencia activa?',
+      html: `Vas a pasar a operar como <strong>${selectedAgency}</strong>. Tenés que volver a iniciar sesión para que el cambio se aplique.`,
+      showCancelButton: true,
+      confirmButtonText: 'Cambiar y cerrar sesión',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#0f172a',
+    });
+    if (!confirm.isConfirmed) return;
+
+    setSwitchingAgency(true);
+    try {
+      await ApiClient.put('/auth/active-agency', { agencia: selectedAgency });
+      await Swal.fire({
+        icon: 'success',
+        title: 'Agencia actualizada',
+        text: 'Iniciá sesión de nuevo para continuar con tu nueva agencia activa.',
+        confirmButtonColor: '#0f172a',
+      });
+      signOut();
+      navigate('/login');
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'No se pudo cambiar de agencia.',
+        confirmButtonColor: '#0f172a',
+      });
+    } finally {
+      setSwitchingAgency(false);
     }
   }
 
@@ -242,6 +293,41 @@ export default function Profile() {
           </div>
         </form>
       </Card>
+
+      {/* Cambio de agencia activa — solo si el superadmin le asignó más de una */}
+      {Array.isArray(profile.agencies) && profile.agencies.length > 1 && (
+        <Card className="p-6">
+          <h3 className="mb-1 text-base font-semibold text-slate-900 flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-slate-400" />
+            Agencia activa
+          </h3>
+          <p className="mb-4 text-sm text-slate-500">
+            Tenés más de una agencia asignada. Elegí con cuál operar — vas a tener que volver a iniciar sesión para que el cambio se aplique.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1.5">
+              <label className="text-sm font-medium text-slate-700" htmlFor="agencia-activa">Agencia</label>
+              <select
+                id="agencia-activa"
+                value={selectedAgency}
+                onChange={(e) => setSelectedAgency(e.target.value)}
+                disabled={switchingAgency}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                {profile.agencies.map((agencia) => (
+                  <option key={agencia} value={agencia}>{agencia}</option>
+                ))}
+              </select>
+            </div>
+            <Button
+              onClick={handleSwitchAgency}
+              disabled={switchingAgency || !selectedAgency || selectedAgency === profile.agencia}
+            >
+              {switchingAgency ? 'Cambiando...' : 'Cambiar agencia'}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Permissions card — only rendered when the user has visible permissions */}
       {permissions.length > 0 && (

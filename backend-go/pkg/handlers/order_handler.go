@@ -128,7 +128,7 @@ func CreateHold(c *gin.Context) {
 		return
 	}
 
-	holdMinutes := services.GetIntSetting("bloqueo_hold_minutos", 10)
+	holdMinutes := services.GetIntSettingForAgency("bloqueo_hold_minutos", userAgencia, 10)
 	expiresAt := time.Now().Add(time.Duration(holdMinutes) * time.Minute)
 
 	hold := models.Reservation{
@@ -387,7 +387,7 @@ func CreateReservation(c *gin.Context) {
 	// 3. Preparar reserva
 	blockMinutes := product.BloqueoTemporalMinutos
 	if blockMinutes <= 0 {
-		blockMinutes = services.GetIntSetting("bloqueo_minutos_default", 60)
+		blockMinutes = services.GetIntSettingForAgency("bloqueo_minutos_default", input.Reservation.Agencia, 60)
 	}
 	expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
 	input.Reservation.BloqueoExpiraAt = &expiresAt

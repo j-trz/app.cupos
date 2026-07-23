@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Save, Clock, Bot, Lock, CalendarClock } from 'lucide-react';
 import ApiClient from '../services/apiClient';
+import AgencyService from '../services/agencyService';
 import Swal from 'sweetalert2';
 import { useAuth } from '../contexts/AuthContext';
 import { ShadcnButton as Button } from '../components/ui/shadcn-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/shadcn-card';
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import { Label } from '../components/ui/shadcn-label';
+import { Checkbox } from '../components/ui/Checkbox.jsx';
 
 export default function Settings() {
-  const { can } = useAuth();
+  const { user, can, signIn } = useAuth();
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
+  const [aiHabilitado, setAiHabilitado] = useState(user?.ai_habilitado !== false);
+  const [savingAiToggle, setSavingAiToggle] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -57,6 +61,24 @@ export default function Settings() {
       ...prev,
       [key]: value
     }));
+  };
+
+  // Self-service: prende/apaga el asistente de IA solo para la propia
+  // agencia (backend en /agencies/me/ai-habilitado resuelve la agencia del
+  // token, nunca un id) — al confirmar, refresca el user en sesión para que
+  // el sidebar/widget reaccionen sin esperar a un nuevo login.
+  const handleToggleAI = async (checked) => {
+    setAiHabilitado(checked);
+    setSavingAiToggle(true);
+    try {
+      await AgencyService.toggleMyAgencyAI(checked);
+      if (user) signIn({ ...user, ai_habilitado: checked });
+    } catch (error) {
+      setAiHabilitado(!checked);
+      Swal.fire('Error', error.message || 'No se pudo actualizar el asistente de IA', 'error');
+    } finally {
+      setSavingAiToggle(false);
+    }
   };
 
   if (loading) {
@@ -167,6 +189,22 @@ export default function Settings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {can('AI_TOGGLE') && (
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                <div className="pr-4">
+                  <Label htmlFor="ai_habilitado">Asistente de IA habilitado para tu agencia</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Apagalo si tu agencia no quiere que sus usuarios vean el chat de IA. Solo afecta a tu propia agencia.
+                  </p>
+                </div>
+                <Checkbox
+                  id="ai_habilitado"
+                  checked={aiHabilitado}
+                  disabled={savingAiToggle}
+                  onCheckedChange={handleToggleAI}
+                />
+              </div>
+            )}
             <div>
               <Label htmlFor="ai_historial_horas">Retención de historial de chat (horas)</Label>
               <Input

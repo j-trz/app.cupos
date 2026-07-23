@@ -35,6 +35,12 @@ export class AgencyService {
     return await ApiClient.put(`/agencies/${agencyId}/config`, configData);
   }
 
+  // Prende/apaga el asistente de IA para la PROPIA agencia (self-service) —
+  // el backend resuelve la agencia objetivo del token, nunca de un id acá.
+  static async toggleMyAgencyAI(aiHabilitado) {
+    return await ApiClient.put('/agencies/me/ai-habilitado', { ai_habilitado: aiHabilitado });
+  }
+
   static async getAgencyConfig(agencyId) {
     return await ApiClient.get(`/agencies/${agencyId}/config`);
   }
