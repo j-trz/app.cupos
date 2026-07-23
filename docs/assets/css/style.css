@@ -195,8 +195,9 @@ body::before {
 /* ---------- Layout ---------- */
 /* Sin max-width/margin:auto acá a propósito: el sidebar debe quedar pegado
    al borde izquierdo real del viewport, no centrado dentro de un contenedor
-   angosto. El texto en sí mantiene su propio ancho de lectura cómodo vía
-   .content { max-width; margin: 0 auto }. */
+   angosto. .content usa todo el ancho de la columna; la prosa mantiene su
+   propio ancho de lectura cómodo vía los selectores `.content > h1/p/...`
+   de más abajo, sin restringir las tablas ni el código. */
 .layout {
   position: relative;
   z-index: 1;
@@ -303,10 +304,24 @@ body::before {
 
 .content {
   min-width: 0;
+  width: 100%;
   padding: 3.5rem 3rem 6rem;
-  max-width: 780px;
-  margin: 0 auto;
   animation: rise-in 0.6s cubic-bezier(.16,1,.3,1) 0.1s both;
+}
+
+/* La prosa (párrafos, listas, títulos, citas) mantiene un ancho de lectura
+   cómodo; las tablas, el código y los diagramas usan todo el ancho
+   disponible de la columna — evita líneas de texto larguísimas en
+   pantallas anchas sin desperdiciar el espacio en las tablas de
+   referencia de la API. */
+.content > h1,
+.content > h2,
+.content > h3,
+.content > p,
+.content > ul,
+.content > ol,
+.content > blockquote {
+  max-width: 72ch;
 }
 
 /* ---------- Typography ---------- */
