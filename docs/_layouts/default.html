@@ -6,6 +6,9 @@
   <title>{{ page.title | default: site.title }} · {{ site.title }}</title>
   <meta name="description" content="{{ page.description | default: site.description }}">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
 </head>
 <body>
@@ -16,10 +19,14 @@
       <span></span><span></span><span></span>
     </button>
     <a class="brand" href="{{ '/' | relative_url }}">
-      <span class="brand-mark">✈️</span> Sistema de Gestión de Cupos <span class="brand-sub">docs</span>
+      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M44 24 30 20 27 6.5c-.2-1-1.6-1-1.8 0L23 20l-8 2.2V26l8-1.3 1 12L20 39v2.6l4-1 4 1V39l-4-2.3 1-12 8 1.3v-3.8Z" fill="currentColor"/>
+      </svg>
+      <span class="brand-text">Sistema de Gestión de Cupos</span>
+      <span class="brand-sub">docs</span>
     </a>
     <a class="gh-link" href="https://github.com/j-trz/app.cupos" target="_blank" rel="noopener">
-      Repositorio ↗
+      Repositorio <span aria-hidden="true">↗</span>
     </a>
   </header>
 
@@ -29,9 +36,10 @@
       <ul>
         {% assign docs = site.pages | where_exp: "p", "p.title" | sort: "nav_order" %}
         {% for p in docs %}
-          <li>
+          <li style="--i: {{ forloop.index0 }}">
             <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
-              {{ p.title }}
+              <span class="nav-index">{{ forloop.index0 | prepend: '00' | slice: -2, 2 }}</span>
+              <span class="nav-label">{{ p.title }}</span>
             </a>
             {% if p.url == page.url %}
               <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
@@ -47,8 +55,9 @@
   </div>
 
   <footer class="site-footer">
-    Generado desde <code>docs/</code> en la rama <code>main</code> de
-    <a href="https://github.com/j-trz/app.cupos">j-trz/app.cupos</a>.
+    <span class="footer-rule" aria-hidden="true"></span>
+    <p>Generado desde <code>docs/</code> en la rama <code>main</code> de
+    <a href="https://github.com/j-trz/app.cupos">j-trz/app.cupos</a>.</p>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -62,10 +71,17 @@
       // algún otro procesador markdown genera esa forma.
       document.querySelectorAll('pre code.language-mermaid, div.language-mermaid').forEach(function (block) {
         var host = block.tagName === 'CODE' ? block.closest('pre') : block;
+        var wrap = document.createElement('div');
+        wrap.className = 'mermaid-frame';
+        var label = document.createElement('span');
+        label.className = 'mermaid-frame-label';
+        label.textContent = 'DIAGRAMA';
         var div = document.createElement('div');
         div.className = 'mermaid';
         div.textContent = block.textContent;
-        host.replaceWith(div);
+        wrap.appendChild(label);
+        wrap.appendChild(div);
+        host.replaceWith(wrap);
       });
       if (window.mermaid) {
         var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -73,10 +89,10 @@
         // startOnLoad encoge TODOS los diagramas al ancho de la tarjeta
         // (width="100%"), sin importar su forma — un flowchart angosto y
         // alto queda legible, pero uno ancho con muchas ramas en paralelo
-        // (ej. la sección de Configuraciones) queda con el texto aplastado.
-        // Con mermaid.run() se puede post-procesar: cada SVG se deja a su
-        // tamaño natural (el de su viewBox) y la tarjeta se banca el ancho
-        // de más con scroll horizontal — así el texto nunca se achica.
+        // queda con el texto aplastado. Con mermaid.run() se puede
+        // post-procesar: cada SVG se deja a su tamaño natural (el de su
+        // viewBox) y la tarjeta se banca el ancho de más con scroll
+        // horizontal — así el texto nunca se achica.
         mermaid.run({ querySelector: '.mermaid' }).then(function () {
           document.querySelectorAll('.content .mermaid svg').forEach(function (svg) {
             var vb = svg.viewBox && svg.viewBox.baseVal;

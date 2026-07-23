@@ -1,26 +1,51 @@
+/* ==========================================================================
+   Sistema de Gestión de Cupos — Documentación
+   Dirección estética: "manual técnico de aviación". Tinta cálida + ámbar
+   (instrumentos de vuelo / tableros de salida), serif editorial (Fraunces)
+   para títulos, sans técnico (Public Sans) para texto e interfaz, monospace
+   (JetBrains Mono) para código y etiquetas técnicas. Los diagramas Mermaid
+   se enmarcan como planos técnicos; los bloques de código son siempre
+   oscuros, sin importar el modo claro/oscuro de la página.
+   ========================================================================== */
+
 :root {
-  --bg: #f8fafc;
+  --bg: #faf6ee;
   --bg-elevated: #ffffff;
-  --text: #0f172a;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --accent: #2563eb;
-  --accent-soft: #eff6ff;
-  --code-bg: #f1f5f9;
-  --header-h: 3.5rem;
-  --sidebar-w: 17rem;
+  --bg-subtle: #f1e9d5;
+  --ink: #211a12;
+  --ink-muted: #7a6d59;
+  --border: #e6dcc2;
+  --accent: #b1550e;
+  --accent-strong: #8a3f09;
+  --accent-soft: #f5e2c8;
+  --code-bg: #1c160f;
+  --code-text: #f2e9d8;
+  --code-border: rgba(226, 149, 47, 0.28);
+  --shadow: 0 16px 40px -20px rgba(33, 26, 18, 0.35);
+
+  --header-h: 3.75rem;
+  --sidebar-w: 18rem;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1120;
-    --bg-elevated: #111827;
-    --text: #e5e7eb;
-    --text-muted: #94a3b8;
-    --border: #1f2937;
-    --accent: #60a5fa;
-    --accent-soft: #12213d;
-    --code-bg: #0f172a;
+    --bg: #16120c;
+    --bg-elevated: #1e170f;
+    --bg-subtle: #241c12;
+    --ink: #f2e9d8;
+    --ink-muted: #a99a80;
+    --border: #382c1c;
+    --accent: #e2952f;
+    --accent-strong: #f3b25a;
+    --accent-soft: rgba(226, 149, 47, 0.15);
+    --code-bg: #0f0c08;
+    --code-text: #f2e9d8;
+    --code-border: rgba(226, 149, 47, 0.22);
+    --shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -30,10 +55,34 @@ html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.65;
+  background:
+    radial-gradient(ellipse 900px 500px at 12% -10%, var(--accent-soft), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Textura sutil de puntos, como papel milimetrado — refuerza el carácter
+   "plano técnico" sin competir con el contenido. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(to bottom, black, black 40%, transparent 92%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
 
 .skip-link {
@@ -44,6 +93,8 @@ body {
   color: #fff;
   padding: 0.5rem 1rem;
   z-index: 100;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
 }
 .skip-link:focus { left: 0.5rem; top: 0.5rem; }
 
@@ -55,62 +106,91 @@ body {
   height: var(--header-h);
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0 1.25rem;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border);
+  gap: 1.25rem;
+  padding: 0 1.5rem;
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 3px solid var(--accent);
+  box-shadow: 0 1px 0 var(--border);
+  animation: drop-in 0.5s cubic-bezier(.16,1,.3,1) both;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text);
+  gap: 0.6rem;
   text-decoration: none;
+  color: var(--ink);
+  min-width: 0;
 }
-.brand-mark { font-size: 1.15rem; }
+.brand-mark {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--accent);
+  flex-shrink: 0;
+  transform: rotate(90deg);
+}
+.brand-text {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .brand-sub {
+  font-family: var(--font-mono);
   font-weight: 500;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  color: var(--ink-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  flex-shrink: 0;
 }
 
 .gh-link {
   margin-left: auto;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink-muted);
   text-decoration: none;
   border: 1px solid var(--border);
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  transition: color 0.15s, border-color 0.15s;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.4rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
 }
-.gh-link:hover { color: var(--accent); border-color: var(--accent); }
+.gh-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.gh-link span { display: inline-block; transition: transform 0.15s; }
+.gh-link:hover span { transform: translate(2px, -2px); }
 
 .nav-toggle {
   display: none;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   width: 2rem;
   height: 2rem;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
 }
 .nav-toggle span {
   display: block;
   height: 2px;
-  background: var(--text);
+  background: var(--ink);
   border-radius: 1px;
   transition: transform 0.2s, opacity 0.2s;
 }
-.nav-toggle.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .nav-toggle.open span:nth-child(2) { opacity: 0; }
-.nav-toggle.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 /* ---------- Layout ---------- */
 /* Sin max-width/margin:auto acá a propósito: el sidebar debe quedar pegado
@@ -118,6 +198,8 @@ body {
    angosto. El texto en sí mantiene su propio ancho de lectura cómodo vía
    .content { max-width; margin: 0 auto }. */
 .layout {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   width: 100%;
@@ -128,139 +210,274 @@ body {
   top: var(--header-h);
   height: calc(100vh - var(--header-h));
   overflow-y: auto;
-  padding: 1.75rem 1.25rem;
+  padding: 2rem 1.25rem;
   border-right: 1px solid var(--border);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 .sidebar-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  margin: 0 0 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--ink-muted);
 }
+.sidebar-title::before { content: "// "; color: var(--accent); }
 
 .sidebar ul { list-style: none; margin: 0; padding: 0; }
-.sidebar li { margin: 0.1rem 0; }
-.sidebar a {
-  display: block;
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.5rem;
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 0.92rem;
+.sidebar > ul > li {
+  margin: 0.05rem 0;
+  animation: rise-in 0.5s cubic-bezier(.16,1,.3,1) both;
+  animation-delay: calc(var(--i, 0) * 45ms + 80ms);
 }
-.sidebar a:hover { background: var(--code-bg); color: var(--text); }
-.sidebar a.active {
-  background: var(--accent-soft);
-  color: var(--accent);
+.sidebar a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.4rem;
+  border-left: 2px solid transparent;
+  color: var(--ink-muted);
+  text-decoration: none;
+  font-size: 0.94rem;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.nav-index {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--border);
   font-weight: 600;
 }
+.sidebar a:hover { background: var(--bg-subtle); color: var(--ink); }
+.sidebar a:hover .nav-index { color: var(--accent); }
+.sidebar a.active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-left-color: var(--accent);
+  font-weight: 700;
+}
+.sidebar a.active .nav-index { color: var(--accent); }
 
 /* Secciones (<h2>) de la página actual, anidadas bajo su propio link — se
    generan por JS solo para la página abierta (ver <script> al final). */
 .sidebar-subnav {
   list-style: none;
-  margin: 0.15rem 0 0.5rem;
-  padding: 0;
+  margin: 0.2rem 0 0.75rem;
+  padding: 0 0 0 1.05rem;
+  border-left: 1px dashed var(--border);
+  margin-left: 0.85rem;
 }
 .sidebar-subnav li { margin: 0; }
 .sidebar-subnav a {
   display: block;
-  padding: 0.3rem 0.65rem 0.3rem 1.5rem;
-  border-radius: 0.5rem;
-  color: var(--accent);
+  padding: 0.32rem 0.6rem;
+  border-radius: 0.4rem;
+  border-left: none;
+  color: var(--ink-muted);
   text-decoration: none;
   font-size: 0.85rem;
-  line-height: 1.35;
+  font-weight: 400;
+  line-height: 1.4;
 }
-.sidebar-subnav a:hover { background: var(--code-bg); text-decoration: underline; }
-.sidebar-subnav a.active { background: var(--accent-soft); font-weight: 700; }
+.sidebar-subnav a:hover { background: var(--bg-subtle); color: var(--accent-strong); }
+.sidebar-subnav a.active { color: var(--accent-strong); font-weight: 600; background: var(--accent-soft); }
 
 .content {
   min-width: 0;
-  padding: 2.5rem 2.5rem 5rem;
-  max-width: 860px;
+  padding: 3.5rem 3rem 6rem;
+  max-width: 780px;
   margin: 0 auto;
+  animation: rise-in 0.6s cubic-bezier(.16,1,.3,1) 0.1s both;
 }
 
 /* ---------- Typography ---------- */
 .content h1 {
-  font-size: 2rem;
-  margin: 0 0 0.5rem;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.1rem, 4vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 0 0 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 3px solid var(--accent);
+  position: relative;
 }
+.content h1::before {
+  content: "DOCUMENTACIÓN TÉCNICA";
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  margin-bottom: 0.85rem;
+}
+
 .content h2 {
-  font-size: 1.4rem;
-  margin: 2.5rem 0 0.75rem;
-  padding-top: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.55rem;
+  letter-spacing: -0.005em;
+  margin: 3.25rem 0 1rem;
+  padding-top: 1.75rem;
   border-top: 1px solid var(--border);
+  position: relative;
+}
+.content h2::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 3rem;
+  height: 1px;
+  background: var(--accent);
 }
 .content h1 + p,
 .content h2:first-child { border-top: none; padding-top: 0; margin-top: 0; }
-.content h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
-.content p { margin: 0.75rem 0; }
-.content a { color: var(--accent); text-decoration: none; }
-.content a:hover { text-decoration: underline; }
 
-.content ul, .content ol { padding-left: 1.4rem; }
-.content li { margin: 0.3rem 0; }
+.content h3 {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 1.75rem 0 0.6rem;
+  color: var(--ink);
+}
+
+.content p { margin: 0.9rem 0; }
+.content a {
+  color: var(--accent-strong);
+  text-decoration-color: var(--border);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s;
+}
+.content a:hover { text-decoration-color: var(--accent); }
+
+.content ul, .content ol { padding-left: 1.3rem; }
+.content li { margin: 0.4rem 0; }
+.content li::marker { color: var(--accent); }
+
+.content strong { color: var(--ink); font-weight: 700; }
 
 .content blockquote {
-  margin: 1.25rem 0;
-  padding: 0.1rem 1rem;
+  margin: 1.75rem 0;
+  padding: 1rem 1.25rem;
   border-left: 3px solid var(--accent);
-  background: var(--accent-soft);
-  color: var(--text-muted);
+  background: var(--bg-subtle);
+  color: var(--ink-muted);
   border-radius: 0 0.5rem 0.5rem 0;
+  position: relative;
 }
+.content blockquote::before {
+  content: "NOTA";
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent-strong);
+  margin-bottom: 0.4rem;
+}
+.content blockquote p { margin: 0; }
 
 .content code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  background: var(--code-bg);
-  padding: 0.15em 0.4em;
+  font-family: var(--font-mono);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 0.1em 0.4em;
   border-radius: 0.35em;
-  font-size: 0.88em;
+  font-size: 0.85em;
+  color: var(--accent-strong);
 }
 
+/* Los bloques de código quedan siempre oscuros (tema "cabina"), sin
+   importar si la página está en modo claro u oscuro — da un punto de
+   referencia visual constante, como una pantalla de instrumentos. */
 .content pre {
   background: var(--code-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--code-border);
   border-radius: 0.65rem;
-  padding: 1rem 1.1rem;
+  padding: 1.1rem 1.25rem;
   overflow-x: auto;
+  box-shadow: var(--shadow);
 }
-.content pre code { background: none; padding: 0; font-size: 0.85em; }
+.content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.85em;
+  color: var(--code-text);
+}
 
 .content table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1.25rem 0;
+  margin: 1.5rem 0;
   font-size: 0.92rem;
 }
 .content th, .content td {
   border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
+  padding: 0.6rem 0.85rem;
   text-align: left;
 }
-.content th { background: var(--code-bg); }
+.content th {
+  background: var(--bg-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
 
 .content hr {
   border: none;
-  border-top: 1px solid var(--border);
-  margin: 2rem 0;
+  height: 1px;
+  margin: 3rem 0;
+  background: repeating-linear-gradient(to right, var(--border) 0, var(--border) 6px, transparent 6px, transparent 12px);
 }
 
-/* ---------- Mermaid diagrams ---------- */
+/* ---------- Mermaid diagrams: marco tipo "plano técnico" ---------- */
+.mermaid-frame {
+  position: relative;
+  margin: 2rem 0;
+  padding: 1.75rem 1.5rem 1.5rem;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  border-radius: 0.5rem;
+}
+.mermaid-frame::before,
+.mermaid-frame::after,
+.mermaid-frame-label::before,
+.mermaid-frame-label::after {
+  content: "";
+  position: absolute;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-color: var(--accent);
+  border-style: solid;
+  opacity: 0.8;
+}
+.mermaid-frame::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.mermaid-frame::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+.mermaid-frame-label {
+  position: absolute;
+  top: 0.65rem;
+  left: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--ink-muted);
+}
 .content .mermaid {
   display: flex;
   justify-content: flex-start;
-  margin: 1.5rem 0;
-  padding: 1.25rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
   overflow-x: auto;
 }
 /* El ancho real lo fija el JS del layout (a partir del viewBox del propio
@@ -273,19 +490,149 @@ body {
    quedaba ignorado. */
 .content .mermaid svg { height: auto; flex-shrink: 0; }
 
+/* ---------- Homepage: hero + manifiesto de secciones ---------- */
+.hero {
+  margin-bottom: 3rem;
+  animation: rise-in 0.6s cubic-bezier(.16,1,.3,1) 0.05s both;
+}
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 1rem;
+}
+.kicker::before {
+  content: "";
+  width: 1.5rem;
+  height: 1px;
+  background: var(--accent);
+}
+.hero h1 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 1rem;
+}
+.hero h1::before { display: none; }
+.hero-lede {
+  font-size: 1.15rem;
+  color: var(--ink-muted);
+  max-width: 46ch;
+  margin: 0;
+}
+
+.manifest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.manifest-item {
+  border-bottom: 1px solid var(--border);
+  animation: rise-in 0.5s cubic-bezier(.16,1,.3,1) both;
+  animation-delay: calc(var(--i, 0) * 80ms + 200ms);
+}
+.manifest-link {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: start;
+  gap: 1.25rem;
+  padding: 1.5rem 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 0.5rem;
+  transition: background 0.2s, padding-left 0.2s;
+}
+.manifest-link:hover { background: var(--bg-subtle); padding-left: 1rem; }
+.manifest-index {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--accent);
+  font-weight: 600;
+  padding-top: 0.15rem;
+}
+.manifest-body h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  border: none;
+  color: var(--ink);
+}
+.manifest-body h2::before { display: none; }
+.manifest-body p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.96rem;
+}
+.manifest-arrow {
+  font-family: var(--font-mono);
+  color: var(--border);
+  font-size: 1.3rem;
+  transition: transform 0.2s, color 0.2s;
+  padding-top: 0.1rem;
+}
+.manifest-link:hover .manifest-arrow { color: var(--accent); transform: translateX(4px); }
+.manifest-soon {
+  opacity: 0.55;
+  padding: 1.5rem 0.5rem;
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  gap: 1.25rem;
+}
+.manifest-soon .manifest-index { color: var(--ink-muted); }
+
+.callout {
+  margin-top: 2.5rem;
+  padding: 1.1rem 1.4rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.92rem;
+  color: var(--ink-muted);
+}
+.callout code { font-size: 0.85em; }
+
 /* ---------- Footer ---------- */
 .site-footer {
+  position: relative;
+  z-index: 1;
   text-align: center;
-  padding: 2rem 1.25rem 3rem;
-  color: var(--text-muted);
+  padding: 3rem 1.25rem 3.5rem;
+  color: var(--ink-muted);
   font-size: 0.85rem;
 }
-.site-footer a { color: var(--text-muted); }
+.site-footer p { margin: 0; }
+.site-footer a { color: var(--ink-muted); }
+.site-footer code { font-family: var(--font-mono); font-size: 0.85em; }
+.footer-rule {
+  display: block;
+  height: 1px;
+  max-width: 6rem;
+  margin: 0 auto 1.5rem;
+  background: var(--accent);
+}
+
+/* ---------- Animations ---------- */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes drop-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {
   .nav-toggle { display: flex; }
   .gh-link { display: none; }
+  .brand-sub { display: none; }
 
   .layout { display: block; }
 
@@ -300,10 +647,11 @@ body {
     transform: translateY(-110%);
     transition: transform 0.2s ease;
     z-index: 15;
-    box-shadow: 0 12px 24px -12px rgba(0,0,0,0.25);
+    box-shadow: var(--shadow);
   }
   .sidebar.open { transform: translateY(0); }
 
-  .content { padding: 1.75rem 1.25rem 3rem; }
-  .content h1 { font-size: 1.6rem; }
+  .content { padding: 2.25rem 1.35rem 3.5rem; }
+  .content h1 { font-size: 1.7rem; }
+  .manifest-link, .manifest-soon { grid-template-columns: 2.2rem 1fr auto; gap: 0.85rem; padding: 1.25rem 0.35rem; }
 }
