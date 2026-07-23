@@ -52,6 +52,7 @@ func InitDB() {
 		&models.AISession{},
 		&models.AIMessage{},
 		&models.ProductSharedAgency{},
+		&models.UserAgency{},
 		&models.Group{},
 		&models.AIExpert{},
 		&models.AIExpertDocument{},
@@ -137,6 +138,7 @@ func seedRBAC(db *gorm.DB) {
 
 		{"AI_VIEW", "Ver Config IA", "ai", "view", "Ver configuración de IA"},
 		{"AI_UPDATE", "Editar Config IA", "ai", "update", "Modificar configuración de IA"},
+		{"AI_TOGGLE", "Activar/Desactivar IA de mi Agencia", "ai", "toggle", "Prender o apagar el asistente de IA para la propia agencia"},
 
 		{"LOGS_VIEW", "Ver Logs del Sitio", "logs", "view", "Ver logs y eventos del sistema"},
 
@@ -213,8 +215,13 @@ func seedRBAC(db *gorm.DB) {
 			// (el scoping por agencia se valida a nivel de handler, no acá) y
 			// necesita ver el catálogo de permisos para armar esos roles — pero
 			// no puede definir permisos nuevos ni tocar logs/backups del sistema.
+			// "agencies" también queda excluido (las 4 acciones, no solo
+			// create/update/delete): administrar OTRAS agencias es exclusivo
+			// del superadmin (ver AdminOnly() en las rutas de /agencies), y
+			// dejarle GestionAgencias.jsx/AGENCIES_VIEW mostraría una pantalla
+			// con botones que igual tirarían 403 al tocarlos.
 			switch p.Module {
-			case "backup", "logs":
+			case "backup", "logs", "agencies":
 				return false
 			case "permissions":
 				return p.Action == "view"
@@ -260,6 +267,23 @@ func seedRBAC(db *gorm.DB) {
 				leakedIDs[i] = p.ID
 			}
 			db.Where("role_id = ? AND permission_id IN ?", salesAgentRole.ID, leakedIDs).Delete(&models.RolePermission{})
+		}
+	}
+
+	// Corrección idempotente: revoca AGENCIES_VIEW/CREATE/UPDATE/DELETE de
+	// AGENCY_ADMIN si ya estaban asignados desde una versión anterior de este
+	// seed — administrar OTRAS agencias pasa a ser exclusivo del rol de
+	// sistema admin (ver AdminOnly() en las rutas de /agencies).
+	var agencyAdminRole models.Role
+	if err := db.Where("code = ? AND is_system = true", "AGENCY_ADMIN").First(&agencyAdminRole).Error; err == nil {
+		var leaked []models.Permission
+		db.Where("code IN ?", []string{"AGENCIES_VIEW", "AGENCIES_CREATE", "AGENCIES_UPDATE", "AGENCIES_DELETE"}).Find(&leaked)
+		if len(leaked) > 0 {
+			leakedIDs := make([]uuid.UUID, len(leaked))
+			for i, p := range leaked {
+				leakedIDs[i] = p.ID
+			}
+			db.Where("role_id = ? AND permission_id IN ?", agencyAdminRole.ID, leakedIDs).Delete(&models.RolePermission{})
 		}
 	}
 
@@ -476,6 +500,25 @@ func runSQLMigrations(db *gorm.DB) {
 		fmt.Println("Migration applied: product_shared_agencies table ensured")
 	}
 
+	// Create user_agencies table (red de seguridad, mismo criterio que
+	// product_shared_agencies arriba) — agencias adicionales asignadas a un
+	// usuario más allá de su agencia activa (Profile.Agencia).
+	createUserAgenciesSQL := `
+	CREATE TABLE IF NOT EXISTS user_agencies (
+		id SERIAL PRIMARY KEY,
+		user_id UUID NOT NULL,
+		agencia VARCHAR(255) NOT NULL,
+		created_by UUID,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		CONSTRAINT idx_user_agency UNIQUE (user_id, agencia)
+	);
+	`
+	if err := db.Exec(createUserAgenciesSQL).Error; err != nil {
+		log.Println("WARNING: Could not create user_agencies table:", err)
+	} else {
+		fmt.Println("Migration applied: user_agencies table ensured")
+	}
+
 	// Check if migration file exists and apply additional constraints
 	if _, err := os.Stat("migrations/001_create_availability_transfers.sql"); err == nil {
 		migrationSQL, err := os.ReadFile("migrations/001_create_availability_transfers.sql")
@@ -546,7 +589,58 @@ func runSQLMigrations(db *gorm.DB) {
 	}
 	fmt.Println("Migration applied: all columns ensured")
 
+	migrateSystemSettingsToAgencyAware(db)
 	dropAgencyForeignKeys(db)
+}
+
+// migrateSystemSettingsToAgencyAware convierte system_settings de "key" como
+// PK (un solo valor global posible por key) a un id surrogate + agency_id
+// nullable, habilitando una fila global (agency_id NULL) y filas de override
+// por agencia para la misma key. AutoMigrate ya agregó las columnas nuevas
+// (son nullable, así que no rompe filas existentes) — acá solo se resuelve el
+// swap de primary key y los índices únicos parciales, con guards idempotentes
+// porque esto corre en cada boot contra la misma base de producción.
+func migrateSystemSettingsToAgencyAware(db *gorm.DB) {
+	settingsSQLs := []string{
+		`ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();`,
+		`ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS agency_id UUID REFERENCES agencies(id);`,
+		// Por si AutoMigrate creó la columna id antes de que corra este bloque
+		// (sin el DEFAULT, porque GORM no siempre lo replica para columnas
+		// nuevas en una tabla ya existente) — sin esto, un INSERT que omite id
+		// (dejando que la base lo genere) fallaría contra la NOT NULL de abajo.
+		`ALTER TABLE system_settings ALTER COLUMN id SET DEFAULT gen_random_uuid();`,
+		`UPDATE system_settings SET id = gen_random_uuid() WHERE id IS NULL;`,
+		`ALTER TABLE system_settings ALTER COLUMN id SET NOT NULL;`,
+		// Solo tira el PK viejo si todavía está sobre "key" (primera corrida) —
+		// en corridas siguientes ya está sobre "id" y este bloque no hace nada.
+		`DO $$
+		BEGIN
+			IF EXISTS (
+				SELECT 1 FROM information_schema.table_constraints tc
+				JOIN information_schema.key_column_usage kcu
+					ON tc.constraint_name = kcu.constraint_name AND tc.table_name = kcu.table_name
+				WHERE tc.table_name = 'system_settings' AND tc.constraint_type = 'PRIMARY KEY' AND kcu.column_name = 'key'
+			) THEN
+				ALTER TABLE system_settings DROP CONSTRAINT system_settings_pkey;
+			END IF;
+		END $$;`,
+		`DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM information_schema.table_constraints tc
+				WHERE tc.table_name = 'system_settings' AND tc.constraint_type = 'PRIMARY KEY'
+			) THEN
+				ALTER TABLE system_settings ADD CONSTRAINT system_settings_pkey PRIMARY KEY (id);
+			END IF;
+		END $$;`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_key_agency ON system_settings (key, agency_id) WHERE agency_id IS NOT NULL;`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_key_global ON system_settings (key) WHERE agency_id IS NULL;`,
+	}
+	for _, sql := range settingsSQLs {
+		if err := db.Exec(sql).Error; err != nil {
+			log.Println("WARNING: system_settings agency-aware migration error:", err)
+		}
+	}
 }
 
 // dropAgencyForeignKeys revierte las FK duras profiles.agencia/reservations.agencia

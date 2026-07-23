@@ -11,19 +11,22 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import UserForm from '../components/UserForm';
-import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle, Lock } from 'lucide-react';
+import UserAgenciesModal from '../components/UserAgenciesModal';
+import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle, Lock, Building2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
 
 const GestionUsuarios = () => {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [agenciesUserTarget, setAgenciesUserTarget] = useState(null);
 
   const { toast } = useToast();
   const { data: usersData, isLoading, isError, refetch } = useUsers({ search: searchTerm });
@@ -259,6 +262,11 @@ const GestionUsuarios = () => {
                       <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="Editar usuario">
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="sm" onClick={() => setAgenciesUserTarget(user)} title="Agencias adicionales">
+                          <Building2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user.id)} title="Eliminar usuario" className="text-red-600 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -291,6 +299,12 @@ const GestionUsuarios = () => {
           onRoleSelect={handleRoleSelect}
         />
       </Modal>
+
+      <UserAgenciesModal
+        open={!!agenciesUserTarget}
+        onClose={() => setAgenciesUserTarget(null)}
+        user={agenciesUserTarget}
+      />
     </div>
   );
 };
