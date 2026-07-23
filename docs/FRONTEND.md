@@ -1,6 +1,7 @@
 ---
 title: Frontend
-nav_order: 5
+nav_order: 21
+nav_group: Arquitectura
 ---
 
 # Frontend

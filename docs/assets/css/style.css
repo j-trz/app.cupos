@@ -229,6 +229,19 @@ body::before {
 }
 .sidebar-title::before { content: "// "; color: var(--accent); }
 
+.sidebar-group {
+  margin: 1.4rem 0 0.4rem;
+  padding: 0 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  opacity: 0.75;
+}
+.sidebar-group:first-of-type { margin-top: 0; }
+
 .sidebar ul { list-style: none; margin: 0; padding: 0; }
 .sidebar > ul > li {
   margin: 0.05rem 0;

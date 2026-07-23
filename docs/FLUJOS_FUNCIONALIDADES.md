@@ -1,6 +1,7 @@
 ---
 title: Flujos de Funcionalidades
-nav_order: 10
+nav_order: 20
+nav_group: Arquitectura
 ---
 
 # Flujos de Funcionalidades
