@@ -193,25 +193,16 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     .itin-grid-time { font-size: 13px; font-weight: 700; color: #0f172a; }
     .itin-connection { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 500; color: #64748b; }
 
-    .itin-baggage-inline { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
-    .itin-baggage-inline-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
-    .itin-baggage-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .itin-baggage-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
-    .itin-baggage-card.included { border-left: 4px solid #166534; background: #f0fdf4; }
-    .itin-baggage-card.not-included { border-left: 4px solid #94a3b8; opacity: 0.6; }
-    .bag-icon { color: #475569; }
-    .itin-baggage-card.included .bag-icon { color: #166534; }
-    .bag-details { display: flex; flex-direction: column; }
-    .bag-title { font-size: 11px; font-weight: 600; color: #1e293b; }
-    .bag-status { font-size: 9px; font-weight: 700; color: #64748b; margin-top: 2px; }
-    .itin-baggage-card.included .bag-status { color: #166534; }
+    .itin-baggage-row { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
+    .itin-baggage-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #94a3b8; }
+    .itin-baggage-ok { color: #166534; }
+    .itin-baggage-no { color: #94a3b8; text-decoration: line-through; text-decoration-thickness: 2px; }
 
     .itin-footer { text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
     .itin-footer-body { font-size: 11px; color: #475569; line-height: 1.7; white-space: pre-line; }
     .itin-footer-agency { font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 8px; }
     @media (max-width: 600px) {
       .itin-grid { grid-template-columns: 1fr; }
-      .itin-baggage-container { grid-template-columns: 1fr; }
     }
     @media print { .no-print { display: none !important; } @page { size: A4; margin: 15mm; } }
   `;
@@ -401,31 +392,16 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                       </div>
 
                       {i === 0 && hasBaggageInfo && (
-                        <div className="itin-baggage-inline">
-                          <div className="itin-baggage-inline-label">Franquicia de Equipaje</div>
-                          <div className="itin-baggage-container">
-                            <div className={`itin-baggage-card ${carryOn ? 'included' : 'not-included'}`}>
-                              <Backpack className="w-4 h-4 bag-icon" />
-                              <div className="bag-details">
-                                <span className="bag-title">Equipaje de mano</span>
-                                <span className="bag-status">{carryOn ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                              </div>
-                            </div>
-                            <div className={`itin-baggage-card ${handBag ? 'included' : 'not-included'}`}>
-                              <ShoppingBag className="w-4 h-4 bag-icon" />
-                              <div className="bag-details">
-                                <span className="bag-title">Artículo personal</span>
-                                <span className="bag-status">{handBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                              </div>
-                            </div>
-                            <div className={`itin-baggage-card ${checkedBag ? 'included' : 'not-included'}`}>
-                              <Luggage className="w-4 h-4 bag-icon" />
-                              <div className="bag-details">
-                                <span className="bag-title">Equipaje en bodega</span>
-                                <span className="bag-status">{checkedBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                              </div>
-                            </div>
-                          </div>
+                        <div className="itin-baggage-row">
+                          <span className={`itin-baggage-item ${carryOn ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
+                            <Backpack size={14} /> Equipaje de mano
+                          </span>
+                          <span className={`itin-baggage-item ${handBag ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
+                            <ShoppingBag size={14} /> Artículo personal
+                          </span>
+                          <span className={`itin-baggage-item ${checkedBag ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
+                            <Luggage size={14} /> Equipaje en bodega
+                          </span>
                         </div>
                       )}
                     </div>
