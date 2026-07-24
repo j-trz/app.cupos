@@ -192,10 +192,11 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     .itin-grid-value { font-size: 12px; color: #334155; }
     .itin-grid-time { font-size: 13px; font-weight: 700; color: #0f172a; }
     .itin-connection { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 500; color: #64748b; }
-    
-    .itin-baggage-section { margin-top: 24px; margin-bottom: 24px; }
-    .itin-baggage-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    .itin-baggage-card { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
+
+    .itin-baggage-inline { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
+    .itin-baggage-inline-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+    .itin-baggage-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .itin-baggage-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
     .itin-baggage-card.included { border-left: 4px solid #166534; background: #f0fdf4; }
     .itin-baggage-card.not-included { border-left: 4px solid #94a3b8; opacity: 0.6; }
     .bag-icon { color: #475569; }
@@ -398,6 +399,35 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                           <div className="itin-grid-value">{duracion || 'N/A'}</div>
                         </div>
                       </div>
+
+                      {i === 0 && hasBaggageInfo && (
+                        <div className="itin-baggage-inline">
+                          <div className="itin-baggage-inline-label">Franquicia de Equipaje</div>
+                          <div className="itin-baggage-container">
+                            <div className={`itin-baggage-card ${carryOn ? 'included' : 'not-included'}`}>
+                              <Backpack className="w-4 h-4 bag-icon" />
+                              <div className="bag-details">
+                                <span className="bag-title">Equipaje de mano</span>
+                                <span className="bag-status">{carryOn ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
+                              </div>
+                            </div>
+                            <div className={`itin-baggage-card ${handBag ? 'included' : 'not-included'}`}>
+                              <ShoppingBag className="w-4 h-4 bag-icon" />
+                              <div className="bag-details">
+                                <span className="bag-title">Artículo personal</span>
+                                <span className="bag-status">{handBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
+                              </div>
+                            </div>
+                            <div className={`itin-baggage-card ${checkedBag ? 'included' : 'not-included'}`}>
+                              <Luggage className="w-4 h-4 bag-icon" />
+                              <div className="bag-details">
+                                <span className="bag-title">Equipaje en bodega</span>
+                                <span className="bag-status">{checkedBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {connectionEl}
                   </div>
@@ -405,36 +435,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
               })}
             </div>
           </>
-        )}
-
-        {/* Franquicia de Equipaje */}
-        {hasBaggageInfo && (
-          <div className="itin-baggage-section">
-            <div className="itin-section-title">Franquicia de Equipaje</div>
-            <div className="itin-baggage-container">
-              <div className={`itin-baggage-card ${carryOn ? 'included' : 'not-included'}`}>
-                <Backpack className="w-5 h-5 bag-icon" />
-                <div className="bag-details">
-                  <span className="bag-title">Equipaje de mano</span>
-                  <span className="bag-status">{carryOn ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                </div>
-              </div>
-              <div className={`itin-baggage-card ${handBag ? 'included' : 'not-included'}`}>
-                <ShoppingBag className="w-5 h-5 bag-icon" />
-                <div className="bag-details">
-                  <span className="bag-title">Artículo personal</span>
-                  <span className="bag-status">{handBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                </div>
-              </div>
-              <div className={`itin-baggage-card ${checkedBag ? 'included' : 'not-included'}`}>
-                <Luggage className="w-5 h-5 bag-icon" />
-                <div className="bag-details">
-                  <span className="bag-title">Equipaje en bodega</span>
-                  <span className="bag-status">{checkedBag ? 'INCLUIDO' : 'NO INCLUIDO'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Footer */}
