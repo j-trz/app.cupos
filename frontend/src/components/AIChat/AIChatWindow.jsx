@@ -78,7 +78,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     };
 
     return (
-        <div className="w-[380px] h-[580px] bg-white dark:bg-zinc-900 rounded-xl shadow-xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
+        <div className="w-[calc(100vw-2rem)] max-w-[380px] h-[70vh] max-h-[580px] bg-white dark:bg-zinc-900 rounded-xl shadow-xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
             {/* Header - Estilo Vercel minimalista */}
             <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">

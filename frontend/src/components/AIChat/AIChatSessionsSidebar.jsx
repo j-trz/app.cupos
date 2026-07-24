@@ -92,7 +92,10 @@ export default function AIChatSessionsSidebar({
                                 <span className="text-sm truncate flex-1">
                                     {session.title || 'Nueva conversación'}
                                 </span>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {/* opacity-60 en vez de 0: en touch no hay hover, así que
+                                    dejarlos completamente ocultos los hacía indescubribles
+                                    en celular — quedan tenues y se resaltan al pasar el mouse. */}
+                                <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                     {onRenameSession && (
                                         <button
                                             onClick={(e) => startRename(e, session)}

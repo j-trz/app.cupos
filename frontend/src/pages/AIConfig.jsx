@@ -455,7 +455,7 @@ export default function AIConfig() {
 
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">Tipo de Proveedor</label>
-                                                <div className="grid grid-cols-5 gap-2">
+                                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                                     {PROVIDER_TYPES.map(type => (
                                                         <button
                                                             key={type.value}

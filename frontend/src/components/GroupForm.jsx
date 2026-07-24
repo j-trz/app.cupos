@@ -166,7 +166,7 @@ const GroupForm = ({
         {!isEditing && (
           <div>
             {sectionLabel('Destinatario de la cotización')}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1 col-span-2 sm:col-span-1">
                 <Label htmlFor="vendedor">Usuario *</Label>
                 <select
@@ -199,7 +199,7 @@ const GroupForm = ({
         {isEditing && (
           <div>
             {sectionLabel('Itinerario y lugares')}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1 col-span-2">
                 <Label htmlFor="itinerario">Itinerario</Label>
                 <Textarea id="itinerario" value={form.itinerario} onChange={(e) => set('itinerario', e.target.value)} rows={4} />
@@ -255,7 +255,7 @@ const GroupForm = ({
 
         <div>
           {sectionLabel('Notas')}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {!isEditing ? null : (
               <div className="space-y-1">
                 <Label htmlFor="notas_vendedor">Notas del vendedor</Label>

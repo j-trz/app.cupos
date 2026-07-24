@@ -29,7 +29,7 @@ const KPICard = ({ title, value, change, icon: Icon, color }) => {
 
 export default function KPIsRow({ stats }) {
     return (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard
                 title="Ventas Totales"
                 value={`$${(stats.ventas / 1000).toFixed(1)}K`}

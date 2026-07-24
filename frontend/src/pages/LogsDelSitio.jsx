@@ -103,7 +103,7 @@ export default function LogsDelSitio() {
 
             <div className="bg-white rounded-2xl border border-slate-200">
                 <form onSubmit={handleSearchSubmit} className="border-b border-slate-200 p-4">
-                    <div className="flex flex-col grid-cols-4 sm:flex-row gap-3 flex-wrap">
+                    <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
                         <div className="flex-1 min-w-[200px] relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input

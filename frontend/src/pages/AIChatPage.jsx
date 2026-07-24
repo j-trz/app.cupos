@@ -12,6 +12,7 @@ import AIChatTopbar from '../components/AIChat/AIChatTopbar';
 import AIChatSessionsSidebar from '../components/AIChat/AIChatSessionsSidebar';
 import AIChatMessage from '../components/AIChat/AIChatMessage';
 import AIChatInput from '../components/AIChat/AIChatInput';
+import Modal from '../components/Modal';
 import AIService from '../services/aiService';
 import useAIChat from '../hooks/useAIChat';
 
@@ -38,6 +39,11 @@ export default function AIChatPage() {
     } = useAIChat({ initialSessionId });
 
     const [experts, setExperts] = useState([]);
+    // Por debajo de md el <aside> de agentes/conversaciones se oculta (no
+    // entra junto al área de chat) y se accede vía un botón en el topbar que
+    // lo abre en este modal — reusa el mismo contenido, solo cambia el
+    // contenedor.
+    const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
 
     // Cargar expertos de la agencia para anclarlos al sidebar
     useEffect(() => {
@@ -74,11 +80,13 @@ export default function AIChatPage() {
     const handleSelectSession = (sessionId) => {
         loadSessionMessages(sessionId);
         setSearchParams({ session: sessionId });
+        setMobileSessionsOpen(false);
     };
 
     const handleNewSessionClick = () => {
         handleNewSession();
         setSearchParams({});
+        setMobileSessionsOpen(false);
     };
 
     const handleDeleteSessionClick = (sessionId, e) => {
@@ -134,14 +142,11 @@ export default function AIChatPage() {
         ];
     };
 
-    return (
-        <div className="h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
-            <AIChatTopbar />
-
-            <div className="flex-1 flex flex-row overflow-hidden">
-                {/* Barra lateral estilo ChatGPT (Agentes + Conversaciones) */}
-                <aside className="w-[290px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col justify-between overflow-hidden">
-                    <div className="flex-1 overflow-y-auto p-3 space-y-6">
+    // Contenido de "Agentes de IA" + "Conversaciones" — compartido entre el
+    // <aside> de escritorio (siempre visible desde md) y el Modal que lo
+    // reemplaza por debajo de md (donde no entra al lado del área de chat).
+    const sessionsSidebarContent = (
+        <div className="flex-1 overflow-y-auto p-3 space-y-6">
                         {/* Agentes de IA */}
                         <div>
                             <p className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 dark:text-zinc-500 px-2 mb-2">
@@ -214,8 +219,29 @@ export default function AIChatPage() {
                                 compact={true}
                             />
                         </div>
-                    </div>
+        </div>
+    );
+
+    return (
+        <div className="h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
+            <AIChatTopbar onOpenSessions={() => setMobileSessionsOpen(true)} />
+
+            <div className="flex-1 flex flex-row overflow-hidden">
+                {/* Barra lateral estilo ChatGPT (Agentes + Conversaciones) —
+                    oculta por debajo de md, se accede desde el botón del topbar */}
+                <aside className="hidden md:flex w-[290px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex-col justify-between overflow-hidden">
+                    {sessionsSidebarContent}
                 </aside>
+
+                {/* Versión móvil: mismo contenido, dentro de un modal */}
+                <Modal
+                    title="Agentes y conversaciones"
+                    open={mobileSessionsOpen}
+                    onClose={() => setMobileSessionsOpen(false)}
+                    size="sm"
+                >
+                    <div className="-m-4 sm:-m-6">{sessionsSidebarContent}</div>
+                </Modal>
 
                 {/* Área de chat */}
                 <div className="flex-1 flex flex-col overflow-hidden">

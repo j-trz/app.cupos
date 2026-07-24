@@ -434,7 +434,7 @@ const Dashboard = () => {
           }
         />
         {isLoadingReports ? (
-          <div className="grid gap-4 grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-24" />
             ))}
@@ -481,7 +481,7 @@ const Dashboard = () => {
 
       {/* Stat cards */}
       {isLoadingUserMetrics ? (
-        <div className="grid gap-4 grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-20" />
           ))}
