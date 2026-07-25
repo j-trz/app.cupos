@@ -16,7 +16,7 @@ const navItems = [
   { label: 'Disponibilidad', path: '/availability', icon: Plane },
   { label: 'Solicitudes', path: '/requests', icon: ClipboardList },
   { label: 'Confirmaciones', path: '/confirmations', icon: CheckCircle2 },
-  { label: 'Asistente IA', path: '/asistente', icon: Bot },
+  { label: 'Asistente IA', path: '/asistente', icon: Bot, key: 'ia' },
 ];
 
 // Admin-only items — cada uno declara el permiso MODULO_ACCION que lo
@@ -72,14 +72,19 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const visibleAdminNavItems = adminNavItems.filter((item) => can(item.permission));
   const visibleSettingsItems = settingsItems.filter((item) => can(item.permission));
   const visibleUserManagementItems = userManagementItems.filter((item) => can(item.permission));
+  // "Asistente IA" se oculta si la propia agencia lo desactivó desde Ajustes
+  // (Agency.AIHabilitado, ver Settings.jsx) — independiente de los permisos.
+  const visibleNavItems = navItems.filter((item) => item.key !== 'ia' || user?.ai_habilitado !== false);
 
   // Secciones de Documentación (grouped bajo Documentación) — una ruta propia
   // por sección en vez de un acordeón largo dentro del main. Filtradas por
-  // rol para no linkear a documentación de funciones que el usuario no
+  // permiso para no linkear a documentación de funciones que el usuario no
   // puede usar (ver docsSections.js).
   const docsItems = useMemo(
-    () => visibleDocsSections(user?.role).map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon })),
-    [user?.role]
+    () => visibleDocsSections(can, isAdmin)
+      .filter((s) => s.key !== 'ia' || user?.ai_habilitado !== false)
+      .map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon })),
+    [user?.permissions, isAdmin, user?.ai_habilitado]
   );
 
   // El ancho puede venir del white-label como número/string sin unidad (ej.
@@ -263,7 +268,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
             <nav className="flex flex-col gap-0.5 px-2">
               {/* Main navigation items */}
-              {navItems.map(({ label, path, icon: Icon }) => (
+              {visibleNavItems.map(({ label, path, icon: Icon }) => (
                 <NavLink
                   key={path}
                   to={path}

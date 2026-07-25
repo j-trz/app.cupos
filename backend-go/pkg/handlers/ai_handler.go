@@ -1289,7 +1289,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 
 			blockMinutes := product.BloqueoTemporalMinutos
 			if blockMinutes <= 0 {
-				blockMinutes = services.GetIntSetting("bloqueo_minutos_default", 60)
+				blockMinutes = services.GetIntSettingForAgency("bloqueo_minutos_default", agencia, 60)
 			}
 			expiresAt := time.Now().Add(time.Duration(blockMinutes) * time.Minute)
 			reserva.BloqueoExpiraAt = &expiresAt

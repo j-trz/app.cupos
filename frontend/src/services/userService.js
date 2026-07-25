@@ -42,6 +42,20 @@ export class UserService {
   static async removeRole(userId, roleId) {
     return await ApiClient.delete(`/users/${userId}/roles/${roleId}`);
   }
+
+  // Agencias ADICIONALES asignadas a un usuario (más allá de su agencia
+  // activa) — exclusivo del superadmin, ver UserAgenciesModal.
+  static async listUserAgencies(userId) {
+    return await ApiClient.get(`/users/${userId}/agencies`);
+  }
+
+  static async addUserAgency(userId, agencia) {
+    return await ApiClient.post(`/users/${userId}/agencies`, { agencia });
+  }
+
+  static async removeUserAgency(userId, agencia) {
+    return await ApiClient.delete(`/users/${userId}/agencies/${encodeURIComponent(agencia)}`);
+  }
 }
 
 export default UserService;

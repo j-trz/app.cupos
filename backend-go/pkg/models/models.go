@@ -314,8 +314,13 @@ type WhiteLabelConfig struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
+// SystemSetting admite una fila global (AgencyID nil) y, para la misma Key,
+// una fila de override por agencia — de ahí el ID surrogate en vez de Key
+// como PK (ver migración en db.go que le cambia la PK a la tabla existente).
 type SystemSetting struct {
-	Key       string         `gorm:"primaryKey" json:"key"`
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Key       string         `gorm:"index;not null" json:"key"`
+	AgencyID  *uuid.UUID     `gorm:"type:uuid" json:"agency_id,omitempty"`
 	Value     datatypes.JSON `gorm:"type:jsonb;not null" json:"value"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
@@ -555,6 +560,18 @@ type ProductSharedAgency struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	ProductID uint      `gorm:"not null;uniqueIndex:idx_product_shared_agency" json:"product_id"`
 	Agencia   string    `gorm:"not null;uniqueIndex:idx_product_shared_agency" json:"agencia"`
+	CreatedBy uuid.UUID `gorm:"type:uuid" json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// UserAgency habilita que un usuario tenga asignada más de una agencia. La
+// activa en un momento dado sigue siendo Profile.Agencia (la que viaja en el
+// JWT) — esta tabla son las agencias ADICIONALES entre las que puede elegir
+// vía SwitchActiveAgency, mismo shape que ProductSharedAgency.
+type UserAgency struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_user_agency" json:"user_id"`
+	Agencia   string    `gorm:"not null;uniqueIndex:idx_user_agency" json:"agencia"`
 	CreatedBy uuid.UUID `gorm:"type:uuid" json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
 }

@@ -89,6 +89,11 @@ func main() {
 		protected.Use(middleware.AuthMiddleware())
 		{
 			protected.GET("/auth/profile", handlers.GetProfile)
+			protected.PUT("/auth/profile", handlers.UpdateMyProfile)
+			// Self-service: elegir cuál de las agencias asignadas (UserAgency) queda
+			// activa — pisa Profile.Agencia pero no reemite el JWT, así que el
+			// frontend fuerza logout justo después para que el próximo login la traiga.
+			protected.PUT("/auth/active-agency", handlers.SwitchActiveAgency)
 
 			// Productos
 			products := protected.Group("/products")
@@ -159,6 +164,12 @@ func main() {
 				users.PUT("/:id", middleware.RequirePermission("USERS_UPDATE"), handlers.UpdateUser)
 				users.DELETE("/:id", middleware.RequirePermission("USERS_DELETE"), handlers.DeleteUser)
 				users.PUT("/:id/status", middleware.RequirePermission("USERS_UNLOCK"), handlers.ToggleUserStatus)
+				// Múltiples agencias por usuario: asignar agencias adicionales a OTRO
+				// usuario es exclusivo del superadmin, igual criterio que Gestión de
+				// Agencias (AdminOnly() apilado antes que el permiso granular).
+				users.GET("/:id/agencies", middleware.AdminOnly(), middleware.RequirePermission("USERS_VIEW"), handlers.ListUserAgencies)
+				users.POST("/:id/agencies", middleware.AdminOnly(), middleware.RequirePermission("USERS_UPDATE"), handlers.AddUserAgency)
+				users.DELETE("/:id/agencies/:agencia", middleware.AdminOnly(), middleware.RequirePermission("USERS_UPDATE"), handlers.RemoveUserAgency)
 			}
 
 			// Reportes
@@ -249,10 +260,18 @@ func main() {
 			agencies := protected.Group("/agencies")
 			{
 				agencies.GET("/", handlers.ListAgencies)
-				agencies.POST("/", middleware.RequirePermission("AGENCIES_CREATE"), handlers.CreateAgency)
-				agencies.PUT("/:id", middleware.RequirePermission("AGENCIES_UPDATE"), handlers.UpdateAgency)
-				agencies.DELETE("/:id", middleware.RequirePermission("AGENCIES_DELETE"), handlers.DeleteAgency)
+				// Crear/editar/eliminar agencias queda exclusivo del superadmin: AdminOnly()
+				// se apila ANTES de RequirePermission para que, aunque a futuro alguien le
+				// reasigne AGENCIES_CREATE/UPDATE/DELETE a un rol personalizado, el endpoint
+				// siga sin abrirse (ver seedRBAC en db.go, que ya no le da estos permisos a
+				// AGENCY_ADMIN por default).
+				agencies.POST("/", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_CREATE"), handlers.CreateAgency)
+				agencies.PUT("/:id", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_UPDATE"), handlers.UpdateAgency)
+				agencies.DELETE("/:id", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_DELETE"), handlers.DeleteAgency)
 			}
+			// Self-service: prender/apagar la IA de la PROPIA agencia — la agencia
+			// objetivo la resuelve el handler de c.Get("agencia"), nunca de acá.
+			protected.PUT("/agencies/me/ai-habilitado", middleware.RequirePermission("AI_TOGGLE"), handlers.ToggleMyAgencyAI)
 
 			// White Label
 			whiteLabel := protected.Group("/white-label")

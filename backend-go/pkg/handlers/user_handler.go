@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,17 +19,99 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// profileWithAIFlag agrega `ai_habilitado` (resuelto desde la agencia del
-// perfil, no una columna propia de Profile) a la respuesta de Login/GetProfile
-// — así el frontend sabe si debe mostrar el widget de chat sin depender de
-// que la primera llamada a /ai/chat falle.
+// callerAgencyIfScoped devuelve (agencia del caller, true) si el caller es
+// agency_admin (rol legacy) — en ese caso la gestión de usuarios debe acotarse
+// a esa agencia. Para cualquier otro rol (admin incluido) devuelve ("", false),
+// es decir, sin acotar.
+func callerAgencyIfScoped(c *gin.Context) (string, bool) {
+	role, _ := c.Get("role")
+	if role != "agency_admin" {
+		return "", false
+	}
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	return services.ResolveAgencyCode(agenciaRaw), true
+}
+
+// profileWithAIFlag agrega a la respuesta de Login/GetProfile: `ai_habilitado`
+// (resuelto desde la agencia del perfil, no una columna propia de Profile) —
+// así el frontend sabe si debe mostrar el widget de chat sin depender de que
+// la primera llamada a /ai/chat falle — y `agencies`, todas las agencias
+// entre las que el usuario puede elegir como activa (la actual + las
+// asignadas vía UserAgency), para el selector de Profile.jsx.
 type profileWithAIFlag struct {
 	models.Profile
-	AIHabilitado bool `json:"ai_habilitado"`
+	AIHabilitado bool     `json:"ai_habilitado"`
+	Agencies     []string `json:"agencies"`
 }
 
 func withAIFlag(profile models.Profile) profileWithAIFlag {
-	return profileWithAIFlag{Profile: profile, AIHabilitado: services.ResolveAgencyAIHabilitado(profile.Agencia)}
+	return profileWithAIFlag{
+		Profile:      profile,
+		AIHabilitado: services.ResolveAgencyAIHabilitado(profile.Agencia),
+		Agencies:     assignedAgencyCodes(profile.ID, profile.Agencia),
+	}
+}
+
+// assignedAgencyCodes junta la agencia activa (primary) con las agencias
+// adicionales asignadas en UserAgency, sin duplicados (comparación
+// case-insensitive) — el set completo entre el que SwitchActiveAgency permite
+// elegir.
+func assignedAgencyCodes(userID uuid.UUID, primary string) []string {
+	var rows []models.UserAgency
+	database.DB.Where("user_id = ?", userID).Find(&rows)
+
+	codes := make([]string, 0, len(rows)+1)
+	seen := map[string]bool{}
+	if primary != "" {
+		codes = append(codes, primary)
+		seen[strings.ToLower(primary)] = true
+	}
+	for _, r := range rows {
+		if !seen[strings.ToLower(r.Agencia)] {
+			codes = append(codes, r.Agencia)
+			seen[strings.ToLower(r.Agencia)] = true
+		}
+	}
+	return codes
+}
+
+// SwitchActiveAgency es self-service: el usuario elige cuál de sus agencias
+// asignadas (la actual + UserAgency) queda activa. Pisa Profile.Agencia en la
+// base — el JWT ya emitido sigue teniendo la agencia vieja hasta que el
+// usuario vuelva a loguearse (acá no se reemite token: ese patrón no existe
+// hoy fuera de Login), por eso el frontend fuerza un logout inmediato después
+// de esta llamada.
+func SwitchActiveAgency(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	var profile models.Profile
+	if err := database.DB.First(&profile, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Perfil no encontrado."})
+		return
+	}
+
+	var input struct {
+		Agencia string `json:"agencia" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	match := ""
+	for _, a := range assignedAgencyCodes(profile.ID, profile.Agencia) {
+		if strings.EqualFold(a, input.Agencia) {
+			match = a
+			break
+		}
+	}
+	if match == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés esa agencia asignada."})
+		return
+	}
+
+	database.DB.Model(&profile).Update("agencia", match)
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 type LoginInput struct {
@@ -175,8 +258,12 @@ func attachUserRoles(users []models.Profile) []UserWithRole {
 }
 
 func ListUsers(c *gin.Context) {
+	query := database.DB.Order("created_at desc")
+	if agencia, scoped := callerAgencyIfScoped(c); scoped {
+		query = query.Where("LOWER(agencia) = LOWER(?)", agencia)
+	}
 	users := []models.Profile{}
-	database.DB.Order("created_at desc").Find(&users)
+	query.Find(&users)
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": attachUserRoles(users)})
 }
 
@@ -193,6 +280,13 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	profile := input.Profile
+
+	// Un agency_admin solo puede dar de alta usuarios de su propia agencia —
+	// se ignora/pisa cualquier agencia distinta que haya mandado el cliente,
+	// mismo criterio que CreateReservation usa para no-admins.
+	if agencia, scoped := callerAgencyIfScoped(c); scoped {
+		profile.Agencia = agencia
+	}
 
 	// El campo bindeado desde JSON es Password (texto plano); EncryptedPassword
 	// tiene json:"-" y nunca llega en el request, así que hashear ese campo
@@ -305,6 +399,10 @@ func GetUserById(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado."})
 		return
 	}
+	if agencia, scoped := callerAgencyIfScoped(c); scoped && !strings.EqualFold(services.ResolveAgencyCode(profile.Agencia), agencia) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sin permiso."})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile})
 }
 
@@ -313,6 +411,11 @@ func UpdateUser(c *gin.Context) {
 	var profile models.Profile
 	if err := database.DB.Where("id = ?", id).First(&profile).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado."})
+		return
+	}
+	callerAgencia, scoped := callerAgencyIfScoped(c)
+	if scoped && !strings.EqualFold(services.ResolveAgencyCode(profile.Agencia), callerAgencia) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sin permiso."})
 		return
 	}
 
@@ -353,7 +456,12 @@ func UpdateUser(c *gin.Context) {
 		updates["telefono"] = *input.Telefono
 	}
 	if input.Agencia != nil {
-		updates["agencia"] = *input.Agencia
+		// Un agency_admin no puede reasignar a uno de sus propios usuarios
+		// hacia otra agencia — se ignora silenciosamente ese cambio puntual
+		// (el resto de los campos del request sí se aplican).
+		if !scoped || strings.EqualFold(services.ResolveAgencyCode(*input.Agencia), callerAgencia) {
+			updates["agencia"] = *input.Agencia
+		}
 	}
 	if input.Role != nil {
 		updates["role"] = *input.Role
@@ -387,6 +495,10 @@ func DeleteUser(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado."})
 		return
 	}
+	if agencia, scoped := callerAgencyIfScoped(c); scoped && !strings.EqualFold(services.ResolveAgencyCode(profile.Agencia), agencia) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sin permiso."})
+		return
+	}
 
 	if err := database.DB.Delete(&profile).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar el usuario."})
@@ -401,6 +513,10 @@ func ToggleUserStatus(c *gin.Context) {
 	var profile models.Profile
 	if err := database.DB.Where("id = ?", id).First(&profile).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado."})
+		return
+	}
+	if agencia, scoped := callerAgencyIfScoped(c); scoped && !strings.EqualFold(services.ResolveAgencyCode(profile.Agencia), agencia) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sin permiso."})
 		return
 	}
 
