@@ -606,7 +606,7 @@ export default function Availability() {
         <div>
           <form onSubmit={handleSubmitReservation} className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div><span className="text-slate-500">Compañía:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.compania}</span></div>
                 <div><span className="text-slate-500">Cantidad de Pasajeros:</span><span className="ml-2 font-medium text-slate-900">{form.passengers.length}</span></div>
                 <div><span className="text-slate-500">Salida:</span><span className="ml-2 font-medium text-slate-900">{formatDate(selectedProduct?.fecha_salida)}</span></div>
@@ -717,7 +717,7 @@ export default function Availability() {
             </div>
           </form>
         </div>
-        <div className="fixed right-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-2 z-10">
+        <div className="fixed right-4 top-1/2 transform -translate-y-1/2 hidden md:flex flex-col gap-2 z-10">
           <Button size="sm" variant="outline" onClick={() => document.getElementById('contacto-section')?.scrollIntoView({ behavior: 'smooth' })} title="Ir a Datos de contacto">
             📞
           </Button>
@@ -735,9 +735,9 @@ export default function Availability() {
 
       {/* ─── Modal Ver Ruta ─── */}
       {routeModalProduct && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto"
+            className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-4xl max-h-screen sm:max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del modal */}
@@ -771,8 +771,8 @@ export default function Availability() {
 
       {/* ─── Modal Ver Notas ─── */}
       {notesModalProduct && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setNotesModalProduct(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setNotesModalProduct(null)}>
+          <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-2xl max-h-screen sm:max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <StickyNote className="h-5 w-5 text-slate-500" />

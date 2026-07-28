@@ -1,4 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useI18n } from '../contexts/I18nContext.jsx';
@@ -80,8 +81,15 @@ export default function Layout({ children }) {
     <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex flex-col flex-1 w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950">
-        <header className="sticky top-0 z-10 flex justify-between items-center px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm">
+        <header className="sticky top-0 z-10 flex justify-between items-center px-3 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center space-x-3.5 min-w-0">
+            <button
+              onClick={() => sidebarCtx?.setMobileOpen(true)}
+              className="shrink-0 -ml-1 flex items-center justify-center h-9 w-9 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 md:hidden"
+              aria-label="Abrir menú"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             {headerData.icon && (
               <div className="flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 p-2 text-zinc-900 dark:text-zinc-100 shrink-0">
                 <headerData.icon className="h-4.5 w-4.5" />
@@ -114,10 +122,10 @@ export default function Layout({ children }) {
           </div>
         </header>
         <main
-          className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 animate-fade-in"
+          className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-3 sm:p-6 animate-fade-in"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
-          <div className="text-zinc-900 dark:text-zinc-100 min-h-full max-w-[95%] mx-auto">
+          <div className="text-zinc-900 dark:text-zinc-100 min-h-full max-w-full md:max-w-[95%] mx-auto">
             {children || <Outlet context={{ user }} />}
           </div>
         </main>

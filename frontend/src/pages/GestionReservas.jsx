@@ -788,7 +788,7 @@ export default function GestionReservas() {
           {/* RESERVA */}
           <section>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Datos del Pedido</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="ID Pedido" hint="se genera automáticamente si se deja vacío">
                 <input type="text" value={form.pedido_id} onChange={e => setField('pedido_id', e.target.value)}
                   className={inputCls} placeholder="Auto-generado" />
@@ -821,7 +821,7 @@ export default function GestionReservas() {
           {editReservation && (
             <section>
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Vuelo y Vencimiento</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Destino">
                   <input type="text" value={form.vuelo_destino} onChange={e => setField('vuelo_destino', e.target.value)}
                     className={inputCls} placeholder="Destino" />
@@ -846,7 +846,7 @@ export default function GestionReservas() {
           <section>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contacto</h3>
             <p className="mb-2 text-xs text-slate-400">La persona de contacto no es necesariamente un pasajero del viaje.</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Nombre del Contacto" required>
                 <input type="text" value={form.contacto_nombre} onChange={e => setField('contacto_nombre', e.target.value)}
                   className={inputCls} placeholder="Nombre completo" required />
@@ -881,7 +881,7 @@ export default function GestionReservas() {
             ) : (
               <p className="mb-2 text-xs text-slate-400">Cada pasajero ocupa 1 lugar y se crea como su propio ticket. Para cargar varios pasajeros en el mismo pedido, usá la pantalla de Disponibilidad.</p>
             )}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Nombre">
                 <input type="text" value={form.nombre_pasajero} onChange={e => setField('nombre_pasajero', e.target.value)}
                   disabled={editReservation && !editPassengerId}
@@ -999,9 +999,9 @@ export default function GestionReservas() {
 
       {/* ─── Modal Ver Ruta ─── */}
       {routeModalProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setRouteModalProduct(null)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-y-auto"
+            className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-4xl max-h-screen sm:max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del modal */}

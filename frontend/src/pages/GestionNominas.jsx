@@ -188,7 +188,7 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
   const set = (key) => (e) => onChange({ ...values, [key]: e.target.value });
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Nombre</label>
           <input type="text" value={values.nombre} onChange={set('nombre')} className={passengerInputCls} />
@@ -198,7 +198,7 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
           <input type="text" value={values.apellido} onChange={set('apellido')} className={passengerInputCls} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Documento</label>
           <input type="text" value={values.documento} onChange={set('documento')} className={passengerInputCls} />
@@ -208,7 +208,7 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
           <input type="date" value={values.nacimiento} onChange={set('nacimiento')} className={passengerInputCls} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Nacionalidad</label>
           <input type="text" value={values.nacionalidad} onChange={set('nacionalidad')} className={passengerInputCls} />
@@ -222,7 +222,7 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Precio Venta</label>
           <input type="number" step="0.01" value={values.precio_venta} onChange={set('precio_venta')} className={passengerInputCls} />

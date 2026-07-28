@@ -305,7 +305,7 @@ const ProductForm = ({
         {/* Notas */}
         <div>
           {sectionLabel('Notas')}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="notas_externas">Notas externas</Label>
               <Textarea

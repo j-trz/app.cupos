@@ -5,13 +5,13 @@
 // igual que en el resto de las pantallas.
 export default function StatsHero({ stats }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 px-8 py-8 text-white shadow-lg">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 px-4 py-6 sm:px-8 sm:py-8 text-white shadow-lg">
       {/* Decoración de fondo */}
       <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
       <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
 
-      {/* Siempre 3 columnas, sin importar el tamaño de pantalla */}
-      <div className="grid gap-4 grid-cols-3 relative z-10">
+      {/* Apiladas en teléfono, 3 columnas desde sm en adelante */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 relative z-10">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (

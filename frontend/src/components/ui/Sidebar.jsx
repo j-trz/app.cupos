@@ -54,6 +54,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const [localCollapsed, setLocalCollapsed] = useState(false);
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
+  const mobileOpen = ctx ? ctx.mobileOpen : false;
+  const setMobileOpen = ctx ? ctx.setMobileOpen : () => {};
   const [openSubmenus, setOpenSubmenus] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
@@ -180,6 +182,15 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
   return (
     <TooltipProvider>
+      {/* Backdrop del drawer móvil — solo existe por debajo de md, donde el
+          <aside> pasa a fixed/off-canvas en vez de ocupar espacio en el flujo. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <aside
         data-sidebar
         dir={dir}
@@ -190,8 +201,21 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
           minWidth: collapsed ? sidebarCollapsedWidth : sidebarWidth,
           maxWidth: collapsed ? sidebarCollapsedWidth : sidebarWidth,
         }}
-        className="relative h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out"
+        className={clsx(
+          'h-screen shrink-0 border-r border-white/10 transition-all duration-300 ease-in-out',
+          'fixed inset-y-0 left-0 z-50 md:relative md:z-auto md:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
       >
+        {/* Botón de cerrar del drawer móvil (arriba a la derecha, solo <md) */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full md:hidden"
+          style={{ color: sbText }}
+          aria-label="Cerrar menú"
+        >
+          <X className="h-4 w-4" />
+        </button>
         <div className="flex h-full flex-col justify-between">
           {/* flex-1 + min-h-0 es lo que permite que este bloque se achique y
               scrollee en vez de desbordar el <aside> — sin min-h-0, un hijo
@@ -261,7 +285,15 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
 
 
-            <nav className="flex flex-col gap-0.5 px-2">
+            <nav
+              className="flex flex-col gap-0.5 px-2"
+              onClick={(e) => {
+                // Cierra el drawer móvil al navegar — cualquier click en un
+                // NavLink de acá adentro burbujea hasta este handler (los
+                // toggles de submenú no navegan, así que no hace nada raro).
+                if (e.target.closest('a[href]')) setMobileOpen(false);
+              }}
+            >
               {/* Main navigation items */}
               {navItems.map(({ label, path, icon: Icon }) => (
                 <NavLink

@@ -277,7 +277,7 @@ export default function GestionAgencias() {
       {/* Modal de Crear/Editar Agencia */}
       <Modal title={editAgency ? 'Editar Agencia' : 'Nueva Agencia'} open={dialogOpen} onClose={closeDialog}>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fields.map((field) => (
               <div key={field.name} className={field.type === 'textarea' ? 'col-span-2' : ''}>
                 <label className="mb-1 block text-xs font-medium text-slate-600">

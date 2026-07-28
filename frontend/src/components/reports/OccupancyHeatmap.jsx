@@ -18,7 +18,7 @@ export default function OccupancyHeatmap({ data, loading }) {
                 <CardTitle className="text-sm font-semibold">Ocupación por Destino/Temporada</CardTitle>
             </CardHeader>
             <CardContent className="h-[230px] overflow-y-auto">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {data?.slice(0, 9).map((item, i) => (
                         <div key={i} className={`p-3 rounded-lg border ${getColor(item.ocupacion)}`}>
                             <p className="text-xs font-medium truncate">{item.destino}</p>

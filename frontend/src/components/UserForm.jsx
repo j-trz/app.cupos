@@ -82,7 +82,7 @@ const UserForm = ({
         {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="nombre">Nombre *</Label>
           <Input id="nombre" {...register('nombre')} />
@@ -103,7 +103,7 @@ const UserForm = ({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="rol">Rol *</Label>
           <Select value={watchedRole} onValueChange={(value) => setValue('rol', value)}>
