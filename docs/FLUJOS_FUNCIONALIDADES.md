@@ -25,6 +25,8 @@ Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** 
 12. [Reportes y Dashboard](#12-reportes-y-dashboard)
 13. [Notificaciones](#13-notificaciones)
 14. [Configuraciones](#14-configuraciones)
+15. [Claves de API para Integraciones Externas (M2M)](#15-claves-de-api-para-integraciones-externas-m2m)
+16. [Estado del Sistema y Backups](#16-estado-del-sistema-y-backups)
 
 ---
 
@@ -393,9 +395,84 @@ flowchart TD
     A --> D["Email: /api/email-config/config, templates y envíos de prueba"]
     A --> E["Plantillas de notificación: /api/notification-config/templates y preview"]
     A --> F["Config de IA: /api/ai/providers para crear, editar y probar proveedores LLM"]
-    B --> G["Cada módulo está gateado por su permiso: SETTINGS, WHITE_LABEL, EMAIL, NOTIFICATION_TEMPLATES o AI"]
-    C --> G
-    D --> G
-    E --> G
-    F --> G
+    A --> G["Claves de API: /api/api-keys para generar tokens M2M para integraciones externas"]
+    B --> H["Cada módulo está gateado por su permiso: SETTINGS, WHITE_LABEL, EMAIL, NOTIFICATION_TEMPLATES o AI"]
+    C --> H
+    D --> H
+    E --> H
+    F --> H
+    G --> H
 ```
+
+---
+
+## 15. Claves de API para Integraciones Externas (M2M)
+
+El sistema permite generar **API Keys de larga duración** para que sistemas externos (ERPs B2B, bots, automatizaciones) consuman la API sin sesión web. La clave secreta se genera criptográficamente y solo se muestra al momento de creación; la base de datos almacena únicamente su **hash SHA-256**.
+
+El acceso está disponible para `admin` y `agency_admin` con reglas de ámbito diferentes:
+
+- **`admin` (Super Admin):** Puede generar claves con alcance global o vinculadas a cualquier agencia. Ve y revoca cualquier clave del sistema.
+- **`agency_admin`:** Puede generar claves, pero el backend **fuerza automáticamente** la vinculación a su propia agencia, sin importar el `agency_id` enviado. Solo ve y revoca las claves de su empresa.
+
+La autenticación con API Key se realiza enviando la cabecera:
+
+```http
+X-API-Key: cupo_live_sk_...
+```
+
+- Backend: `GET / POST / DELETE /api/api-keys` (`handlers/api_key_handler.go`), `AuthMiddleware` con detección dual JWT / API Key (`middleware/auth.go`), modelo `APIKey` (`models/api_key.go`).
+- Frontend: Panel de gestión en **Configuración ➔ Claves de API** (`components/system/ApiKeyPanel.jsx`).
+
+```mermaid
+flowchart TD
+    A["Super Admin o Agency Admin"] --> B["Configuración → Claves de API"]
+    B --> C["POST /api/api-keys con nombre y agencia"]
+    C --> D{"¿Rol del solicitante?"}
+    D -->|"admin"| E["Asociar a agencia elegida o acceso global"]
+    D -->|"agency_admin"| F["Forzar agency_id a su propia agencia (backend)"]
+    E --> G["Generar token cupo_live_sk_<32bytes>"]
+    F --> G
+    G --> H["Guardar hash SHA-256 en DB"]
+    H --> I["Devolver clave plana UNA sola vez al cliente"]
+    I --> J["Sistema externo usa X-API-Key: cupo_live_sk_..."]
+    J --> K["AuthMiddleware calcula SHA-256 del header"]
+    K --> L{"¿Coincide con hash en DB y está activa?"}
+    L -->|"No"| M["401 Unauthorized"]
+    L -->|"Sí"| N["Inyectar contexto de agencia y role"]
+    N --> O["Actualizar last_used_at async"]
+    O --> P["Procesar request con scope acotado a su agencia"]
+```
+
+---
+
+## 16. Estado del Sistema y Backups
+
+El módulo de **Estado del Sistema** (`/logs`) ofrece monitoreo en tiempo real del estado de servicios (base de datos, conexiones, almacenamiento) y los logs detallados del sistema con posibilidad de filtrado y descarga en JSON.
+
+El **sistema de backups** permite exportar el estado completo de la base de datos en formato JSON. Existen dos modos:
+
+- **Backup Instantáneo Manual:** Generado desde la UI por un usuario con permiso `BACKUP_CREATE` (`POST /api/backup/generate`).
+- **Backup Automático (Cron):** Invocado por un scheduler externo (`GET /api/cron/backup`) autenticado con `X-Cron-Secret`. Mantiene rotación de los últimos 30 backups.
+
+Los backups son descargables como archivos JSON desde la UI (`GET /api/backup/download/:filename`).
+
+- Backend: `handlers/backup_handler.go`, `GET /api/cron/backup`.
+- Frontend: `components/system/BackupPanel.jsx`, `pages/LogsDelSitio.jsx`.
+
+```mermaid
+flowchart TD
+    A["Módulo Estado del Sistema"] --> B["Logs detallados con filtros"]
+    A --> C["Estado de servicios (DB, Conexiones, Almacenamiento)"]
+    A --> D["Panel de Backups"]
+    D --> E{"¿Modo de backup?"}
+    E -->|"Manual"| F["POST /api/backup/generate"]
+    E -->|"Automático"| G["GET /api/cron/backup con X-Cron-Secret"]
+    F --> H["Generar JSON con todas las tablas"]
+    G --> H
+    H --> I["Guardar archivo backup_YYYY-MM-DD_HH-MM-SS.json"]
+    I --> J["Listar en tabla con GET /api/backup"]
+    J --> K["Descargar JSON con GET /api/backup/download/:filename"]
+    K --> L["Rotación automática: mantener últimos 30 backups"]
+```
+

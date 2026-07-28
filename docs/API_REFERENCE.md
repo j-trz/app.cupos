@@ -30,7 +30,10 @@ Salvo `POST /api/auth/login` y `POST /api/auth/register`, todo endpoint requiere
    ```http
    X-API-Key: cupo_live_sk_...
    ```
-   Clave secreta permanente generada desde **Configuración ➔ Claves de API** por un Super Admin. Ver el [Quickstart](QUICKSTART.html) para el flujo completo.
+   Clave secreta permanente generada desde **Configuración ➔ Claves de API**.
+   - **Super Admin (`admin`):** puede generar claves de alcance global o vinculadas a cualquier agencia.
+   - **Administrador de Agencia (`agency_admin`):** puede generar claves vinculadas **exclusivamente a su propia agencia**. Quien consuma la API con ese token solo obtendrá y podrá operar sobre información de esa empresa.
+
 
 ### Content-Type
 
@@ -487,3 +490,66 @@ curl -X GET "https://<tu-dominio>/api/cron/backup" \
 ```
 
 Además existe un endpoint genérico `/api/data` (uso interno del panel de administración para CRUD dinámico) que no está pensado para integraciones externas y no se documenta en detalle acá.
+
+---
+
+## Claves de API para Integraciones Externas (M2M)
+
+Permite generar tokens de acceso de larga duración para sistemas externos (ERPs B2B, bots, automatizaciones). La clave plana solo se muestra al momento de creación; en base de datos se almacena únicamente el **hash SHA-256**.
+
+**Permisos:**
+- `admin` (Super Admin): Ve y opera sobre **todas** las API Keys. Puede crear claves globales o vinculadas a cualquier agencia.
+- `agency_admin`: Ve y opera **solo** las claves de **su propia agencia**. El backend fuerza automáticamente el `agency_id` correcto.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/api-keys` | `admin` o `agency_admin` | Lista API Keys (con filtro de agencia para `agency_admin`). |
+| `POST` | `/api/api-keys` | `admin` o `agency_admin` | Genera una nueva API Key. Devuelve `secret_key` una sola vez. |
+| `DELETE` | `/api/api-keys/:id` | `admin` o `agency_admin` | Revoca una API Key (con verificación de pertenencia de agencia). |
+
+**Body de creación (`POST /api/api-keys`):**
+
+```json
+{
+  "name": "Integración ERP B2B",
+  "agency_id": "uuid-opcional",
+  "scopes": ["*"]
+}
+```
+
+**Respuesta de creación (`201`):**
+
+```json
+{
+  "message": "API Key generada exitosamente",
+  "data": {
+    "id": "uuid",
+    "name": "Integración ERP B2B",
+    "prefix": "cupo_live_sk_a1b2c3...",
+    "secret_key": "cupo_live_sk_<hex completo>",
+    "scopes": "*",
+    "created_at": "2026-07-28T18:45:00Z"
+  }
+}
+```
+
+**Uso desde sistemas externos:**
+
+```bash
+curl https://<dominio>/api/products/ \
+  -H "X-API-Key: cupo_live_sk_..."
+```
+
+---
+
+## Estado del Sistema y Backups
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/logs` | Permiso `LOGS_VIEW` | Lista logs del sistema con filtros de nivel, fuente y búsqueda. |
+| `GET` | `/api/backup` | Permiso `BACKUP_VIEW` | Lista los backups disponibles. |
+| `POST` | `/api/backup/generate` | Permiso `BACKUP_CREATE` | Genera un backup JSON instantáneo. |
+| `GET` | `/api/backup/download/:filename` | Permiso `BACKUP_VIEW` | Descarga un backup como archivo JSON. |
+| `DELETE` | `/api/backup/:filename` | Permiso `BACKUP_CREATE` | Elimina un backup del servidor. |
+| `GET` | `/api/cron/backup` | `X-Cron-Secret` | Genera backup automático (para scheduler externo). Mantiene rotación de 30. |
+
