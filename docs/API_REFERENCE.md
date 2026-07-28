@@ -418,20 +418,66 @@ Ver [Asistente IA](FLUJOS_FUNCIONALIDADES.html#10-asistente-ia) para el detalle 
 }
 ```
 
+### Respaldo y Restauración de Base de Datos (Backup)
+
+El sistema genera copias de seguridad completas de la base de datos en formato **JSON agnóstico**, respaldando las 13 tablas principales (`products`, `reservations`, `passengers`, `profiles`, `agencies`, `roles`, `permissions`, `role_permissions`, `email_smtp_configs`, `email_templates`, `notification_templates`, `ai_providers`, `system_logs`).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/backup` | Permiso: `BACKUP_VIEW` | Lista los archivos de backup guardados en el servidor |
+| `POST` | `/api/backup/generate` | Permiso: `BACKUP_CREATE` | Genera un backup JSON completo y lo guarda en disco |
+| `GET` | `/api/backup/download/:filename` | Permiso: `BACKUP_VIEW` | Descarga el archivo de backup `.json` especificado |
+| `POST` | `/api/backup/restore` | Permiso: `BACKUP_CREATE` | Restaura tablas de la base de datos a partir de un JSON de backup |
+| `DELETE` | `/api/backup/:filename` | Permiso: `BACKUP_CREATE` | Elimina un archivo de backup del servidor |
+
+**Estructura del archivo `backup_YYYYMMDD_HHMMSS.json`:**
+
+```json
+{
+  "meta": {
+    "version": "1.0",
+    "created_at": "2026-07-28T14:45:00Z",
+    "total_records": 1540,
+    "database": "postgresql",
+    "tables_count": 13
+  },
+  "tables": {
+    "products": [ ... ],
+    "reservations": [ ... ],
+    "passengers": [ ... ],
+    "profiles": [ ... ],
+    "agencies": [ ... ],
+    "email_smtp_configs": [ ... ],
+    "ai_providers": [ ... ]
+  }
+}
+```
+
+---
+
 ### Otras exportaciones
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| `GET` | `/api/backup` | Permiso: `BACKUP_VIEW` | Backup de datos |
-| `GET` | `/api/export/csv/:entityType` | Sesión | Exporta una entidad a CSV |
+| `GET` | `/api/export/csv/:entityType` | Sesión | Exporta una entidad a CSV (`products`, `reservations`, `agencies`, etc.) |
 
-## Automatización interna (no pensado para integraciones externas)
+---
 
-Estos dos endpoints los golpea un cron externo (GitHub Actions / cron-job.org), no un cliente de la API: no usan JWT, se protegen con el header `X-Cron-Secret` comparado contra la variable de entorno `CRON_SECRET` del servidor.
+## Automatización interna (Cron Jobs)
+
+Estos endpoints están diseñados para ser invocados por un **scheduler externo** (ej. `cron-job.org`, GitHub Actions, Vercel Cron). No usan JWT: se autentican con la cabecera `X-Cron-Secret` o parámetro `?secret=`, comparados contra la variable de entorno `CRON_SECRET` del servidor.
 
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api/cron/expire-reservations` | Vence bloqueos temporales y holds cumplidos, devuelve el stock |
 | `GET` | `/api/cron/check-deadlines` | Avisa vencimientos operativos próximos (pago, nominación, emisión) |
+| `GET` | `/api/cron/backup` | Genera automáticamente una copia de seguridad JSON y mantiene la rotación de los últimos 30 backups |
+
+**Ejemplo de llamada cURL para Backup Automático:**
+
+```bash
+curl -X GET "https://<tu-dominio>/api/cron/backup" \
+  -H "X-Cron-Secret: $CRON_SECRET"
+```
 
 Además existe un endpoint genérico `/api/data` (uso interno del panel de administración para CRUD dinámico) que no está pensado para integraciones externas y no se documenta en detalle acá.

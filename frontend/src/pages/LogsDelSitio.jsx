@@ -5,12 +5,13 @@ import {
   Clock3, Mail, Bot, ChevronDown, ChevronRight, Download,
   Activity, Database, Server, Wifi, WifiOff, Copy, Check,
   Lock, Unlock, User, ShieldAlert, Info, Zap, Package,
-  Users, ClipboardList, AlertCircle, CheckCircle2, TrendingDown,
+  Users, ClipboardList, AlertCircle, CheckCircle2, TrendingDown, HardDrive,
 } from 'lucide-react';
 import LogService from '../services/logService';
 import Button from '../components/ui/Button.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import BackupPanel from '../components/system/BackupPanel.jsx';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -676,6 +677,7 @@ function LogsTab() {
 const TABS = [
   { id: 'status', label: 'Estado del sistema', icon: Activity },
   { id: 'logs', label: 'Registro de logs', icon: ScrollText },
+  { id: 'backups', label: 'Backups de BD', icon: HardDrive },
 ];
 
 export default function LogsDelSitio() {
@@ -697,12 +699,12 @@ export default function LogsDelSitio() {
     <div className="space-y-6">
       <PageHeader
         title="Estado del sistema"
-        description="Monitoreo en tiempo real, diagnóstico, rastreo de bloqueos y registro de eventos"
+        description="Monitoreo en tiempo real, diagnóstico, respaldo de base de datos y registro de eventos"
         icon={Activity}
       />
 
       {/* Pestañas */}
-      <div className="flex gap-1 bg-slate-100 rounded-2xl p-1 w-fit">
+      <div className="flex gap-1 bg-slate-100 rounded-2xl p-1 w-fit flex-wrap">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -720,7 +722,7 @@ export default function LogsDelSitio() {
       </div>
 
       {/* Contenido */}
-      {activeTab === 'status' ? <SystemStatusTab /> : <LogsTab />}
+      {activeTab === 'status' ? <SystemStatusTab /> : activeTab === 'logs' ? <LogsTab /> : <BackupPanel />}
     </div>
   );
 }
