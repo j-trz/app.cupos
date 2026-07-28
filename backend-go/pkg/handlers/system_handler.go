@@ -105,38 +105,92 @@ func GetSystemStatus(c *gin.Context) {
 		Details: "Servidor HTTP activo y respondiendo",
 	})
 
-	// SMTP: verificar variables de entorno
-	smtpHost := os.Getenv("SMTP_HOST")
-	if smtpHost == "" {
+	// SMTP / Email: verificar tanto en Base de Datos como en variables de entorno
+	var smtpConfigCount int64
+	var smtpConfig models.EmailSMTPConfig
+	database.DB.Model(&models.EmailSMTPConfig{}).Where("is_active = ?", true).Count(&smtpConfigCount)
+	if smtpConfigCount > 0 {
+		database.DB.Where("is_active = ?", true).First(&smtpConfig)
+	} else {
+		database.DB.Model(&models.EmailSMTPConfig{}).Count(&smtpConfigCount)
+		if smtpConfigCount > 0 {
+			database.DB.First(&smtpConfig)
+		}
+	}
+
+	smtpHostEnv := os.Getenv("SMTP_HOST")
+	if smtpConfigCount > 0 && smtpConfig.SMTPHost != "" {
 		resp.Services = append(resp.Services, ServiceStatus{
 			Name:    "SMTP / Email",
-			Status:  "degraded",
-			Details: "Variable SMTP_HOST no configurada en el entorno",
+			Status:  "ok",
+			Details: fmt.Sprintf("Configurado en BD (%s:%d)", smtpConfig.SMTPHost, smtpConfig.SMTPPort),
+		})
+	} else if smtpHostEnv != "" {
+		resp.Services = append(resp.Services, ServiceStatus{
+			Name:    "SMTP / Email",
+			Status:  "ok",
+			Details: "Host configurado en entorno: " + smtpHostEnv,
 		})
 	} else {
 		resp.Services = append(resp.Services, ServiceStatus{
 			Name:    "SMTP / Email",
-			Status:  "ok",
-			Details: "Host configurado: " + smtpHost,
+			Status:  "degraded",
+			Details: "Sin configuración SMTP activa en BD ni variables de entorno",
 		})
 	}
 
-	// IA: verificar variables de entorno
-	aiKey := os.Getenv("GEMINI_API_KEY")
-	if aiKey == "" {
-		aiKey = os.Getenv("OPENAI_API_KEY")
+	// Asistente IA: verificar tanto en Base de Datos (AIProvider) como en variables de entorno
+	var aiProviderCount int64
+	var activeAIProvider models.AIProvider
+	database.DB.Model(&models.AIProvider{}).Where("is_active = ?", true).Count(&aiProviderCount)
+	if aiProviderCount > 0 {
+		database.DB.Where("is_active = ?", true).Order("is_default desc").First(&activeAIProvider)
+	} else {
+		database.DB.Model(&models.AIProvider{}).Count(&aiProviderCount)
+		if aiProviderCount > 0 {
+			database.DB.Order("is_default desc").First(&activeAIProvider)
+		}
 	}
-	if aiKey == "" {
+
+	aiKeyGemini := os.Getenv("GEMINI_API_KEY")
+	aiKeyOpenAI := os.Getenv("OPENAI_API_KEY")
+	aiKeyAnthropic := os.Getenv("ANTHROPIC_API_KEY")
+
+	if aiProviderCount > 0 && (activeAIProvider.APIKey != "" || activeAIProvider.Name != "") {
+		provName := activeAIProvider.DisplayName
+		if provName == "" {
+			provName = activeAIProvider.Name
+		}
+		modelName := activeAIProvider.DefaultModel
+		if modelName == "" {
+			modelName = activeAIProvider.ProviderType
+		}
+		details := fmt.Sprintf("Proveedor activo en BD: %s (%s)", provName, modelName)
+		if activeAIProvider.IsDefault {
+			details += " [Predeterminado]"
+		}
 		resp.Services = append(resp.Services, ServiceStatus{
 			Name:    "Asistente IA",
-			Status:  "degraded",
-			Details: "API Key de IA no configurada en el entorno",
+			Status:  "ok",
+			Details: details,
+		})
+	} else if aiKeyGemini != "" || aiKeyOpenAI != "" || aiKeyAnthropic != "" {
+		providerName := "OpenAI"
+		if aiKeyGemini != "" {
+			providerName = "Gemini"
+		} else if aiKeyAnthropic != "" {
+			providerName = "Anthropic"
+		}
+		resp.Services = append(resp.Services, ServiceStatus{
+			Name:    "Asistente IA",
+			Status:  "ok",
+			Details: fmt.Sprintf("API Key de %s configurada en entorno", providerName),
 		})
 	} else {
 		resp.Services = append(resp.Services, ServiceStatus{
 			Name:    "Asistente IA",
-			Status:  "ok",
-			Details: "API Key configurada",
+			Status:  "degraded",
+			Details: "Sin proveedores de IA activos en BD ni variables de entorno",
 		})
 	}
 
