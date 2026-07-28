@@ -20,6 +20,13 @@ jobs:
     steps:
       - name: Llamar al endpoint de expiración
         run: |
-          curl -v -sf -X GET "${{ secrets.BACKEND_URL }}/api/cron/expire-reservations" \
+          curl -v -X GET "${{ secrets.BACKEND_URL }}/api/cron/expire-reservations" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
-            -w "\n[HTTP %{http_code}]\n"
+            -w "\n[HTTP %{http_code}]\n" > diag-output.txt 2>&1 || true
+          cat diag-output.txt
+      - name: Subir diagnóstico como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag-output
+          path: diag-output.txt
