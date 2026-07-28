@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | default: site.title }} · {{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+  <a class="skip-link" href="#content">Saltar al contenido</a>
+
+  <header class="site-header">
+    <button class="nav-toggle" id="nav-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <a class="brand" href="{{ '/' | relative_url }}">
+      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M44 24 30 20 27 6.5c-.2-1-1.6-1-1.8 0L23 20l-8 2.2V26l8-1.3 1 12L20 39v2.6l4-1 4 1V39l-4-2.3 1-12 8 1.3v-3.8Z" fill="currentColor"/>
+      </svg>
+      <span class="brand-text">Sistema de Gestión de Cupos</span>
+      <span class="brand-sub">docs</span>
+    </a>
+    <a class="gh-link" href="https://github.com/j-trz/app.cupos" target="_blank" rel="noopener">
+      Repositorio <span aria-hidden="true">↗</span>
+    </a>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" id="sidebar">
+      <p class="sidebar-title">Documentación</p>
+      {% assign docs = site.pages | where_exp: "p", "p.title" | sort: "nav_order" %}
+      {% assign prev_group = nil %}
+      {% for p in docs %}
+        {% if p.nav_group != prev_group %}
+          {% unless forloop.first %}</ul>{% endunless %}
+          <p class="sidebar-group">{{ p.nav_group }}</p>
+          <ul>
+          {% assign prev_group = p.nav_group %}
+        {% endif %}
+        <li style="--i: {{ forloop.index0 }}">
+          <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
+            <span class="nav-index">{{ forloop.index0 | prepend: '00' | slice: -2, 2 }}</span>
+            <span class="nav-label">{{ p.title }}</span>
+          </a>
+          {% if p.url == page.url %}
+            <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
+          {% endif %}
+        </li>
+      {% endfor %}
+      </ul>
+    </nav>
+
+    <main id="content" class="content">
+      {{ content }}
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <span class="footer-rule" aria-hidden="true"></span>
+    <p>Generado desde <code>docs/</code> en la rama <code>main</code> de
+    <a href="https://github.com/j-trz/app.cupos">j-trz/app.cupos</a>.</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // kramdown+rouge (el build real de GitHub Pages) dejan los bloques
+      // ```mermaid como texto plano dentro de <pre><code class="language-mermaid">,
+      // sin ningún renderer real detrás — acá se reemplaza cada uno por un
+      // <div class="mermaid"> con el mismo contenido para que mermaid.js los
+      // dibuje como diagramas. Se cubre también div.language-mermaid por si
+      // algún otro procesador markdown genera esa forma.
+      document.querySelectorAll('pre code.language-mermaid, div.language-mermaid').forEach(function (block) {
+        var host = block.tagName === 'CODE' ? block.closest('pre') : block;
+        var wrap = document.createElement('div');
+        wrap.className = 'mermaid-frame';
+        var label = document.createElement('span');
+        label.className = 'mermaid-frame-label';
+        label.textContent = 'DIAGRAMA';
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = block.textContent;
+        wrap.appendChild(label);
+        wrap.appendChild(div);
+        host.replaceWith(wrap);
+      });
+      if (window.mermaid) {
+        var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'neutral', securityLevel: 'loose' });
+        // startOnLoad encoge TODOS los diagramas al ancho de la tarjeta
+        // (width="100%"), sin importar su forma — un flowchart angosto y
+        // alto queda legible, pero uno ancho con muchas ramas en paralelo
+        // queda con el texto aplastado. Con mermaid.run() se puede
+        // post-procesar: cada SVG se deja a su tamaño natural (el de su
+        // viewBox) y la tarjeta se banca el ancho de más con scroll
+        // horizontal — así el texto nunca se achica.
+        mermaid.run({ querySelector: '.mermaid' }).then(function () {
+          document.querySelectorAll('.content .mermaid svg').forEach(function (svg) {
+            var vb = svg.viewBox && svg.viewBox.baseVal;
+            if (vb && vb.width) {
+              svg.style.width = vb.width + 'px';
+              svg.style.maxWidth = 'none';
+            }
+          });
+        });
+      }
+
+      // Ítems individuales de la página actual, anidados bajo su propio link
+      // en el sidebar principal: lista los <h2> del artículo y resalta el
+      // que está en foco a medida que se scrollea (scrollspy simple).
+      var tocList = document.getElementById('sidebar-subnav');
+      if (tocList) {
+        var headings = document.querySelectorAll('.content h2[id]');
+        var links = [];
+        headings.forEach(function (h) {
+          var li = document.createElement('li');
+          var a = document.createElement('a');
+          a.href = '#' + h.id;
+          a.textContent = h.textContent;
+          li.appendChild(a);
+          tocList.appendChild(li);
+          links.push(a);
+        });
+        if ('IntersectionObserver' in window && links.length) {
+          var linkById = {};
+          links.forEach(function (a) { linkById[a.getAttribute('href').slice(1)] = a; });
+          var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+              var link = linkById[entry.target.id];
+              if (!link || !entry.isIntersecting) return;
+              links.forEach(function (a) { a.classList.remove('active'); });
+              link.classList.add('active');
+            });
+          }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+          headings.forEach(function (h) { observer.observe(h); });
+        }
+      }
+
+      var toggle = document.getElementById('nav-toggle');
+      var sidebar = document.getElementById('sidebar');
+      if (toggle && sidebar) {
+        toggle.addEventListener('click', function () {
+          var open = sidebar.classList.toggle('open');
+          toggle.classList.toggle('open', open);
+          toggle.setAttribute('aria-expanded', String(open));
+        });
+        sidebar.querySelectorAll('a').forEach(function (link) {
+          link.addEventListener('click', function () {
+            sidebar.classList.remove('open');
+            toggle.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>

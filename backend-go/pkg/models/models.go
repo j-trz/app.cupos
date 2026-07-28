@@ -109,6 +109,12 @@ const (
 	EstadoSolicitudCancelacion = "solicitud_cancelacion"
 	EstadoCancelada            = "cancelada"
 	EstadoExpirada             = "expirada"
+	// EstadoHoldTemporal marca un pre-hold de stock creado apenas el usuario
+	// elige cuántos pasajeros va a cargar, antes de tener datos de contacto o
+	// pasajeros reales — ver CreateHold/ReleaseHold en order_handler.go. Se
+	// mantiene separado de EstadoBloqueoTemporal para que no aparezca como
+	// reserva fantasma en listados admin ni dispare avisos de vencimiento.
+	EstadoHoldTemporal = "hold_temporal"
 	// EstadoCedida marca la línea que queda en la agencia cedente cuando cede
 	// disponibilidad a otra agencia — es un registro de auditoría del stock
 	// que salió de su pool, no una reserva de pasajero real.
@@ -121,6 +127,10 @@ type Reservation struct {
 	CreatedBy            uuid.UUID  `gorm:"type:uuid" json:"created_by"`
 	Estado               string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
 	BloqueoExpiraAt      *time.Time `json:"bloqueo_expira_at"`
+	// HoldPassengerCount es la cantidad de asientos que ocupa un pre-hold
+	// (EstadoHoldTemporal) antes de que existan Passengers reales — necesario
+	// para saber cuánto stock devolver si el hold se cancela o vence.
+	HoldPassengerCount int `gorm:"column:hold_passenger_count;default:0" json:"hold_passenger_count,omitempty"`
 	PrecioVenta          float64    `json:"precio_venta"`
 	Neto1                float64    `json:"neto_1"`
 	PedidoID             string     `gorm:"not null" json:"pedido_id"`
@@ -288,8 +298,11 @@ type Agency struct {
 	Website   string    `json:"website"`
 	Color     string    `gorm:"default:'#3b82f6'" json:"color"`
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// AIHabilitado permite que una agencia desactive el asistente de IA para
+	// todos sus usuarios (widget de chat + endpoint /ai/chat).
+	AIHabilitado bool      `gorm:"column:ai_habilitado;default:true" json:"ai_habilitado"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type WhiteLabelConfig struct {
@@ -301,8 +314,13 @@ type WhiteLabelConfig struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
+// SystemSetting admite una fila global (AgencyID nil) y, para la misma Key,
+// una fila de override por agencia — de ahí el ID surrogate en vez de Key
+// como PK (ver migración en db.go que le cambia la PK a la tabla existente).
 type SystemSetting struct {
-	Key       string         `gorm:"primaryKey" json:"key"`
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Key       string         `gorm:"index;not null" json:"key"`
+	AgencyID  *uuid.UUID     `gorm:"type:uuid" json:"agency_id,omitempty"`
 	Value     datatypes.JSON `gorm:"type:jsonb;not null" json:"value"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
@@ -542,6 +560,18 @@ type ProductSharedAgency struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	ProductID uint      `gorm:"not null;uniqueIndex:idx_product_shared_agency" json:"product_id"`
 	Agencia   string    `gorm:"not null;uniqueIndex:idx_product_shared_agency" json:"agencia"`
+	CreatedBy uuid.UUID `gorm:"type:uuid" json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// UserAgency habilita que un usuario tenga asignada más de una agencia. La
+// activa en un momento dado sigue siendo Profile.Agencia (la que viaja en el
+// JWT) — esta tabla son las agencias ADICIONALES entre las que puede elegir
+// vía SwitchActiveAgency, mismo shape que ProductSharedAgency.
+type UserAgency struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_user_agency" json:"user_id"`
+	Agencia   string    `gorm:"not null;uniqueIndex:idx_user_agency" json:"agencia"`
 	CreatedBy uuid.UUID `gorm:"type:uuid" json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
 }

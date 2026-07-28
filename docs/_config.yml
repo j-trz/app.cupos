@@ -1,0 +1,6 @@
+title: Sistema de Gestión de Cupos — Documentación
+description: Documentación técnica del sistema de gestión de cupos aéreos
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge

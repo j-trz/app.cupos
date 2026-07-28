@@ -19,3 +19,19 @@ func ResolveAgencyCode(value string) string {
 	}
 	return agency.Code
 }
+
+// ResolveAgencyAIHabilitado indica si el asistente de IA está habilitado para
+// la agencia dada (Profile.Agencia, código o nombre). Sin agencia cargada, o
+// si la agencia no se encuentra, no se bloquea (comportamiento previo a que
+// existiera este flag) — el apagado es un opt-out explícito por agencia, no
+// un default restrictivo.
+func ResolveAgencyAIHabilitado(agenciaRaw string) bool {
+	if agenciaRaw == "" {
+		return true
+	}
+	agency, err := FindAgencyByCodeOrName(agenciaRaw)
+	if err != nil {
+		return true
+	}
+	return agency.AIHabilitado
+}

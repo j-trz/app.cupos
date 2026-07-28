@@ -656,6 +656,46 @@ function UsuariosSection() {
   );
 }
 
+function NominasSection() {
+  return (
+    <div className="space-y-4">
+      <DocSubsection title="¿Qué es la nómina acá?" color="blue" icon={Info}>
+        <DocParagraph>
+          No es una nómina de sueldos: es el <strong>listado de pasajeros</strong> cargados en las reservas confirmadas de un producto (vuelo).
+          Cada pasajero es su propio ticket individual, con sus propios datos de documento, precio de venta, neto y número de ticket
+          — no se comparten entre pasajeros de una misma reserva.
+        </DocParagraph>
+      </DocSubsection>
+
+      <DocSubsection title="Quién ve qué" color="purple" icon={Shield}>
+        <DocParagraph>
+          Ves la nómina de los productos de tu propia agencia, y también la de los productos que otra agencia te cedió por
+          <strong> Cesión de Cupos</strong>. Un <DocCode>agency_admin</DocCode> ve toda la nómina de su agencia; un agente
+          individual solo ve la de sus propias reservas.
+        </DocParagraph>
+      </DocSubsection>
+
+      <DocSubsection title="Datos por pasajero" color="green" icon={CheckCircle}>
+        <DocList items={[
+          'Nombre, apellido, documento, fecha de nacimiento y nacionalidad.',
+          '<strong>Tipo de pasajero</strong> (adulto, menor, infante).',
+          '<strong>Número de ticket:</strong> se asigna cuando el operador emite el pasaje. Hasta entonces figura como pendiente.',
+          '<strong>Doc contable:</strong> referencia del documento contable de esa venta.',
+          'Precio de venta y neto — los valores económicos de ESE pasajero, no del pedido completo.',
+        ]} />
+      </DocSubsection>
+
+      <DocSubsection title="Editar y exportar" color="orange" icon={Download}>
+        <DocList items={[
+          'Podés editar los datos de un pasajero en cualquier momento desde su fila (por ejemplo, para completar el número de ticket cuando llega).',
+          'La tabla es expandible: una fila por pasajero, con todos sus datos a la vista, no una fila por reserva.',
+          'Exportá la nómina filtrada a Excel/CSV para enviarla al operador o para control interno.',
+        ]} />
+      </DocSubsection>
+    </div>
+  );
+}
+
 function AgenciasSection() {
   return (
     <div className="space-y-4">
@@ -818,6 +858,7 @@ const SECTION_CONTENT = {
   email: EmailSection,
   'plantillas-notificacion': PlantillasNotificacionSection,
   reportes: ReportesSection,
+  nominas: NominasSection,
   usuarios: UsuariosSection,
   agencias: AgenciasSection,
   logs: LogsSection,
@@ -829,12 +870,16 @@ const SECTION_CONTENT = {
 export default function Documentacion() {
   const { section } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  // Secciones visibles para este usuario — oculta las admin-only tanto de la
-  // navegación prev/next como del acceso directo por URL (ver docsSections.js).
-  const sections = useMemo(() => visibleDocsSections(user?.role), [user?.role]);
+  // Secciones visibles para este usuario — oculta las que no le corresponden
+  // por permiso real (ver docsSections.js) tanto de la navegación prev/next
+  // como del acceso directo por URL, y además la de IA si su agencia la apagó.
+  const sections = useMemo(
+    () => visibleDocsSections(can, isAdmin).filter((s) => s.key !== 'ia' || user?.ai_habilitado !== false),
+    [can, isAdmin, user?.ai_habilitado]
+  );
 
   const currentIndex = sections.findIndex((s) => s.key === section);
   const current = sections[currentIndex];

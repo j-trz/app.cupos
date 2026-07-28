@@ -236,6 +236,34 @@ class ReservationService {
     };
   }
 
+  // Descuenta de inmediato N lugares de un producto ANTES de cargar datos de
+  // pasajero, con un vencimiento corto (bloqueo_hold_minutos) — ver
+  // CreateHold en order_handler.go. El resultado se pasa como hold_id a
+  // submitReservation para convertir este mismo hold en la reserva real.
+  static async createHold(productId, passengerCount) {
+    const result = await ApiClient.post('/orders/hold', {
+      product_id: productId,
+      passenger_count: passengerCount,
+    });
+    return {
+      id: result.id,
+      pedidoId: result.pedido_id,
+      expiresAt: result.bloqueo_expira_at,
+      passengerCount: result.passenger_count,
+    };
+  }
+
+  // Cancela un hold en curso y libera el stock al instante, sin esperar al
+  // cron — se llama al cerrar el modal sin confirmar. Best-effort: si falla
+  // (ya venció, o cualquier error de red) no debe romper el cierre del modal.
+  static async releaseHold(holdId) {
+    try {
+      await ApiClient.delete(`/orders/hold/${holdId}`);
+    } catch (error) {
+      console.error(`Error releasing hold ${holdId}:`, error);
+    }
+  }
+
   // Get user blocked reservations pending doc_contable
   static async getMyBlockedReservations() {
     try {

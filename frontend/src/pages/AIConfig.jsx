@@ -584,6 +584,7 @@ export default function AIConfig() {
                     {/* Tab: Expertos */}
                     {activeTab === 'experts' && <ExpertsTab />}
 
+                    {/* Tab: Agencias — encendido/apagado del asistente por agencia */}
                     {/* Tab: Estadísticas */}
                     {activeTab === 'stats' && stats && (
                         <div className="space-y-6">

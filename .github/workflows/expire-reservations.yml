@@ -7,7 +7,11 @@ name: Expirar reservas en bloqueo temporal
 # de reservas nunca corre").
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    # */3: los pre-holds de stock (ver hold_temporal en order_handler.go)
+    # duran solo bloqueo_hold_minutos (default 10 min) — con el schedule
+    # anterior de */10 un hold abandonado podía tardar hasta ~20 min en
+    # liberarse; a */3 el peor caso baja a ~12-13 min.
+    - cron: '*/3 * * * *'
   workflow_dispatch: {}
 
 jobs:
