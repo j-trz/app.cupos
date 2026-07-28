@@ -161,46 +161,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
   const cssStyles = `
     .itinerary-content { font-family: "${bodyFont}", "Montserrat", sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; background: white; color: #0f172a; }
     .itinerary-content * { box-sizing: border-box; }
-<<<<<<< HEAD
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #e2e8f0; }
-    .logo { height: 48px; object-fit: contain; }
-    .title { font-family: "${headingFont}", "Montserrat", sans-serif; font-size: 1.5rem; font-weight: 700; color: ${primaryColor}; }
-    .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; padding: 1.5rem; margin-bottom: 1.5rem; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-    .info-label { font-size: 0.875rem; font-weight: 600; color: #64748b; margin-bottom: 0.25rem; }
-    .info-value { font-size: 0.875rem; font-weight: 700; color: #0f172a; text-transform: uppercase; }
-    .section-title { font-family: "${headingFont}", "Montserrat", sans-serif; font-size: 1.1rem; font-weight: 700; color: ${primaryColor}; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; }
-    .flight-segment { display: grid; grid-template-columns: auto 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-    .flight-icon-col { display: flex; flex-direction: column; align-items: center; }
-    .flight-icon { color: ${primaryColor}; }
-    .flight-line { width: 2px; background-color: #e2e8f0; flex-grow: 1; margin: 0.5rem 0; min-height: 40px; }
-    .flight-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0rem; flex-wrap: wrap; gap: 0.5rem; }
-    .flight-route { display: flex; align-items: center; gap: 0.75rem; }
-    .airline-logo { height: 32px; width: 32px; object-fit: contain; border-radius: 0.5rem; background: #fff; border: 1px solid #e2e8f0; margin-bottom: 1rem; }
-    .route-text { font-size: 0.9rem; font-weight: 600; color: #0f172a; }
-    .route-info { display: flex; flex-direction: column; gap: 0.15rem; }
-    .badge { display: inline-flex; align-items: center; padding: 0.4rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-    .flight-info { font-size: 0.7rem; color: #64748b; margin-top: 0; margin-bottom: 1rem; }
-    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .detail-item { margin-bottom: 0.75rem; }
-    .detail-label { font-size: 0.8rem; color: #64748b; margin-bottom: 0.15rem; }
-    .detail-value { font-size: 0.7rem; font-weight: 600; color: #0f172a; }
-    .baggage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.25rem; }
-    .baggage-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; font-weight: 600; }
-    .baggage-included { color: #15803d; }
-    .baggage-excluded { color: #94a3b8; }
-    .baggage-excluded .baggage-label { text-decoration: line-through; text-decoration-thickness: 2px; }
-    .footer { text-align: center; padding: 2rem 0; color: #64748b; font-size: 0.875rem; }
-    .footer a { color: ${primaryColor}; text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
-    .connection-badge { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background-color: #f1f5f9; color: #475569; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px dashed #cbd5e1; width: 100%; margin-bottom: 1.5rem; gap: 8px; }
-    .openjaw-badge { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background-color: #fff7ed; color: #c2410c; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px dashed #fdba74; width: 100%; margin-bottom: 1.5rem; gap: 8px; }
-    .mt-5 { margin-top: 1.25rem; }
-    .print-btn { display: flex; align-items: center; gap: 8px; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: opacity 0.2s; }
-    .print-btn:hover { opacity: 0.9; }
-    @media print { body { padding: 1rem; background: white; } .card { box-shadow: none; border: 1px solid #ccc; } .no-print { display: none !important; } }
-    @media (max-width: 600px) { .info-grid, .details-grid, .baggage-grid { grid-template-columns: 1fr; } .flight-header { flex-direction: column; align-items: flex-start; } }
-=======
     .itin-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; gap: 16px; flex-wrap: wrap; }
     .itin-header-left { display: flex; align-items: center; gap: 12px; }
     .itin-logo { height: 40px; width: auto; object-fit: contain; }
@@ -236,7 +196,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
       .itin-grid { grid-template-columns: 1fr; }
     }
     @media print { .no-print { display: none !important; } @page { size: A4; margin: 15mm; } }
->>>>>>> 51fbe14788ed120b5c7db4eaa65c370f47bc7f62
   `;
 
   const handlePrint = () => {
