@@ -232,7 +232,9 @@ Servicios disponibles:
 - `aiService` — asistente IA (chat, sesiones, expertos).
 - `whiteLabelService` — configuración de marca blanca.
 - `emailConfigService` / `emailTemplateService` — configuración y plantillas de email.
-- `logService` — logs del sitio.
+- `logService` — logs del sitio y diagnóstico de servicios.
+- `backupService` — copias de seguridad de BD.
+- `apiKeyService` — claves de API para integraciones externas M2M.
 - `exportService` — exportación de datos (Excel/PDF).
 - `alertRuleService` — reglas de alerta.
 - `backofficeService` — utilidades de backoffice.

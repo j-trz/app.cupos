@@ -18,13 +18,19 @@ Todas las rutas cuelgan de `/api` (ej. `https://<tu-dominio>/api/products`). No 
 
 ### Autenticación
 
-Salvo `POST /api/auth/login` y `POST /api/auth/register`, todo endpoint requiere el header:
+Salvo `POST /api/auth/login` y `POST /api/auth/register`, todo endpoint requiere autenticación mediante una de las siguientes cabeceras:
 
-```
-Authorization: Bearer <token>
-```
+1. **Sesión Web (JWT):**
+   ```http
+   Authorization: Bearer <token>
+   ```
+   El token es un JWT firmado (HS256) que expira a las 24 horas.
 
-El token es un JWT firmado (HS256) que se consigue con `POST /api/auth/login` y **expira a las 24 horas**. No hay refresh token — volvé a loguear cuando venza. Ver el [Quickstart](QUICKSTART.html) para el flujo completo.
+2. **Integración B2B / M2M (API Key):**
+   ```http
+   X-API-Key: cupo_live_sk_...
+   ```
+   Clave secreta permanente generada desde **Configuración ➔ Claves de API** por un Super Admin. Ver el [Quickstart](QUICKSTART.html) para el flujo completo.
 
 ### Content-Type
 

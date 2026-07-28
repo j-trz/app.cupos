@@ -57,22 +57,32 @@ Cabeceras permitidas: `Content-Type`, `Authorization`, `X-Requested-With`. Méto
 
 ## Autenticación
 
-La API usa **JWT (HS256)**. El flujo típico para una integración es:
+La API soporta dos esquemas de autenticación según el escenario:
 
+### 1. Sesión Web / Usuarios Humanos (JWT)
+El flujo típico para el frontend web:
 1. `POST /api/auth/login` con `email` y `password`.
 2. Guardar el `token` devuelto.
-3. Enviar el token en cada request protegida con la cabecera:
-
+3. Enviar el token en cada request con la cabecera:
    ```http
    Authorization: Bearer <token>
    ```
 
-Detalles:
+### 2. Integraciones Externas / Máquina a Máquina (API Keys)
+Para ERPs, bots o sistemas externos B2B:
+- Enviar la clave secreta generada desde el panel de Super Admin mediante la cabecera:
+  ```http
+  X-API-Key: cupo_live_sk_...
+  ```
+  o alternativamente:
+  ```http
+  Authorization: Bearer cupo_live_sk_...
+  ```
 
-- El token expira a las **24 horas** de emitido (claim `exp`).
-- Los claims incluyen: `id`, `email`, `nombre`, `apellido`, `telefono`, `agencia`, `role`, `admin`, `exp`.
-- El token se firma con la variable de entorno `JWT_SECRET`.
-- Sin cabecera `Authorization` válida, los endpoints protegidos responden `401`.
+Detalles:
+- El token JWT expira a las **24 horas** de emitido (claim `exp`).
+- Las **API Keys** son permanentes hasta ser revocadas y permiten asociar las peticiones a una agencia específica.
+- Sin cabecera `Authorization` o `X-API-Key` válida, los endpoints protegidos responden `401`.
 
 Ejemplo de login:
 
@@ -535,11 +545,45 @@ El cuerpo es un objeto JSON libre (logo, colores, etc.). Un admin puede incluir 
 | `PUT` | `/api/permissions/:id` | Permiso: `PERMISSIONS_UPDATE` | Actualiza permiso. |
 | `DELETE` | `/api/permissions/:id` | Permiso: `PERMISSIONS_DELETE` | Elimina permiso. |
 
-**Asignación de rol a usuario**
-
 | Método | Ruta | Acceso | Descripción |
 | --- | --- | --- | --- |
 | `POST` | `/api/user-roles` | Permiso: `ROLES_ASSIGN_PERMISSIONS` | Asigna un rol a un usuario. Body: `{ "user_id": "uuid", "role_id": "uuid" }`. |
+
+### Claves de API (API Keys)
+
+Gestión de tokens de acceso criptográficos para sistemas externos y clientes M2M (exclusivo Super Admin).
+
+| Método | Ruta | Acceso | Descripción |
+| --- | --- | --- | --- |
+| `GET` | `/api/api-keys` | Solo Super Admin (`admin`) | Lista todas las API Keys registradas (sin exponer el secreto). |
+| `POST` | `/api/api-keys` | Solo Super Admin (`admin`) | Genera una nueva API Key. Devuelve la clave secreta `secret_key` una sola vez. |
+| `DELETE` | `/api/api-keys/:id` | Solo Super Admin (`admin`) | Revoca o desactiva una API Key existente. |
+
+**`POST /api/api-keys`** — body:
+
+```json
+{
+  "name": "Integración ERP B2B",
+  "agency_id": "8f9a2b1c-...", 
+  "scopes": ["*"]
+}
+```
+
+Respuesta (`201 Created`):
+
+```json
+{
+  "message": "API Key generada exitosamente",
+  "data": {
+    "id": "11223344-5566-7788-9900-aabbccddeeff",
+    "name": "Integración ERP B2B",
+    "prefix": "cupo_live_sk_a1b2c3...",
+    "secret_key": "cupo_live_sk_a1b2c3d4e5f678901234567890abcdef1234567890abcdef",
+    "scopes": "*",
+    "created_at": "2026-07-28T18:45:00Z"
+  }
+}
+```
 
 ### Notificaciones
 

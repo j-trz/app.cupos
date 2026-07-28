@@ -222,6 +222,14 @@ func main() {
 				backupGroup.DELETE("/:filename", middleware.RequirePermission("BACKUP_CREATE"), handlers.DeleteBackupHandler)
 			}
 
+			// API Keys (Solo Super Admin)
+			apiKeysGroup := protected.Group("/api-keys")
+			{
+				apiKeysGroup.GET("", middleware.AdminOnly(), handlers.ListAPIKeysHandler)
+				apiKeysGroup.POST("", middleware.AdminOnly(), handlers.CreateAPIKeyHandler)
+				apiKeysGroup.DELETE("/:id", middleware.AdminOnly(), handlers.RevokeAPIKeyHandler)
+			}
+
 
 			// Exportación
 			protected.GET("/export/csv/:entityType", handlers.ExportCSV)

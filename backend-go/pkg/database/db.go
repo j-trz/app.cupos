@@ -57,6 +57,7 @@ func InitDB() {
 		&models.AIExpert{},
 		&models.AIExpertDocument{},
 		&models.AIExpertChunk{},
+		&models.APIKey{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements

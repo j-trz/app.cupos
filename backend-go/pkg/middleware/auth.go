@@ -4,17 +4,76 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"backend-go/pkg/database"
+	"backend-go/pkg/handlers"
+	"backend-go/pkg/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		apiKeyHeader := c.GetHeader("X-API-Key")
 		authHeader := c.GetHeader("Authorization")
+
+		// 1. Verificar si viene una API Key por X-API-Key o Bearer cupo_live_sk_
+		rawAPIKey := ""
+		if apiKeyHeader != "" {
+			rawAPIKey = strings.TrimSpace(apiKeyHeader)
+		} else if strings.HasPrefix(authHeader, "Bearer cupo_live_sk_") {
+			rawAPIKey = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		}
+
+		if rawAPIKey != "" {
+			// Autenticación por API Key
+			keyHash := handlers.HashAPIKey(rawAPIKey)
+			var apiKey models.APIKey
+			err := database.DB.Preload("Agency").Where("key_hash = ? AND is_active = true", keyHash).First(&apiKey).Error
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "API Key inválida, revocada o expirada."})
+				c.Abort()
+				return
+			}
+
+			// Verificar si expiró
+			if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "La API Key ha expirado."})
+				c.Abort()
+				return
+			}
+
+			// Actualizar última fecha de uso asincrónicamente
+			go func(keyID uuid.UUID) {
+				now := time.Now()
+				database.DB.Model(&models.APIKey{}).Where("id = ?", keyID).Update("last_used_at", now)
+			}(apiKey.ID)
+
+			// Inyectar contexto
+			c.Set("userID", apiKey.CreatedByID)
+			c.Set("authMethod", "api_key")
+			c.Set("apiKeyID", apiKey.ID)
+			c.Set("apiKeyName", apiKey.Name)
+
+			if apiKey.AgencyID != nil && apiKey.Agency != nil {
+				c.Set("agencyID", *apiKey.AgencyID)
+				c.Set("agencia", apiKey.Agency.Name)
+				c.Set("role", "agency_admin")
+			} else {
+				c.Set("role", "admin")
+			}
+			c.Set("userName", "API Key ("+apiKey.Name+")")
+
+			c.Next()
+			return
+		}
+
+		// 2. Fallback: Autenticación normal por JWT para sesión web
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado. Se requiere token Bearer."})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado. Se requiere token Bearer o X-API-Key."})
 			c.Abort()
 			return
 		}
