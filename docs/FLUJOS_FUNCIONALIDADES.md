@@ -282,6 +282,8 @@ El asistente (`POST /api/ai/chat`) arma un **system prompt** dinámico según el
 
 El backend expone un **toolset filtrado por rol** (con function calling sobre OpenAI/Anthropic/Google). Las herramientas son de lectura/acción sobre la DB (`buscar_productos`, `mis_reservas`, `crear_reserva`, `cotizar_grupo`, `rentabilidad`, etc.) o **UIActions** que instruyen al frontend (`abrir_modal_reserva`, `navegar_a_pantalla`, `completar_formulario_pasajeros`). El bucle llama al modelo, ejecuta las tools que pida respetando las reglas de seguridad, y repite hasta la respuesta final.
 
+En el frontend, las respuestas del asistente se renderizan como **Markdown** (encabezados, listas, código y tablas) en vez de texto plano. Cuando el modelo usa `consultar_experto` para citar la base de conocimiento de un Experto, el contenido de cada documento cargado puede editarse manualmente desde el panel de Expertos — útil para corregir errores de OCR de un PDF escaneado sin tener que volver a subir el archivo.
+
 - Backend: `backend-go/pkg/handlers/ai_handler.go`.
 
 ```mermaid
