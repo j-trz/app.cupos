@@ -492,18 +492,18 @@ const GestionProductos = () => {
                   <TableHead>Salida</TableHead>
                   <TableHead>Regreso</TableHead>
                   <TableHead>Venc. Pago</TableHead>
-                  <TableHead>Nominación</TableHead>
+                  <TableHead>Nómina</TableHead>
                   <TableHead>Emisión</TableHead>
-                  <TableHead>Entrada en gastos</TableHead>
+                  <TableHead>Gastos</TableHead>
                   <TableHead>Bloqueo (min)</TableHead>
-                  <TableHead>Precio ADT</TableHead>
-                  <TableHead>Precio INF</TableHead>
-                  <TableHead>Precio CHD</TableHead>
+                  <TableHead>ADT</TableHead>
+                  <TableHead>INF</TableHead>
+                  <TableHead>CHD</TableHead>
                   <TableHead>Neto 1</TableHead>
                   <TableHead>OP</TableHead>
                   <TableHead>Equipaje</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
