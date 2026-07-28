@@ -355,7 +355,11 @@ type SystemLog struct {
 	Message    string     `json:"message"`
 	Details    string     `json:"details"`
 	UserID     *uuid.UUID `gorm:"type:uuid" json:"user_id"`
+	UserName   string     `json:"user_name"`
+	UserEmail  string     `json:"user_email"`
 	Agencia    string     `json:"agencia"`
+	IP         string     `json:"ip"`
+	RequestID  string     `json:"request_id"`
 	DurationMs int64      `json:"duration_ms"`
 	CreatedAt  time.Time  `gorm:"index" json:"created_at"`
 }

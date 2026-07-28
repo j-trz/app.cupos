@@ -24,3 +24,13 @@ admin
 *.njsproj
 *.sln
 *.sw?
+
+# Go binaries & temporary files
+main
+*.exe
+*.test
+*.prof
+tmp_*
+tmp-*
+backups/
+

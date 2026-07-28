@@ -18,13 +18,22 @@ Todas las rutas cuelgan de `/api` (ej. `https://<tu-dominio>/api/products`). No 
 
 ### Autenticación
 
-Salvo `POST /api/auth/login` y `POST /api/auth/register`, todo endpoint requiere el header:
+Salvo `POST /api/auth/login` y `POST /api/auth/register`, todo endpoint requiere autenticación mediante una de las siguientes cabeceras:
 
-```
-Authorization: Bearer <token>
-```
+1. **Sesión Web (JWT):**
+   ```http
+   Authorization: Bearer <token>
+   ```
+   El token es un JWT firmado (HS256) que expira a las 24 horas.
 
-El token es un JWT firmado (HS256) que se consigue con `POST /api/auth/login` y **expira a las 24 horas**. No hay refresh token — volvé a loguear cuando venza. Ver el [Quickstart](QUICKSTART.html) para el flujo completo.
+2. **Integración B2B / M2M (API Key):**
+   ```http
+   X-API-Key: cupo_live_sk_...
+   ```
+   Clave secreta permanente generada desde **Configuración ➔ Claves de API**.
+   - **Super Admin (`admin`):** puede generar claves de alcance global o vinculadas a cualquier agencia.
+   - **Administrador de Agencia (`agency_admin`):** puede generar claves vinculadas **exclusivamente a su propia agencia**. Quien consuma la API con ese token solo obtendrá y podrá operar sobre información de esa empresa.
+
 
 ### Content-Type
 
@@ -292,21 +301,255 @@ Ver [Asistente IA](FLUJOS_FUNCIONALIDADES.html#10-asistente-ia) para el detalle 
 
 > Las rutas de `email-config` y `notification-config` solo exigen sesión iniciada (no un permiso puntual) pese a ser configuración administrativa — tenelo en cuenta si tu integración maneja credenciales SMTP.
 
-## Logs, backup y exportación
+## Logs, Estado del sistema y exportación
+
+### Estado del sistema
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| `GET` | `/api/logs` | Permiso: `LOGS_VIEW` | Logs del sistema (acepta `?page=`, `?limit=`, `?level=`, `?source=`, `?startDate=`, `?endDate=`, `?q=`) |
-| `GET` | `/api/backup` | Permiso: `BACKUP_VIEW` | Backup de datos |
-| `GET` | `/api/export/csv/:entityType` | Sesión | Exporta una entidad a CSV |
+| `GET` | `/api/system/status` | Permiso: `LOGS_VIEW` | Diagnóstico completo del sistema |
+| `POST` | `/api/system/holds/:id/release` | Solo admin | Libera manualmente un hold/bloqueo estancado |
 
-## Automatización interna (no pensado para integraciones externas)
+**`GET /api/system/status`** devuelve:
 
-Estos dos endpoints los golpea un cron externo (GitHub Actions / cron-job.org), no un cliente de la API: no usan JWT, se protegen con el header `X-Cron-Secret` comparado contra la variable de entorno `CRON_SECRET` del servidor.
+```json
+{
+  "timestamp": "2025-01-15T14:30:00Z",
+  "database": {
+    "connected": true,
+    "latency_ms": 3
+  },
+  "services": [
+    { "name": "API Go", "status": "ok", "details": "Servidor HTTP activo y respondiendo" },
+    { "name": "SMTP / Email", "status": "ok", "details": "Host configurado: smtp.example.com" },
+    { "name": "Asistente IA", "status": "degraded", "details": "API Key de IA no configurada en el entorno" }
+  ],
+  "counts": {
+    "total_products": 45,
+    "total_reservations": 312,
+    "total_confirmed": 280,
+    "total_blocked": 5,
+    "total_hold_temp": 2,
+    "total_expired": 20,
+    "total_cancelled": 5,
+    "total_users": 38,
+    "total_logs": 15420,
+    "total_error_logs": 12
+  },
+  "active_holds": [
+    {
+      "reservation_id": 99,
+      "pedido_id": "ORD-20250115-001",
+      "estado": "hold_temporal",
+      "producto_id": 12,
+      "destino": "Cancún",
+      "codigo_cupo": "CAN-2025-01",
+      "agencia": "Viajes Express",
+      "contacto_nombre": "Juan Pérez",
+      "contacto_email": "juan@example.com",
+      "hold_passengers": 2,
+      "bloqueo_expira_at": "2025-01-15T14:45:00Z",
+      "minutes_ago": 7.3,
+      "is_expired": false,
+      "created_at": "2025-01-15T14:23:00Z"
+    }
+  ],
+  "stuck_holds": []
+}
+```
+
+**`POST /api/system/holds/:id/release`** — Solo para rol `admin`. Devuelve:
+
+```json
+{
+  "message": "Hold liberado exitosamente",
+  "reservation_id": 99,
+  "pedido_id": "ORD-20250115-001",
+  "passengers_returned": 2,
+  "product_id": 12
+}
+```
+
+---
+
+### Logs del sistema
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/logs` | Permiso: `LOGS_VIEW` | Logs paginados del sistema con filtros |
+| `GET` | `/api/logs/export` | Permiso: `LOGS_VIEW` | Exporta los logs como archivo JSON descargable |
+
+**Query params para `/api/logs` y `/api/logs/export`:**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `page` | int | Página (default: 1). Solo para `/api/logs`. |
+| `limit` | int | Registros por página (1–500, default: 50). Solo para `/api/logs`. |
+| `level` | string | Filtro por nivel: `info`, `warning`, `error` |
+| `source` | string | Filtro por fuente: `http`, `cron`, `email`, `ai`, `admin` |
+| `startDate` | string | Desde (YYYY-MM-DD) |
+| `endDate` | string | Hasta (YYYY-MM-DD, incluye hasta las 23:59:59) |
+| `q` | string | Búsqueda libre sobre mensaje, nombre de usuario, email, agencia, ruta e IP |
+| `userEmail` | string | Filtro exacto por email de usuario |
+| `agencia` | string | Filtro por agencia |
+| `status_code` | int | Filtro por código HTTP |
+
+**Estructura de un `SystemLog`:**
+
+```json
+{
+  "id": "uuid",
+  "level": "error",
+  "source": "http",
+  "method": "POST",
+  "path": "/api/reservations",
+  "status_code": 500,
+  "message": "Error interno al crear reserva",
+  "details": "pq: insert or update violates...",
+  "user_id": "uuid",
+  "user_name": "Juan Pérez",
+  "user_email": "juan@agencia.com",
+  "agencia": "Viajes Express",
+  "ip": "190.123.45.67",
+  "request_id": "1737123456789",
+  "duration_ms": 145,
+  "created_at": "2025-01-15T14:23:00Z"
+}
+```
+
+`/api/logs/export` descarga directamente un archivo `system_logs_YYYYMMDD_HHMMSS.json` con estructura:
+
+```json
+{
+  "exported_at": "2025-01-15T14:30:00Z",
+  "count": 3200,
+  "logs": [ ... ]
+}
+```
+
+### Respaldo y Restauración de Base de Datos (Backup)
+
+El sistema genera copias de seguridad completas de la base de datos en formato **JSON agnóstico**, respaldando las 13 tablas principales (`products`, `reservations`, `passengers`, `profiles`, `agencies`, `roles`, `permissions`, `role_permissions`, `email_smtp_configs`, `email_templates`, `notification_templates`, `ai_providers`, `system_logs`).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/backup` | Permiso: `BACKUP_VIEW` | Lista los archivos de backup guardados en el servidor |
+| `POST` | `/api/backup/generate` | Permiso: `BACKUP_CREATE` | Genera un backup JSON completo y lo guarda en disco |
+| `GET` | `/api/backup/download/:filename` | Permiso: `BACKUP_VIEW` | Descarga el archivo de backup `.json` especificado |
+| `POST` | `/api/backup/restore` | Permiso: `BACKUP_CREATE` | Restaura tablas de la base de datos a partir de un JSON de backup |
+| `DELETE` | `/api/backup/:filename` | Permiso: `BACKUP_CREATE` | Elimina un archivo de backup del servidor |
+
+**Estructura del archivo `backup_YYYYMMDD_HHMMSS.json`:**
+
+```json
+{
+  "meta": {
+    "version": "1.0",
+    "created_at": "2026-07-28T14:45:00Z",
+    "total_records": 1540,
+    "database": "postgresql",
+    "tables_count": 13
+  },
+  "tables": {
+    "products": [ ... ],
+    "reservations": [ ... ],
+    "passengers": [ ... ],
+    "profiles": [ ... ],
+    "agencies": [ ... ],
+    "email_smtp_configs": [ ... ],
+    "ai_providers": [ ... ]
+  }
+}
+```
+
+---
+
+### Otras exportaciones
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/export/csv/:entityType` | Sesión | Exporta una entidad a CSV (`products`, `reservations`, `agencies`, etc.) |
+
+---
+
+## Automatización interna (Cron Jobs)
+
+Estos endpoints están diseñados para ser invocados por un **scheduler externo** (ej. `cron-job.org`, GitHub Actions, Vercel Cron). No usan JWT: se autentican con la cabecera `X-Cron-Secret` o parámetro `?secret=`, comparados contra la variable de entorno `CRON_SECRET` del servidor.
 
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api/cron/expire-reservations` | Vence bloqueos temporales y holds cumplidos, devuelve el stock |
 | `GET` | `/api/cron/check-deadlines` | Avisa vencimientos operativos próximos (pago, nominación, emisión) |
+| `GET` | `/api/cron/backup` | Genera automáticamente una copia de seguridad JSON y mantiene la rotación de los últimos 30 backups |
+
+**Ejemplo de llamada cURL para Backup Automático:**
+
+```bash
+curl -X GET "https://<tu-dominio>/api/cron/backup" \
+  -H "X-Cron-Secret: $CRON_SECRET"
+```
 
 Además existe un endpoint genérico `/api/data` (uso interno del panel de administración para CRUD dinámico) que no está pensado para integraciones externas y no se documenta en detalle acá.
+
+---
+
+## Claves de API para Integraciones Externas (M2M)
+
+Permite generar tokens de acceso de larga duración para sistemas externos (ERPs B2B, bots, automatizaciones). La clave plana solo se muestra al momento de creación; en base de datos se almacena únicamente el **hash SHA-256**.
+
+**Permisos:**
+- `admin` (Super Admin): Ve y opera sobre **todas** las API Keys. Puede crear claves globales o vinculadas a cualquier agencia.
+- `agency_admin`: Ve y opera **solo** las claves de **su propia agencia**. El backend fuerza automáticamente el `agency_id` correcto.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/api-keys` | `admin` o `agency_admin` | Lista API Keys (con filtro de agencia para `agency_admin`). |
+| `POST` | `/api/api-keys` | `admin` o `agency_admin` | Genera una nueva API Key. Devuelve `secret_key` una sola vez. |
+| `DELETE` | `/api/api-keys/:id` | `admin` o `agency_admin` | Revoca una API Key (con verificación de pertenencia de agencia). |
+
+**Body de creación (`POST /api/api-keys`):**
+
+```json
+{
+  "name": "Integración ERP B2B",
+  "agency_id": "uuid-opcional",
+  "scopes": ["*"]
+}
+```
+
+**Respuesta de creación (`201`):**
+
+```json
+{
+  "message": "API Key generada exitosamente",
+  "data": {
+    "id": "uuid",
+    "name": "Integración ERP B2B",
+    "prefix": "cupo_live_sk_a1b2c3...",
+    "secret_key": "cupo_live_sk_<hex completo>",
+    "scopes": "*",
+    "created_at": "2026-07-28T18:45:00Z"
+  }
+}
+```
+
+**Uso desde sistemas externos:**
+
+```bash
+curl https://<dominio>/api/products/ \
+  -H "X-API-Key: cupo_live_sk_..."
+```
+
+---
+
+## Estado del Sistema y Backups
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/logs` | Permiso `LOGS_VIEW` | Lista logs del sistema con filtros de nivel, fuente y búsqueda. |
+| `GET` | `/api/backup` | Permiso `BACKUP_VIEW` | Lista los backups disponibles. |
+| `POST` | `/api/backup/generate` | Permiso `BACKUP_CREATE` | Genera un backup JSON instantáneo. |
+| `GET` | `/api/backup/download/:filename` | Permiso `BACKUP_VIEW` | Descarga un backup como archivo JSON. |
+| `DELETE` | `/api/backup/:filename` | Permiso `BACKUP_CREATE` | Elimina un backup del servidor. |
+| `GET` | `/api/cron/backup` | `X-Cron-Secret` | Genera backup automático (para scheduler externo). Mantiene rotación de 30. |
+

@@ -60,14 +60,14 @@ const PanelControl = () => {
               <CardTitle>Backup y Restauración</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button variant="outline" className="w-full" onClick={() => handleAction('Realizar Backup')}>
-                Realizar Backup
+              <Button variant="outline" className="w-full" onClick={() => navigate('/logs')}>
+                Realizar Backup (JSON)
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => handleAction('Restaurar desde Backup')}>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/logs')}>
                 Restaurar desde Backup
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => handleAction('Programar Backup')}>
-                Programar Backup
+              <Button variant="outline" className="w-full" onClick={() => navigate('/logs')}>
+                Programar Backup (Cron)
               </Button>
             </CardContent>
           </Card>

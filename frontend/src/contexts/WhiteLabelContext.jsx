@@ -16,8 +16,6 @@ const DEFAULT_CONFIG = {
         pdf_footer_message: '¡Estimado pasajero, le deseamos un muy buen viaje! Verificá los requisitos de documentación (visas y vacunas) antes de partir.',
         pdf_show_logo: true,
         pdf_logo_url: '',
-        phone: '',
-        address: '',
     },
     colors: {
         primary: '#3b82f6',

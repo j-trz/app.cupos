@@ -82,6 +82,7 @@ func init() {
 		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
 		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
 		api.GET("/cron/check-deadlines", handlers.CheckDeadlineReminders)
+		api.GET("/cron/backup", handlers.CronBackup)
 
 		// Rutas protegidas
 		protected := api.Group("/")
@@ -213,7 +214,22 @@ func init() {
 			}
 
 			// Backup
-			protected.GET("/backup", middleware.RequirePermission("BACKUP_VIEW"), handlers.GetBackup)
+			backupGroup := protected.Group("/backup")
+			{
+				backupGroup.GET("", middleware.RequirePermission("BACKUP_VIEW"), handlers.GetBackup)
+				backupGroup.POST("/generate", middleware.RequirePermission("BACKUP_CREATE"), handlers.GenerateBackupHandler)
+				backupGroup.GET("/download/:filename", middleware.RequirePermission("BACKUP_VIEW"), handlers.DownloadBackupHandler)
+				backupGroup.POST("/restore", middleware.RequirePermission("BACKUP_CREATE"), handlers.RestoreBackupHandler)
+				backupGroup.DELETE("/:filename", middleware.RequirePermission("BACKUP_CREATE"), handlers.DeleteBackupHandler)
+			}
+
+			// API Keys (Super Admin y Administradores de Agencia)
+			apiKeysGroup := protected.Group("/api-keys")
+			{
+				apiKeysGroup.GET("", middleware.AgencyAdminOrAdmin(), handlers.ListAPIKeysHandler)
+				apiKeysGroup.POST("", middleware.AgencyAdminOrAdmin(), handlers.CreateAPIKeyHandler)
+				apiKeysGroup.DELETE("/:id", middleware.AgencyAdminOrAdmin(), handlers.RevokeAPIKeyHandler)
+			}
 
 			// Exportación
 			protected.GET("/export/csv/:entityType", handlers.ExportCSV)
@@ -334,8 +350,14 @@ func init() {
 			// Lista completa
 			protected.GET("/transfers/all", middleware.RequirePermission("TRANSFERS_VIEW"), handlers.ListTransfers)
 
-			// Logs del sitio
+			// Logs del sistema y Estado del sistema
 			protected.GET("/logs", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemLogs)
+			protected.GET("/logs/export", middleware.RequirePermission("LOGS_VIEW"), handlers.ExportSystemLogsJSON)
+			systemGroup := protected.Group("/system")
+			{
+				systemGroup.GET("/status", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemStatus)
+				systemGroup.POST("/holds/:id/release", middleware.AdminOnly(), handlers.AdminReleaseHold)
+			}
 
 			// Configuración de email (SMTP + plantillas) por agencia
 			emailConfig := protected.Group("/email-config")

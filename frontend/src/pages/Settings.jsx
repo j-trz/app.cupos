@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import { Label } from '../components/ui/shadcn-label';
 import { Checkbox } from '../components/ui/Checkbox.jsx';
+import ApiKeyPanel from '../components/system/ApiKeyPanel.jsx';
 
 export default function Settings() {
   const { user, can, signIn } = useAuth();
@@ -229,6 +230,13 @@ export default function Settings() {
           Guardar Cambios
         </Button>
       </div>
+
+      {/* Sección de API Keys (Super Admin y Administradores de Agencia) */}
+      {(user?.role === 'admin' || user?.role === 'agency_admin') && (
+        <div className="pt-8 border-t border-slate-200">
+          <ApiKeyPanel />
+        </div>
+      )}
     </div>
   );
 }
