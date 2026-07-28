@@ -161,39 +161,64 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
   const cssStyles = `
     .itinerary-content { font-family: "${bodyFont}", "Montserrat", sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; background: white; color: #0f172a; }
     .itinerary-content * { box-sizing: border-box; }
-    .itin-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; gap: 16px; flex-wrap: wrap; }
-    .itin-header-left { display: flex; align-items: center; gap: 12px; }
-    .itin-logo { height: 40px; width: auto; object-fit: contain; }
-    .itin-title { font-family: "${headingFont}", "Inter", sans-serif; font-size: 18px; font-weight: 800; color: ${primaryColor}; }
-    .itin-info-bar { display: flex; justify-content: space-between; align-items: flex-start; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
-    .itin-info-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-    .itin-info-value { font-size: 14px; font-weight: 700; color: #0f172a; }
-    .itin-section-title { font-family: "${headingFont}", "Inter", sans-serif; font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
-    .itin-segments-box { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
-    .itin-segment { padding: 16px 18px; }
-    .itin-segment + .itin-segment { border-top: 1px solid #f1f5f9; }
-    .itin-segment-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
-    .itin-leg-icon { color: ${primaryColor}; flex-shrink: 0; margin-top: 2px; }
-    .itin-airline-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
-    .itin-route-title { font-size: 13px; font-weight: 700; color: #0f172a; }
-    .itin-airline-line { font-size: 11px; color: #64748b; margin-top: 2px; }
-    .itin-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-left: auto; }
-    .itin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
-    .itin-grid-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-    .itin-grid-value { font-size: 12px; color: #334155; }
-    .itin-grid-time { font-size: 13px; font-weight: 700; color: #0f172a; }
-    .itin-connection { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 500; color: #64748b; }
 
-    .itin-baggage-row { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
-    .itin-baggage-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #94a3b8; }
-    .itin-baggage-ok { color: #166534; }
-    .itin-baggage-no { color: #94a3b8; text-decoration: line-through; text-decoration-thickness: 2px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #e2e8f0; }
+    .logo { height: 48px; object-fit: contain; max-width: 220px; }
+    .title { font-family: "${headingFont}", "Montserrat", sans-serif; font-size: 1.5rem; font-weight: 700; color: ${primaryColor}; }
+
+    .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; padding: 1.5rem; margin-bottom: 1.5rem; }
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .info-label { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    .info-value { font-size: 1rem; font-weight: 700; color: #0f172a; }
+
+    .section-title { font-family: "${headingFont}", "Montserrat", sans-serif; font-size: 1.15rem; font-weight: 700; color: ${primaryColor}; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; }
+
+    .flight-segment { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; }
+    .flight-segment:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+    .flight-icon-col { display: flex; flex-direction: column; align-items: center; }
+    .flight-icon { color: ${primaryColor}; margin-top: 4px; }
+    .flight-line { width: 2px; background-color: #cbd5e1; flex-grow: 1; margin: 0.5rem 0; min-height: 40px; }
+
+    .flight-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .flight-route { display: flex; align-items: center; gap: 0.75rem; }
+    .airline-logo { height: 36px; width: 36px; object-fit: contain; border-radius: 0.5rem; background: #fff; border: 1px solid #e2e8f0; padding: 2px; }
+    .route-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .route-text { font-size: 1rem; font-weight: 700; color: #0f172a; }
+    .flight-info { font-size: 0.8rem; color: #64748b; font-weight: 500; }
+
+    .badge { display: inline-flex; align-items: center; padding: 0.35rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; background: #f8fafc; padding: 1rem 1.25rem; border-radius: 0.75rem; border: 1px solid #f1f5f9; }
+    .detail-item { margin-bottom: 0; }
+    .detail-label { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
+    .detail-value { font-size: 0.9rem; font-weight: 700; color: #0f172a; }
+
+    .baggage-grid { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.5rem; }
+    .baggage-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 600; }
+    .baggage-included { color: #166534; }
+    .baggage-excluded { color: #94a3b8; text-decoration: line-through; text-decoration-thickness: 2px; }
+    .baggage-label { text-decoration: none; }
+
+    .connection-badge { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background-color: #f1f5f9; color: #475569; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px dashed #cbd5e1; width: 100%; margin-bottom: 1.5rem; gap: 8px; }
+    .openjaw-badge { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background-color: #fff7ed; color: #c2410c; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px dashed #fdba74; width: 100%; margin-bottom: 1.5rem; gap: 8px; }
+
+    .footer { text-align: center; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; color: #64748b; font-size: 0.85rem; }
+    .footer a { color: ${primaryColor}; text-decoration: none; }
 
     .itin-footer { text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
     .itin-footer-body { font-size: 11px; color: #475569; line-height: 1.7; white-space: pre-line; }
     .itin-footer-agency { font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 8px; }
+
+    .print-btn { display: flex; align-items: center; gap: 8px; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: opacity 0.2s; }
+    .print-btn:hover { opacity: 0.9; }
+
+    .mt-5 { margin-top: 1.25rem; }
+
     @media (max-width: 600px) {
-      .itin-grid { grid-template-columns: 1fr; }
+      .info-grid, .details-grid { grid-template-columns: 1fr; }
+      .flight-header { flex-direction: column; align-items: flex-start; }
     }
     @media print { .no-print { display: none !important; } @page { size: A4; margin: 15mm; } }
   `;
@@ -404,20 +429,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                           </div>
                         )}
                       </div>
-
-                      {i === 0 && hasBaggageInfo && (
-                        <div className="itin-baggage-row">
-                          <span className={`itin-baggage-item ${carryOn ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
-                            <Backpack size={14} /> Equipaje de mano
-                          </span>
-                          <span className={`itin-baggage-item ${handBag ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
-                            <ShoppingBag size={14} /> Artículo personal
-                          </span>
-                          <span className={`itin-baggage-item ${checkedBag ? 'itin-baggage-ok' : 'itin-baggage-no'}`}>
-                            <Luggage size={14} /> Equipaje en bodega
-                          </span>
-                        </div>
-                      )}
                     </div>
                     {connectionEl}
                   </div>
