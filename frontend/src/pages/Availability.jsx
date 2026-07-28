@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Download, MapPin, StickyNote } from 'lucide-react';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Download, MapPin, StickyNote, Minus, AlertCircle } from 'lucide-react';
 import ItineraryTable from '../components/ItineraryTable';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
 import CountdownTimer from '../components/CountdownTimer.jsx';
@@ -51,6 +51,18 @@ export default function Availability() {
   // (ej. el Asistente IA abre el modal directo, sin pasar por este flujo).
   const [hold, setHold] = useState(null);
   const [holdExpired, setHoldExpired] = useState(false);
+
+  // Modal nativo de selección de cantidad de lugares
+  const [quantityModalProduct, setQuantityModalProduct] = useState(null);
+  const [passengerCount, setPassengerCount] = useState(1);
+  const [quantitySubmitting, setQuantitySubmitting] = useState(false);
+  const [quantityError, setQuantityError] = useState('');
+
+  // Modal nativo para importar pasajeros
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFichaVenta, setImportFichaVenta] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     fetchAvailability();
@@ -137,29 +149,41 @@ export default function Availability() {
   // y recién ahí abre el modal ya pre-cargado con N bloques de pasajero y el
   // cronómetro de 10 min corriendo — así nadie más se lleva esos cupos
   // mientras el usuario completa los datos.
-  const promptPassengerCountAndHold = async (product) => {
+  // Flujo manual: clic en el número de disponibilidad o en "Reservar" abre el modal nativo de cantidad
+  const promptPassengerCountAndHold = (product) => {
     const disponibles = Number(product.disponibilidad) || 0;
-    const { value: countStr } = await Swal.fire({
-      title: '¿Cuántos pasajeros?',
-      input: 'number',
-      inputLabel: `Hay ${disponibles} cupo(s) disponible(s) — se reservan al confirmar`,
-      inputValue: 1,
-      inputAttributes: { min: 1, max: String(disponibles), step: 1 },
-      showCancelButton: true,
-      confirmButtonText: 'Reservar cupo',
-      cancelButtonText: 'Cancelar',
-      inputValidator: (value) => {
-        const n = Number(value);
-        if (!value || !Number.isInteger(n) || n < 1) return 'Ingresá una cantidad válida.';
-        if (n > disponibles) return `Solo hay ${disponibles} cupo(s) disponible(s).`;
-      },
-    });
-    if (!countStr) return;
-    const count = Number(countStr);
+    if (disponibles <= 0) return;
+    setQuantityModalProduct(product);
+    setPassengerCount(1);
+    setQuantityError('');
+  };
 
+  const closeQuantityModal = () => {
+    setQuantityModalProduct(null);
+    setPassengerCount(1);
+    setQuantityError('');
+  };
+
+  const handleConfirmQuantityModal = async (e) => {
+    if (e) e.preventDefault();
+    if (!quantityModalProduct) return;
+    const disponibles = Number(quantityModalProduct.disponibilidad) || 0;
+    const count = Number(passengerCount);
+
+    if (!count || !Number.isInteger(count) || count < 1) {
+      setQuantityError('Ingresá una cantidad válida.');
+      return;
+    }
+    if (count > disponibles) {
+      setQuantityError(`Solo hay ${disponibles} cupo(s) disponible(s).`);
+      return;
+    }
+
+    setQuantitySubmitting(true);
+    setQuantityError('');
     try {
-      const holdInfo = await ReservationService.createHold(product.id, count);
-      setSelectedProduct(product);
+      const holdInfo = await ReservationService.createHold(quantityModalProduct.id, count);
+      setSelectedProduct(quantityModalProduct);
       setForm({
         ...EMPTY_FORM,
         pedido_id: holdInfo.pedidoId,
@@ -167,14 +191,13 @@ export default function Availability() {
       });
       setHold(holdInfo);
       setHoldExpired(false);
+      setQuantityModalProduct(null);
       setModalOpen(true);
     } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: 'No se pudo reservar el cupo',
-        text: error.message || 'Puede que alguien más ya lo haya tomado. Se actualizó la disponibilidad.',
-      });
+      setQuantityError(error.message || 'Puede que alguien más ya lo haya tomado. Se actualizó la disponibilidad.');
       fetchAvailability();
+    } finally {
+      setQuantitySubmitting(false);
     }
   };
 
@@ -265,75 +288,58 @@ export default function Availability() {
     }));
   };
 
-  const handleImportPassengers = async () => {
-    const { value: fichaVenta } = await Swal.fire({
-      title: 'Importar Pasajeros',
-      input: 'text',
-      inputLabel: 'Ingrese el número de Ficha de Venta',
-      inputPlaceholder: 'Ej: FV-123',
-      showCancelButton: true,
-      confirmButtonText: 'Importar',
-      cancelButtonText: 'Cancelar',
-      inputValidator: (value) => {
-        if (!value) {
-          return '¡Debes ingresar una ficha de venta!';
-        }
-      }
-    });
+  // Importar pasajeros mediante modal nativo
+  const handleOpenImportModal = () => {
+    setImportFichaVenta('');
+    setImportError('');
+    setImportModalOpen(true);
+  };
 
-    if (fichaVenta) {
-      try {
-        Swal.fire({
-          title: 'Importando...',
-          text: 'Conectando con el backoffice',
-          allowOutsideClick: false,
-          didOpen: () => {
-            Swal.showLoading();
-          }
+  const handleCloseImportModal = () => {
+    if (importing) return;
+    setImportModalOpen(false);
+    setImportFichaVenta('');
+    setImportError('');
+  };
+
+  const handleConfirmImportPassengers = async (e) => {
+    if (e) e.preventDefault();
+    const ficha = importFichaVenta.trim();
+    if (!ficha) {
+      setImportError('¡Debes ingresar una ficha de venta!');
+      return;
+    }
+
+    setImporting(true);
+    setImportError('');
+    try {
+      const response = await BackofficeService.importarPasajeros(ficha);
+      if (response.success && response.pasajeros && response.pasajeros.length > 0) {
+        setForm((prev) => {
+          const importedPassengers = response.pasajeros.map((p) => ({
+            nombre: p.nombre || '',
+            apellido: p.apellido || '',
+            documento: p.documento || '',
+            nacimiento: p.nacimiento || '',
+            nacionalidad: p.nacionalidad || '',
+            tipo_pasajero: p.tipo_pasajero || 'Adulto',
+          }));
+
+          return {
+            ...prev,
+            ficha_venta: ficha,
+            passengers: importedPassengers,
+          };
         });
-
-        const response = await BackofficeService.importarPasajeros(fichaVenta);
-
-        if (response.success && response.pasajeros && response.pasajeros.length > 0) {
-          setForm((prev) => {
-            const importedPassengers = response.pasajeros.map(p => ({
-              nombre: p.nombre || '',
-              apellido: p.apellido || '',
-              documento: p.documento || '',
-              nacimiento: p.nacimiento || '',
-              nacionalidad: p.nacionalidad || '',
-              tipo_pasajero: p.tipo_pasajero || 'Adulto'
-            }));
-
-            return {
-              ...prev,
-              ficha_venta: fichaVenta,
-              passengers: importedPassengers
-            };
-          });
-
-          Swal.fire({
-            icon: 'success',
-            title: '¡Importación exitosa!',
-            text: `Se importaron ${response.pasajeros.length} pasajero(s) desde el backoffice.`,
-            timer: 2000,
-            showConfirmButton: false
-          });
-        } else {
-          Swal.fire({
-            icon: 'warning',
-            title: 'Sin datos',
-            text: 'No se encontraron pasajeros para la ficha de venta ingresada.'
-          });
-        }
-      } catch (error) {
-        console.error('Error al importar pasajeros:', error);
-        Swal.fire({
-          icon: 'error',
-          title: 'Error de importación',
-          text: error.message || 'No se pudo conectar con el backoffice.'
-        });
+        setImportModalOpen(false);
+      } else {
+        setImportError('No se encontraron pasajeros para la ficha de venta ingresada.');
       }
+    } catch (error) {
+      console.error('Error al importar pasajeros:', error);
+      setImportError(error.message || 'No se pudo conectar con el backoffice.');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -698,14 +704,14 @@ export default function Availability() {
       {/* Modal de Reserva individual */}
       <Modal title={`Reservar: ${selectedProduct?.codigo_cupo || ''} - ${selectedProduct?.destino || ''}`} open={modalOpen} onClose={closeReservationModal} size="2xl">
         <div>
-          <form onSubmit={handleSubmitReservation} className="space-y-4">
+          <form onSubmit={handleSubmitReservation} className="space-y-6 sm:space-y-8 py-2">
             {hold?.expiresAt && (
-              <div className={`flex items-center justify-between gap-3 rounded-2xl border p-4 ${holdExpired ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}>
+              <div className={`flex items-center justify-between gap-3 rounded-2xl border p-4 sm:p-5 ${holdExpired ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}>
                 <div>
                   <p className={`text-sm font-semibold ${holdExpired ? 'text-red-800' : 'text-emerald-800'}`}>
                     {holdExpired ? 'El bloqueo temporal expiró' : `Cupo reservado para ${form.passengers.length} pasajero(s)`}
                   </p>
-                  <p className={`text-xs mt-0.5 ${holdExpired ? 'text-red-600' : 'text-emerald-700'}`}>
+                  <p className={`text-xs mt-1 ${holdExpired ? 'text-red-600' : 'text-emerald-700'}`}>
                     {holdExpired
                       ? 'El cupo se liberó. Cerrá el formulario y volvé a intentar.'
                       : 'Completá los datos antes de que venza el cronómetro.'}
@@ -717,67 +723,77 @@ export default function Availability() {
 
             <fieldset disabled={holdExpired} className="contents">
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div><span className="text-slate-500">Compañía:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.compania}</span></div>
-                <div><span className="text-slate-500">Cantidad de Pasajeros:</span><span className="ml-2 font-medium text-slate-900">{form.passengers.length}</span></div>
-                <div><span className="text-slate-500">Salida:</span><span className="ml-2 font-medium text-slate-900">{formatDate(selectedProduct?.fecha_salida)}</span></div>
-                <div><span className="text-slate-500">Regreso:</span><span className="ml-2 font-medium text-slate-900">{formatDate(selectedProduct?.fecha_regreso)}</span></div>
-                <div><span className="text-slate-500">Temporada:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.temporada || '—'}</span></div>
-                <div><span className="text-slate-500">Ruta:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.ruta || '—'}</span></div>
-                <div><span className="text-slate-500">Disponibles:</span><span className="ml-2 font-medium text-slate-900">{selectedProduct?.disponibilidad}</span></div>
+                <div><span className="text-slate-500">Compañía:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.compania}</span></div>
+                <div><span className="text-slate-500">Cantidad de Pasajeros:</span><span className="ml-2 font-semibold text-slate-900">{form.passengers.length}</span></div>
+                <div><span className="text-slate-500">Salida:</span><span className="ml-2 font-semibold text-slate-900">{formatDate(selectedProduct?.fecha_salida)}</span></div>
+                <div><span className="text-slate-500">Regreso:</span><span className="ml-2 font-semibold text-slate-900">{formatDate(selectedProduct?.fecha_regreso)}</span></div>
+                <div><span className="text-slate-500">Temporada:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.temporada || '—'}</span></div>
+                <div><span className="text-slate-500">Ruta:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.ruta || '—'}</span></div>
+                <div><span className="text-slate-500">Disponibles:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.disponibilidad}</span></div>
               </div>
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700"><Hash className="inline h-4 w-4 mr-1" />N° de Pedido</label>
-              <input type="text" value={form.pedido_id} readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500 cursor-not-allowed" />
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-2">
+              <label className="block text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                <Hash className="h-4 w-4 text-slate-500" />N° de Pedido
+              </label>
+              <input type="text" value={form.pedido_id} readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2.5 text-sm text-slate-600 cursor-not-allowed font-mono" />
             </div>
 
-            <fieldset id="contacto-section" className="rounded-2xl border border-slate-200 p-4">
-              <legend className="px-2 text-sm font-semibold text-slate-700">Datos de contacto</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+              <legend className="px-2.5 text-sm font-bold text-slate-800">Datos de contacto</legend>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600"><User className="inline h-3 w-3 mr-1" />Nombre contacto *</label>
-                  <input type="text" value={form.contacto_nombre} onChange={(e) => handleFormChange('contacto_nombre', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Juan Pérez" />
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <User className="h-3.5 w-3.5 text-slate-500" />Nombre contacto *
+                  </label>
+                  <input type="text" value={form.contacto_nombre} onChange={(e) => handleFormChange('contacto_nombre', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Juan Pérez" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600"><Mail className="inline h-3 w-3 mr-1" />Email contacto *</label>
-                  <input type="email" value={form.contacto_email} onChange={(e) => handleFormChange('contacto_email', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: juan@agencia.com" />
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-slate-500" />Email contacto *
+                  </label>
+                  <input type="email" value={form.contacto_email} onChange={(e) => handleFormChange('contacto_email', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: juan@agencia.com" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-600"><Phone className="inline h-3 w-3 mr-1" />Teléfono contacto</label>
-                  <input type="text" value={form.contacto_telefono} onChange={(e) => handleFormChange('contacto_telefono', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: +54 11 1234-5678" />
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5 text-slate-500" />Teléfono contacto
+                  </label>
+                  <input type="text" value={form.contacto_telefono} onChange={(e) => handleFormChange('contacto_telefono', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: +54 11 1234-5678" />
                 </div>
               </div>
             </fieldset>
 
-            <fieldset id="pasajero-section" className="rounded-2xl border border-slate-200 p-4">
-              <legend className="px-2 text-sm font-semibold text-slate-700">Datos del pasajero</legend>
-              <div className="grid gap-3 mt-6">
+            <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+              <legend className="px-2.5 text-sm font-bold text-slate-800">Datos del pasajero</legend>
+              <div className="space-y-4 mt-2">
                 {form.passengers.map((passenger, index) => (
-                  <fieldset key={index} className="rounded-2xl border border-slate-200 p-4">
-                    <legend className="px-2 text-sm font-semibold text-slate-700">Pasajero {index + 1}</legend>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                  <fieldset key={index} className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 space-y-4">
+                    <legend className="px-2 text-xs font-bold uppercase tracking-wider text-slate-600">Pasajero {index + 1}</legend>
+                    <div className="grid gap-3.5 sm:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Nombre *</label>
-                        <input type="text" value={passenger.nombre} onChange={(e) => handlePassengerChange(index, 'nombre', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: María" />
+                        <input type="text" value={passenger.nombre} onChange={(e) => handlePassengerChange(index, 'nombre', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: María" />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Apellido *</label>
-                        <input type="text" value={passenger.apellido} onChange={(e) => handlePassengerChange(index, 'apellido', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: González" />
+                        <input type="text" value={passenger.apellido} onChange={(e) => handlePassengerChange(index, 'apellido', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: González" />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Documento</label>
-                        <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
+                        <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad</label>
-                        <input type="text" value={passenger.nacionalidad} onChange={(e) => handlePassengerChange(index, 'nacionalidad', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Argentina" />
+                        <input type="text" value={passenger.nacionalidad} onChange={(e) => handlePassengerChange(index, 'nacionalidad', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Argentina" />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600"><Calendar className="inline h-3 w-3 mr-1" />Fecha de nacimiento</label>
-                        <input type="date" value={passenger.nacimiento} onChange={(e) => handlePassengerChange(index, 'nacimiento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                        <label className="mb-1 block text-xs font-medium text-slate-600 flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-slate-500" />Fecha de nacimiento
+                        </label>
+                        <input type="date" value={passenger.nacimiento} onChange={(e) => handlePassengerChange(index, 'nacimiento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Tipo de pasajero</label>
@@ -786,7 +802,7 @@ export default function Availability() {
                         </select>
                       </div>
                     </div>
-                    <div className="flex items-center justify-end mt-2">
+                    <div className="flex items-center justify-end pt-1">
                       <Button variant="secondary" size="sm" onClick={() => handleRemovePassenger(index)} disabled={form.passengers.length === 1 || !!hold} title={hold ? 'La cantidad quedó fija al reservar el cupo — cancelá y volvé a empezar para cambiarla' : undefined}>
                         <X className="h-4 w-4 mr-1" />Eliminar
                       </Button>
@@ -794,33 +810,33 @@ export default function Availability() {
                   </fieldset>
                 ))}
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="pt-2 flex flex-wrap gap-2.5">
                 <Button variant="secondary" size="sm" onClick={() => handleAddPassenger()} disabled={!!hold} title={hold ? 'La cantidad quedó fija al reservar el cupo — cancelá y volvé a empezar para cambiarla' : undefined}>
                   <Plus className="h-4 w-4 mr-1" />Agregar Pasajero
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleImportPassengers} className="border-dashed">
+                <Button type="button" variant="outline" size="sm" onClick={handleOpenImportModal} className="border-dashed">
                   <Download className="h-4 w-4 mr-1" />Importar pasajeros
                 </Button>
               </div>
             </fieldset>
 
-            <fieldset id="documentacion-section" className="rounded-2xl border border-slate-200 p-4">
-              <legend className="px-2 text-sm font-semibold text-slate-700">Documentación (opcional)</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+              <legend className="px-2.5 text-sm font-bold text-slate-800">Documentación (opcional)</legend>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Ficha de venta</label>
-                  <input type="text" value={form.ficha_venta} onChange={(e) => handleFormChange('ficha_venta', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: FV-001" />
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">Ficha de venta</label>
+                  <input type="text" value={form.ficha_venta} onChange={(e) => handleFormChange('ficha_venta', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: FV-001" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Doc. Contable</label>
-                  <input type="text" value={form.doc_contable} onChange={(e) => handleFormChange('doc_contable', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: DC-001" />
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">Doc. Contable</label>
+                  <input type="text" value={form.doc_contable} onChange={(e) => handleFormChange('doc_contable', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: DC-001" />
                 </div>
               </div>
             </fieldset>
 
             </fieldset>
 
-            <div id="confirm-section" className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-6 mt-6">
               <Button variant="secondary" type="button" onClick={closeReservationModal} disabled={submitting} className="mr-2">
                 <X className="h-4 w-4 mr-1" />{holdExpired ? 'Cerrar' : 'Cancelar'}
               </Button>
@@ -831,20 +847,144 @@ export default function Availability() {
             </div>
           </form>
         </div>
-        <div className="fixed right-4 top-1/2 transform -translate-y-1/2 hidden md:flex flex-col gap-2 z-10">
-          <Button size="sm" variant="outline" onClick={() => document.getElementById('contacto-section')?.scrollIntoView({ behavior: 'smooth' })} title="Ir a Datos de contacto">
-            📞
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => document.getElementById('pasajero-section')?.scrollIntoView({ behavior: 'smooth' })} title="Ir a Datos del pasajero">
-            👤
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => document.getElementById('documentacion-section')?.scrollIntoView({ behavior: 'smooth' })} title="Ir a Documentación">
-            📄
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => document.getElementById('confirm-section')?.scrollIntoView({ behavior: 'smooth' })} title="Ir a Confirmar Reserva">
-            ✅
-          </Button>
-        </div>
+      </Modal>
+
+      {/* ─── Modal Seleccionar Cantidad de Lugares ─── */}
+      <Modal
+        title="Seleccionar Cantidad de Pasajeros"
+        open={!!quantityModalProduct}
+        onClose={closeQuantityModal}
+        size="md"
+      >
+        {quantityModalProduct && (
+          <form onSubmit={handleConfirmQuantityModal} className="space-y-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-900">{quantityModalProduct.codigo_cupo}</span>
+                <Badge variant={getAvailabilityVariant(Number(quantityModalProduct.disponibilidad))}>
+                  {quantityModalProduct.disponibilidad} disponible(s)
+                </Badge>
+              </div>
+              <div className="text-slate-600 text-xs grid grid-cols-2 gap-1 pt-1 border-t border-slate-200/60">
+                <div><span className="text-slate-400">Destino:</span> {quantityModalProduct.destino}</div>
+                <div><span className="text-slate-400">Compañía:</span> {quantityModalProduct.compania}</div>
+                <div><span className="text-slate-400">Salida:</span> {formatDate(quantityModalProduct.fecha_salida)}</div>
+                <div><span className="text-slate-400">Regreso:</span> {formatDate(quantityModalProduct.fecha_regreso)}</div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">
+                ¿Cuántos lugares querés reservar?
+              </label>
+              <p className="text-xs text-slate-500">
+                Se bloquearán temporalmente los cupos mientras completás los datos del formulario.
+              </p>
+
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPassengerCount((prev) => Math.max(1, prev - 1))}
+                  disabled={passengerCount <= 1 || quantitySubmitting}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  max={Number(quantityModalProduct.disponibilidad) || 1}
+                  value={passengerCount}
+                  onChange={(e) => {
+                    const val = Math.max(1, Math.min(Number(quantityModalProduct.disponibilidad) || 1, Number(e.target.value) || 1));
+                    setPassengerCount(val);
+                  }}
+                  disabled={quantitySubmitting}
+                  className="h-10 w-24 rounded-xl border border-slate-300 px-3 text-center text-base font-semibold text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPassengerCount((prev) => Math.min(Number(quantityModalProduct.disponibilidad) || 1, prev + 1))}
+                  disabled={passengerCount >= (Number(quantityModalProduct.disponibilidad) || 1) || quantitySubmitting}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {quantityError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{quantityError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 mt-2">
+              <Button variant="secondary" type="button" onClick={closeQuantityModal} disabled={quantitySubmitting}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={quantitySubmitting}>
+                {quantitySubmitting ? 'Reservando...' : 'Reservar cupo'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ─── Modal Importar Pasajeros ─── */}
+      <Modal
+        title="Importar Pasajeros desde Backoffice"
+        open={importModalOpen}
+        onClose={handleCloseImportModal}
+        size="md"
+      >
+        <form onSubmit={handleConfirmImportPassengers} className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Ingresá el número de Ficha de Venta para traer automáticamente la lista de pasajeros asociados.
+          </p>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-700">
+              Ficha de Venta *
+            </label>
+            <input
+              type="text"
+              value={importFichaVenta}
+              onChange={(e) => setImportFichaVenta(e.target.value)}
+              placeholder="Ej: FV-123"
+              autoFocus
+              disabled={importing}
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+
+          {importError && (
+            <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{importError}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+            <Button variant="secondary" type="button" onClick={handleCloseImportModal} disabled={importing}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={importing || !importFichaVenta.trim()}>
+              {importing ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  Importando...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <Download className="h-4 w-4" />
+                  Importar Pasajeros
+                </span>
+              )}
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       {/* ─── Modal Ver Ruta ─── */}

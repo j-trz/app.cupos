@@ -468,18 +468,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
           </>
         )}
 
-<<<<<<< HEAD
-        <div className="footer">
-          <p style={{ whiteSpace: 'pre-line', marginBottom: '1rem', color: '#0f172a' }}>{pdfFooterMessage}</p>
-          <p>
-            {agencyAddress ? `  ${agencyAddress}` : ''}
-            {agencyPhone ? ` | Tel: ${agencyPhone} |` : ''}
-            {agencyEmail ? `  ${agencyEmail}` : ''}
-          </p>
-          <p style={{ marginTop: '0.5rem' }}>
-            Verifique los requisitos de documentación en <a href="http://www.iatatravelcentre.com/" target="_blank" rel="noreferrer">iatatravelcentre.com</a>
-          </p>
-=======
         {/* Footer */}
         <div className="itin-footer">
           <div className="itin-footer-body">{pdfFooterMessage}</div>
@@ -488,7 +476,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
             {agencyPhone && <>{agencyAddress ? ' · ' : ''}Tel: {agencyPhone}</>}
             {agencyEmail && <>{(agencyAddress || agencyPhone) ? ' · ' : ''}{agencyEmail}</>}
           </div>
->>>>>>> 51fbe14788ed120b5c7db4eaa65c370f47bc7f62
         </div>
       </div>
     </div>
