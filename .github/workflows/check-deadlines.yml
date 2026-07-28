@@ -16,5 +16,6 @@ jobs:
     steps:
       - name: Llamar al endpoint de chequeo de vencimientos
         run: |
-          curl -sf -X GET "${{ secrets.BACKEND_URL }}/api/cron/check-deadlines" \
-            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
+          curl -v -sf -X GET "${{ secrets.BACKEND_URL }}/api/cron/check-deadlines" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -w "\n[HTTP %{http_code}]\n"
