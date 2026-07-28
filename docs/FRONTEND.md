@@ -266,7 +266,7 @@ Componentes destacados en `frontend/src/components/`:
 - **`TransferModal.jsx`**: cesión de cupos entre agencias.
 - **`ShareProductModal.jsx`**: compartir la visibilidad de un producto con otras agencias.
 - **`ItineraryPDF.jsx` / `ItineraryTable.jsx`**: generación y presentación de itinerarios (PDF con `jspdf`).
-- **`CountdownTimer.jsx`**: cuenta regresiva de los bloqueos temporales de reserva.
+- **`CountdownTimer.jsx`**: cuenta regresiva del hold de stock al elegir cantidad de pasajeros en `Availability.jsx` (ver [Disponibilidad y Creación de Reserva](FLUJOS_FUNCIONALIDADES.html#2-disponibilidad-y-creación-de-reserva) para el flujo completo). La cuenta regresiva de una reserva ya creada en `bloqueo_temporal` (en `GestionReservas.jsx`) usa un mecanismo distinto, `lib/expiry.js`.
 - **`DashboardCharts.jsx`**: gráficos del dashboard (Chart.js/Recharts).
 - **`ExportButton.jsx`**: exportación a Excel/PDF.
 - **`GlobalSearch.jsx`**: búsqueda global.
