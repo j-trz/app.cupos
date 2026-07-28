@@ -6,7 +6,7 @@ nav_group: Arquitectura
 
 # Frontend
 
-Este documento describe la arquitectura del **frontend** del Sistema de Gestión de Cupos: una **Single Page Application (SPA)** que vive en la carpeta `frontend/` y consume la API de Go (`backend-go/`). Cubre el stack tecnológico, la estructura de carpetas, el enrutamiento y el árbol de providers, las páginas, los contextos globales, la capa de servicios HTTP, los hooks de datos, los componentes clave, la internacionalización y el build/despliegue.
+Este documento describe la arquitectura del **frontend** del Sistema de Gestión de Cupos: una **Single Page Application (SPA)** que vive en la carpeta `frontend/` y consume la API de Go (`backend-go/`). Cubre el stack tecnológico, la estructura de carpetas, el enrutamiento y el árbol de providers, las páginas, los contextos globales, la capa de servicios HTTP, los hooks de datos, los componentes clave, la compatibilidad con móviles, la internacionalización y el build/despliegue.
 
 
 ## Índice
@@ -19,8 +19,9 @@ Este documento describe la arquitectura del **frontend** del Sistema de Gestión
 6. [Servicios](#6-servicios)
 7. [Hooks](#7-hooks)
 8. [Componentes clave](#8-componentes-clave)
-9. [Internacionalización](#9-internacionalización)
-10. [Build y despliegue](#10-build-y-despliegue)
+9. [Compatibilidad móvil](#9-compatibilidad-móvil)
+10. [Internacionalización](#10-internacionalización)
+11. [Build y despliegue](#11-build-y-despliegue)
 
 ---
 
@@ -36,7 +37,7 @@ El frontend está construido con tecnologías modernas del ecosistema React. Bas
 - **Estado de servidor**: [TanStack React Query v5](https://tanstack.com/query/latest) para fetching, caché y sincronización de datos.
 - **Animaciones**: [Framer Motion](https://www.framer.com/motion/).
 - **Gráficos**: [Chart.js](https://www.chartjs.org/) y [Recharts](https://recharts.org/) para el dashboard y los reportes analíticos.
-- **Internacionalización**: la SPA usa un contexto propio de i18n (ver [sección 9](#9-internacionalización)); `i18next` figura como dependencia.
+- **Internacionalización**: la SPA usa un contexto propio de i18n (ver [sección 10](#10-internacionalización)); `i18next` figura como dependencia.
 - **Exportación de datos**: `xlsx` (SheetJS) para Excel y `jspdf` / `jspdf-autotable` para PDF (itinerarios, reportes).
 - **Iconografía**: [Lucide React](https://lucide.dev/) y [Heroicons](https://heroicons.com/).
 
@@ -259,8 +260,8 @@ Componentes destacados en `frontend/src/components/`:
 
 - **`Layout.jsx`**: estructura general de la app autenticada — combina `Sidebar`, encabezado (desde `HeaderContext`) y el widget flotante de IA (`AIChat/AIChatWidget.jsx`).
 - **`ProtectedRoute.jsx`**: guarda de rutas; muestra un spinner mientras carga la sesión y redirige a `/login` si no hay usuario.
-- **`ui/Sidebar.jsx`**: navegación lateral. Los ítems de administración declaran el permiso `MODULO_ACCION` que los habilita, de modo que el menú se **filtra por permisos RBAC** (un `admin` los ve todos).
-- **`Modal.jsx`**: modal genérico reutilizable.
+- **`ui/Sidebar.jsx`**: navegación lateral. Los ítems de administración declaran el permiso `MODULO_ACCION` que los habilita, de modo que el menú se **filtra por permisos RBAC** (un `admin` los ve todos). Por debajo del breakpoint `md` se comporta como un drawer deslizante (ver [sección 9](#9-compatibilidad-móvil)).
+- **`Modal.jsx`**: modal genérico reutilizable; ocupa toda la pantalla en anchos móviles en vez de un tamaño fijo centrado.
 - **Formularios**: `ProductForm.jsx`, `UserForm.jsx`, `GroupForm.jsx` (React Hook Form + Zod), más `GroupOptionsFields.jsx` y `PermissionSelector.jsx`.
 - **`TransferModal.jsx`**: cesión de cupos entre agencias.
 - **`ShareProductModal.jsx`**: compartir la visibilidad de un producto con otras agencias.
@@ -272,12 +273,24 @@ Componentes destacados en `frontend/src/components/`:
 - **`ProductBulkUpload.jsx`**, **`AdvancedFilters.jsx`**, **`OnboardingGuide.jsx`**, **`KeyboardShortcuts.jsx`**, **`WhiteLabelPreviewModal.jsx`**, **`ThemeToggle.jsx`**, **`LanguageSelector.jsx`**, **`ToastNotification.jsx`** y estados auxiliares (`EmptyState.jsx`, `SkeletonTable.jsx`).
 - **`ui/`**: primitivos accesibles sobre Radix (`Dialog`, `Select`, `DropdownMenu`, `Tooltip`, `Table`, `Card`, `Button`, etc.) y sus variantes `shadcn-*`.
 - **`reports/`**: piezas del cockpit de reportes (`KPIsRow`, `EvolutionChart`, `OccupancyHeatmap`, `RiskAlertsTable`, `ProductPerformanceTable`, `TopDestinationsChart`, `DataTable`, etc.).
-- **`AIChat/`**: interfaz del asistente — `AIChatWidget` (flotante), `AIChatWindow`, `AIChatMessage`, `AIChatInput`, `AIChatTopbar`, `AIChatSessionsSidebar`, `AIChatItineraryResult`, `ExpertPicker`.
-- **`AIExperts/`**: gestión de expertos/base de conocimiento del LLM — `ExpertsTab`, `ExpertDocumentsPanel`.
+- **`AIChat/`**: interfaz del asistente — `AIChatWidget` (flotante), `AIChatWindow`, `AIChatMessage` (renderiza las respuestas del asistente como Markdown con `react-markdown` + `remark-gfm`: encabezados, listas, código y tablas), `AIChatInput`, `AIChatTopbar`, `AIChatSessionsSidebar`, `AIChatItineraryResult`, `ExpertPicker`.
+- **`AIExperts/`**: gestión de expertos/base de conocimiento del LLM — `ExpertsTab`, `ExpertDocumentsPanel` (además de subir documentos, permite editar manualmente el contenido ya extraído de uno para corregir errores de OCR sin volver a subirlo).
 
 ---
 
-## 9. Internacionalización
+## 9. Compatibilidad móvil
+
+El shell de la aplicación (sidebar, header, modales, grillas y tablas) sigue un enfoque **mobile-first**: las clases sin prefijo de Tailwind son la versión para pantallas chicas, y los breakpoints (`sm:`, `md:`, `lg:`) agregan el comportamiento de escritorio.
+
+- **Sidebar** (`ui/SidebarProvider.jsx` + `ui/Sidebar.jsx`): además de `collapsed` (el toggle de mini-sidebar de escritorio), el provider expone `mobileOpen`/`setMobileOpen`. Por debajo del breakpoint `md`, el `<aside>` se comporta como un **drawer deslizante** (`fixed` + `-translate-x-full`/`translate-x-0`) con un backdrop semitransparente que lo cierra al tocarlo; se cierra automáticamente al navegar a otra sección. `Layout.jsx` agrega el botón hamburguesa que lo abre, visible solo por debajo de `md`.
+- **`Modal.jsx`**: por debajo de `sm` ocupa todo el alto y ancho de la pantalla (`w-full h-full`, sin bordes redondeados) en vez de un tamaño fijo centrado; desde `sm` vuelve al comportamiento de escritorio. Como es el modal compartido, esto alcanza automáticamente a la mayoría de los modales del sistema sin tocarlos uno por uno.
+- **Grillas de KPIs y formularios**: `StatsHero.jsx` y `DashboardCharts.jsx` (grillas de 3 columnas del dashboard) y varias grillas de dos columnas dentro de modales de creación/edición (por ejemplo, en `GestionReservas.jsx` y `Availability.jsx`) pasan a una sola columna en pantallas angostas.
+- **`ui/Table.jsx`**: agrega una sombra de scroll horizontal a cada lado del contenedor (calculada a partir de `scrollLeft`/`scrollWidth` con un `ResizeObserver`) como señal visual de que hay más columnas para scrollear, sin cambiar el diseño de columnas de cada tabla.
+- **Chat de IA**: `AIChatPage.jsx` oculta el sidebar de sesiones por debajo de `md` y lo reemplaza por un botón en `AIChatTopbar.jsx` que abre la misma lista dentro de un `Modal`; el widget flotante (`AIChatWindow.jsx`) ajusta su ancho al viewport en vez de un tamaño fijo en píxeles.
+
+---
+
+## 10. Internacionalización
 
 La internacionalización se implementa mediante el **`I18nContext`** propio de la aplicación (`contexts/I18nContext.jsx`), que contiene un diccionario de traducciones (español e inglés) y expone `t(key)`, `locale` y `changeLocale`, persistiendo el idioma elegido en `localStorage` y actualizando el atributo `lang` del documento. El archivo `i18n/i18n.js` re-exporta `I18nProvider` como `i18n` para mantener compatibilidad con los imports existentes; `i18next` figura como dependencia en `package.json`.
 
@@ -285,7 +298,7 @@ El componente **`LanguageSelector.jsx`** consume `useI18n()` y permite cambiar e
 
 ---
 
-## 10. Build y despliegue
+## 11. Build y despliegue
 
 Scripts definidos en `frontend/package.json`:
 
