@@ -59,49 +59,60 @@ flowchart TD
 
 ## 2. Disponibilidad y Creación de Reserva
 
-La pantalla de **Disponibilidad** es el catálogo de vuelos reservables. El backend solo muestra productos con `disponibilidad > 0`, no bloqueados para venta y accesibles para la agencia (propios, cedidos vía `RestrictedAgency` o compartidos vía `ProductSharedAgency`). Desde ahí la agencia carga un formulario con uno o más pasajeros y confirma.
+La pantalla de **Disponibilidad** es el catálogo de vuelos reservables. El backend solo muestra productos con `disponibilidad > 0`, no bloqueados para venta y accesibles para la agencia (propios, cedidos vía `RestrictedAgency` o compartidos vía `ProductSharedAgency`). Desde ahí la agencia elige cuántos pasajeros va a cargar, y **recién ahí** se abre el formulario.
 
-`CreateReservation` valida acceso al cupo, verifica disponibilidad suficiente para la cantidad de pasajeros, descuenta `disponibilidad` y suma `vendidos`, y calcula la expiración del bloqueo (`bloqueo_temporal_minutos` del producto o el setting `bloqueo_minutos_default`, 60 por defecto). Si se cargó `doc_contable` la reserva nace **confirmada**; si no, en **bloqueo_temporal**. Cada pasajero se crea como su propio ticket individual (1 lugar, 1 fila en `passengers`) y se calcula su `NRO`. Finalmente notifica al admin, avisa si la disponibilidad quedó baja y envía email a la agencia.
+Antes de mostrar el formulario, el frontend llama a `POST /api/orders/hold` (`CreateHold`) con la cantidad de pasajeros — sin ningún dato de contacto todavía. Esto **ya descuenta `disponibilidad` y suma `vendidos`** (para que nadie más pueda tomar ese lugar mientras se completa el formulario) y crea una `Reservation` en estado **`hold_temporal`**, sin datos de pasajero, con su propio vencimiento corto: `bloqueo_hold_minutos` (setting por agencia, 10 minutos por defecto — bien distinto del `bloqueo_minutos_default` de una reserva real). Mientras el hold está activo, el modal muestra una cuenta regresiva (`CountdownTimer.jsx`); si el usuario cierra el modal sin confirmar, `DELETE /api/orders/hold/:id` libera el lugar al instante.
 
-- Backend: `POST /api/orders/` → `CreateReservation` (`order_handler.go`), `GET /api/products/` → `GetProducts` (`product_handler.go`).
-- Frontend: `frontend/src/pages/Availability.jsx`; sección `DisponibilidadSection` en `Documentacion.jsx`.
+Al confirmar el formulario, `CreateReservation` recibe el `hold_id`. Si viene, valida que la cantidad de pasajeros no haya cambiado, **reutiliza la misma fila** (no vuelve a descontar `disponibilidad`/`vendidos`, ya se habían descontado en el hold) y la completa con los datos reales, arrancando ahí el vencimiento de `bloqueo_temporal` (`bloqueo_temporal_minutos` del producto o el setting `bloqueo_minutos_default`, 60 por defecto). Si se cargó `doc_contable` la reserva nace **confirmada**; si no, en **bloqueo_temporal**. Cada pasajero se crea como su propio ticket individual (1 lugar, 1 fila en `passengers`) y se calcula su `NRO`. Finalmente notifica al admin, avisa si la disponibilidad quedó baja y envía email a la agencia. (El asistente de IA puede crear una reserva directo, sin pasar por el hold — en ese caso descuenta el stock recién en `CreateReservation`.)
+
+- Backend: `POST /api/orders/hold` → `CreateHold`, `DELETE /api/orders/hold/:id` → `ReleaseHold`, `POST /api/orders/` → `CreateReservation` (`order_handler.go`), `GET /api/products/` → `GetProducts` (`product_handler.go`).
+- Frontend: `frontend/src/pages/Availability.jsx`, `CountdownTimer.jsx`; sección `DisponibilidadSection` en `Documentacion.jsx`.
 
 ```mermaid
 flowchart TD
     A["Agencia abre Disponibilidad"] --> B["GET /api/products/ con disponibilidad mayor a 0 y no bloqueado, filtrado por agencia"]
-    B --> C["Elige producto y completa el formulario con N pasajeros"]
-    C --> D["POST /api/orders/ (CreateReservation)"]
-    D --> E{"¿No es admin y el cupo no es propio, cedido ni compartido?"}
-    E -->|"Sí"| F["403 No tenés acceso a este cupo"]
-    E -->|"No"| G{"¿Disponibilidad mayor o igual a N pasajeros?"}
-    G -->|"No"| H["400 No hay disponibilidad suficiente"]
-    G -->|"Sí"| I["Descuenta disponibilidad y suma vendidos"]
-    I --> J["Calcula bloqueo_expira_at según minutos del producto o setting default"]
-    J --> K{"¿Se cargó doc_contable al crear?"}
-    K -->|"Sí"| L["Estado = confirmada"]
-    K -->|"No"| M["Estado = bloqueo_temporal"]
-    L --> N["Crea Reservation y un Passenger por pasajero, cada uno un ticket con su NRO"]
-    M --> N
-    N --> O["Notifica al admin, avisa baja disponibilidad y envía email a la agencia"]
+    B --> C["Elige producto e indica cantidad de pasajeros"]
+    C --> D["POST /api/orders/hold (CreateHold)"]
+    D --> E["Descuenta disponibilidad y suma vendidos; crea Reservation en hold_temporal sin datos de pasajero"]
+    E --> F["Abre el formulario con cuenta regresiva de bloqueo_hold_minutos (10 min por defecto)"]
+    F --> G{"¿Cierra el modal sin confirmar?"}
+    G -->|"Sí"| H["DELETE /api/orders/hold/:id: devuelve disponibilidad y borra la fila"]
+    G -->|"No, confirma"| I["POST /api/orders/ con hold_id (CreateReservation)"]
+    I --> J{"¿No es admin y el cupo no es propio, cedido ni compartido?"}
+    J -->|"Sí"| K["403 No tenés acceso a este cupo"]
+    J -->|"No"| L["Reutiliza la fila del hold, sin volver a descontar stock"]
+    L --> M["Calcula bloqueo_expira_at según minutos del producto o setting default"]
+    M --> N{"¿Se cargó doc_contable al crear?"}
+    N -->|"Sí"| O["Estado = confirmada"]
+    N -->|"No"| P["Estado = bloqueo_temporal"]
+    O --> Q["Completa Reservation con los pasajeros reales, cada uno un ticket con su NRO"]
+    P --> Q
+    Q --> R["Notifica al admin, avisa baja disponibilidad y envía email a la agencia"]
 ```
 
 ---
 
 ## 3. Ciclo de Vida de la Reserva
 
-Una reserva se mueve por una máquina de estados. Los valores canónicos definidos en el backend (`models.go`) son: `bloqueo_temporal`, `confirmada`, `solicitud_cancelacion`, `cancelada`, `expirada` y `cedido`. La documentación de usuario (`ReservasSection` en `Documentacion.jsx`) además presenta visualmente el estado **`procesando`** (el operador tomó la solicitud y está emitiendo el ticket) y el badge **`cedido`** (cupo prestado por otra agencia).
+Una reserva se mueve por una máquina de estados. Los valores canónicos definidos en el backend (`models.go`) son: `hold_temporal`, `bloqueo_temporal`, `confirmada`, `solicitud_cancelacion`, `cancelada`, `expirada` y `cedido`. `hold_temporal` es un estado previo, sin datos de pasajero (ver sección 2) — se excluye explícitamente de los listados de reservas (`GET /api/orders`) para no aparecer como una reserva fantasma. La documentación de usuario (`ReservasSection` en `Documentacion.jsx`) además presenta visualmente el estado **`procesando`** (el operador tomó la solicitud y está emitiendo el ticket) y el badge **`cedido`** (cupo prestado por otra agencia).
 
 Transiciones reales:
+- **hold_temporal → bloqueo_temporal / confirmada**: al confirmar el formulario con `hold_id` (`CreateReservation`), según haya `doc_contable` o no.
+- **hold_temporal → (se borra la fila)**: al cerrar el modal sin confirmar (`ReleaseHold`) o cuando el cron vence el hold (ver sección 11) — en ningún caso pasa por `expirada`, porque nunca llegó a ser una reserva real.
 - **bloqueo_temporal → confirmada**: al cargar el documento contable (`AddDocContable`) o al confirmar (`ConfirmReservation`).
 - **bloqueo_temporal → expirada**: el cron libera el cupo cuando vence `bloqueo_expira_at` (ver sección 11).
 - **cualquiera → solicitud_cancelacion**: `RequestCancellation` guarda el estado previo en `pre_cancel_estado`.
 - **solicitud_cancelacion → cancelada**: `ResolveCancellation` aprueba, libera el cupo y conserva la fila en el historial.
 - **solicitud_cancelacion → estado previo**: `ResolveCancellation` rechaza y restaura `pre_cancel_estado`.
 
-- Backend: `order_handler.go` (`AddDocContable`, `ConfirmReservation`, `RequestCancellation`, `ResolveCancellation`), `cron_handler.go`. Referencia de datos: `ESTRUCTURA_BD_GO.md`.
+- Backend: `order_handler.go` (`CreateHold`, `ReleaseHold`, `AddDocContable`, `ConfirmReservation`, `RequestCancellation`, `ResolveCancellation`), `cron_handler.go`. Referencia de datos: `ESTRUCTURA_BD_GO.md`.
 
 ```mermaid
 stateDiagram-v2
+    [*] --> hold_temporal: CreateHold
+    hold_temporal --> bloqueo_temporal: CreateReservation con hold_id, sin doc_contable
+    hold_temporal --> confirmada: CreateReservation con hold_id y doc_contable
+    hold_temporal --> [*]: ReleaseHold o cron vence el hold
     [*] --> bloqueo_temporal: CreateReservation sin doc_contable
     [*] --> confirmada: CreateReservation con doc_contable
     bloqueo_temporal --> confirmada: AddDocContable o ConfirmReservation
@@ -112,6 +123,11 @@ stateDiagram-v2
     solicitud_cancelacion --> confirmada: ResolveCancellation rechaza y restaura
     expirada --> [*]
     cancelada --> [*]
+    note right of hold_temporal
+        Sin hold_id, CreateReservation
+        descuenta el stock directamente
+        (ej. desde el asistente de IA).
+    end note
     note right of bloqueo_temporal
         La UI también muestra procesando y cedido
         como estados visuales de una reserva.
@@ -306,25 +322,28 @@ flowchart TD
 
 ## 11. Expiración Automática de Reservas
 
-Un servicio de cron externo (cron-job.org, GitHub Actions, etc.) golpea `GET /api/cron/expire-reservations` cada 5–15 minutos. No usa JWT: se protege con el header `X-Cron-Secret` comparado contra `CRON_SECRET`.
+Un cron de GitHub Actions (`.github/workflows/expire-reservations.yml`) golpea `GET /api/cron/expire-reservations` cada **3 minutos** — más seguido que el vencimiento de una reserva (`bloqueo_temporal`, 60 min por defecto) porque es lo bastante frecuente para el hold de stock de la sección 2 (`bloqueo_hold_minutos`, 10 min por defecto): con un intervalo más largo, un hold abandonado podría tardar casi el doble de su propio vencimiento en liberarse de verdad. No usa JWT: se protege con el header `X-Cron-Secret` comparado contra `CRON_SECRET`.
 
-El handler hace dos pasadas sobre las reservas en `bloqueo_temporal`: primero **avisa** las que vencen en menos de 15 minutos y aún no tienen aviso (`expiration_warning_sent_at`), enviando notificación + email y marcando la bandera; luego **expira** las que ya pasaron su `bloqueo_expira_at`, devolviendo la disponibilidad al producto (resta `vendidos`), poniendo reserva y pasajeros en `expirada`, notificando a usuario y admin, enviando email y dejando un `SystemLog`. Responde con la cantidad avisada y expirada.
+El handler hace tres pasadas: primero **libera los holds vencidos** (`expireOverdueHolds`) — reservas en `hold_temporal` con `BloqueoExpiraAt` ya vencido, les devuelve la disponibilidad al producto y **borra la fila** (no hay contacto cargado, así que no hay a quién notificarle); luego, sobre las reservas en `bloqueo_temporal`, **avisa** las que vencen en menos de 15 minutos y aún no tienen aviso (`expiration_warning_sent_at`), enviando notificación + email y marcando la bandera; por último **expira** las que ya pasaron su `bloqueo_expira_at`, devolviendo la disponibilidad al producto (resta `vendidos`), poniendo reserva y pasajeros en `expirada`, notificando a usuario y admin, enviando email y dejando un `SystemLog`. Responde con la cantidad de holds liberados, avisados y expirados.
 
-- Backend: `cron_handler.go` (`ExpireReservations`), documentado en `backend-go/README.md`.
+- Backend: `cron_handler.go` (`ExpireReservations`, `expireOverdueHolds`), documentado en `backend-go/README.md`.
 
 ```mermaid
 flowchart TD
-    A["Cron externo cada 5 a 15 minutos"] --> B["GET /api/cron/expire-reservations con header X-Cron-Secret"]
+    A["Cron de GitHub Actions cada 3 minutos"] --> B["GET /api/cron/expire-reservations con header X-Cron-Secret"]
     B --> C{"¿El secret coincide con CRON_SECRET?"}
     C -->|"No"| D["401 No autorizado"]
-    C -->|"Sí"| E["warnExpiringReservations: bloqueos que vencen en menos de 15 min sin aviso"]
-    E --> F["Notifica, envía email por vencer y marca expiration_warning_sent_at"]
-    C -->|"Sí"| G["expireOverdueReservations: bloqueos con bloqueo_expira_at ya vencido"]
-    G --> H["Devuelve disponibilidad y resta vendidos"]
-    H --> I["Pone reserva y pasajeros en estado expirada"]
-    I --> J["Notifica a usuario y admin, envía email y crea SystemLog"]
-    F --> K["Responde con warned y expired"]
-    J --> K
+    C -->|"Sí"| E["expireOverdueHolds: holds vencidos, sin dato de contacto"]
+    E --> F["Devuelve disponibilidad y borra la fila, sin notificar"]
+    C -->|"Sí"| G["warnExpiringReservations: bloqueos que vencen en menos de 15 min sin aviso"]
+    G --> H["Notifica, envía email por vencer y marca expiration_warning_sent_at"]
+    C -->|"Sí"| I["expireOverdueReservations: bloqueos con bloqueo_expira_at ya vencido"]
+    I --> J["Devuelve disponibilidad y resta vendidos"]
+    J --> K["Pone reserva y pasajeros en estado expirada"]
+    K --> L["Notifica a usuario y admin, envía email y crea SystemLog"]
+    F --> M["Responde con holds_released, warned y expired"]
+    H --> M
+    L --> M
 ```
 
 ---
@@ -378,7 +397,7 @@ flowchart TD
 
 La sección de configuración agrupa varios módulos, cada uno gateado por su permiso:
 
-- **Ajustes generales**: pares clave-valor vía `GET/PUT /api/settings/:key` (ej. `bloqueo_minutos_default`). Permisos `SETTINGS_VIEW/UPDATE`.
+- **Ajustes generales**: pares clave-valor vía `GET/PUT /api/settings/:key` (ej. `bloqueo_minutos_default`, el vencimiento de una reserva en `bloqueo_temporal`, y `bloqueo_hold_minutos`, el vencimiento del hold de stock al elegir cantidad de pasajeros — ver sección 2). Permisos `SETTINGS_VIEW/UPDATE`.
 - **Diseño / White-Label**: logo y colores de la agencia (`/api/white-label/config`), usados en la UI y en los itinerarios PDF. Permiso `WHITE_LABEL_*`.
 - **Email**: configuración SMTP y plantillas por agencia (`/api/email-config/config`, `/templates`, `/test`, `/send-test`). Permiso `EMAIL_*`.
 - **Plantillas de notificación** in-app (`/api/notification-config/templates` y preview). Permiso `NOTIFICATION_TEMPLATES_*`.
