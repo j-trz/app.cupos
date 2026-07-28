@@ -55,27 +55,6 @@ function StatusDot({ ok, degraded }) {
   return <span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-400 ring-2 ring-rose-200" />;
 }
 
-function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
-  const colors = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-700',
-    amber: 'bg-amber-50 border-amber-200 text-amber-700',
-    rose: 'bg-rose-50 border-rose-200 text-rose-700',
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-    violet: 'bg-violet-50 border-violet-200 text-violet-700',
-    slate: 'bg-slate-50 border-slate-200 text-slate-700',
-  };
-  return (
-    <div className={`rounded-2xl border p-4 flex flex-col gap-1.5 ${colors[color]}`}>
-      <div className="flex items-center gap-2 opacity-70">
-        <Icon className="h-4 w-4" />
-        <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-2xl font-bold">{value ?? '—'}</p>
-      {sub && <p className="text-xs opacity-60">{sub}</p>}
-    </div>
-  );
-}
-
 // ─── Pestaña Estado del Sistema ──────────────────────────────────────────────
 
 function SystemStatusTab() {
@@ -141,109 +120,134 @@ function SystemStatusTab() {
   const dbLatency = status.database?.latency_ms;
 
   return (
-    <div className="space-y-8">
-      {/* Header refresh */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">
-          Actualizado: {fmtDate(status.timestamp)} · Auto-refresh cada 30s
-        </p>
-        <Button size="sm" variant="secondary" onClick={fetchStatus} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
+    <div className="space-y-6">
+      {/* ── Hero de métricas — mismo gradiente oscuro del sitio ─────────────── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 text-white shadow-lg">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
+        <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
 
-      {/* ── Base de datos ─────────────────────────────────────────────────── */}
-      <section>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <Database className="h-4 w-4 text-slate-500" /> Base de datos
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3">
-            <StatusDot ok={dbOk} />
-            <div>
-              <p className="text-xs text-slate-500">Conexión</p>
-              <p className={`text-sm font-semibold ${dbOk ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {dbOk ? 'Conectada' : 'Sin conexión'}
-              </p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3">
-            <Zap className="h-5 w-5 text-blue-400" />
-            <div>
-              <p className="text-xs text-slate-500">Latencia</p>
-              <p className="text-sm font-semibold text-blue-700">{fmtMs(dbLatency)}</p>
-            </div>
-          </div>
-          {status.database?.error && (
-            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-3">
-              <XCircle className="h-5 w-5 text-rose-500" />
-              <div>
-                <p className="text-xs text-rose-600">Error</p>
-                <p className="text-xs font-mono text-rose-700 break-all">{status.database.error}</p>
-              </div>
-            </div>
-          )}
+        <div className="relative z-10 flex items-center justify-between mb-5 flex-wrap gap-3">
+          <p className="text-xs text-slate-400">
+            Actualizado: {fmtDate(status.timestamp)} · Auto-refresh cada 30s
+          </p>
+          <button
+            onClick={fetchStatus}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-medium text-white transition-all"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
         </div>
-      </section>
 
-      {/* ── Servicios ─────────────────────────────────────────────────────── */}
-      <section>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <Server className="h-4 w-4 text-slate-500" /> Servicios
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(status.services || []).map((svc) => (
-            <div key={svc.name} className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3">
-              <StatusDot ok={svc.status === 'ok'} degraded={svc.status === 'degraded'} />
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[
+            { icon: Package, label: 'Productos', value: status.counts?.total_products, color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+            { icon: ClipboardList, label: 'Reservas', value: status.counts?.total_reservations, color: 'text-slate-300 bg-white/5 border-white/10' },
+            { icon: CheckCircle2, label: 'Confirmadas', value: status.counts?.total_confirmed, color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
+            { icon: Lock, label: 'Bloqueadas', value: status.counts?.total_blocked, color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
+            { icon: Clock3, label: 'Hold Temp.', value: status.counts?.total_hold_temp, color: 'text-violet-300 bg-violet-500/10 border-violet-500/20' },
+            { icon: TrendingDown, label: 'Expiradas', value: status.counts?.total_expired, color: 'text-slate-300 bg-white/5 border-white/10' },
+            { icon: XCircle, label: 'Canceladas', value: status.counts?.total_cancelled, color: 'text-rose-300 bg-rose-500/10 border-rose-500/20' },
+            { icon: Users, label: 'Usuarios', value: status.counts?.total_users, color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+            { icon: ScrollText, label: 'Logs totales', value: status.counts?.total_logs, color: 'text-slate-300 bg-white/5 border-white/10' },
+            { icon: AlertTriangle, label: 'Logs de error', value: status.counts?.total_error_logs, color: 'text-rose-300 bg-rose-500/10 border-rose-500/20' },
+          ].map(({ icon: Icon, label, value, color }) => (
+            <div key={label} className="flex items-center gap-3 rounded-2xl bg-white/5 border border-white/10 p-3.5 hover:bg-white/10 transition-colors">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${color}`}>
+                <Icon className="h-4 w-4" />
+              </div>
               <div className="min-w-0">
-                <p className="text-xs text-slate-500">{svc.name}</p>
-                <p className={`text-sm font-semibold ${svc.status === 'ok' ? 'text-emerald-600' : svc.status === 'degraded' ? 'text-amber-600' : 'text-rose-600'}`}>
-                  {svc.status === 'ok' ? 'Operativo' : svc.status === 'degraded' ? 'Degradado' : 'Error'}
-                </p>
-                {svc.details && <p className="text-xs text-slate-400 truncate" title={svc.details}>{svc.details}</p>}
+                <p className="text-[11px] font-medium text-slate-400">{label}</p>
+                <p className="text-lg font-bold text-white leading-tight">{value ?? '—'}</p>
               </div>
             </div>
           ))}
         </div>
-      </section>
+      </div>
 
-      {/* ── Conteos ──────────────────────────────────────────────────────── */}
-      <section>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-slate-500" /> Métricas del sistema
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <StatCard icon={Package} label="Productos" value={status.counts?.total_products} color="blue" />
-          <StatCard icon={ClipboardList} label="Reservas" value={status.counts?.total_reservations} color="slate" />
-          <StatCard icon={CheckCircle2} label="Confirmadas" value={status.counts?.total_confirmed} color="emerald" />
-          <StatCard icon={Lock} label="Bloqueadas" value={status.counts?.total_blocked} sub="bloqueo_temporal" color="amber" />
-          <StatCard icon={Clock3} label="Hold Temp." value={status.counts?.total_hold_temp} sub="hold_temporal" color="violet" />
-          <StatCard icon={TrendingDown} label="Expiradas" value={status.counts?.total_expired} color="slate" />
-          <StatCard icon={XCircle} label="Canceladas" value={status.counts?.total_cancelled} color="rose" />
-          <StatCard icon={Users} label="Usuarios" value={status.counts?.total_users} color="blue" />
-          <StatCard icon={ScrollText} label="Logs totales" value={status.counts?.total_logs} color="slate" />
-          <StatCard icon={AlertTriangle} label="Logs de error" value={status.counts?.total_error_logs} color="rose" />
+      {/* ── Base de datos + Servicios ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2.5">
+            <span className="p-1.5 bg-slate-100 rounded-lg"><Database className="h-4 w-4 text-slate-600" /></span>
+            Base de datos
+          </h3>
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <StatusDot ok={dbOk} />
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Conexión PostgreSQL</p>
+                  <p className={`text-xs ${dbOk ? 'text-emerald-600' : 'text-rose-600'}`}>{dbOk ? 'Conectada y operativa' : 'Sin conexión'}</p>
+                </div>
+              </div>
+              <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-xl border ${dbOk ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+                {fmtMs(dbLatency)}
+              </span>
+            </div>
+            {status.database?.error && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2">
+                <XCircle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-xs font-mono text-rose-700 break-all">{status.database.error}</p>
+              </div>
+            )}
+          </div>
         </div>
-      </section>
 
-      {/* ── Holds activos ────────────────────────────────────────────────── */}
-      <section>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <Lock className="h-4 w-4 text-amber-500" />
-          Holds activos ({(status.active_holds || []).length})
-          <span className="ml-1 text-xs font-normal text-slate-400">— cupos bloqueados sin confirmación</span>
-        </h3>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2.5">
+            <span className="p-1.5 bg-slate-100 rounded-lg"><Server className="h-4 w-4 text-slate-600" /></span>
+            Servicios
+          </h3>
+          <div className="flex flex-col gap-2.5">
+            {(status.services || []).map((svc) => (
+              <div key={svc.name} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <StatusDot ok={svc.status === 'ok'} degraded={svc.status === 'degraded'} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-700">{svc.name}</p>
+                    {svc.details && <p className="text-xs text-slate-400 truncate" title={svc.details}>{svc.details}</p>}
+                  </div>
+                </div>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-xl border shrink-0 ml-3 ${
+                  svc.status === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                  svc.status === 'degraded' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                  'bg-rose-50 border-rose-200 text-rose-700'
+                }`}>
+                  {svc.status === 'ok' ? 'Operativo' : svc.status === 'degraded' ? 'Degradado' : 'Error'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Holds activos ─────────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1.5 bg-amber-50 border border-amber-200/60 rounded-lg"><Lock className="h-4 w-4 text-amber-600" /></span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Holds activos <span className="ml-1 text-slate-400 font-normal">({(status.active_holds || []).length})</span>
+            </h3>
+            <p className="text-xs text-slate-400">Cupos bloqueados sin confirmación de pago</p>
+          </div>
+        </div>
         <HoldsTable holds={status.active_holds || []} onRelease={handleRelease} releasingId={releasingId} releaseSuccess={releaseSuccess} />
       </section>
 
-      {/* ── Holds estancados ─────────────────────────────────────────────── */}
-      <section>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-500" />
-          Holds expirados/estancados ({(status.stuck_holds || []).length})
-          <span className="ml-1 text-xs font-normal text-slate-400">— bloqueos que expiraron pero no se cerraron</span>
-        </h3>
+      {/* ── Holds estancados ──────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1.5 bg-rose-50 border border-rose-200/60 rounded-lg"><AlertCircle className="h-4 w-4 text-rose-600" /></span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Holds expirados/estancados <span className="ml-1 text-slate-400 font-normal">({(status.stuck_holds || []).length})</span>
+            </h3>
+            <p className="text-xs text-slate-400">Bloqueos que vencieron pero no se cerraron automáticamente</p>
+          </div>
+        </div>
         <HoldsTable holds={status.stuck_holds || []} onRelease={handleRelease} releasingId={releasingId} releaseSuccess={releaseSuccess} stuck />
       </section>
     </div>

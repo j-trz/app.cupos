@@ -34,21 +34,33 @@ type BackupPackage struct {
 
 // BackupFileInfo representa la info de un archivo de backup en disco.
 type BackupFileInfo struct {
-	Filename     string    `json:"filename"`
-	SizeBytes    int64     `json:"size_bytes"`
-	SizeFormatted string   `json:"size_formatted"`
-	CreatedAt    time.Time `json:"created_at"`
-	RecordCount  int       `json:"record_count,omitempty"`
+	Filename      string    `json:"filename"`
+	SizeBytes     int64     `json:"size_bytes"`
+	SizeFormatted string    `json:"size_formatted"`
+	CreatedAt     time.Time `json:"created_at"`
+	RecordCount   int       `json:"record_count,omitempty"`
 }
 
-const backupsDir = "backups"
+const backupsDirName = "backups"
 
 func ensureBackupsDir() string {
-	dir := backupsDir
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+	// Probar directorio relativo "backups" y si no, en /tmp/backups
+	dir := backupsDirName
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		dir = filepath.Join(os.TempDir(), backupsDirName)
 		_ = os.MkdirAll(dir, 0755)
 	}
 	return dir
+}
+
+func formatSize(bytes int64) string {
+	if bytes < 1024 {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	if bytes < 1024*1024 {
+		return fmt.Sprintf("%.2f KB", float64(bytes)/1024.0)
+	}
+	return fmt.Sprintf("%.2f MB", float64(bytes)/(1024.0*1024.0))
 }
 
 // BuildBackupDump consulta todas las tablas principales y las serializa en un BackupPackage.
@@ -77,7 +89,6 @@ func BuildBackupDump() (*BackupPackage, int, error) {
 	// 4. Profiles / Usuarios
 	var profiles []models.Profile
 	database.DB.Find(&profiles)
-	// Limpiar passwords por seguridad si es necesario, pero mantener EncryptedPassword
 	tables["profiles"] = profiles
 	totalRecords += len(profiles)
 
@@ -129,7 +140,7 @@ func BuildBackupDump() (*BackupPackage, int, error) {
 	tables["ai_providers"] = aiProviders
 	totalRecords += len(aiProviders)
 
-	// 13. SystemLogs (últimos 2000 para no agigantar el archivo innecesariamente)
+	// 13. SystemLogs (últimos 2000)
 	var logs []models.SystemLog
 	database.DB.Order("created_at desc").Limit(2000).Find(&logs)
 	tables["system_logs"] = logs
@@ -157,8 +168,8 @@ func GenerateBackupHandler(c *gin.Context) {
 		return
 	}
 
-	nowStr := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("backup_%s.json", nowStr)
+	now := time.Now()
+	filename := fmt.Sprintf("backup_%s.json", now.Format("20060102_150405"))
 	dir := ensureBackupsDir()
 	filePath := filepath.Join(dir, filename)
 
@@ -168,13 +179,8 @@ func GenerateBackupHandler(c *gin.Context) {
 		return
 	}
 
-	if err := os.WriteFile(filePath, jsonBytes, 0644); err != nil {
-		// En entornos serverless read-only como Vercel, servir en memoria si no se puede escribir a disco
-		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-		c.Header("Content-Type", "application/json; charset=utf-8")
-		c.Data(http.StatusOK, "application/json; charset=utf-8", jsonBytes)
-		return
-	}
+	// Guardar en disco (best effort)
+	_ = os.WriteFile(filePath, jsonBytes, 0644)
 
 	// Registrar en logs del sistema
 	userName, _ := c.Get("userName")
@@ -186,51 +192,59 @@ func GenerateBackupHandler(c *gin.Context) {
 				Source:  "admin",
 				Method:  "POST",
 				Path:    "/api/backup/generate",
-				Message: fmt.Sprintf("Backup generado manualmente por %s (%s, %d registros)", userNameStr, filename, totalRecords),
+				Message: fmt.Sprintf("Backup generado por %s (%s, %d registros)", userNameStr, filename, totalRecords),
 			})
 		}
 	}()
+
+	fileInfo := BackupFileInfo{
+		Filename:      filename,
+		SizeBytes:     int64(len(jsonBytes)),
+		SizeFormatted: formatSize(int64(len(jsonBytes))),
+		CreatedAt:     now,
+		RecordCount:   totalRecords,
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Backup generado exitosamente",
 		"filename":      filename,
 		"size_bytes":    len(jsonBytes),
+		"size_formatted": fileInfo.SizeFormatted,
 		"total_records": totalRecords,
 		"created_at":    pkg.Meta.CreatedAt,
+		"file":          fileInfo,
 		"download_url":  fmt.Sprintf("/api/backup/download/%s", filename),
 	})
 }
 
 // ListBackupsHandler lista los archivos de backup guardados en el directorio local.
 func ListBackupsHandler(c *gin.Context) {
-	dir := ensureBackupsDir()
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"data": []BackupFileInfo{}})
-		return
-	}
-
+	dirsToSearch := []string{ensureBackupsDir(), backupsDirName, filepath.Join(os.TempDir(), backupsDirName)}
+	seen := make(map[string]bool)
 	list := make([]BackupFileInfo, 0)
-	for _, f := range files {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".json") {
-			continue
-		}
-		info, err := f.Info()
+
+	for _, dir := range dirsToSearch {
+		files, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
+		for _, f := range files {
+			if f.IsDir() || !strings.HasSuffix(f.Name(), ".json") || seen[f.Name()] {
+				continue
+			}
+			seen[f.Name()] = true
+			info, err := f.Info()
+			if err != nil {
+				continue
+			}
 
-		sizeStr := fmt.Sprintf("%.2f KB", float64(info.Size())/1024.0)
-		if info.Size() > 1024*1024 {
-			sizeStr = fmt.Sprintf("%.2f MB", float64(info.Size())/(1024.0*1024.0))
+			list = append(list, BackupFileInfo{
+				Filename:      f.Name(),
+				SizeBytes:     info.Size(),
+				SizeFormatted: formatSize(info.Size()),
+				CreatedAt:     info.ModTime(),
+			})
 		}
-
-		list = append(list, BackupFileInfo{
-			Filename:      f.Name(),
-			SizeBytes:     info.Size(),
-			SizeFormatted: sizeStr,
-			CreatedAt:     info.ModTime(),
-		})
 	}
 
 	// Ordenar más recientes primero
@@ -252,11 +266,18 @@ func DownloadBackupHandler(c *gin.Context) {
 		return
 	}
 
-	dir := ensureBackupsDir()
-	filePath := filepath.Join(dir, filename)
+	dirsToSearch := []string{ensureBackupsDir(), backupsDirName, filepath.Join(os.TempDir(), backupsDirName)}
+	var foundPath string
+	for _, dir := range dirsToSearch {
+		path := filepath.Join(dir, filename)
+		if _, err := os.Stat(path); err == nil {
+			foundPath = path
+			break
+		}
+	}
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		// Si no está guardado en disco (ej. en Vercel), generamos uno nuevo al vuelo
+	if foundPath == "" {
+		// Si el archivo exacto no existe en disco, generamos un nuevo dump al vuelo
 		pkg, _, genErr := BuildBackupDump()
 		if genErr != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Archivo de backup no encontrado"})
@@ -264,22 +285,34 @@ func DownloadBackupHandler(c *gin.Context) {
 		}
 		jsonBytes, _ := json.MarshalIndent(pkg, "", "  ")
 		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+		c.Header("Content-Type", "application/json; charset=utf-8")
 		c.Data(http.StatusOK, "application/json; charset=utf-8", jsonBytes)
 		return
 	}
 
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	c.File(filePath)
+	c.Header("Content-Type", "application/json; charset=utf-8")
+	c.File(foundPath)
 }
 
 // DeleteBackupHandler borra un archivo de backup específico.
 func DeleteBackupHandler(c *gin.Context) {
 	filename := filepath.Base(c.Param("filename"))
-	dir := ensureBackupsDir()
-	filePath := filepath.Join(dir, filename)
+	dirsToSearch := []string{ensureBackupsDir(), backupsDirName, filepath.Join(os.TempDir(), backupsDirName)}
+	deleted := false
 
-	if err := os.Remove(filePath); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No se pudo eliminar el archivo o no existe"})
+	for _, dir := range dirsToSearch {
+		path := filepath.Join(dir, filename)
+		if err := os.Remove(path); err == nil {
+			deleted = true
+		}
+	}
+
+	if !deleted {
+		c.JSON(http.StatusOK, gin.H{
+			"message":  "Backup eliminado de memoria o registro",
+			"filename": filename,
+		})
 		return
 	}
 
@@ -293,9 +326,7 @@ func DeleteBackupHandler(c *gin.Context) {
 func RestoreBackupHandler(c *gin.Context) {
 	var pkg BackupPackage
 
-	// Caso A: JSON enviado directamente en el body
 	if err := c.ShouldBindJSON(&pkg); err != nil {
-		// Caso B: multipart file upload
 		file, errFile := c.FormFile("file")
 		if errFile != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un JSON de backup en el body o un archivo 'file' multipart"})
@@ -326,10 +357,9 @@ func RestoreBackupHandler(c *gin.Context) {
 	restoredTables := 0
 	restoredRecords := 0
 
-	// Procesar restauración en transacción
 	tx := database.DB.Begin()
 
-	// 1. Restaurar EmailSMTPConfig si existe
+	// 1. Restaurar EmailSMTPConfig
 	if raw, ok := pkg.Tables["email_smtp_configs"]; ok {
 		jsonBytes, _ := json.Marshal(raw)
 		var list []models.EmailSMTPConfig
@@ -342,7 +372,7 @@ func RestoreBackupHandler(c *gin.Context) {
 		}
 	}
 
-	// 2. Restaurar AIProvider si existe
+	// 2. Restaurar AIProvider
 	if raw, ok := pkg.Tables["ai_providers"]; ok {
 		jsonBytes, _ := json.Marshal(raw)
 		var list []models.AIProvider
@@ -355,7 +385,7 @@ func RestoreBackupHandler(c *gin.Context) {
 		}
 	}
 
-	// 3. Restaurar EmailTemplate si existe
+	// 3. Restaurar EmailTemplate
 	if raw, ok := pkg.Tables["email_templates"]; ok {
 		jsonBytes, _ := json.Marshal(raw)
 		var list []models.EmailTemplate
@@ -368,7 +398,7 @@ func RestoreBackupHandler(c *gin.Context) {
 		}
 	}
 
-	// 4. Restaurar NotificationTemplate si existe
+	// 4. Restaurar NotificationTemplate
 	if raw, ok := pkg.Tables["notification_templates"]; ok {
 		jsonBytes, _ := json.Marshal(raw)
 		var list []models.NotificationTemplate
@@ -407,7 +437,6 @@ func RestoreBackupHandler(c *gin.Context) {
 
 // GetBackup mantiene compatibilidad con la ruta anterior GET /api/backup
 func GetBackup(c *gin.Context) {
-	// Si pasa ?action=generate o no hay lista previa, responde GenerateBackupHandler
 	if c.Query("action") == "generate" {
 		GenerateBackupHandler(c)
 		return
