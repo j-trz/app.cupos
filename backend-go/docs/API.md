@@ -551,13 +551,13 @@ El cuerpo es un objeto JSON libre (logo, colores, etc.). Un admin puede incluir 
 
 ### Claves de API (API Keys)
 
-Gestión de tokens de acceso criptográficos para sistemas externos y clientes M2M (exclusivo Super Admin).
+Gestión de tokens de acceso criptográficos para sistemas externos y clientes M2M (disponible para Super Admin `admin` y Administradores de Agencia `agency_admin`). Los `agency_admin` están automáticamente limitados a su propia agencia.
 
 | Método | Ruta | Acceso | Descripción |
 | --- | --- | --- | --- |
-| `GET` | `/api/api-keys` | Solo Super Admin (`admin`) | Lista todas las API Keys registradas (sin exponer el secreto). |
-| `POST` | `/api/api-keys` | Solo Super Admin (`admin`) | Genera una nueva API Key. Devuelve la clave secreta `secret_key` una sola vez. |
-| `DELETE` | `/api/api-keys/:id` | Solo Super Admin (`admin`) | Revoca o desactiva una API Key existente. |
+| `GET` | `/api/api-keys` | `admin` o `agency_admin` | Lista API Keys registradas (Super Admin ve todas; `agency_admin` solo las de su propia empresa). |
+| `POST` | `/api/api-keys` | `admin` o `agency_admin` | Genera una nueva API Key. `agency_admin` asigna automáticamente su `agency_id`. Devuelve la clave secreta `secret_key` una sola vez. |
+| `DELETE` | `/api/api-keys/:id` | `admin` o `agency_admin` | Revoca o desactiva una API Key (sujeta a pertenencia de agencia). |
 
 **`POST /api/api-keys`** — body:
 

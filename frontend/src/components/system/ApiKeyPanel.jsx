@@ -8,8 +8,12 @@ import AgencyService from '../../services/agencyService';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import Swal from 'sweetalert2';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ApiKeyPanel() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'admin';
+
   const [keys, setKeys] = useState([]);
   const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -276,20 +280,29 @@ export default function ApiKeyPanel() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Agencia Asociada (Opcional)</label>
-                <select
-                  value={formData.agency_id}
-                  onChange={(e) => setFormData({ ...formData, agency_id: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
-                >
-                  <option value="">Todas / Acceso global admin</option>
-                  {agencies.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 mt-1">Si elegís una agencia, la clave solo accederá al contexto de esa empresa.</p>
-              </div>
+              {isSuperAdmin ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Agencia Asociada (Opcional)</label>
+                  <select
+                    value={formData.agency_id}
+                    onChange={(e) => setFormData({ ...formData, agency_id: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                  >
+                    <option value="">Todas / Acceso global admin</option>
+                    {agencies.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">Si elegís una agencia, la clave solo accederá al contexto de esa empresa.</p>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-800">Ámbito de acceso acotado:</span>
+                  <p className="leading-relaxed">
+                    Esta API Key estará vinculada exclusivamente a tu agencia (<strong className="text-indigo-600 font-semibold">{user?.agencia || 'Tu Agencia'}</strong>). Quien consuma la API con este token solo obtendrá y operará sobre información de tu empresa.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <Button variant="secondary" type="button" onClick={() => setShowModal(false)}>

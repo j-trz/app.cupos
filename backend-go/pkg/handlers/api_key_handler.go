@@ -34,7 +34,7 @@ func GenerateSecretKey() (rawKey string, prefix string, keyHash string, err erro
 	return rawKey, prefix, keyHash, nil
 }
 
-// CreateAPIKeyHandler genera una nueva API Key para integraciones externas (Solo Super Admin).
+// CreateAPIKeyHandler genera una nueva API Key para integraciones externas.
 func CreateAPIKeyHandler(c *gin.Context) {
 	var req models.CreateAPIKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -49,7 +49,6 @@ func CreateAPIKeyHandler(c *gin.Context) {
 	}
 	userID, ok := userIDRaw.(uuid.UUID)
 	if !ok {
-		// En caso de que venga formateado como string
 		if userIDStr, isStr := userIDRaw.(string); isStr {
 			parsedID, err := uuid.Parse(userIDStr)
 			if err == nil {
@@ -58,6 +57,28 @@ func CreateAPIKeyHandler(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "ID de usuario no válido"})
 				return
 			}
+		}
+	}
+
+	roleRaw, _ := c.Get("role")
+	roleStr, _ := roleRaw.(string)
+
+	targetAgencyID := req.AgencyID
+
+	// Para agency_admin u otros roles no-admin global, forzar la agencia propia obligatoriamente
+	if roleStr != "admin" {
+		agenciaVal, _ := c.Get("agencia")
+		agenciaStr, _ := agenciaVal.(string)
+		if agenciaStr != "" {
+			var callerAgency models.Agency
+			if err := database.DB.Where("LOWER(code) = LOWER(?) OR LOWER(name) = LOWER(?)", agenciaStr, agenciaStr).First(&callerAgency).Error; err == nil {
+				targetAgencyID = &callerAgency.ID
+			}
+		}
+
+		if targetAgencyID == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No tenés asignada una agencia válida para crear API Keys."})
+			return
 		}
 	}
 
@@ -76,7 +97,7 @@ func CreateAPIKeyHandler(c *gin.Context) {
 		Name:        strings.TrimSpace(req.Name),
 		Prefix:      prefix,
 		KeyHash:     keyHash,
-		AgencyID:    req.AgencyID,
+		AgencyID:    targetAgencyID,
 		CreatedByID: userID,
 		Scopes:      scopes,
 		IsActive:    true,
@@ -96,7 +117,7 @@ func CreateAPIKeyHandler(c *gin.Context) {
 				Source:  "admin",
 				Method:  "POST",
 				Path:    "/api/api-keys",
-				Message: fmt.Sprintf("API Key '%s' (%s) creada", apiKey.Name, prefix),
+				Message: fmt.Sprintf("API Key '%s' (%s) creada por %s", apiKey.Name, prefix, roleStr),
 			})
 		}
 	}()
@@ -117,16 +138,27 @@ func CreateAPIKeyHandler(c *gin.Context) {
 	})
 }
 
-// ListAPIKeysHandler devuelve el listado de API Keys (Solo Super Admin).
+// ListAPIKeysHandler devuelve el listado de API Keys (filtrado por agencia para agency_admin).
 func ListAPIKeysHandler(c *gin.Context) {
-	var keys []models.APIKey
-	err := database.DB.
-		Preload("Agency").
-		Preload("CreatedBy").
-		Order("created_at DESC").
-		Find(&keys).Error
+	roleRaw, _ := c.Get("role")
+	roleStr, _ := roleRaw.(string)
 
-	if err != nil {
+	query := database.DB.Preload("Agency").Preload("CreatedBy").Order("created_at DESC")
+
+	// Si no es super admin, limitar estrictamente a las llaves de su propia agencia
+	if roleStr != "admin" {
+		agenciaVal, _ := c.Get("agencia")
+		agenciaStr, _ := agenciaVal.(string)
+		var callerAgency models.Agency
+		if err := database.DB.Where("LOWER(code) = LOWER(?) OR LOWER(name) = LOWER(?)", agenciaStr, agenciaStr).First(&callerAgency).Error; err == nil {
+			query = query.Where("agency_id = ?", callerAgency.ID)
+		} else {
+			query = query.Where("1 = 0")
+		}
+	}
+
+	var keys []models.APIKey
+	if err := query.Find(&keys).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al consultar las API Keys"})
 		return
 	}
@@ -137,7 +169,7 @@ func ListAPIKeysHandler(c *gin.Context) {
 	})
 }
 
-// RevokeAPIKeyHandler desactiva/elimina una API Key existente (Solo Super Admin).
+// RevokeAPIKeyHandler desactiva/elimina una API Key existente.
 func RevokeAPIKeyHandler(c *gin.Context) {
 	idParam := c.Param("id")
 	keyID, err := uuid.Parse(idParam)
@@ -146,10 +178,29 @@ func RevokeAPIKeyHandler(c *gin.Context) {
 		return
 	}
 
+	roleRaw, _ := c.Get("role")
+	roleStr, _ := roleRaw.(string)
+
 	var key models.APIKey
 	if err := database.DB.First(&key, "id = ?", keyID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "API Key no encontrada"})
 		return
+	}
+
+	// Verificar pertenencia si no es admin global
+	if roleStr != "admin" {
+		agenciaVal, _ := c.Get("agencia")
+		agenciaStr, _ := agenciaVal.(string)
+		var callerAgency models.Agency
+		if err := database.DB.Where("LOWER(code) = LOWER(?) OR LOWER(name) = LOWER(?)", agenciaStr, agenciaStr).First(&callerAgency).Error; err == nil {
+			if key.AgencyID == nil || *key.AgencyID != callerAgency.ID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso para revocar esta API Key."})
+				return
+			}
+		} else {
+			c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso para revocar esta API Key."})
+			return
+		}
 	}
 
 	key.IsActive = false
@@ -166,7 +217,7 @@ func RevokeAPIKeyHandler(c *gin.Context) {
 				Source:  "admin",
 				Method:  "DELETE",
 				Path:    "/api/api-keys/" + idParam,
-				Message: fmt.Sprintf("API Key '%s' (%s) fue revocada", key.Name, key.Prefix),
+				Message: fmt.Sprintf("API Key '%s' (%s) fue revocada por %s", key.Name, key.Prefix, roleStr),
 			})
 		}
 	}()

@@ -231,8 +231,8 @@ export default function Settings() {
         </Button>
       </div>
 
-      {/* Sección de API Keys (Exclusivo Super Admin) */}
-      {user?.role === 'admin' && (
+      {/* Sección de API Keys (Super Admin y Administradores de Agencia) */}
+      {(user?.role === 'admin' || user?.role === 'agency_admin') && (
         <div className="pt-8 border-t border-slate-200">
           <ApiKeyPanel />
         </div>
