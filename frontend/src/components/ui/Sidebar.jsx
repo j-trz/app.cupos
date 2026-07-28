@@ -29,7 +29,7 @@ const adminNavItems = [
   { label: 'Reservas', path: '/reservas', icon: CreditCard, permission: 'RESERVATIONS_VIEW' },
   { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
   { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
-  { label: 'Logs del sitio', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
+  { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
 ];
 
 // Settings items (grouped under Ajustes)

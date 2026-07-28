@@ -292,11 +292,136 @@ Ver [Asistente IA](FLUJOS_FUNCIONALIDADES.html#10-asistente-ia) para el detalle 
 
 > Las rutas de `email-config` y `notification-config` solo exigen sesión iniciada (no un permiso puntual) pese a ser configuración administrativa — tenelo en cuenta si tu integración maneja credenciales SMTP.
 
-## Logs, backup y exportación
+## Logs, Estado del sistema y exportación
+
+### Estado del sistema
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| `GET` | `/api/logs` | Permiso: `LOGS_VIEW` | Logs del sistema (acepta `?page=`, `?limit=`, `?level=`, `?source=`, `?startDate=`, `?endDate=`, `?q=`) |
+| `GET` | `/api/system/status` | Permiso: `LOGS_VIEW` | Diagnóstico completo del sistema |
+| `POST` | `/api/system/holds/:id/release` | Solo admin | Libera manualmente un hold/bloqueo estancado |
+
+**`GET /api/system/status`** devuelve:
+
+```json
+{
+  "timestamp": "2025-01-15T14:30:00Z",
+  "database": {
+    "connected": true,
+    "latency_ms": 3
+  },
+  "services": [
+    { "name": "API Go", "status": "ok", "details": "Servidor HTTP activo y respondiendo" },
+    { "name": "SMTP / Email", "status": "ok", "details": "Host configurado: smtp.example.com" },
+    { "name": "Asistente IA", "status": "degraded", "details": "API Key de IA no configurada en el entorno" }
+  ],
+  "counts": {
+    "total_products": 45,
+    "total_reservations": 312,
+    "total_confirmed": 280,
+    "total_blocked": 5,
+    "total_hold_temp": 2,
+    "total_expired": 20,
+    "total_cancelled": 5,
+    "total_users": 38,
+    "total_logs": 15420,
+    "total_error_logs": 12
+  },
+  "active_holds": [
+    {
+      "reservation_id": 99,
+      "pedido_id": "ORD-20250115-001",
+      "estado": "hold_temporal",
+      "producto_id": 12,
+      "destino": "Cancún",
+      "codigo_cupo": "CAN-2025-01",
+      "agencia": "Viajes Express",
+      "contacto_nombre": "Juan Pérez",
+      "contacto_email": "juan@example.com",
+      "hold_passengers": 2,
+      "bloqueo_expira_at": "2025-01-15T14:45:00Z",
+      "minutes_ago": 7.3,
+      "is_expired": false,
+      "created_at": "2025-01-15T14:23:00Z"
+    }
+  ],
+  "stuck_holds": []
+}
+```
+
+**`POST /api/system/holds/:id/release`** — Solo para rol `admin`. Devuelve:
+
+```json
+{
+  "message": "Hold liberado exitosamente",
+  "reservation_id": 99,
+  "pedido_id": "ORD-20250115-001",
+  "passengers_returned": 2,
+  "product_id": 12
+}
+```
+
+---
+
+### Logs del sistema
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/logs` | Permiso: `LOGS_VIEW` | Logs paginados del sistema con filtros |
+| `GET` | `/api/logs/export` | Permiso: `LOGS_VIEW` | Exporta los logs como archivo JSON descargable |
+
+**Query params para `/api/logs` y `/api/logs/export`:**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `page` | int | Página (default: 1). Solo para `/api/logs`. |
+| `limit` | int | Registros por página (1–500, default: 50). Solo para `/api/logs`. |
+| `level` | string | Filtro por nivel: `info`, `warning`, `error` |
+| `source` | string | Filtro por fuente: `http`, `cron`, `email`, `ai`, `admin` |
+| `startDate` | string | Desde (YYYY-MM-DD) |
+| `endDate` | string | Hasta (YYYY-MM-DD, incluye hasta las 23:59:59) |
+| `q` | string | Búsqueda libre sobre mensaje, nombre de usuario, email, agencia, ruta e IP |
+| `userEmail` | string | Filtro exacto por email de usuario |
+| `agencia` | string | Filtro por agencia |
+| `status_code` | int | Filtro por código HTTP |
+
+**Estructura de un `SystemLog`:**
+
+```json
+{
+  "id": "uuid",
+  "level": "error",
+  "source": "http",
+  "method": "POST",
+  "path": "/api/reservations",
+  "status_code": 500,
+  "message": "Error interno al crear reserva",
+  "details": "pq: insert or update violates...",
+  "user_id": "uuid",
+  "user_name": "Juan Pérez",
+  "user_email": "juan@agencia.com",
+  "agencia": "Viajes Express",
+  "ip": "190.123.45.67",
+  "request_id": "1737123456789",
+  "duration_ms": 145,
+  "created_at": "2025-01-15T14:23:00Z"
+}
+```
+
+`/api/logs/export` descarga directamente un archivo `system_logs_YYYYMMDD_HHMMSS.json` con estructura:
+
+```json
+{
+  "exported_at": "2025-01-15T14:30:00Z",
+  "count": 3200,
+  "logs": [ ... ]
+}
+```
+
+### Otras exportaciones
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
 | `GET` | `/api/backup` | Permiso: `BACKUP_VIEW` | Backup de datos |
 | `GET` | `/api/export/csv/:entityType` | Sesión | Exporta una entidad a CSV |
 

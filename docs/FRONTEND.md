@@ -131,7 +131,7 @@ Rutas definidas en `frontend/src/App.jsx`:
 | `/permisos` | `GestionPermisos.jsx` | Permisos (RBAC). |
 | `/panel-control` | `PanelControl.jsx` | Panel de control. |
 | `/reportes` | `Reportes.jsx` | Cockpit de reportes y analíticas. |
-| `/logs` | `LogsDelSitio.jsx` | Logs del sitio. |
+| `/logs` | `LogsDelSitio.jsx` | **Estado del sistema** — monitoreo de base de datos, servicios, holds activos, rastreo de reservas y registro de logs. |
 | `/notificaciones` | `Notificaciones.jsx` | Bandeja de notificaciones. |
 | `/settings` | `Settings.jsx` | Ajustes generales. |
 | `/marca-blanca` | `WhiteLabelConfig.jsx` | Configuración de marca blanca. |
@@ -166,7 +166,9 @@ Las vistas viven en `frontend/src/pages/`. Cada una corresponde a una o más rut
 - **GestionAgencias** (`GestionAgencias.jsx`): administración de agencias.
 - **GestionTemas** (`GestionTemas.jsx`): gestión de temas visuales.
 - **Reportes** (`Reportes.jsx`): cockpit ejecutivo con gráficos y tablas analíticas (ver `components/reports/`).
-- **LogsDelSitio** (`LogsDelSitio.jsx`): auditoría/logs traducidos a lenguaje legible para administradores.
+- **LogsDelSitio** (`LogsDelSitio.jsx`): **Estado del sistema** con dos pestañas:
+  - **Estado del sistema** — salud de la base de datos (conexión + latencia ms), servicios (API Go, SMTP, IA), métricas de conteo de entidades, tabla de **holds activos** (bloqueos temporales sin confirmar) y **holds expirados/estancados** con botón de **liberación manual** (devuelve stock).
+  - **Registro de logs** — tabla enriquecida con usuario, email, agencia, IP, método, ruta, status HTTP y duración. Filtros por nivel, fuente, fechas y búsqueda libre. **Exportar todos los logs filtrados como archivo `.json`** (máx. 5000 filas). Acordeón expandible por fila con visualizador JSON formateado, botón **Copiar JSON** y **Descargar JSON** individual.
 - **Notificaciones** (`Notificaciones.jsx`): bandeja de notificaciones del usuario.
 - **Settings** (`Settings.jsx`): ajustes generales del sistema.
 - **WhiteLabelConfig** (`WhiteLabelConfig.jsx`): configuración de marca blanca (identidad, colores, tipografías).

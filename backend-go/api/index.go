@@ -334,8 +334,14 @@ func init() {
 			// Lista completa
 			protected.GET("/transfers/all", middleware.RequirePermission("TRANSFERS_VIEW"), handlers.ListTransfers)
 
-			// Logs del sitio
+			// Logs del sistema y Estado del sistema
 			protected.GET("/logs", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemLogs)
+			protected.GET("/logs/export", middleware.RequirePermission("LOGS_VIEW"), handlers.ExportSystemLogsJSON)
+			systemGroup := protected.Group("/system")
+			{
+				systemGroup.GET("/status", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemStatus)
+				systemGroup.POST("/holds/:id/release", middleware.AdminOnly(), handlers.AdminReleaseHold)
+			}
 
 			// Configuración de email (SMTP + plantillas) por agencia
 			emailConfig := protected.Group("/email-config")

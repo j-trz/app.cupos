@@ -392,7 +392,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                               <p className="detail-label">Salida</p>
                               <p className="detail-value">{displayFlightDate(vuelo.fechaSalida, referenceYear)}{salidaHora ? ` - ${salidaHora}` : ''}</p>
                             </div>
-                            <div className="detail-item">
+                            <div className="detail-item mt-2">
                               <p className="detail-label">Cabina</p>
                               <p className="detail-value">{vuelo.clase || 'Economy'}</p>
                             </div>
@@ -402,7 +402,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                               <p className="detail-label">Llegada{vuelo.nextDay ? ' (+1)' : ''}</p>
                               <p className="detail-value">{displayFlightDate(vuelo.fechaLlegada || vuelo.fechaSalida, referenceYear)}{llegadaHora ? ` - ${llegadaHora}` : ''}</p>
                             </div>
-                            <div className="detail-item">
+                            <div className="detail-item mt-2">
                               <p className="detail-label">Duración</p>
                               <p className="detail-value">{duracion || 'N/A'}</p>
                             </div>
@@ -410,9 +410,9 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
                         </div>
 
                         {hasBaggageInfo && (
-                          <div className="detail-item mt-5">
+                          <div className="detail-item mt-8">
                             <p className="detail-label">Franquicia de equipaje</p>
-                            <div className="baggage-grid">
+                            <div className="baggage-grid mb-8">
                               <div className={`baggage-item ${handBag ? 'baggage-included' : 'baggage-excluded'}`}>
                                 <ShoppingBag size={16} />
                                 <span className="baggage-label">Artículo personal</span>
