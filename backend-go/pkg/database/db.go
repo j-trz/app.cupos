@@ -577,10 +577,15 @@ func runSQLMigrations(db *gorm.DB) {
 		// gestionado) — pg_trgm es una extensión estándar de Postgres.
 		`CREATE EXTENSION IF NOT EXISTS pg_trgm;`,
 		`CREATE INDEX IF NOT EXISTS idx_ai_expert_chunks_content_trgm ON ai_expert_chunks USING gin (content gin_trgm_ops);`,
+<<<<<<< HEAD
+		// Asegurar que disponibilidad nunca sea mayor a cupo en la DB
+		`UPDATE products SET disponibilidad = cupo WHERE cupo > 0 AND disponibilidad > cupo;`,
+=======
 		// Hold temporal de stock (pre-reserva de cupos mientras se completa el
 		// formulario de pasajeros) y apagado de IA por agencia.
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_passenger_count INT DEFAULT 0;`,
 		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS ai_habilitado BOOLEAN DEFAULT true;`,
+>>>>>>> 51fbe14788ed120b5c7db4eaa65c370f47bc7f62
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

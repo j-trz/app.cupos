@@ -173,7 +173,7 @@ function parseSegmentLine(line) {
 
   const isTime = t => /^\d{4}$/.test(t) || /^\d{2}:\d{2}$/.test(t);
   const normTime = t => t.replace(':', '');
-  const isDate = t => /^\d{1,2}[A-Z]{3}$/.test(t);
+  const isDate = t => /^\d{1,2}[A-Z]{3}(\d{2,4})?$/.test(t);
   const isAirport = t => /^[A-Z]{3}$/.test(t);
   const isOD = t => /[A-Z]{6}/.test(t);
   const isFlight = t => /^[A-Z]{2}\d{3,4}$/.test(t);

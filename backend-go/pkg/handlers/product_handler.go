@@ -179,6 +179,10 @@ func CreateProduct(c *gin.Context) {
 		product.TipoProducto = categorizeProduct(product.CodigoCupo)
 	}
 
+	if product.Cupo > 0 && product.Disponibilidad > product.Cupo {
+		product.Disponibilidad = product.Cupo
+	}
+
 	database.DB.Create(&product)
 
 	services.NotifyBroadcastByCode(createdByFromContext(c), "new_product", "Nuevo producto disponible",
@@ -237,6 +241,10 @@ func UpdateProduct(c *gin.Context) {
 	updated.RestrictedAgency = existing.RestrictedAgency
 	updated.TransferID = existing.TransferID
 	updated.CreatedAt = existing.CreatedAt
+
+	if updated.Cupo > 0 && updated.Disponibilidad > updated.Cupo {
+		updated.Disponibilidad = updated.Cupo
+	}
 
 	if err := database.DB.Select(
 		"destino", "compania", "disponibilidad", "cupo",
@@ -331,6 +339,9 @@ func BulkCreateProducts(c *gin.Context) {
 		}
 		if input.Products[i].TipoProducto == "" {
 			input.Products[i].TipoProducto = categorizeProduct(input.Products[i].CodigoCupo)
+		}
+		if input.Products[i].Cupo > 0 && input.Products[i].Disponibilidad > input.Products[i].Cupo {
+			input.Products[i].Disponibilidad = input.Products[i].Cupo
 		}
 	}
 
