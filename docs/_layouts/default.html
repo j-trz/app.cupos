@@ -1,16 +1,21 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page.title | default: site.title }} · {{ site.title }}</title>
   <meta name="description" content="{{ page.description | default: site.description }}">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
 </head>
+
 <body>
   <a class="skip-link" href="#content">Saltar al contenido</a>
 
@@ -19,8 +24,13 @@
       <span></span><span></span><span></span>
     </button>
     <a class="brand" href="{{ '/' | relative_url }}">
-      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M44 24 30 20 27 6.5c-.2-1-1.6-1-1.8 0L23 20l-8 2.2V26l8-1.3 1 12L20 39v2.6l4-1 4 1V39l-4-2.3 1-12 8 1.3v-3.8Z" fill="currentColor"/>
+      <svg class="brand-mark icon icon-tabler icons-tabler-outline icon-tabler-plane-departure" width="24" height="24"
+        viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path
+          d="M14.639 10.258l4.83 -1.294a2 2 0 1 1 1.035 3.863l-14.489 3.883l-4.45 -5.02l2.897 -.776l2.45 1.414l2.897 -.776l-3.743 -6.244l2.898 -.777l5.675 5.727" />
+        <path d="M3 21h18" />
       </svg>
       <span class="brand-text">Sistema de Gestión de Cupos</span>
       <span class="brand-sub">docs</span>
@@ -36,22 +46,22 @@
       {% assign docs = site.pages | where_exp: "p", "p.title" | sort: "nav_order" %}
       {% assign prev_group = nil %}
       {% for p in docs %}
-        {% if p.nav_group != prev_group %}
-          {% unless forloop.first %}</ul>{% endunless %}
-          <p class="sidebar-group">{{ p.nav_group }}</p>
-          <ul>
-          {% assign prev_group = p.nav_group %}
+      {% if p.nav_group != prev_group %}
+      {% unless forloop.first %}</ul>{% endunless %}
+      <p class="sidebar-group">{{ p.nav_group }}</p>
+      <ul>
+        {% assign prev_group = p.nav_group %}
         {% endif %}
         <li style="--i: {{ forloop.index0 }}">
-          <a href="{{ p.url | relative_url }}" {% if p.url == page.url %}class="active" aria-current="page"{% endif %}>
+          <a href="{{ p.url | relative_url }}" {% if p.url==page.url %}class="active" aria-current="page" {% endif %}>
             <span class="nav-index">{{ forloop.index0 | prepend: '00' | slice: -2, 2 }}</span>
             <span class="nav-label">{{ p.title }}</span>
           </a>
           {% if p.url == page.url %}
-            <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
+          <ul class="sidebar-subnav" id="sidebar-subnav"></ul>
           {% endif %}
         </li>
-      {% endfor %}
+        {% endfor %}
       </ul>
     </nav>
 
@@ -63,7 +73,8 @@
   <footer class="site-footer">
     <span class="footer-rule" aria-hidden="true"></span>
     <p>Generado desde <code>docs/</code> en la rama <code>main</code> de
-    <a href="https://github.com/j-trz/app.cupos">j-trz/app.cupos</a>.</p>
+      <a href="https://github.com/j-trz/app.cupos">j-trz/app.cupos</a>.
+    </p>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -160,4 +171,5 @@
     });
   </script>
 </body>
+
 </html>
