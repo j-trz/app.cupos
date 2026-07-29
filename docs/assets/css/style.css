@@ -128,7 +128,6 @@ body::before {
   height: 2.5rem;
   color: var(--accent);
   flex-shrink: 0;
-  transform: rotate(90deg);
 }
 .brand-text {
   font-family: var(--font-display);
