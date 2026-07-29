@@ -373,6 +373,23 @@ func init() {
 				emailConfig.GET("/templates/:id/preview", handlers.PreviewEmailTemplate)
 			}
 
+			// Backoffice (Netviax Atlas) - Búsqueda de contactos
+			backoffice := protected.Group("/backoffice/atlas")
+			{
+				backoffice.POST("/contactos/buscar", handlers.BuscarContactoAtlas)
+				backoffice.GET("/contactos/:codigo", handlers.DetalleContactoAtlas)
+			}
+
+			// Configuración de credenciales de Netviax Atlas, por agencia
+			atlasConfig := protected.Group("/atlas-config")
+			{
+				atlasConfig.GET("/config", handlers.GetAtlasConfig)
+				atlasConfig.POST("/config", handlers.CreateAtlasConfig)
+				atlasConfig.PUT("/config/:id", handlers.UpdateAtlasConfig)
+				atlasConfig.DELETE("/config/:id", handlers.DeleteAtlasConfig)
+				atlasConfig.POST("/test", handlers.TestAtlasConnectionHandler)
+			}
+
 			// Plantillas de notificaciones in-app (campana), por agencia
 			notificationConfig := protected.Group("/notification-config")
 			{
