@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import Swal from 'sweetalert2';
@@ -37,6 +37,7 @@ const settingsItems = [
   { label: 'Ajustes generales', path: '/settings', icon: Settings, permission: 'SETTINGS_VIEW' },
   { label: 'Diseño', path: '/marca-blanca', icon: Palette, permission: 'WHITE_LABEL_VIEW' },
   { label: 'Configuración de Email', path: '/email-config', icon: Mail, permission: 'EMAIL_VIEW' },
+  { label: 'Integración con Atlas', path: '/atlas-config', icon: Plug, permission: 'ATLAS_VIEW' },
   { label: 'Notificaciones', path: '/notification-config', icon: Bell, permission: 'NOTIFICATION_TEMPLATES_VIEW' },
   { label: 'Configuración de IA', path: '/config-ia', icon: Bot, permission: 'AI_VIEW' },
 ];

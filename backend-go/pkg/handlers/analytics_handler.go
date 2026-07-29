@@ -845,8 +845,13 @@ func DetalleDestinosHandler(c *gin.Context) {
 		}
 
 		disponibles := cupo.Disponibilidad
-		if disponibles == 0 && tomados > 0 {
-			disponibles = tomados - vendidos - cancelados
+		if disponibles < 0 {
+			disponibles = 0
+		} else if disponibles == 0 && tomados > vendidos {
+			disponibles = tomados - vendidos
+			if disponibles < 0 {
+				disponibles = 0
+			}
 		}
 
 		opUnit := cupo.OP
@@ -862,6 +867,11 @@ func DetalleDestinosHandler(c *gin.Context) {
 			}
 		}
 
+		riesgoItem := float64(disponibles) * neto1Unit
+		if riesgoItem < 0 {
+			riesgoItem = 0
+		}
+
 		item := grouped[key]
 		item.CuposTomados += tomados
 		item.LugaresVendidos += vendidos
@@ -872,7 +882,7 @@ func DetalleDestinosHandler(c *gin.Context) {
 		item.CostoTotal += float64(tomados) * neto1Unit
 		item.Venta += precioUnit * float64(vendidos)
 		item.VentaTotal += float64(tomados) * precioUnit
-		item.Riesgo += float64(disponibles) * neto1Unit
+		item.Riesgo += riesgoItem
 	}
 
 	dataList := []*FilaCalculada{}
@@ -938,6 +948,14 @@ func DestinosCompaniaHandler(c *gin.Context) {
 
 		vendidos := cupo.Vendidos
 		disponibles := cupo.Disponibilidad
+		if disponibles < 0 {
+			disponibles = 0
+		} else if disponibles == 0 && cupo.Cupo > vendidos {
+			disponibles = cupo.Cupo - vendidos
+			if disponibles < 0 {
+				disponibles = 0
+			}
+		}
 
 		cancelados := 0
 		for _, pax := range passengers {
@@ -1380,8 +1398,13 @@ func PorSalidaHandler(c *gin.Context) {
 		}
 
 		disponibles := cupo.Disponibilidad
-		if disponibles == 0 && tomados > 0 {
-			disponibles = tomados - vendidos - cancelados
+		if disponibles < 0 {
+			disponibles = 0
+		} else if disponibles == 0 && tomados > vendidos {
+			disponibles = tomados - vendidos
+			if disponibles < 0 {
+				disponibles = 0
+			}
 		}
 
 		opUnit := cupo.OP
@@ -1396,6 +1419,11 @@ func PorSalidaHandler(c *gin.Context) {
 		nombre := cupo.Ficha
 		if nombre == "" {
 			nombre = destino
+		}
+
+		riesgoItem := float64(disponibles) * neto1Unit
+		if riesgoItem < 0 {
+			riesgoItem = 0
 		}
 
 		rows = append(rows, FilaSalida{
@@ -1416,7 +1444,7 @@ func PorSalidaHandler(c *gin.Context) {
 			CostoTotal:         float64(tomados) * neto1Unit,
 			Venta:              precioUnit * float64(vendidos),
 			VentaTotal:         float64(tomados) * precioUnit,
-			Riesgo:             float64(disponibles) * neto1Unit,
+			Riesgo:             riesgoItem,
 		})
 	}
 
@@ -1574,8 +1602,13 @@ func DashboardDataHandler(c *gin.Context) {
 		}
 
 		disponibles := cupo.Disponibilidad
-		if disponibles == 0 && tomados > 0 {
-			disponibles = tomados - vendidos - cancelados
+		if disponibles < 0 {
+			disponibles = 0
+		} else if disponibles == 0 && tomados > vendidos {
+			disponibles = tomados - vendidos
+			if disponibles < 0 {
+				disponibles = 0
+			}
 		}
 
 		opUnit := cupo.OP
@@ -1591,6 +1624,11 @@ func DashboardDataHandler(c *gin.Context) {
 			}
 		}
 
+		riesgoItem := float64(disponibles) * neto1Unit
+		if riesgoItem < 0 {
+			riesgoItem = 0
+		}
+
 		item := grouped[key]
 		item.CuposTomados += tomados
 		item.LugaresVendidos += vendidos
@@ -1601,7 +1639,7 @@ func DashboardDataHandler(c *gin.Context) {
 		item.CostoTotal += float64(tomados) * neto1Unit
 		item.Venta += precioUnit * float64(vendidos)
 		item.VentaTotal += float64(tomados) * precioUnit
-		item.Riesgo += float64(disponibles) * neto1Unit
+		item.Riesgo += riesgoItem
 	}
 
 	dataList := []*FilaCalculada{}
@@ -1711,11 +1749,10 @@ func MetricsSummaryHandler(c *gin.Context) {
 		ventaTotal += float64(tomados) * precioUnit
 	}
 
-	var riskUnit float64
-	if len(cuposUnicos) > 0 {
-		riskUnit = cuposUnicos[0].Neto1
+	riesgo := costoTotal - costo
+	if riesgo < 0 {
+		riesgo = 0
 	}
-	riesgo := (costoTotal - costo) - (float64(cancelados) * riskUnit)
 
 	c.JSON(200, gin.H{
 		"periodo": gin.H{
@@ -1804,6 +1841,16 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		neto1 := cupo.Neto1
 		precioUnit := cupo.Precio
 
+		disponiblesCupo := cupo.Disponibilidad
+		if disponiblesCupo < 0 {
+			disponiblesCupo = 0
+		} else if disponiblesCupo == 0 && tomados > v {
+			disponiblesCupo = tomados - v
+			if disponiblesCupo < 0 {
+				disponiblesCupo = 0
+			}
+		}
+
 		item := agg[destino]
 		item.CuposTomados += tomados
 		item.Vendidos += v
@@ -1811,7 +1858,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		item.Rentabilidad += opUnit * float64(v)
 		item.Costo += neto1 * float64(v)
 		item.Venta += precioUnit * float64(v)
-		item.Riesgo += ((float64(tomados-canc) * neto1) - (neto1 * float64(v)))
+		item.Riesgo += float64(disponiblesCupo) * neto1
 	}
 
 	rows := []*DestinationMetrics{}

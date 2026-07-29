@@ -45,6 +45,7 @@ func InitDB() {
 		&models.UserRole{},
 		&models.RolePermission{},
 		&models.EmailSMTPConfig{},
+		&models.AtlasConfig{},
 		&models.EmailTemplate{},
 		&models.NotificationTemplate{},
 		&models.SystemLog{},
@@ -136,6 +137,9 @@ func seedRBAC(db *gorm.DB) {
 
 		{"EMAIL_VIEW", "Ver Config Email", "email", "view", "Ver configuración SMTP"},
 		{"EMAIL_UPDATE", "Editar Config Email", "email", "update", "Modificar configuración SMTP"},
+
+		{"ATLAS_VIEW", "Ver Config Atlas", "atlas", "view", "Ver configuración de Netviax Atlas (backoffice)"},
+		{"ATLAS_UPDATE", "Editar Config Atlas", "atlas", "update", "Modificar configuración de Netviax Atlas (backoffice)"},
 
 		{"AI_VIEW", "Ver Config IA", "ai", "view", "Ver configuración de IA"},
 		{"AI_UPDATE", "Editar Config IA", "ai", "update", "Modificar configuración de IA"},

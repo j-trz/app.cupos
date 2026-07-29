@@ -268,10 +268,10 @@ const Reportes = () => {
       const totalRiesgo = rowsDet.reduce((sum, r) => sum + (parseFloat(r['Riesgo']) || 0), 0);
 
       setKpis([
-        { label: 'Ventas Totales (USD)', value: `$${Math.round(totalVentas).toLocaleString()}`, icon: DollarSign },
-        { label: 'Rentabilidad (USD)', value: `$${Math.round(totalRentabilidad).toLocaleString()}`, icon: TrendingUp },
-        { label: 'Costo de lo Vendido (USD)', value: `$${Math.round(totalCosto).toLocaleString()}`, icon: Wallet },
-        { label: 'Riesgo Económico (USD)', value: `$${Math.round(totalRiesgo).toLocaleString()}`, icon: AlertTriangle },
+        { label: 'Ventas Totales (USD)', value: `$${Math.max(0, Math.round(totalVentas)).toLocaleString()}`, icon: DollarSign },
+        { label: 'Rentabilidad (USD)', value: `$${Math.max(0, Math.round(totalRentabilidad)).toLocaleString()}`, icon: TrendingUp },
+        { label: 'Costo de lo Vendido (USD)', value: `$${Math.max(0, Math.round(totalCosto)).toLocaleString()}`, icon: Wallet },
+        { label: 'Riesgo Económico (USD)', value: `$${Math.max(0, Math.round(totalRiesgo)).toLocaleString()}`, icon: AlertTriangle },
       ]);
 
       const [agencias, evolucionAgencias, destinosCompania] = await Promise.all([

@@ -262,8 +262,13 @@ func GetDestinationsDetail(c *gin.Context) {
 		}
 
 		disponibles := cupo.Disponibilidad
-		if disponibles == 0 && tomados > 0 {
-			disponibles = tomados - vendidos - cancelados
+		if disponibles < 0 {
+			disponibles = 0
+		} else if disponibles == 0 && tomados > vendidos {
+			disponibles = tomados - vendidos
+			if disponibles < 0 {
+				disponibles = 0
+			}
 		}
 
 		opUnit := cupo.OP
@@ -278,11 +283,16 @@ func GetDestinationsDetail(c *gin.Context) {
 			}
 		}
 
+		riesgoItem := float64(disponibles) * neto1Unit
+		if riesgoItem < 0 {
+			riesgoItem = 0
+		}
+
 		item := grouped[key]
 		item.Rentabilidad += opUnit * float64(vendidos)
 		item.CostoReal += neto1Unit * float64(vendidos)
 		item.VentaReal += precioUnit * float64(vendidos)
-		item.Riesgo += float64(disponibles) * neto1Unit
+		item.Riesgo += riesgoItem
 	}
 
 	var results []*Result
@@ -334,10 +344,14 @@ func GetEvolutionRevenue(c *gin.Context) {
 			evol[period] = &MonthStats{Period: period}
 		}
 
+		disp := cupo.Disponibilidad
+		if disp < 0 {
+			disp = 0
+		}
 		item := evol[period]
 		item.Ventas += float64(cupo.Vendidos) * cupo.Precio
 		item.Rentabilidad += float64(cupo.Vendidos) * cupo.OP
-		item.Riesgo += float64(cupo.Disponibilidad) * cupo.Neto1
+		item.Riesgo += float64(disp) * cupo.Neto1
 		item.Cupos += cupo.Cupo
 		item.Vendidos += cupo.Vendidos
 	}
@@ -478,8 +492,12 @@ func GetTopProducts(c *gin.Context) {
 
 	var results []Result
 	for _, cupo := range products {
+		disp := cupo.Disponibilidad
+		if disp < 0 {
+			disp = 0
+		}
 		rentabilidad := float64(cupo.Vendidos) * cupo.OP
-		riesgo := float64(cupo.Disponibilidad) * cupo.Neto1
+		riesgo := float64(disp) * cupo.Neto1
 		ocupacion := 0.0
 		if cupo.Cupo > 0 {
 			ocupacion = (float64(cupo.Vendidos) / float64(cupo.Cupo)) * 100
@@ -534,11 +552,11 @@ func GetRiskAlerts(c *gin.Context) {
 	now := time.Now()
 
 	for _, cupo := range products {
-		if cupo.Disponibilidad <= 0 {
-			continue
+		disp := cupo.Disponibilidad
+		if disp < 0 {
+			disp = 0
 		}
-
-		riesgo := float64(cupo.Disponibilidad) * cupo.Neto1
+		riesgo := float64(disp) * cupo.Neto1
 		ocupacion := 0.0
 		if cupo.Cupo > 0 {
 			ocupacion = (float64(cupo.Vendidos) / float64(cupo.Cupo)) * 100

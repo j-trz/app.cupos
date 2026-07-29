@@ -28,6 +28,7 @@ import Requests from './pages/Requests';
 import Confirmations from './pages/Confirmations';
 import WhiteLabelConfig from './pages/WhiteLabelConfig';
 import EmailConfig from './pages/EmailConfig';
+import AtlasConfig from './pages/AtlasConfig';
 import NotificationTemplates from './pages/NotificationTemplates';
 import AIConfig from './pages/AIConfig';
 import AIChatPage from './pages/AIChatPage';
@@ -249,6 +250,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <EmailConfig />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/atlas-config"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <AtlasConfig />
                           </Layout>
                         </ProtectedRoute>
                       }

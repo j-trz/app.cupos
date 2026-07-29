@@ -237,7 +237,8 @@ Servicios disponibles:
 - `apiKeyService` — claves de API para integraciones externas M2M.
 - `exportService` — exportación de datos (Excel/PDF).
 - `alertRuleService` — reglas de alerta.
-- `backofficeService` — utilidades de backoffice.
+- `atlasService` — búsqueda de contactos en Netviax Atlas (backoffice) para autocompletar el formulario de reserva.
+- `atlasConfigService` — configuración por agencia de las credenciales de Netviax Atlas.
 
 ---
 

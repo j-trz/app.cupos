@@ -633,11 +633,19 @@ SMTP y plantillas de email por agencia.
 
 **`POST /api/email-config/test`** — body: `{ "smtp_host": "…", "smtp_port": 587, "smtp_user": "…", "smtp_pass": "…", "smtp_secure": false }`.
 
-### Backoffice
+### Backoffice (Netviax Atlas)
+
+Integración de solo lectura con Netviax Atlas para buscar un contacto ya cargado y autocompletar el formulario de reserva. Las credenciales (Usuario/Clave/Empresa/Sucursal) se configuran por agencia desde `/api/atlas-config` (ver más abajo).
 
 | Método | Ruta | Acceso | Descripción |
 | --- | --- | --- | --- |
-| `GET` | `/api/backoffice/importar-pasajeros` | Autenticado | Utilidad de importación de pasajeros. |
+| `POST` | `/api/backoffice/atlas/contactos/buscar` | Autenticado | Busca contactos en Atlas. Body: `{ "filtro_tipo": "documento"\|"email"\|"celular"\|"nombre", "valor": "…" }`. |
+| `GET` | `/api/backoffice/atlas/contactos/:codigo` | Autenticado | Detalle de un contacto por `ContactoCodigo`, mapeado a datos de contacto + pasajero. |
+| `GET` | `/api/atlas-config/config` | Autenticado | Configuración de Atlas de la agencia actual (o `?agency_id=` para admin). |
+| `POST` | `/api/atlas-config/config` | Autenticado | Crea la configuración de Atlas de la agencia. |
+| `PUT` | `/api/atlas-config/config/:id` | Autenticado | Actualiza la configuración de Atlas. |
+| `DELETE` | `/api/atlas-config/config/:id` | Autenticado | Elimina la configuración de Atlas. |
+| `POST` | `/api/atlas-config/test` | Autenticado | Prueba las credenciales de Atlas contra `wscontactovendedorbuscar`. |
 
 ### Logs
 

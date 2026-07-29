@@ -349,10 +349,21 @@ func main() {
 			}
 			protected.GET("/transfers/all", middleware.RequirePermission("TRANSFERS_VIEW"), handlers.ListTransfers)
 
-			// Backoffice (Importar Pasajeros)
-			backoffice := protected.Group("/backoffice")
+			// Backoffice (Netviax Atlas) - Búsqueda de contactos
+			backoffice := protected.Group("/backoffice/atlas")
 			{
-				backoffice.GET("/importar-pasajeros", handlers.ImportarPasajeros)
+				backoffice.POST("/contactos/buscar", handlers.BuscarContactoAtlas)
+				backoffice.GET("/contactos/:codigo", handlers.DetalleContactoAtlas)
+			}
+
+			// Configuración de credenciales de Netviax Atlas, por agencia
+			atlasConfig := protected.Group("/atlas-config")
+			{
+				atlasConfig.GET("/config", handlers.GetAtlasConfig)
+				atlasConfig.POST("/config", handlers.CreateAtlasConfig)
+				atlasConfig.PUT("/config/:id", handlers.UpdateAtlasConfig)
+				atlasConfig.DELETE("/config/:id", handlers.DeleteAtlasConfig)
+				atlasConfig.POST("/test", handlers.TestAtlasConnectionHandler)
 			}
 
 			// Logs del sistema y Estado del sistema
