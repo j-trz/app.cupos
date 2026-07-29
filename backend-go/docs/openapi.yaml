@@ -36,6 +36,7 @@ tags:
   - name: RBAC
   - name: Notifications
   - name: EmailConfig
+  - name: Backoffice
   - name: Logs
 
 security:
@@ -1435,10 +1436,63 @@ paths:
       responses:
         '200': { description: Preview }
 
-  /backoffice/importar-pasajeros:
+  /backoffice/atlas/contactos/buscar:
+    post:
+      tags: [Backoffice]
+      summary: Busca contactos en Netviax Atlas (documento/email/celular/nombre)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filtro_tipo: { type: string, enum: [documento, email, celular, nombre] }
+                valor: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /backoffice/atlas/contactos/{codigo}:
     get:
-      tags: [Logs]
-      summary: Utilidad de importación de pasajeros
+      tags: [Backoffice]
+      summary: Detalle de un contacto de Atlas por ContactoCodigo
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /atlas-config/config:
+    get:
+      tags: [Backoffice]
+      summary: Configuración de Atlas de la agencia actual
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Backoffice]
+      summary: Crea la configuración de Atlas de la agencia
+      responses:
+        '201': { description: Created }
+
+  /atlas-config/config/{id}:
+    put:
+      tags: [Backoffice]
+      summary: Actualiza la configuración de Atlas
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Backoffice]
+      summary: Elimina la configuración de Atlas
+      parameters: [ { $ref: '#/components/parameters/UuidId' } ]
+      responses:
+        '200': { description: OK }
+
+  /atlas-config/test:
+    post:
+      tags: [Backoffice]
+      summary: Prueba las credenciales de Atlas (wscontactovendedorbuscar)
       responses:
         '200': { description: OK }
 

@@ -421,6 +421,22 @@ type EmailSMTPConfig struct {
 	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
+// AtlasConfig guarda las credenciales de Netviax Atlas (backoffice externo)
+// por agencia — mismo patrón que EmailSMTPConfig. AgencyID nulo = config
+// global/default, usada cuando la agencia no tiene credenciales propias.
+type AtlasConfig struct {
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AgencyID    *uuid.UUID `gorm:"type:uuid" json:"agency_id,omitempty"`
+	Usuario     string     `json:"usuario"`
+	Clave       string     `json:"clave"`
+	Empresa     string     `json:"empresa"`
+	Sucursal    string     `json:"sucursal"`
+	Environment string     `gorm:"default:'test'" json:"environment"` // "test" | "prod"
+	IsActive    bool       `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
 // EmailTemplate define el asunto/cuerpo de un email transaccional identificado
 // por Code (ej. "reservation_blocked"). AgencyID nulo = plantilla global/default,
 // usada cuando la agencia no definió una propia para ese Code.

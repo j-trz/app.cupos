@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Download, MapPin, StickyNote, Minus, AlertCircle } from 'lucide-react';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Search, MapPin, StickyNote, Minus, AlertCircle } from 'lucide-react';
 import ItineraryTable from '../components/ItineraryTable';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
 import CountdownTimer from '../components/CountdownTimer.jsx';
 import ReservationService from '../services/reservationService';
-import BackofficeService from '../services/backofficeService';
+import AtlasService from '../services/atlasService';
 import { useAIPageContext } from '../contexts/AIPageContext.jsx';
 import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import Swal from 'sweetalert2';
@@ -58,11 +58,17 @@ export default function Availability() {
   const [quantitySubmitting, setQuantitySubmitting] = useState(false);
   const [quantityError, setQuantityError] = useState('');
 
-  // Modal nativo para importar pasajeros
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importFichaVenta, setImportFichaVenta] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
+  // Modal nativo para buscar contactos en Atlas (backoffice) — "target"
+  // indica dónde aplicar el resultado: 'contacto' llena solo los datos de
+  // contacto, un número llena además esa fila de pasajero puntual.
+  const [atlasModalOpen, setAtlasModalOpen] = useState(false);
+  const [atlasTarget, setAtlasTarget] = useState('contacto');
+  const [atlasFiltroTipo, setAtlasFiltroTipo] = useState('documento');
+  const [atlasValor, setAtlasValor] = useState('');
+  const [atlasResultados, setAtlasResultados] = useState([]);
+  const [atlasSearching, setAtlasSearching] = useState(false);
+  const [atlasApplying, setAtlasApplying] = useState(false);
+  const [atlasError, setAtlasError] = useState('');
 
   useEffect(() => {
     fetchAvailability();
@@ -288,58 +294,91 @@ export default function Availability() {
     }));
   };
 
-  // Importar pasajeros mediante modal nativo
-  const handleOpenImportModal = () => {
-    setImportFichaVenta('');
-    setImportError('');
-    setImportModalOpen(true);
+  // Buscar contacto en Atlas (backoffice) mediante modal nativo — "target"
+  // es 'contacto' (botón general, llena solo Datos de contacto) o el índice
+  // de una fila de pasajero puntual (botón junto al campo Documento).
+  const handleOpenAtlasSearch = (target = 'contacto') => {
+    setAtlasTarget(target);
+    setAtlasFiltroTipo('documento');
+    setAtlasValor('');
+    setAtlasResultados([]);
+    setAtlasError('');
+    setAtlasModalOpen(true);
   };
 
-  const handleCloseImportModal = () => {
-    if (importing) return;
-    setImportModalOpen(false);
-    setImportFichaVenta('');
-    setImportError('');
+  const handleCloseAtlasSearch = () => {
+    if (atlasSearching || atlasApplying) return;
+    setAtlasModalOpen(false);
+    setAtlasResultados([]);
+    setAtlasError('');
   };
 
-  const handleConfirmImportPassengers = async (e) => {
+  const applyAtlasContacto = async (contactoCodigo) => {
+    setAtlasApplying(true);
+    setAtlasError('');
+    try {
+      const detalle = await AtlasService.detalleContacto(contactoCodigo);
+      setForm((prev) => {
+        const next = {
+          ...prev,
+          contacto_nombre: detalle.contacto_nombre || prev.contacto_nombre,
+          contacto_email: detalle.contacto_email || prev.contacto_email,
+          contacto_telefono: detalle.contacto_telefono || prev.contacto_telefono,
+        };
+        if (typeof atlasTarget === 'number' && detalle.passenger) {
+          const pasajero = detalle.passenger;
+          next.passengers = prev.passengers.map((p, i) => {
+            if (i !== atlasTarget) return p;
+            const nacimiento = pasajero.nacimiento || p.nacimiento;
+            return {
+              ...p,
+              nombre: pasajero.nombre || p.nombre,
+              apellido: pasajero.apellido || p.apellido,
+              documento: pasajero.documento || p.documento,
+              nacimiento,
+              nacionalidad: pasajero.nacionalidad || p.nacionalidad,
+              tipo_pasajero: nacimiento ? calcTipoPasajero(nacimiento, selectedProduct?.fecha_salida) : p.tipo_pasajero,
+            };
+          });
+        }
+        return next;
+      });
+      setAtlasModalOpen(false);
+      setAtlasResultados([]);
+    } catch (error) {
+      console.error('Error al traer el detalle del contacto:', error);
+      setAtlasError(error.message || 'No se pudo traer el detalle del contacto.');
+    } finally {
+      setAtlasApplying(false);
+    }
+  };
+
+  const handleSearchAtlas = async (e) => {
     if (e) e.preventDefault();
-    const ficha = importFichaVenta.trim();
-    if (!ficha) {
-      setImportError('¡Debes ingresar una ficha de venta!');
+    const valor = atlasValor.trim();
+    if (!valor) {
+      setAtlasError('Ingresá un valor para buscar.');
       return;
     }
 
-    setImporting(true);
-    setImportError('');
+    setAtlasSearching(true);
+    setAtlasError('');
+    setAtlasResultados([]);
     try {
-      const response = await BackofficeService.importarPasajeros(ficha);
-      if (response.success && response.pasajeros && response.pasajeros.length > 0) {
-        setForm((prev) => {
-          const importedPassengers = response.pasajeros.map((p) => ({
-            nombre: p.nombre || '',
-            apellido: p.apellido || '',
-            documento: p.documento || '',
-            nacimiento: p.nacimiento || '',
-            nacionalidad: p.nacionalidad || '',
-            tipo_pasajero: p.tipo_pasajero || 'Adulto',
-          }));
-
-          return {
-            ...prev,
-            ficha_venta: ficha,
-            passengers: importedPassengers,
-          };
-        });
-        setImportModalOpen(false);
+      const response = await AtlasService.buscarContacto(atlasFiltroTipo, valor);
+      const contactos = response.contactos || [];
+      if (contactos.length === 0) {
+        setAtlasError('No se encontraron contactos en Atlas para ese criterio.');
+      } else if (contactos.length === 1) {
+        await applyAtlasContacto(contactos[0].contacto_codigo);
       } else {
-        setImportError('No se encontraron pasajeros para la ficha de venta ingresada.');
+        setAtlasResultados(contactos);
       }
     } catch (error) {
-      console.error('Error al importar pasajeros:', error);
-      setImportError(error.message || 'No se pudo conectar con el backoffice.');
+      console.error('Error al buscar en Atlas:', error);
+      setAtlasError(error.message || 'No se pudo conectar con Atlas.');
     } finally {
-      setImporting(false);
+      setAtlasSearching(false);
     }
   };
 
@@ -783,7 +822,17 @@ export default function Availability() {
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Documento</label>
-                        <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
+                        <div className="flex gap-1.5">
+                          <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAtlasSearch(index)}
+                            title="Buscar este pasajero en Atlas"
+                            className="flex shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white px-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+                          >
+                            <Search className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad</label>
@@ -814,8 +863,8 @@ export default function Availability() {
                 <Button variant="secondary" size="sm" onClick={() => handleAddPassenger()} disabled={!!hold} title={hold ? 'La cantidad quedó fija al reservar el cupo — cancelá y volvé a empezar para cambiarla' : undefined}>
                   <Plus className="h-4 w-4 mr-1" />Agregar Pasajero
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleOpenImportModal} className="border-dashed">
-                  <Download className="h-4 w-4 mr-1" />Importar pasajeros
+                <Button type="button" variant="outline" size="sm" onClick={() => handleOpenAtlasSearch('contacto')} className="border-dashed">
+                  <Search className="h-4 w-4 mr-1" />Buscar contacto en Atlas
                 </Button>
               </div>
             </fieldset>
@@ -932,54 +981,91 @@ export default function Availability() {
         )}
       </Modal>
 
-      {/* ─── Modal Importar Pasajeros ─── */}
+      {/* ─── Modal Buscar Contacto en Atlas ─── */}
       <Modal
-        title="Importar Pasajeros desde Backoffice"
-        open={importModalOpen}
-        onClose={handleCloseImportModal}
+        title={typeof atlasTarget === 'number' ? `Buscar en Atlas para Pasajero ${atlasTarget + 1}` : 'Buscar contacto en Atlas'}
+        open={atlasModalOpen}
+        onClose={handleCloseAtlasSearch}
         size="md"
       >
-        <form onSubmit={handleConfirmImportPassengers} className="space-y-4">
+        <form onSubmit={handleSearchAtlas} className="space-y-4">
           <p className="text-sm text-slate-600">
-            Ingresá el número de Ficha de Venta para traer automáticamente la lista de pasajeros asociados.
+            Buscá un contacto ya cargado en Atlas por documento, email, celular o nombre para autocompletar
+            {typeof atlasTarget === 'number' ? ' los datos de este pasajero.' : ' los datos de contacto.'}
           </p>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-700">
-              Ficha de Venta *
-            </label>
-            <input
-              type="text"
-              value={importFichaVenta}
-              onChange={(e) => setImportFichaVenta(e.target.value)}
-              placeholder="Ej: FV-123"
-              autoFocus
-              disabled={importing}
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700">Buscar por</label>
+              <select
+                value={atlasFiltroTipo}
+                onChange={(e) => setAtlasFiltroTipo(e.target.value)}
+                disabled={atlasSearching || atlasApplying}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 bg-white"
+              >
+                <option value="documento">Documento</option>
+                <option value="email">Email</option>
+                <option value="celular">Celular</option>
+                <option value="nombre">Nombre</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-slate-700">Valor *</label>
+              <input
+                type="text"
+                value={atlasValor}
+                onChange={(e) => setAtlasValor(e.target.value)}
+                placeholder="Ej: 12345678"
+                autoFocus
+                disabled={atlasSearching || atlasApplying}
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
           </div>
 
-          {importError && (
+          {atlasResultados.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-slate-700">Se encontraron {atlasResultados.length} contactos — elegí uno:</p>
+              <div className="max-h-56 space-y-1.5 overflow-y-auto">
+                {atlasResultados.map((contacto) => (
+                  <button
+                    key={contacto.contacto_codigo}
+                    type="button"
+                    disabled={atlasApplying}
+                    onClick={() => applyAtlasContacto(contacto.contacto_codigo)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  >
+                    <div className="font-medium text-slate-900">{contacto.nombre || 'Sin nombre'}</div>
+                    <div className="text-xs text-slate-500">
+                      {[contacto.documento, contacto.email, contacto.celular].filter(Boolean).join(' · ') || '—'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {atlasError && (
             <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{importError}</span>
+              <span>{atlasError}</span>
             </div>
           )}
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="secondary" type="button" onClick={handleCloseImportModal} disabled={importing}>
+            <Button variant="secondary" type="button" onClick={handleCloseAtlasSearch} disabled={atlasSearching || atlasApplying}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={importing || !importFichaVenta.trim()}>
-              {importing ? (
+            <Button type="submit" disabled={atlasSearching || atlasApplying || !atlasValor.trim()}>
+              {atlasSearching || atlasApplying ? (
                 <span className="flex items-center gap-1.5">
                   <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  Importando...
+                  {atlasApplying ? 'Aplicando...' : 'Buscando...'}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5">
-                  <Download className="h-4 w-4" />
-                  Importar Pasajeros
+                  <Search className="h-4 w-4" />
+                  Buscar
                 </span>
               )}
             </Button>

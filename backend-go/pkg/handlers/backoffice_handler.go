@@ -1,140 +1,142 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
-	"time"
+
+	"backend-go/pkg/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 // ─────────────────────────────────────────────
-// BACKOFFICE - Importar Pasajeros
+// BACKOFFICE (Netviax Atlas) - Búsqueda de contactos
 //
-// Permite conectar el sistema con un backoffice externo para importar
-// los datos de pasajeros automáticamente a partir de una ficha de venta.
+// Permite buscar un contacto ya cargado en Atlas (por documento, email,
+// celular o nombre) y traer su detalle para autocompletar el formulario de
+// reserva. Solo lectura por ahora — el alta/actualización hacia Atlas
+// (wscontactoguardar) queda para una etapa posterior.
 //
-// NOTA: Actualmente en modo SIMULACIÓN hasta tener las credenciales del backoffice.
-// Cuando lleguen las credenciales, reemplazar la función simulateBackofficeAPI
-// con la llamada HTTP real al sistema externo.
+// La lógica de la llamada HTTP a Atlas vive en
+// pkg/services/netviax_atlas_service.go.
 // ─────────────────────────────────────────────
 
-// PasajeroImportado representa un pasajero devuelto por el backoffice
-type PasajeroImportado struct {
-	Nombre       string `json:"nombre"`
-	Apellido     string `json:"apellido"`
-	Documento    string `json:"documento"`
-	Nacimiento   string `json:"nacimiento"`   // formato YYYY-MM-DD
-	Nacionalidad string `json:"nacionalidad"`
-	TipoPasajero string `json:"tipo_pasajero"` // Adulto | Menor | Infante
+// BuscarContactoAtlasRequest es el body de POST /api/backoffice/atlas/contactos/buscar
+type BuscarContactoAtlasRequest struct {
+	FiltroTipo string `json:"filtro_tipo" binding:"required"` // documento | email | celular | nombre
+	Valor      string `json:"valor" binding:"required"`
 }
 
-// ImportarPasajerosResponse es la respuesta del endpoint
-type ImportarPasajerosResponse struct {
-	Success     bool                `json:"success"`
-	FichaVenta  string              `json:"ficha_venta"`
-	Pasajeros   []PasajeroImportado `json:"pasajeros"`
+// ContactoAtlasResumen es la fila que se muestra en la lista de resultados.
+type ContactoAtlasResumen struct {
+	ContactoCodigo string `json:"contacto_codigo"`
+	Nombre         string `json:"nombre"`
+	Documento      string `json:"documento"`
+	Email          string `json:"email"`
+	Celular        string `json:"celular"`
 }
 
-// ImportarPasajeros godoc
-// GET /api/backoffice/importar-pasajeros?ficha_venta=FV-123
-// Requiere autenticación. Importa pasajeros del backoffice por ficha de venta.
-func ImportarPasajeros(c *gin.Context) {
-	fichaVenta := c.Query("ficha_venta")
-	if fichaVenta == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "La ficha de venta es requerida para la importación."})
+// BuscarContactoAtlas godoc
+// POST /api/backoffice/atlas/contactos/buscar
+// Busca contactos en Atlas por documento, email, celular o nombre.
+func BuscarContactoAtlas(c *gin.Context) {
+	var input BuscarContactoAtlasRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "filtro_tipo y valor son requeridos"})
 		return
 	}
 
-	// Simular latencia de red del backoffice externo
-	time.Sleep(600 * time.Millisecond)
+	cfg, err := resolveAtlasConfigForRequest(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	// ─────────────────────────────────────────────────────────────────
-	// MODO SIMULACIÓN — Reemplazar por llamada real cuando haya credenciales
-	// Ejemplo de integración real futura:
-	//   pasajeros, err := callRealBackofficeAPI(fichaVenta)
-	//   if err != nil {
-	//       c.JSON(http.StatusBadGateway, gin.H{"error": "Error al conectar con el backoffice: " + err.Error()})
-	//       return
-	//   }
-	// ─────────────────────────────────────────────────────────────────
-	pasajeros := simulateBackofficeAPI(fichaVenta)
+	resultados, err := services.BuscarContacto(cfg, input.FiltroTipo, input.Valor)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
 
-	c.JSON(http.StatusOK, ImportarPasajerosResponse{
-		Success:    true,
-		FichaVenta: fichaVenta,
-		Pasajeros:  pasajeros,
-	})
+	contactos := make([]ContactoAtlasResumen, 0, len(resultados))
+	for _, r := range resultados {
+		contactos = append(contactos, ContactoAtlasResumen{
+			ContactoCodigo: r.ContactoCodigo,
+			Nombre:         r.ContactoNombre,
+			Documento:      r.ContactoDocumento1,
+			Email:          r.ContactoComunicacion1Email,
+			Celular:        r.ContactoComunicacion1Celular,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"contactos": contactos})
 }
 
-// simulateBackofficeAPI simula la respuesta del backoffice según la ficha de venta.
-// Cuando lleguen las credenciales reales, esta función se reemplaza por la llamada HTTP real.
-func simulateBackofficeAPI(fichaVenta string) []PasajeroImportado {
-	lower := strings.ToLower(fichaVenta)
+// PasajeroDesdeAtlas es el pedazo del detalle que llena una fila de pasajero
+// en el formulario — mismo shape que ya usa el formulario manual
+// (nombre/apellido/documento/nacimiento/nacionalidad).
+type PasajeroDesdeAtlas struct {
+	Nombre       string `json:"nombre"`
+	Apellido     string `json:"apellido"`
+	Documento    string `json:"documento"`
+	Nacimiento   string `json:"nacimiento"`
+	Nacionalidad string `json:"nacionalidad"`
+}
 
-	switch {
-	case strings.Contains(lower, "123"):
-		// Caso: 2 pasajeros (Adulto + Menor)
-		return []PasajeroImportado{
-			{
-				Nombre:       "Juan Carlos",
-				Apellido:     "Pérez",
-				Documento:    "38472910",
-				Nacimiento:   "1994-05-15",
-				Nacionalidad: "Argentina",
-				TipoPasajero: "Adulto",
-			},
-			{
-				Nombre:       "Mariana Belén",
-				Apellido:     "Pérez",
-				Documento:    "51123987",
-				Nacimiento:   "2018-09-20",
-				Nacionalidad: "Argentina",
-				TipoPasajero: "Menor",
-			},
-		}
+// DetalleContactoAtlasResponse es la respuesta de GET .../contactos/:codigo,
+// ya mapeada al shape que espera el formulario de reserva.
+type DetalleContactoAtlasResponse struct {
+	ContactoNombre   string             `json:"contacto_nombre"`
+	ContactoEmail    string             `json:"contacto_email"`
+	ContactoTelefono string             `json:"contacto_telefono"`
+	Passenger        PasajeroDesdeAtlas `json:"passenger"`
+}
 
-	case strings.Contains(lower, "456"):
-		// Caso: 3 pasajeros (2 Adultos + 1 Infante)
-		return []PasajeroImportado{
-			{
-				Nombre:       "Roberto",
-				Apellido:     "Gómez Fernández",
-				Documento:    "28194837",
-				Nacimiento:   "1980-11-02",
-				Nacionalidad: "Uruguay",
-				TipoPasajero: "Adulto",
-			},
-			{
-				Nombre:       "Estela Maris",
-				Apellido:     "López",
-				Documento:    "30485920",
-				Nacimiento:   "1983-04-24",
-				Nacionalidad: "Argentina",
-				TipoPasajero: "Adulto",
-			},
-			{
-				Nombre:       "Sofía",
-				Apellido:     "Gómez López",
-				Documento:    "62194837",
-				Nacimiento:   "2025-01-10",
-				Nacionalidad: "Argentina",
-				TipoPasajero: "Infante",
-			},
-		}
-
-	default:
-		// Caso por defecto: 1 pasajero Adulto
-		return []PasajeroImportado{
-			{
-				Nombre:       "Pasajero",
-				Apellido:     fmt.Sprintf("FV %s", fichaVenta),
-				Documento:    "35194820",
-				Nacimiento:   "1990-08-12",
-				Nacionalidad: "Argentina",
-				TipoPasajero: "Adulto",
-			},
-		}
+// DetalleContactoAtlas godoc
+// GET /api/backoffice/atlas/contactos/:codigo
+// Trae el detalle completo de un contacto por su ContactoCodigo, mapeado
+// para autocompletar tanto los datos de contacto como una fila de pasajero.
+func DetalleContactoAtlas(c *gin.Context) {
+	codigo := c.Param("codigo")
+	if codigo == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "El código de contacto es requerido"})
+		return
 	}
+
+	cfg, err := resolveAtlasConfigForRequest(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	contacto, err := services.DetalleContacto(cfg, codigo)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	celularOTelefono := contacto.ContactoComunicacion1Celular
+	if celularOTelefono == "" {
+		celularOTelefono = contacto.ContactoComunicacion1Telefono
+	}
+
+	nombrePasajero := contacto.ContactoPrimerNombre
+	if contacto.ContactoSegundoNombre != "" {
+		nombrePasajero = nombrePasajero + " " + contacto.ContactoSegundoNombre
+	}
+	apellidoPasajero := contacto.ContactoPrimerApellido
+	if contacto.ContactoSegundoApellido != "" {
+		apellidoPasajero = apellidoPasajero + " " + contacto.ContactoSegundoApellido
+	}
+
+	c.JSON(http.StatusOK, DetalleContactoAtlasResponse{
+		ContactoNombre:   contacto.ContactoNombre,
+		ContactoEmail:    contacto.ContactoComunicacion1Email,
+		ContactoTelefono: celularOTelefono,
+		Passenger: PasajeroDesdeAtlas{
+			Nombre:       nombrePasajero,
+			Apellido:     apellidoPasajero,
+			Documento:    contacto.ContactoDocumento1,
+			Nacimiento:   contacto.ContactoNacimiento,
+			Nacionalidad: contacto.ContactoNacionalidadPaisNombre,
+		},
+	})
 }
