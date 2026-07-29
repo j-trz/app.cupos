@@ -146,7 +146,6 @@ body::before {
   height: 2.5rem;
   color: var(--accent);
   flex-shrink: 0;
-
 }
 
 .brand-text {
