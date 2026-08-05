@@ -80,12 +80,34 @@ func credentialsFromConfig(cfg *models.AtlasConfig) AtlasCredentials {
 	return AtlasCredentials{Usuario: cfg.Usuario, Clave: cfg.Clave, Empresa: cfg.Empresa, Sucursal: cfg.Sucursal}
 }
 
+// AtlasFlexString existe porque Atlas no es consistente entre endpoints: la
+// colección Postman muestra "Error"/"Mensaje" como string ("0", ""), pero
+// wscontactovendedorbuscar los devuelve como número (0) — un string común
+// tira "cannot unmarshal number into Go struct field" apenas llega la
+// primera respuesta real. Acepta cualquiera de las dos formas y normaliza a
+// string.
+type AtlasFlexString string
+
+func (s *AtlasFlexString) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		*s = AtlasFlexString(str)
+		return nil
+	}
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err != nil {
+		return fmt.Errorf("no es ni string ni número: %w", err)
+	}
+	*s = AtlasFlexString(num.String())
+	return nil
+}
+
 // AtlasEnvelope son los campos de negocio que Atlas usa para indicar
 // éxito/error ("0" = OK) — el status HTTP no es confiable (ver
 // doAtlasRequest), así que el éxito/fracaso se decide siempre con este campo.
 type AtlasEnvelope struct {
-	Error   string `json:"Error"`
-	Mensaje string `json:"Mensaje"`
+	Error   AtlasFlexString `json:"Error"`
+	Mensaje AtlasFlexString `json:"Mensaje"`
 }
 
 func (e AtlasEnvelope) asError() error {
