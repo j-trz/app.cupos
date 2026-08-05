@@ -1128,7 +1128,15 @@ export default function LogsDelSitio() {
       </div>
 
       {/* Contenido */}
-      {activeTab === 'status' ? <SystemStatusTab /> : activeTab === 'logs' ? <LogsTab /> : <BackupPanel />}
+      {activeTab === 'status' ? (
+        <SystemStatusTab />
+      ) : activeTab === 'qa' ? (
+        <QADiagnosticTab />
+      ) : activeTab === 'logs' ? (
+        <LogsTab />
+      ) : (
+        <BackupPanel />
+      )}
     </div>
   );
 }
