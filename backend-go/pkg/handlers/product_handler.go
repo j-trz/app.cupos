@@ -34,7 +34,10 @@ func createdByFromContext(c *gin.Context) *uuid.UUID {
 
 // fixNumbers convierte strings numéricos a float64/int para evitar errores de unmarshal
 func fixNumbers(data map[string]interface{}) {
-	floatFields := []string{"precio", "neto_1", "op", "inf_fare", "chd_fare"}
+	floatFields := []string{
+		"precio", "neto_1", "op", "inf_fare", "chd_fare",
+		"tarifa_adt", "impuestos_adt", "tarifa_chd", "impuestos_chd", "tarifa_inf", "impuestos_inf",
+	}
 	intFields := []string{"disponibilidad", "cupo", "vendidos", "bloqueo_temporal_minutos"}
 	for _, field := range floatFields {
 		if v, ok := data[field]; ok {
@@ -54,6 +57,38 @@ func fixNumbers(data map[string]interface{}) {
 			}
 		}
 	}
+}
+
+// applyCalculatedPrices calcula la Venta de cada tipo de pasajero como
+// Tarifa+Impuestos+OP y la escribe en Precio/ChdFare/InfFare — esos 3 campos
+// dejan de cargarse a mano; siempre reflejan lo que se acaba de cargar en
+// Tarifa/Impuestos (por tipo) + OP (compartido). Se llama tanto en
+// CreateProduct como en UpdateProduct para que nunca queden desincronizados.
+func applyCalculatedPrices(product *models.Product) {
+	product.Precio = product.TarifaAdt + product.ImpuestosAdt + product.OP
+	product.ChdFare = product.TarifaChd + product.ImpuestosChd + product.OP
+	product.InfFare = product.TarifaInf + product.ImpuestosInf + product.OP
+}
+
+// reconcilePricesForImport se usa en la carga masiva (BulkCreateProducts),
+// que acepta tanto filas "viejas" (precio/chd_fare/inf_fare ya calculado, de
+// una migración de cupos históricos) como filas "nuevas" (con desglose de
+// tarifa/impuestos). Si vino el desglose nuevo, la Venta se recalcula
+// (Tarifa+Impuestos+OP) igual que en CreateProduct/UpdateProduct. Si vino
+// solo el precio viejo sin desglose, se infiere Tarifa=precio pero NO se
+// recalcula el precio (evita sumarle el OP encima a un precio que ya era
+// correcto).
+func reconcilePricesForImport(product *models.Product) {
+	reconcileOne := func(tarifa, impuestos *float64, venta *float64) {
+		if *tarifa != 0 || *impuestos != 0 {
+			*venta = *tarifa + *impuestos + product.OP
+		} else if *venta != 0 {
+			*tarifa = *venta
+		}
+	}
+	reconcileOne(&product.TarifaAdt, &product.ImpuestosAdt, &product.Precio)
+	reconcileOne(&product.TarifaChd, &product.ImpuestosChd, &product.ChdFare)
+	reconcileOne(&product.TarifaInf, &product.ImpuestosInf, &product.InfFare)
 }
 
 // fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
@@ -182,6 +217,7 @@ func CreateProduct(c *gin.Context) {
 	if product.Cupo > 0 && product.Disponibilidad > product.Cupo {
 		product.Disponibilidad = product.Cupo
 	}
+	applyCalculatedPrices(&product)
 
 	database.DB.Create(&product)
 
@@ -245,11 +281,13 @@ func UpdateProduct(c *gin.Context) {
 	if updated.Cupo > 0 && updated.Disponibilidad > updated.Cupo {
 		updated.Disponibilidad = updated.Cupo
 	}
+	applyCalculatedPrices(&updated)
 
 	if err := database.DB.Select(
 		"destino", "compania", "disponibilidad", "cupo",
 		"fecha_salida", "fecha_regreso", "salida", "regreso",
 		"precio", "neto_1", "op",
+		"tarifa_adt", "impuestos_adt", "tarifa_chd", "impuestos_chd", "tarifa_inf", "impuestos_inf",
 		"ruta", "pnr", "ficha", "temporada", "tipo_producto",
 		"bloqueo_temporal_minutos",
 		"carryon", "handbag", "checkedbag",
@@ -343,6 +381,7 @@ func BulkCreateProducts(c *gin.Context) {
 		if input.Products[i].Cupo > 0 && input.Products[i].Disponibilidad > input.Products[i].Cupo {
 			input.Products[i].Disponibilidad = input.Products[i].Cupo
 		}
+		reconcilePricesForImport(&input.Products[i])
 	}
 
 	tx := database.DB.Begin()

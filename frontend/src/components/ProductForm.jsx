@@ -18,6 +18,16 @@ const TIPOS_PRODUCTO = [
 
 const SERVICIO_OPTIONS = ['Cupo', 'Charter'];
 
+// Los 3 tipos de pasajero tienen tarifa/impuestos independientes — la Venta
+// de cada uno se calcula (Tarifa+Impuestos+OP) y la termina fijando el
+// backend en Precio/ChdFare/InfFare (ver applyCalculatedPrices en
+// product_handler.go); acá solo se previsualiza en vivo mientras se edita.
+const PASSENGER_PRICE_TYPES = [
+  { key: 'adt', label: 'ADT' },
+  { key: 'chd', label: 'CHD' },
+  { key: 'inf', label: 'INF' },
+];
+
 const RUTA_LABEL_BY_TIPO = {
   Hotel: 'Habitación',
   Crucero: 'Cabina',
@@ -33,7 +43,12 @@ const EMPTY_FORM = {
   cupo: '',
   fecha_salida: '',
   fecha_regreso: '',
-  precio: '',
+  tarifa_adt: '',
+  impuestos_adt: '',
+  tarifa_chd: '',
+  impuestos_chd: '',
+  tarifa_inf: '',
+  impuestos_inf: '',
   neto_1: '',
   op: '',
   ruta: '',
@@ -46,8 +61,6 @@ const EMPTY_FORM = {
   carryon: false,
   handbag: false,
   checkedbag: false,
-  inf_fare: '',
-  chd_fare: '',
   is_blocked_for_sale: false,
   notas_internas: '',
   notas_externas: '',
@@ -69,7 +82,12 @@ function toFormValues(product) {
     cupo: product.cupo ?? '',
     fecha_salida: fmt(product.fecha_salida),
     fecha_regreso: fmt(product.fecha_regreso),
-    precio: product.precio ?? '',
+    tarifa_adt: product.tarifa_adt ?? '',
+    impuestos_adt: product.impuestos_adt ?? '',
+    tarifa_chd: product.tarifa_chd ?? '',
+    impuestos_chd: product.impuestos_chd ?? '',
+    tarifa_inf: product.tarifa_inf ?? '',
+    impuestos_inf: product.impuestos_inf ?? '',
     neto_1: product.neto_1 ?? '',
     op: product.op ?? '',
     ruta: product.ruta || '',
@@ -82,8 +100,6 @@ function toFormValues(product) {
     carryon: product.carryon ?? false,
     handbag: product.handbag ?? false,
     checkedbag: product.checkedbag ?? false,
-    inf_fare: product.inf_fare ?? '',
-    chd_fare: product.chd_fare ?? '',
     is_blocked_for_sale: product.is_blocked_for_sale ?? false,
     notas_internas: product.notas_internas || '',
     notas_externas: product.notas_externas || '',
@@ -105,7 +121,12 @@ function toPayload(form) {
     cupo: num(form.cupo),
     fecha_salida: form.fecha_salida || null,
     fecha_regreso: form.fecha_regreso || null,
-    precio: num(form.precio),
+    tarifa_adt: num(form.tarifa_adt),
+    impuestos_adt: num(form.impuestos_adt),
+    tarifa_chd: num(form.tarifa_chd),
+    impuestos_chd: num(form.impuestos_chd),
+    tarifa_inf: num(form.tarifa_inf),
+    impuestos_inf: num(form.impuestos_inf),
     neto_1: num(form.neto_1),
     op: num(form.op),
     ruta: form.ruta,
@@ -118,8 +139,6 @@ function toPayload(form) {
     carryon: form.carryon,
     handbag: form.handbag,
     checkedbag: form.checkedbag,
-    inf_fare: num(form.inf_fare),
-    chd_fare: num(form.chd_fare),
     is_blocked_for_sale: form.is_blocked_for_sale,
     notas_internas: form.notas_internas,
     notas_externas: form.notas_externas,
@@ -283,12 +302,29 @@ const ProductForm = ({
         {/* Precios */}
         <div>
           {sectionLabel('Precios')}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-            {field('precio', 'Precio ADT', 'number', { step: '0.01', min: '0' })}
-            {field('inf_fare', 'Precio INF', 'number', { step: '0.01', min: '0' })}
-            {field('chd_fare', 'Precio CHD', 'number', { step: '0.01', min: '0' })}
-            {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
-            {field('op', 'OP', 'number', { step: '0.01', min: '0' })}
+          <div className="space-y-3">
+            {PASSENGER_PRICE_TYPES.map(({ key, label }) => {
+              const tarifa = Number(form[`tarifa_${key}`]) || 0;
+              const impuestos = Number(form[`impuestos_${key}`]) || 0;
+              const op = Number(form.op) || 0;
+              const venta = tarifa + impuestos + op;
+              return (
+                <div key={key} className="grid grid-cols-3 gap-4 items-end">
+                  {field(`tarifa_${key}`, `Tarifa ${label}`, 'number', { step: '0.01', min: '0' })}
+                  {field(`impuestos_${key}`, `Impuestos ${label}`, 'number', { step: '0.01', min: '0' })}
+                  <div className="space-y-1">
+                    <Label>Venta {label}</Label>
+                    <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                      ${venta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5 pt-2 border-t border-slate-200">
+              {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
+              {field('op', 'OP', 'number', { step: '0.01', min: '0', help: 'Se suma a la Venta de los 3 tipos de pasajero, arriba.' })}
+            </div>
           </div>
         </div>
 

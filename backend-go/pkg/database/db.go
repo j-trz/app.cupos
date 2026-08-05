@@ -594,6 +594,21 @@ func runSQLMigrations(db *gorm.DB) {
 		// formulario de pasajeros) y apagado de IA por agencia.
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_passenger_count INT DEFAULT 0;`,
 		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS ai_habilitado BOOLEAN DEFAULT true;`,
+		// Precios: Tarifa+Impuestos por tipo de pasajero (precio/chd_fare/inf_fare
+		// pasan a ser la Venta calculada = Tarifa+Impuestos+OP, ver
+		// applyCalculatedPrices en product_handler.go). Backfill de productos
+		// cargados antes de este cambio: Tarifa = precio actual, Impuestos = 0 —
+		// a propósito NO se recalcula precio/chd_fare/inf_fare acá (quedan
+		// iguales hasta que alguien edite y guarde ese producto de nuevo).
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS tarifa_adt numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS impuestos_adt numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS tarifa_chd numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS impuestos_chd numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS tarifa_inf numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS impuestos_inf numeric DEFAULT 0;`,
+		`UPDATE products SET tarifa_adt = precio WHERE tarifa_adt = 0 AND impuestos_adt = 0 AND precio != 0;`,
+		`UPDATE products SET tarifa_chd = chd_fare WHERE tarifa_chd = 0 AND impuestos_chd = 0 AND chd_fare != 0;`,
+		`UPDATE products SET tarifa_inf = inf_fare WHERE tarifa_inf = 0 AND impuestos_inf = 0 AND inf_fare != 0;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

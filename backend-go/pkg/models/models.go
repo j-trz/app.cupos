@@ -29,30 +29,42 @@ type Profile struct {
 }
 
 type Product struct {
-	ID                     uint       `gorm:"primaryKey" json:"id"`
-	CodigoCupo             string     `gorm:"not null" json:"codigo_cupo"`
-	Destino                string     `gorm:"not null" json:"destino"`
-	Compania               string     `gorm:"not null" json:"compania"`
-	Disponibilidad         int        `gorm:"not null" json:"disponibilidad"`
-	Cupo                   int        `json:"cupo"`
-	Vendidos               int        `json:"vendidos"`
-	FechaSalida            *time.Time `json:"fecha_salida"`
-	FechaRegreso           *time.Time `json:"fecha_regreso"`
-	Precio                 float64    `json:"precio"`
-	Neto1                  float64    `json:"neto_1"`
-	OP                     float64    `json:"op"`
-	Ruta                   string     `json:"ruta"`
-	PNR                    string     `json:"pnr"`
-	Ficha                  string     `json:"ficha"`
-	Temporada              string     `json:"temporada"`
-	TipoProducto           string     `json:"tipo_producto"`
-	BloqueoTemporalMinutos int        `json:"bloqueo_temporal_minutos"`
-	CarryOn                bool       `gorm:"column:carryon;default:false" json:"carryon"`
-	HandBag                bool       `gorm:"column:handbag;default:false" json:"handbag"`
-	CheckedBag             bool       `gorm:"column:checkedbag;default:false" json:"checkedbag"`
-	InfFare                float64    `json:"inf_fare"`
-	ChdFare                float64    `json:"chd_fare"`
-	IsBlockedForSale       bool       `gorm:"default:false" json:"is_blocked_for_sale"`
+	ID             uint       `gorm:"primaryKey" json:"id"`
+	CodigoCupo     string     `gorm:"not null" json:"codigo_cupo"`
+	Destino        string     `gorm:"not null" json:"destino"`
+	Compania       string     `gorm:"not null" json:"compania"`
+	Disponibilidad int        `gorm:"not null" json:"disponibilidad"`
+	Cupo           int        `json:"cupo"`
+	Vendidos       int        `json:"vendidos"`
+	FechaSalida    *time.Time `json:"fecha_salida"`
+	FechaRegreso   *time.Time `json:"fecha_regreso"`
+	// Precio/InfFare/ChdFare son la Venta de cada tipo de pasajero (ADT/INF/CHD)
+	// — se calculan y pisan server-side (ver applyCalculatedPrices en
+	// product_handler.go) como Tarifa+Impuestos+OP de ese tipo. Se mantienen
+	// estos 3 nombres (no se renombran a "venta_adt" etc.) a propósito: son
+	// consumidos por Availability.jsx, reportes, PDFs y el payload de reserva
+	// sin que ninguno de esos lugares necesite saber que ahora es un cálculo.
+	Precio                 float64 `json:"precio"`
+	TarifaAdt              float64 `json:"tarifa_adt"`
+	ImpuestosAdt           float64 `json:"impuestos_adt"`
+	Neto1                  float64 `json:"neto_1"`
+	OP                     float64 `json:"op"`
+	Ruta                   string  `json:"ruta"`
+	PNR                    string  `json:"pnr"`
+	Ficha                  string  `json:"ficha"`
+	Temporada              string  `json:"temporada"`
+	TipoProducto           string  `json:"tipo_producto"`
+	BloqueoTemporalMinutos int     `json:"bloqueo_temporal_minutos"`
+	CarryOn                bool    `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag                bool    `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag             bool    `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	InfFare                float64 `json:"inf_fare"`
+	TarifaInf              float64 `json:"tarifa_inf"`
+	ImpuestosInf           float64 `json:"impuestos_inf"`
+	ChdFare                float64 `json:"chd_fare"`
+	TarifaChd              float64 `json:"tarifa_chd"`
+	ImpuestosChd           float64 `json:"impuestos_chd"`
+	IsBlockedForSale       bool    `gorm:"default:false" json:"is_blocked_for_sale"`
 	// Servicio es un texto libre que describe el servicio puntual del
 	// producto (ej. "Traslado", "Seguro de viaje", "Excursión"), distinto de
 	// TipoProducto (que categoriza Aéreo/Hotel/Crucero).
@@ -122,15 +134,15 @@ const (
 )
 
 type Reservation struct {
-	ID                   uint       `gorm:"primaryKey" json:"id"`
-	ProductID            uint       `json:"product_id"`
-	CreatedBy            uuid.UUID  `gorm:"type:uuid" json:"created_by"`
-	Estado               string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
-	BloqueoExpiraAt      *time.Time `json:"bloqueo_expira_at"`
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	ProductID       uint       `json:"product_id"`
+	CreatedBy       uuid.UUID  `gorm:"type:uuid" json:"created_by"`
+	Estado          string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
+	BloqueoExpiraAt *time.Time `json:"bloqueo_expira_at"`
 	// HoldPassengerCount es la cantidad de asientos que ocupa un pre-hold
 	// (EstadoHoldTemporal) antes de que existan Passengers reales — necesario
 	// para saber cuánto stock devolver si el hold se cancela o vence.
-	HoldPassengerCount int `gorm:"column:hold_passenger_count;default:0" json:"hold_passenger_count,omitempty"`
+	HoldPassengerCount   int        `gorm:"column:hold_passenger_count;default:0" json:"hold_passenger_count,omitempty"`
 	PrecioVenta          float64    `json:"precio_venta"`
 	Neto1                float64    `json:"neto_1"`
 	PedidoID             string     `gorm:"not null" json:"pedido_id"`
@@ -290,14 +302,14 @@ type Group struct {
 }
 
 type Agency struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Code      string    `gorm:"unique;not null" json:"code"`
-	Name      string    `gorm:"not null" json:"name"`
-	Email     string    `json:"email"`
-	Phone     string    `json:"phone"`
-	Website   string    `json:"website"`
-	Color     string    `gorm:"default:'#3b82f6'" json:"color"`
-	IsActive  bool      `gorm:"default:true" json:"is_active"`
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Code     string    `gorm:"unique;not null" json:"code"`
+	Name     string    `gorm:"not null" json:"name"`
+	Email    string    `json:"email"`
+	Phone    string    `json:"phone"`
+	Website  string    `json:"website"`
+	Color    string    `gorm:"default:'#3b82f6'" json:"color"`
+	IsActive bool      `gorm:"default:true" json:"is_active"`
 	// AIHabilitado permite que una agencia desactive el asistente de IA para
 	// todos sus usuarios (widget de chat + endpoint /ai/chat).
 	AIHabilitado bool      `gorm:"column:ai_habilitado;default:true" json:"ai_habilitado"`
@@ -514,10 +526,10 @@ type AIMessage struct {
 // configurado y nombrado por cada agencia — scopeado por Agencia igual que
 // Product/Reservation.
 type AIExpert struct {
-	ID          uuid.UUID          `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Agencia     string             `gorm:"not null;index" json:"agencia"`
-	Name        string             `gorm:"not null" json:"name"`
-	Description string             `json:"description"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Agencia     string    `gorm:"not null;index" json:"agencia"`
+	Name        string    `gorm:"not null" json:"name"`
+	Description string    `json:"description"`
 	// Persona es tono/personalidad opcional, se agrega al system prompt del
 	// turno cuando se consulta a este experto.
 	Persona   string             `json:"persona"`
