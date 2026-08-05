@@ -138,7 +138,7 @@ export default function Availability() {
   };
 
   // ---- Reserva individual ----
-  const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' };
+  const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' };
 
   // Abre el modal SIN hold — lo sigue usando el Asistente IA (abrir_modal_reserva),
   // que no pasa por el flujo manual de "elegir cantidad" de abajo.
@@ -283,7 +283,7 @@ export default function Availability() {
   const handleAddPassenger = () => {
     setForm((prev) => ({
       ...prev,
-      passengers: [...prev.passengers, { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' }],
+      passengers: [...prev.passengers, { nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' }],
     }));
   };
 
@@ -822,7 +822,7 @@ export default function Availability() {
                         <input type="text" value={passenger.apellido} onChange={(e) => handlePassengerChange(index, 'apellido', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: González" />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Documento</label>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">CI</label>
                         <div className="flex gap-1.5">
                           <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
                           <button
@@ -834,6 +834,10 @@ export default function Availability() {
                             <Search className="h-4 w-4" />
                           </button>
                         </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">Pasaporte</label>
+                        <input type="text" value={passenger.pasaporte} onChange={(e) => handlePassengerChange(index, 'pasaporte', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: D740258" />
                       </div>
                       {passenger.nacionalidadFromAtlas && passenger.nacionalidad && (
                         <div>

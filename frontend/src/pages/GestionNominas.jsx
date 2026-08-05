@@ -58,6 +58,7 @@ const buildPassengerRows = (r) => {
       nombre: p.nombre || '—',
       apellido: p.apellido || '—',
       documento: p.documento || '—',
+      pasaporte: p.pasaporte || '—',
       nacimiento: p.nacimiento,
       nacionalidad: p.nacionalidad || '—',
       tipoPasajero: p.tipo_pasajero || '—',
@@ -79,6 +80,7 @@ const buildPassengerRows = (r) => {
     nombre: r.nombre_pasajero || '—',
     apellido: r.apellido_pasajero || '—',
     documento: r.documento_pasajero || '—',
+    pasaporte: '—',
     nacimiento: r.nacimiento_pasajero,
     nacionalidad: r.nacionalidad_pasajero || '—',
     tipoPasajero: r.tipo_pasajero || '—',
@@ -140,6 +142,7 @@ const buildRow = (r, products) => {
     'Nombre': row.nombre,
     'Apellido': row.apellido,
     'Documento': row.documento,
+    'Pasaporte': row.pasaporte === '—' ? '' : row.pasaporte,
     'Fecha Nacimiento': formatDate(row.nacimiento),
     'Nacionalidad': row.nacionalidad,
     'Tipo Pasajero': row.tipoPasajero,
@@ -180,6 +183,71 @@ const exportToExcel = (reservations, products) => {
   XLSX.writeFile(wb, `nominas-${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
+// ─── Excel export para Backoffice (BO) ──────────────────────────────────────
+// Formato fijo pedido para importar a Netviax Atlas: una fila por pasajero,
+// con las columnas exactas (incluye varias en blanco a propósito — "K1" a
+// "P1", "W1", "AA1" a "AD1" — que el template de BO espera aunque este
+// sistema no tenga ese dato).
+
+// Adulto/Menor(Niño)/Infante -> el sufijo de campo de Producto correspondiente
+// (tarifa_adt/impuestos_adt, etc). Acepta "Niño" además de "Menor" porque
+// conviven los dos valores en el sistema (ver GestionReservas.jsx vs.
+// Availability.jsx) — cualquiera de los dos cuenta como CHD acá.
+const passengerPriceSuffix = (tipoPasajero) => {
+  const t = (tipoPasajero || '').toLowerCase();
+  if (t === 'infante') return 'inf';
+  if (t === 'menor' || t === 'niño' || t === 'nino') return 'chd';
+  return 'adt';
+};
+
+const buildBORow = (r, products, agencies) => {
+  const product = products.find((p) => String(p.id) === String(r.product_id));
+  const op = Number(product?.op) || 0;
+  const agencyDisplayName = agencies.find((a) => a.code === r.agencia)?.name || r.agencia || '';
+
+  return buildPassengerRows(r).map((row) => {
+    const suffix = passengerPriceSuffix(row.tipoPasajero);
+    const tarifa = Number(product?.[`tarifa_${suffix}`]) || 0;
+    const impuestos = Number(product?.[`impuestos_${suffix}`]) || 0;
+    const neto1 = tarifa + impuestos;
+    const netoVendedor = neto1 + op;
+
+    return {
+      'NRO': row.esVentaPrincipal === null ? '' : (row.esVentaPrincipal ? 1 : 0),
+      'Cupo': product?.codigo_cupo || r.vuelo_codigo || '',
+      'Pasajero': `${row.apellido === '—' ? '' : row.apellido.toUpperCase()}/${row.nombre === '—' ? '' : row.nombre.toUpperCase()}`,
+      'Ficha': row.fichaVenta === '—' ? '' : row.fichaVenta,
+      'CI': row.documento === '—' ? '' : row.documento,
+      'Pasaporte': row.pasaporte === '—' ? '' : row.pasaporte,
+      'Fecha Nac': formatDate(row.nacimiento) || '',
+      'Celular': r.contacto_telefono || '',
+      'Vendedor': row.vendedorEmail === '—' ? '' : row.vendedorEmail,
+      'Agencia': agencyDisplayName,
+      'K1': '', 'L1': '', 'M1': '', 'N1': '', 'O1': '', 'P1': '',
+      'Creado': r.created_at ? new Date(r.created_at).toLocaleString('es-AR') : '',
+      'TARIFA': tarifa,
+      'TASAS': impuestos,
+      'NETO 1': neto1,
+      'OP': op,
+      'Neto Vendedor': netoVendedor,
+      'W1': '',
+      'Regreso': formatDate(product?.fecha_regreso) || '',
+      'Fecha emisión de grupo': r.emitido_at ? formatDate(r.emitido_at) : '',
+      'Código de Reserva': product?.pnr || '',
+      'AA1': '', 'AB1': '', 'AC1': '', 'AD1': '',
+      'Status BACK': r.status_back || '',
+    };
+  });
+};
+
+const exportToExcelBO = (reservations, products, agencies) => {
+  const rows = reservations.flatMap((r) => buildBORow(r, products, agencies));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+  XLSX.utils.book_append_sheet(wb, ws, 'BO');
+  XLSX.writeFile(wb, `nominas-bo-${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
 // ─── Formulario compartido de datos de pasajero (editar / agregar) ──────────
 
 const passengerInputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
@@ -200,19 +268,25 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700">Documento</label>
+          <label className="text-sm font-medium text-slate-700">CI</label>
           <input type="text" value={values.documento} onChange={set('documento')} className={passengerInputCls} />
         </div>
         <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700">Nacimiento</label>
-          <input type="date" value={values.nacimiento} onChange={set('nacimiento')} className={passengerInputCls} />
+          <label className="text-sm font-medium text-slate-700">Pasaporte</label>
+          <input type="text" value={values.pasaporte} onChange={set('pasaporte')} className={passengerInputCls} />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-700">Nacimiento</label>
+          <input type="date" value={values.nacimiento} onChange={set('nacimiento')} className={passengerInputCls} />
+        </div>
+        <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Nacionalidad</label>
           <input type="text" value={values.nacionalidad} onChange={set('nacionalidad')} className={passengerInputCls} />
         </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Tipo</label>
           <select value={values.tipo_pasajero} onChange={set('tipo_pasajero')} className={`${passengerInputCls} bg-white`}>
@@ -447,7 +521,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const EMPTY_PASSENGER_FORM = {
-  nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '',
+  nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '',
   tipo_pasajero: 'Adulto', precio_venta: '', neto_1: '', numero_ticket: '',
 };
 
@@ -517,6 +591,7 @@ export default function GestionNominas() {
       nombre: row.nombre === '—' ? '' : row.nombre,
       apellido: row.apellido === '—' ? '' : row.apellido,
       documento: row.documento === '—' ? '' : row.documento,
+      pasaporte: row.pasaporte === '—' ? '' : row.pasaporte,
       nacimiento: row.nacimiento ? String(row.nacimiento).slice(0, 10) : '',
       nacionalidad: row.nacionalidad === '—' ? '' : row.nacionalidad,
       tipo_pasajero: row.tipoPasajero === '—' ? 'Adulto' : row.tipoPasajero,
@@ -540,6 +615,7 @@ export default function GestionNominas() {
           nombre: editForm.nombre,
           apellido: editForm.apellido,
           documento: editForm.documento,
+          pasaporte: editForm.pasaporte,
           nacimiento: editForm.nacimiento || null,
           nacionalidad: editForm.nacionalidad,
           tipo_pasajero: editForm.tipo_pasajero,
@@ -583,6 +659,7 @@ export default function GestionNominas() {
         nombre: addForm.nombre,
         apellido: addForm.apellido,
         documento: addForm.documento,
+        pasaporte: addForm.pasaporte,
         nacimiento: addForm.nacimiento || null,
         nacionalidad: addForm.nacionalidad,
         tipo_pasajero: addForm.tipo_pasajero,
@@ -760,6 +837,17 @@ export default function GestionNominas() {
             >
               <Download className="h-4 w-4" />
               Exportar Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToExcelBO(reservations, products, agencies)}
+              disabled={loading || reservations.length === 0}
+              className="flex items-center gap-2"
+              title="Excel con el formato para importar a Netviax Atlas"
+            >
+              <Download className="h-4 w-4" />
+              Exportar BO
             </Button>
           </div>
         }

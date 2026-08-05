@@ -373,6 +373,8 @@ func main() {
 			{
 				systemGroup.GET("/status", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemStatus)
 				systemGroup.POST("/holds/:id/release", middleware.AdminOnly(), handlers.AdminReleaseHold)
+				systemGroup.POST("/qa/run", middleware.RequirePermission("LOGS_VIEW"), handlers.RunSystemQA)
+				systemGroup.POST("/qa/ai-dictamen", middleware.RequirePermission("LOGS_VIEW"), handlers.GenerateAIDictamen)
 			}
 
 			// Configuración de email (SMTP + plantillas) por agencia

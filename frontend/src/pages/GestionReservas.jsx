@@ -28,6 +28,7 @@ const emptyForm = {
   nombre_pasajero: '',
   apellido_pasajero: '',
   documento_pasajero: '',
+  pasaporte_pasajero: '',
   nacimiento_pasajero: '',
   nacionalidad_pasajero: '',
   tipo_pasajero: 'Adulto',
@@ -39,7 +40,11 @@ const emptyForm = {
   vuelo_salida: '',
   bloqueo_expira_at: '',
   ficha_venta: '',
+  estado_interno: '',
+  status_back: '',
 };
+
+const ESTADO_INTERNO_OPTIONS = ['', 'Pendiente', 'Seña', 'Pagado', 'Emitido'];
 
 const formatDate = formatDateOnly;
 
@@ -256,6 +261,7 @@ export default function GestionReservas() {
       nombre_pasajero: primaryPassenger?.nombre || r.nombre_pasajero || '',
       apellido_pasajero: primaryPassenger?.apellido || r.apellido_pasajero || '',
       documento_pasajero: primaryPassenger?.documento || r.documento_pasajero || '',
+      pasaporte_pasajero: primaryPassenger?.pasaporte || '',
       nacimiento_pasajero: (primaryPassenger?.nacimiento || r.nacimiento_pasajero)
         ? String(primaryPassenger?.nacimiento || r.nacimiento_pasajero).slice(0, 10)
         : '',
@@ -269,6 +275,8 @@ export default function GestionReservas() {
       vuelo_salida: r.vuelo_salida ? String(r.vuelo_salida).slice(0, 10) : '',
       bloqueo_expira_at: r.bloqueo_expira_at ? String(r.bloqueo_expira_at).slice(0, 16) : '',
       ficha_venta: r.ficha_venta || '',
+      estado_interno: r.estado_interno || '',
+      status_back: r.status_back || '',
     });
     setProductInfo(null);
     setDialogOpen(true);
@@ -315,6 +323,7 @@ export default function GestionReservas() {
         nombre: payload.nombre_pasajero,
         apellido: payload.apellido_pasajero,
         documento: payload.documento_pasajero,
+        pasaporte: payload.pasaporte_pasajero,
         nacimiento: payload.nacimiento_pasajero || null,
         nacionalidad: payload.nacionalidad_pasajero,
         tipo_pasajero: payload.tipo_pasajero,
@@ -323,9 +332,25 @@ export default function GestionReservas() {
       delete payload.nombre_pasajero;
       delete payload.apellido_pasajero;
       delete payload.documento_pasajero;
+      delete payload.pasaporte_pasajero;
       delete payload.nacimiento_pasajero;
       delete payload.nacionalidad_pasajero;
       delete payload.tipo_pasajero;
+    } else {
+      // pasaporte no es un campo de Reservation (solo existe a nivel
+      // Passenger) — si no se manda un pasajero explícito, el backend lo
+      // sintetiza a partir de los campos *_pasajero de arriba, pero ese
+      // fallback no conoce "pasaporte". Se manda armado para que no se pierda.
+      payload.passengers = [{
+        nombre: payload.nombre_pasajero,
+        apellido: payload.apellido_pasajero,
+        documento: payload.documento_pasajero,
+        pasaporte: payload.pasaporte_pasajero,
+        nacimiento: payload.nacimiento_pasajero || null,
+        nacionalidad: payload.nacionalidad_pasajero,
+        tipo_pasajero: payload.tipo_pasajero,
+      }];
+      delete payload.pasaporte_pasajero;
     }
     delete payload.numero_ticket;
     // Quitar campos vacíos
@@ -838,6 +863,17 @@ export default function GestionReservas() {
                   <input type="text" value={form.ficha_venta} onChange={e => setField('ficha_venta', e.target.value)}
                     className={inputCls} placeholder="Ficha de venta" />
                 </Field>
+                <Field label="Estado interno" hint="Seguimiento de pago/emisión, independiente del estado de arriba">
+                  <select value={form.estado_interno} onChange={e => setField('estado_interno', e.target.value)} className={inputCls + ' bg-white'}>
+                    {ESTADO_INTERNO_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>{opt || 'Sin definir'}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Status BACK" hint='Ej: "BO OK" — si ya se cargó en el backoffice'>
+                  <input type="text" value={form.status_back} onChange={e => setField('status_back', e.target.value)}
+                    className={inputCls} placeholder="BO OK" />
+                </Field>
               </div>
             </section>
           )}
@@ -892,10 +928,15 @@ export default function GestionReservas() {
                   disabled={editReservation && !editPassengerId}
                   className={inputCls} placeholder="Apellido" />
               </Field>
-              <Field label="Documento">
+              <Field label="CI">
                 <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
                   disabled={editReservation && !editPassengerId}
-                  className={inputCls} placeholder="CI / Pasaporte" />
+                  className={inputCls} placeholder="CI" />
+              </Field>
+              <Field label="Pasaporte">
+                <input type="text" value={form.pasaporte_pasajero} onChange={e => setField('pasaporte_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} placeholder="Pasaporte" />
               </Field>
               <Field label="Nacimiento">
                 <input type="date" value={form.nacimiento_pasajero} onChange={e => setField('nacimiento_pasajero', e.target.value)}

@@ -6,6 +6,7 @@ import {
   Activity, Database, Server, Wifi, WifiOff, Copy, Check,
   Lock, Unlock, User, ShieldAlert, Info, Zap, Package,
   Users, ClipboardList, AlertCircle, CheckCircle2, TrendingDown, HardDrive,
+  Sparkles, ShieldCheck, Play, Terminal, Layers, Cpu, FileCode, Sliders,
 } from 'lucide-react';
 import LogService from '../services/logService';
 import Button from '../components/ui/Button.jsx';
@@ -676,10 +677,411 @@ function LogsTab() {
   );
 }
 
+// ─── Pestaña Diagnóstico QA & Testeo Quirúrgico ────────────────────────────
+
+const QA_CATEGORIES = [
+  { id: 'all', label: 'Todos los Testeos', icon: Layers },
+  { id: 'endpoints', label: 'Endpoints API', icon: Globe },
+  { id: 'database', label: 'Base de Datos', icon: Database },
+  { id: 'business', label: 'Reglas de Negocio', icon: ClipboardList },
+  { id: 'security', label: 'Seguridad & RBAC', icon: ShieldCheck },
+  { id: 'services', label: 'Servicios SMTP/Atlas', icon: Server },
+  { id: 'ai', label: 'Asistente IA', icon: Bot },
+];
+
+function QADiagnosticTab() {
+  const [qaData, setQaData] = useState(null);
+  const [aiDictamen, setAiDictamen] = useState(null);
+  const [loadingQA, setLoadingQA] = useState(false);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [expandedItem, setExpandedItem] = useState(null);
+  const [copiedDictamen, setCopiedDictamen] = useState(false);
+
+  const runDiagnostic = useCallback(async () => {
+    setLoadingQA(true);
+    try {
+      const data = await LogService.runSystemQA();
+      setQaData(data);
+      fetchAIDictamen(data);
+    } catch (e) {
+      console.error('Error al ejecutar diagnóstico QA:', e);
+    } finally {
+      setLoadingQA(false);
+    }
+  }, []);
+
+  const fetchAIDictamen = async (currentQAData) => {
+    const dataToUse = currentQAData || qaData;
+    if (!dataToUse) return;
+    setLoadingAI(true);
+    try {
+      const dictamen = await LogService.generateAIDictamen(dataToUse);
+      setAiDictamen(dictamen);
+    } catch (e) {
+      console.error('Error al solicitar dictamen de IA:', e);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  useEffect(() => {
+    runDiagnostic();
+  }, []);
+
+  const handleExportReport = () => {
+    if (!qaData) return;
+    const jsonStr = JSON.stringify({
+      qa_results: qaData,
+      ai_dictamen: aiDictamen,
+      exported_at: new Date().toISOString()
+    }, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `diagnostico_qa_sistema_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyDictamen = () => {
+    if (!aiDictamen) return;
+    const textToCopy = `${aiDictamen.health_verdict}\n\n${aiDictamen.dictamen_text}\n\nRecomendaciones:\n${(aiDictamen.key_recommendations || []).map(r => '- ' + r).join('\n')}`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedDictamen(true);
+    setTimeout(() => setCopiedDictamen(false), 2500);
+  };
+
+  const tests = qaData?.tests || [];
+  const filteredTests = activeCategory === 'all'
+    ? tests
+    : tests.filter(t => t.category === activeCategory);
+
+  const getStatusBadge = (status) => {
+    if (status === 'passed') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          PASÓ
+        </span>
+      );
+    }
+    if (status === 'warning') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+          AVISO
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+        <XCircle className="h-3.5 w-3.5 text-rose-500" />
+        FALLÓ
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* ── Header Hero: Score de Salud Quirúrgica ──────────────────────────── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-12 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            {/* Score Ring */}
+            <div className="relative flex items-center justify-center h-24 w-24 rounded-2xl bg-white/5 border border-white/10 shrink-0 shadow-inner">
+              <div className="text-center">
+                <span className={`text-3xl font-extrabold tracking-tight ${
+                  (qaData?.health_score || 0) >= 90 ? 'text-emerald-400' :
+                  (qaData?.health_score || 0) >= 70 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {qaData ? `${qaData.health_score}%` : '—'}
+                </span>
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mt-0.5">Salud QA</p>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/10 inline-flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-indigo-300" />
+                  Diagnóstico Quirúrgico en Vivo
+                </span>
+                {qaData?.timestamp && (
+                  <span className="text-xs text-slate-400">
+                    Última corrida: {fmtDate(qaData.timestamp)} ({fmtMs(qaData.duration_ms)})
+                  </span>
+                )}
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                {qaData?.health_score >= 90 ? 'Sistema 100% Operativo y Quirúrgicamente Estable' :
+                 qaData?.health_score >= 70 ? 'Sistema Operativo con Advertencias Preventivas' :
+                 qaData ? 'Se Detectaron Fallos Quirúrgicos Relevantes' : 'Ejecutando Testeo Quirúrgico...'}
+              </h2>
+              <p className="text-sm text-slate-300 mt-1 max-w-xl">
+                Prueba en tiempo real de endpoints HTTP, tiempos de latencia, integridad de PostgreSQL, stock de cupos, servicios de email y motor de IA.
+              </p>
+            </div>
+          </div>
+
+          {/* Acciones principales */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full lg:w-auto">
+            <button
+              onClick={runDiagnostic}
+              disabled={loadingQA}
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm shadow-md transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loadingQA ? 'animate-spin' : ''}`} />
+              {loadingQA ? 'Testeando...' : 'Ejecutar QA Quirúrgico'}
+            </button>
+
+            <button
+              onClick={() => fetchAIDictamen()}
+              disabled={loadingAI || !qaData}
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white font-medium text-sm transition-all disabled:opacity-50"
+            >
+              <Bot className={`h-4 w-4 text-emerald-400 ${loadingAI ? 'animate-bounce' : ''}`} />
+              {loadingAI ? 'Analizando IA...' : 'Dictamen IA'}
+            </button>
+
+            <button
+              onClick={handleExportReport}
+              disabled={!qaData}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-sm font-medium transition-all disabled:opacity-40"
+              title="Exportar informe de diagnóstico en JSON"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Bar con Resumen de Testeos */}
+        {qaData?.summary && (
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-white/10">
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl p-3 border border-white/5">
+              <div className="p-2 rounded-xl bg-blue-500/20 text-blue-300"><Layers className="h-4 w-4" /></div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-medium">Total Testeos</p>
+                <p className="text-lg font-bold text-white leading-tight">{qaData.summary.total}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl p-3 border border-white/5">
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300"><CheckCircle2 className="h-4 w-4" /></div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-medium">Pasaron OK</p>
+                <p className="text-lg font-bold text-emerald-300 leading-tight">{qaData.summary.passed}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl p-3 border border-white/5">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300"><AlertTriangle className="h-4 w-4" /></div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-medium">Advertencias</p>
+                <p className="text-lg font-bold text-amber-300 leading-tight">{qaData.summary.warnings}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl p-3 border border-white/5">
+              <div className="p-2 rounded-xl bg-rose-500/20 text-rose-300"><XCircle className="h-4 w-4" /></div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-medium">Fallaron</p>
+                <p className="text-lg font-bold text-rose-300 leading-tight">{qaData.summary.failed}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Tarjeta de Dictamen Quirúrgico con IA Integrada ───────────────── */}
+      {aiDictamen && (
+        <div className="relative rounded-3xl bg-white border border-indigo-100 shadow-md p-6 overflow-hidden space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  Dictamen Quirúrgico con IA Integrada
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {aiDictamen.provider_used}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">Evaluación ejecutiva y recomendaciones automatizadas</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-xl text-xs font-bold border ${
+                aiDictamen.risk_level === 'BAJO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                aiDictamen.risk_level === 'MEDIO' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                'bg-rose-50 text-rose-700 border-rose-200'
+              }`}>
+                RIESGO {aiDictamen.risk_level}
+              </span>
+
+              <button
+                onClick={handleCopyDictamen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              >
+                {copiedDictamen ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-slate-500" />}
+                {copiedDictamen ? 'Copiado' : 'Copiar Dictamen'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200/60 font-sans text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+            {aiDictamen.dictamen_text}
+          </div>
+
+          {aiDictamen.key_recommendations && aiDictamen.key_recommendations.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                Recomendaciones Quirúrgicas Sugeridas
+              </h4>
+              <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {aiDictamen.key_recommendations.map((rec, i) => (
+                  <li key={i} className="flex items-start gap-2 bg-indigo-50/40 border border-indigo-100/80 rounded-xl p-3 text-xs font-medium text-slate-800">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold mt-0.5">
+                      {i + 1}
+                    </span>
+                    <span>{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Filtros por Categoría ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {QA_CATEGORIES.map(({ id, label, icon: Icon }) => {
+          const count = id === 'all'
+            ? tests.length
+            : tests.filter(t => t.category === id).length;
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveCategory(id)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                activeCategory === id
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeCategory === id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Listado de Testeos Quirúrgicos ────────────────────────────────── */}
+      {loadingQA && !qaData ? (
+        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-3">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
+          <p className="text-sm font-medium text-slate-600">Ejecutando suite de testeo quirúrgico del sistema...</p>
+        </div>
+      ) : filteredTests.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center text-sm text-slate-400">
+          No hay testeos que coincidan con la categoría seleccionada.
+        </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {filteredTests.map((test) => {
+              const isExpanded = expandedItem === test.id;
+              return (
+                <div key={test.id} className="p-4 hover:bg-slate-50/70 transition-colors">
+                  <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      {/* Estado Icon */}
+                      <div className="shrink-0">
+                        {test.status === 'passed' && <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100"><CheckCircle2 className="h-4 w-4" /></div>}
+                        {test.status === 'warning' && <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100"><AlertTriangle className="h-4 w-4" /></div>}
+                        {test.status === 'failed' && <div className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100"><XCircle className="h-4 w-4" /></div>}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-slate-900">{test.name}</h4>
+                          {test.method && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {test.method}
+                            </span>
+                          )}
+                          {test.path && (
+                            <span className="text-xs font-mono text-slate-500 truncate" title={test.path}>
+                              {test.path}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5">{test.message}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {test.http_status > 0 && (
+                        <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-xl border ${
+                          test.http_status >= 200 && test.http_status < 300
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-slate-50 text-slate-700 border-slate-200'
+                        }`}>
+                          {test.http_status}
+                        </span>
+                      )}
+
+                      <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
+                        {fmtMs(test.latency_ms)}
+                      </span>
+
+                      {getStatusBadge(test.status)}
+
+                      {test.details && (
+                        <button
+                          onClick={() => setExpandedItem(isExpanded ? null : test.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                          title="Ver detalles del testeo"
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Detalles Expandibles */}
+                  {isExpanded && test.details && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="bg-slate-900 text-slate-200 rounded-2xl p-3.5 font-mono text-xs overflow-x-auto">
+                        <p className="text-slate-400 text-[11px] font-sans font-semibold mb-1">Detalles de diagnóstico:</p>
+                        <pre className="whitespace-pre-wrap leading-relaxed">{test.details}</pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 const TABS = [
   { id: 'status', label: 'Estado del sistema', icon: Activity },
+  { id: 'qa', label: 'Diagnóstico QA & Testeo Quirúrgico', icon: Sparkles },
   { id: 'logs', label: 'Registro de logs', icon: ScrollText },
   { id: 'backups', label: 'Backups de BD', icon: HardDrive },
 ];
@@ -703,7 +1105,7 @@ export default function LogsDelSitio() {
     <div className="space-y-6">
       <PageHeader
         title="Estado del sistema"
-        description="Monitoreo en tiempo real, diagnóstico, respaldo de base de datos y registro de eventos"
+        description="Monitoreo en tiempo real, diagnóstico quirúrgico QA, respaldo de base de datos y registro de eventos"
         icon={Activity}
       />
 
@@ -719,7 +1121,7 @@ export default function LogsDelSitio() {
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className={`h-4 w-4 ${id === 'qa' ? 'text-indigo-600' : ''}`} />
             {label}
           </button>
         ))}

@@ -609,6 +609,13 @@ func runSQLMigrations(db *gorm.DB) {
 		`UPDATE products SET tarifa_adt = precio WHERE tarifa_adt = 0 AND impuestos_adt = 0 AND precio != 0;`,
 		`UPDATE products SET tarifa_chd = chd_fare WHERE tarifa_chd = 0 AND impuestos_chd = 0 AND chd_fare != 0;`,
 		`UPDATE products SET tarifa_inf = inf_fare WHERE tarifa_inf = 0 AND impuestos_inf = 0 AND inf_fare != 0;`,
+		// Seguimiento administrativo de pago/emisión (Exportar BO en Nóminas)
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS estado_interno VARCHAR(20) DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS emitido_at TIMESTAMP WITH TIME ZONE;`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS status_back VARCHAR(50) DEFAULT '';`,
+		// CI (Documento) y Pasaporte son documentos distintos — un pasajero puede
+		// tener uno, el otro, o los dos.
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS pasaporte VARCHAR(50) DEFAULT '';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

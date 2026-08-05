@@ -24,6 +24,7 @@ type PassengerInput struct {
 	Nombre       string   `json:"nombre"`
 	Apellido     string   `json:"apellido"`
 	Documento    string   `json:"documento"`
+	Pasaporte    string   `json:"pasaporte,omitempty"`
 	Nacimiento   string   `json:"nacimiento"` // "1994-10-20" o "1994-10-20T00:00:00Z"
 	Nacionalidad string   `json:"nacionalidad"`
 	TipoPasajero string   `json:"tipo_pasajero"`
@@ -237,6 +238,7 @@ func toPassengerModel(pi PassengerInput) models.Passenger {
 		Nombre:       pi.Nombre,
 		Apellido:     pi.Apellido,
 		Documento:    pi.Documento,
+		Pasaporte:    pi.Pasaporte,
 		Nacimiento:   parseDateFlexible(pi.Nacimiento),
 		Nacionalidad: pi.Nacionalidad,
 		TipoPasajero: pi.TipoPasajero,
@@ -890,6 +892,19 @@ func UpdateReservation(c *gin.Context) {
 		}
 	}
 
+	// emitido_at nunca se acepta directo del cliente — se calcula acá abajo,
+	// la primera vez que estado_interno pasa a "Emitido".
+	delete(input, "emitido_at")
+	if v, ok := input["estado_interno"].(string); ok {
+		if !models.IsValidEstadoInterno(v) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "estado_interno inválido"})
+			return
+		}
+		if v == "Emitido" && reservation.EstadoInterno != "Emitido" {
+			input["emitido_at"] = time.Now()
+		}
+	}
+
 	if err := database.DB.Model(&reservation).Updates(input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar la reserva: " + err.Error()})
 		return
@@ -1198,6 +1213,7 @@ func UpdatePassenger(c *gin.Context) {
 		Nombre       string   `json:"nombre"`
 		Apellido     string   `json:"apellido"`
 		Documento    string   `json:"documento"`
+		Pasaporte    string   `json:"pasaporte"`
 		Nacimiento   string   `json:"nacimiento"`
 		Nacionalidad string   `json:"nacionalidad"`
 		TipoPasajero string   `json:"tipo_pasajero"`
@@ -1213,6 +1229,7 @@ func UpdatePassenger(c *gin.Context) {
 		"nombre":        input.Nombre,
 		"apellido":      input.Apellido,
 		"documento":     input.Documento,
+		"pasaporte":     input.Pasaporte,
 		"nacionalidad":  input.Nacionalidad,
 		"tipo_pasajero": input.TipoPasajero,
 		"nacimiento":    parseDateFlexible(input.Nacimiento),
@@ -1286,6 +1303,7 @@ func DuplicatePassenger(c *gin.Context) {
 		Nombre:          source.Nombre,
 		Apellido:        source.Apellido,
 		Documento:       source.Documento,
+		Pasaporte:       source.Pasaporte,
 		Nacimiento:      source.Nacimiento,
 		Nacionalidad:    source.Nacionalidad,
 		TipoPasajero:    source.TipoPasajero,
@@ -1327,6 +1345,7 @@ func AddPassenger(c *gin.Context) {
 		Nombre       string   `json:"nombre"`
 		Apellido     string   `json:"apellido"`
 		Documento    string   `json:"documento"`
+		Pasaporte    string   `json:"pasaporte"`
 		Nacimiento   string   `json:"nacimiento"`
 		Nacionalidad string   `json:"nacionalidad"`
 		TipoPasajero string   `json:"tipo_pasajero"`
@@ -1379,6 +1398,7 @@ func AddPassenger(c *gin.Context) {
 		Nombre:          input.Nombre,
 		Apellido:        input.Apellido,
 		Documento:       input.Documento,
+		Pasaporte:       input.Pasaporte,
 		Nacimiento:      parseDateFlexible(input.Nacimiento),
 		Nacionalidad:    input.Nacionalidad,
 		TipoPasajero:    input.TipoPasajero,

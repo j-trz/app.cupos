@@ -133,6 +133,23 @@ const (
 	EstadoCedida = "cedido"
 )
 
+// EstadoInternoOptions son los valores válidos de Reservation.EstadoInterno —
+// seguimiento administrativo de pago/emisión, independiente del ciclo de
+// vida de Estado. "" (vacío) es válido y significa "sin definir".
+var EstadoInternoOptions = []string{"Pendiente", "Seña", "Pagado", "Emitido"}
+
+func IsValidEstadoInterno(v string) bool {
+	if v == "" {
+		return true
+	}
+	for _, opt := range EstadoInternoOptions {
+		if opt == v {
+			return true
+		}
+	}
+	return false
+}
+
 type Reservation struct {
 	ID              uint       `gorm:"primaryKey" json:"id"`
 	ProductID       uint       `json:"product_id"`
@@ -167,6 +184,18 @@ type Reservation struct {
 	FichaVenta           string     `json:"ficha_venta"`
 	DocContable          string     `json:"doc_contable"`
 	DocContableExpiresAt *time.Time `json:"doc_contable_expires_at"`
+	// EstadoInterno es un seguimiento administrativo (Pendiente/Seña/Pagado/
+	// Emitido) independiente del ciclo de vida de Estado (bloqueo/confirmada/
+	// cancelada) — lo carga a mano un admin/agencia desde Gestión de Reservas.
+	// EmitidoAt se calcula solo (nunca lo manda el cliente, ver UpdateReservation
+	// en order_handler.go): queda fijada la primera vez que EstadoInterno pasa
+	// a "Emitido", para poder reportarla en la exportación a Backoffice.
+	EstadoInterno string     `gorm:"column:estado_interno" json:"estado_interno,omitempty"`
+	EmitidoAt     *time.Time `gorm:"column:emitido_at" json:"emitido_at,omitempty"`
+	// StatusBack es una anotación libre sobre si esta reserva ya se cargó
+	// correctamente en el backoffice externo (ej. "BO OK") — manual por ahora,
+	// no hay todavía una integración de escritura real hacia Atlas.
+	StatusBack string `gorm:"column:status_back" json:"status_back,omitempty"`
 	// ExpirationWarningSentAt evita reenviar el aviso de "por vencer" en cada corrida del cron.
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
 	// PreCancelEstado guarda el estado que tenía la reserva justo antes de que
@@ -191,16 +220,19 @@ type Reservation struct {
 // se crea siempre de forma individual (con su propio ticket), aunque varios
 // pasajeros compartan PedidoID/ReservationID por haberse reservado juntos.
 type Passenger struct {
-	ID            uint       `gorm:"primaryKey" json:"id"`
-	ReservationID uint       `json:"reservation_id"`
-	PedidoID      string     `json:"pedido_id"`
-	Nombre        string     `json:"nombre"`
-	Apellido      string     `json:"apellido"`
-	Documento     string     `json:"documento"`
-	Nacimiento    *time.Time `json:"nacimiento"`
-	Nacionalidad  string     `json:"nacionalidad"`
-	TipoPasajero  string     `json:"tipo_pasajero"`
-	NRO           int        `json:"nro"` // 1 = Venta, 0 = Acompañante
+	ID            uint   `gorm:"primaryKey" json:"id"`
+	ReservationID uint   `json:"reservation_id"`
+	PedidoID      string `json:"pedido_id"`
+	Nombre        string `json:"nombre"`
+	Apellido      string `json:"apellido"`
+	Documento     string `json:"documento"`
+	// Pasaporte es un documento aparte del CI (Documento) — un pasajero puede
+	// tener uno, el otro, o los dos (ej. si vino cargado desde Atlas con ambos).
+	Pasaporte    string     `json:"pasaporte"`
+	Nacimiento   *time.Time `json:"nacimiento"`
+	Nacionalidad string     `json:"nacionalidad"`
+	TipoPasajero string     `json:"tipo_pasajero"`
+	NRO          int        `json:"nro"` // 1 = Venta, 0 = Acompañante
 	// Campos de ticket individual: cada pasajero progresa de forma
 	// independiente dentro del mismo pedido.
 	Estado                  string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
