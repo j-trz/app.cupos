@@ -59,6 +59,7 @@ func InitDB() {
 		&models.AIExpertDocument{},
 		&models.AIExpertChunk{},
 		&models.APIKey{},
+		&models.Temporada{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -102,6 +103,11 @@ func seedRBAC(db *gorm.DB) {
 		{"AGENCIES_CREATE", "Crear Agencias", "agencies", "create", "Crear nuevas agencias"},
 		{"AGENCIES_UPDATE", "Editar Agencias", "agencies", "update", "Modificar datos de agencias"},
 		{"AGENCIES_DELETE", "Eliminar Agencias", "agencies", "delete", "Eliminar agencias"},
+
+		{"TEMPORADAS_VIEW", "Ver Temporadas", "temporadas", "view", "Listar temporadas"},
+		{"TEMPORADAS_CREATE", "Crear Temporadas", "temporadas", "create", "Crear nuevas temporadas"},
+		{"TEMPORADAS_UPDATE", "Editar Temporadas", "temporadas", "update", "Modificar temporadas"},
+		{"TEMPORADAS_DELETE", "Eliminar Temporadas", "temporadas", "delete", "Eliminar temporadas"},
 
 		{"PRODUCTS_VIEW", "Ver Productos", "products", "view", "Listar y buscar productos"},
 		{"PRODUCTS_CREATE", "Crear Productos", "products", "create", "Crear nuevos productos"},
@@ -226,7 +232,11 @@ func seedRBAC(db *gorm.DB) {
 			// dejarle GestionAgencias.jsx/AGENCIES_VIEW mostraría una pantalla
 			// con botones que igual tirarían 403 al tocarlos.
 			switch p.Module {
-			case "backup", "logs", "agencies":
+			case "backup", "logs", "agencies", "temporadas":
+				// temporadas es una lista global (no por agencia, ver models.go) —
+				// mismo criterio que agencies: administrarla es exclusivo del
+				// superadmin para que ningún agency_admin le cambie/borre una
+				// temporada al resto de las agencias.
 				return false
 			case "permissions":
 				return p.Action == "view"

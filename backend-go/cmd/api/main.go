@@ -230,7 +230,6 @@ func main() {
 				apiKeysGroup.DELETE("/:id", middleware.AgencyAdminOrAdmin(), handlers.RevokeAPIKeyHandler)
 			}
 
-
 			// Exportación
 			protected.GET("/export/csv/:entityType", handlers.ExportCSV)
 
@@ -285,6 +284,17 @@ func main() {
 				agencies.POST("/", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_CREATE"), handlers.CreateAgency)
 				agencies.PUT("/:id", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_UPDATE"), handlers.UpdateAgency)
 				agencies.DELETE("/:id", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_DELETE"), handlers.DeleteAgency)
+			}
+
+			// Temporadas: lista global para el desplegable de Producto — el GET
+			// queda abierto a cualquier autenticado (lo necesita el formulario),
+			// administrarla es exclusivo del superadmin (ver seedRBAC en db.go).
+			temporadas := protected.Group("/temporadas")
+			{
+				temporadas.GET("/", handlers.ListTemporadas)
+				temporadas.POST("/", middleware.AdminOnly(), middleware.RequirePermission("TEMPORADAS_CREATE"), handlers.CreateTemporada)
+				temporadas.PUT("/:id", middleware.AdminOnly(), middleware.RequirePermission("TEMPORADAS_UPDATE"), handlers.UpdateTemporada)
+				temporadas.DELETE("/:id", middleware.AdminOnly(), middleware.RequirePermission("TEMPORADAS_DELETE"), handlers.DeleteTemporada)
 			}
 			// Self-service: prender/apagar la IA de la PROPIA agencia — la agencia
 			// objetivo la resuelve el handler de c.Get("agencia"), nunca de acá.

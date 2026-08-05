@@ -5,6 +5,7 @@ import { Label } from './ui/Label';
 import { Textarea } from './ui/Textarea';
 import { toDateOnlyString } from '../lib/dateOnly.js';
 import { useAgencies } from '../hooks/useAgencies';
+import { useTemporadas } from '../hooks/useTemporadas';
 
 // Tipos de producto soportados. El campo "ruta" se relabela según el tipo
 // (Cabina para Crucero, Habitación para Hotel) — la lógica de negocio
@@ -159,6 +160,7 @@ const ProductForm = ({
   const [form, setForm] = useState(() => toFormValues(isEditing ? defaultValues : null));
   const [errors, setErrors] = useState({});
   const { data: agencies = [] } = useAgencies();
+  const { data: temporadas = [] } = useTemporadas();
 
   const set = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -339,7 +341,26 @@ const ProductForm = ({
             } : {})}
             {field('pnr', 'PNR')}
             {field('ficha', 'Ficha')}
-            {field('temporada', 'Temporada')}
+            <div className="space-y-1">
+              <Label htmlFor="temporada">Temporada</Label>
+              <select
+                id="temporada"
+                value={form.temporada}
+                onChange={(e) => set('temporada', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Sin especificar</option>
+                {temporadas.filter((t) => t.activa || t.nombre === form.temporada).map((t) => (
+                  <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                ))}
+                {/* Si el producto ya tenía un valor viejo (texto libre, de antes de
+                    que esto fuera un desplegable) que ni siquiera está en la lista
+                    de Gestión de Temporadas, se muestra igual para no perderlo. */}
+                {form.temporada && !temporadas.some((t) => t.nombre === form.temporada) && (
+                  <option value={form.temporada}>{form.temporada}</option>
+                )}
+              </select>
+            </div>
             <div className="space-y-1 col-span-2">
               <Label htmlFor="servicio">Servicio</Label>
               <select

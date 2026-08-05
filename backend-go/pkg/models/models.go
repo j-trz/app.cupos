@@ -349,6 +349,18 @@ type Agency struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// Temporada es una lista global (no por agencia, todas comparten el mismo
+// calendario de temporadas) administrada por el admin — reemplaza el texto
+// libre que tenía Product.Temporada antes, para que el desplegable del
+// formulario de Producto no dependa de que cada uno tipee el nombre igual.
+type Temporada struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Nombre    string    `gorm:"unique;not null" json:"nombre"`
+	Activa    bool      `gorm:"default:true" json:"activa"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type WhiteLabelConfig struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AgencyID  string         `gorm:"not null;uniqueIndex" json:"agency_id"`
