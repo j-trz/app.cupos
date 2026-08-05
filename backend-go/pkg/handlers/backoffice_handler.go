@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"backend-go/pkg/services"
 
@@ -148,5 +149,130 @@ func DetalleContactoAtlas(c *gin.Context) {
 			Nacimiento:   contacto.ContactoNacimiento,
 			Nacionalidad: contacto.ContactoNacionalidadPaisNombre,
 		},
+	})
+}
+
+// ─────────────────────────────────────────────
+// FICHAS — búsqueda de una ficha de venta por número, para traer el
+// listado de pasajeros asociados y elegir cuáles importar al formulario de
+// reserva. Solo lectura (wsfichabuscar) — no existe alta/edición acá.
+// ─────────────────────────────────────────────
+
+// PasajeroFichaAtlas es un pasajero de la ficha, mapeado al shape que
+// entiende el formulario de reserva.
+type PasajeroFichaAtlas struct {
+	ContactoCodigo string `json:"contacto_codigo"`
+	Nombre         string `json:"nombre"`
+	Apellido       string `json:"apellido"`
+	Documento      string `json:"documento"`
+	Pasaporte      string `json:"pasaporte"`
+	Nacionalidad   string `json:"nacionalidad"`
+	Nacimiento     string `json:"nacimiento"`
+	TipoPasajero   string `json:"tipo_pasajero"` // Adulto | Menor | Infante
+	Telefono       string `json:"telefono"`
+	Email          string `json:"email"`
+}
+
+// FichaAtlasResponse es la respuesta de POST .../fichas/buscar.
+type FichaAtlasResponse struct {
+	FichaNumero string               `json:"ficha_numero"`
+	Asunto      string               `json:"asunto"`
+	Pasajeros   []PasajeroFichaAtlas `json:"pasajeros"`
+}
+
+// tipoPasajeroFromAtlas traduce el código de tipo de pasajero de Atlas
+// (ADT/CHD/INF, estándar de la industria) a las 3 opciones que ya usa el
+// formulario de reserva.
+func tipoPasajeroFromAtlas(codigo string) string {
+	switch strings.ToUpper(codigo) {
+	case "CHD":
+		return "Menor"
+	case "INF":
+		return "Infante"
+	default:
+		return "Adulto"
+	}
+}
+
+// splitDocumentosFicha separa los 2 documentos de un pasajero de ficha en
+// documento (CI) y pasaporte, según el código de identificación de cada
+// uno — Atlas los manda como Documento/Documento2 sin fijar cuál es cuál.
+func splitDocumentosFicha(c services.WSFichaContacto) (documento, pasaporte string) {
+	if strings.EqualFold(c.ContactoDocumentoIdentificacionCodigo, "PAS") {
+		pasaporte = c.ContactoDocumento
+	} else if c.ContactoDocumento != "" {
+		documento = c.ContactoDocumento
+	}
+	if c.ContactoDocumento2 != "" {
+		if strings.EqualFold(c.ContactoDocumento2IdentificacionCodigo, "PAS") {
+			pasaporte = c.ContactoDocumento2
+		} else if documento == "" {
+			documento = c.ContactoDocumento2
+		}
+	}
+	return documento, pasaporte
+}
+
+// BuscarFichaAtlas godoc
+// POST /api/backoffice/atlas/fichas/buscar
+// Busca una ficha de venta por número exacto y devuelve sus pasajeros.
+func BuscarFichaAtlas(c *gin.Context) {
+	var input struct {
+		Valor string `json:"valor" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "valor es requerido"})
+		return
+	}
+
+	cfg, err := resolveAtlasConfigForRequest(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	fichas, err := services.BuscarFicha(cfg, input.Valor)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	if len(fichas) == 0 {
+		c.JSON(http.StatusOK, FichaAtlasResponse{Pasajeros: []PasajeroFichaAtlas{}})
+		return
+	}
+
+	ficha := fichas[0]
+	pasajeros := make([]PasajeroFichaAtlas, 0, len(ficha.Contactos))
+	for _, contacto := range ficha.Contactos {
+		if contacto.ContactoEsPasajero != "S" {
+			continue
+		}
+		documento, pasaporte := splitDocumentosFicha(contacto)
+		nombre := contacto.ContactoPrimerNombre
+		if contacto.ContactoSegundoNombre != "" {
+			nombre = nombre + " " + contacto.ContactoSegundoNombre
+		}
+		apellido := contacto.ContactoPrimerApellido
+		if contacto.ContactoSegundoApellido != "" {
+			apellido = apellido + " " + contacto.ContactoSegundoApellido
+		}
+		pasajeros = append(pasajeros, PasajeroFichaAtlas{
+			ContactoCodigo: contacto.ContactoCodigo,
+			Nombre:         nombre,
+			Apellido:       apellido,
+			Documento:      documento,
+			Pasaporte:      pasaporte,
+			Nacionalidad:   contacto.ContactoNacionalidadPaisNombre,
+			Nacimiento:     services.NormalizeAtlasDate(contacto.ContactoNacimiento),
+			TipoPasajero:   tipoPasajeroFromAtlas(contacto.ContactoTipoCodigo),
+			Telefono:       contacto.ContactoCelular,
+			Email:          contacto.ContactoEmail,
+		})
+	}
+
+	c.JSON(http.StatusOK, FichaAtlasResponse{
+		FichaNumero: ficha.FichaNumero,
+		Asunto:      ficha.FichaAsunto,
+		Pasajeros:   pasajeros,
 	})
 }

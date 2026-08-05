@@ -116,6 +116,7 @@ func init() {
 				orders.GET("/blocked", handlers.GetBlockedReservations)
 				orders.POST("", handlers.CreateReservation)
 				orders.POST("/hold", handlers.CreateHold)
+				orders.PUT("/hold/:id", handlers.AdjustHold)
 				orders.DELETE("/hold/:id", handlers.ReleaseHold)
 				orders.GET("/:id", handlers.GetReservationByID)
 				orders.PUT("/:id", handlers.UpdateReservation)
@@ -391,6 +392,9 @@ func init() {
 			{
 				backoffice.POST("/contactos/buscar", handlers.BuscarContactoAtlas)
 				backoffice.GET("/contactos/:codigo", handlers.DetalleContactoAtlas)
+				// wsfichabuscar ya trae el detalle + pasajeros en la misma
+				// respuesta, no hace falta un detalle aparte.
+				backoffice.POST("/fichas/buscar", handlers.BuscarFichaAtlas)
 			}
 
 			// Configuración de credenciales de Netviax Atlas, por agencia

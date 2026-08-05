@@ -218,6 +218,95 @@ func ReleaseHold(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// AdjustHold cambia la cantidad de pasajeros de un pre-hold ya creado — el
+// usuario agregó o quitó una fila de pasajero en el modal después de haber
+// elegido la cantidad inicial (ver CreateHold). Ajusta la disponibilidad del
+// producto según la diferencia y extiende el vencimiento del bloqueo, ya que
+// sigue activamente completando el formulario.
+func AdjustHold(c *gin.Context) {
+	id := c.Param("id")
+	userIDStr, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	var input struct {
+		PassengerCount int `json:"passenger_count"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.PassengerCount <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "passenger_count debe ser mayor a 0"})
+		return
+	}
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var hold models.Reservation
+	if err := tx.First(&hold, id).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bloqueo temporal no encontrado."})
+		return
+	}
+	if hold.Estado != models.EstadoHoldTemporal {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este bloqueo ya no está activo — cerrá el formulario y volvé a empezar."})
+		return
+	}
+	if role != "admin" && userIDStr != nil {
+		if uid, err := uuid.Parse(userIDStr.(string)); err == nil && hold.CreatedBy != uid {
+			tx.Rollback()
+			c.JSON(http.StatusForbidden, gin.H{"error": "No podés modificar un bloqueo de otro usuario"})
+			return
+		}
+	}
+
+	delta := input.PassengerCount - hold.HoldPassengerCount
+	if delta != 0 {
+		var product models.Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, hold.ProductID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
+			return
+		}
+		if delta > 0 && product.Disponibilidad < delta {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Solo hay %d cupo(s) más disponible(s).", product.Disponibilidad)})
+			return
+		}
+		product.Disponibilidad -= delta
+		product.Vendidos += delta
+		if err := tx.Save(&product).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+			return
+		}
+	}
+
+	hold.HoldPassengerCount = input.PassengerCount
+	holdMinutes := services.GetIntSettingForAgency("bloqueo_hold_minutos", hold.Agencia, 10)
+	expiresAt := time.Now().Add(time.Duration(holdMinutes) * time.Minute)
+	hold.BloqueoExpiraAt = &expiresAt
+	if err := tx.Save(&hold).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el bloqueo"})
+		return
+	}
+
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{
+		"id":                hold.ID,
+		"pedido_id":         hold.PedidoID,
+		"bloqueo_expira_at": hold.BloqueoExpiraAt,
+		"passenger_count":   hold.HoldPassengerCount,
+	})
+}
+
 // parseDateFlexible acepta "YYYY-MM-DD" o RFC3339
 func parseDateFlexible(s string) *time.Time {
 	if s == "" {

@@ -253,6 +253,21 @@ class ReservationService {
     };
   }
 
+  // Cambia la cantidad de pasajeros de un hold ya creado (el usuario agregó
+  // o quitó una fila en el modal) — ajusta la disponibilidad reservada y
+  // extiende el vencimiento. Tira si no hay más stock para agregar.
+  static async adjustHold(holdId, passengerCount) {
+    const result = await ApiClient.put(`/orders/hold/${holdId}`, {
+      passenger_count: passengerCount,
+    });
+    return {
+      id: result.id,
+      pedidoId: result.pedido_id,
+      expiresAt: result.bloqueo_expira_at,
+      passengerCount: result.passenger_count,
+    };
+  }
+
   // Cancela un hold en curso y libera el stock al instante, sin esperar al
   // cron — se llama al cerrar el modal sin confirmar. Best-effort: si falla
   // (ya venció, o cualquier error de red) no debe romper el cierre del modal.

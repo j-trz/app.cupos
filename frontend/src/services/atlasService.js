@@ -31,6 +31,16 @@ class AtlasService {
   static async detalleContacto(contactoCodigo) {
     return ApiClient.get(`/backoffice/atlas/contactos/${encodeURIComponent(contactoCodigo)}`);
   }
+
+  /**
+   * Buscar una ficha de venta por número exacto — devuelve el listado de
+   * pasajeros asociados, ya mapeados al shape del formulario de reserva.
+   * @param {string} valor
+   * @returns {Promise<{ficha_numero: string, asunto: string, pasajeros: Array}>}
+   */
+  static async buscarFicha(valor) {
+    return ApiClient.post('/backoffice/atlas/fichas/buscar', { valor });
+  }
 }
 
 export default AtlasService;

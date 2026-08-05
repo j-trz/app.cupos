@@ -269,7 +269,9 @@ type wsContactoDetalleResponse struct {
 // atlasEmptyDate es el placeholder que Atlas usa para fechas vacías.
 const atlasEmptyDate = "0000-00-00"
 
-func normalizeAtlasDate(v string) string {
+// NormalizeAtlasDate convierte el placeholder "0000-00-00" en "" — Atlas lo
+// usa para representar una fecha vacía.
+func NormalizeAtlasDate(v string) string {
 	if v == atlasEmptyDate {
 		return ""
 	}
@@ -287,8 +289,107 @@ func DetalleContacto(cfg *models.AtlasConfig, contactoCodigo string) (*WSContact
 	if err := contacto.asError(); err != nil {
 		return nil, err
 	}
-	contacto.ContactoNacimiento = normalizeAtlasDate(contacto.ContactoNacimiento)
+	contacto.ContactoNacimiento = NormalizeAtlasDate(contacto.ContactoNacimiento)
 	return &contacto, nil
+}
+
+// ---- Fichas (wsfichabuscar) — solo lectura ----
+//
+// Confirmado contra un request real: el campo de filtro correcto es
+// "FichaNumero" (no "Ficha" ni "FichaCodigo", que Atlas ignora en silencio y
+// devuelve todo el listado sin filtrar). La respuesta de wsfichabuscar ya
+// trae el detalle completo de la ficha, incluyendo el array "Contactos" con
+// TODOS los pasajeros asociados — no hace falta wsfichadetallebuscar aparte
+// para esto. Deliberadamente no se implementa wsfichaguardar (alta/edición).
+//
+// Igual que en Contactos, el campo "Error" viene inconsistente entre
+// niveles (número en el nivel raíz, string adentro de cada ficha) — por eso
+// se usa AtlasEnvelope (con AtlasFlexString) en los dos lugares.
+
+type WSFichaFiltro struct {
+	Filtros           string `json:"Filtros"`
+	FichaNumero       string `json:"FichaNumero,omitempty"`
+	Paginado          string `json:"Paginado"`
+	PaginadoRegistros string `json:"PaginadoRegistros"`
+	PaginadoPaginas   string `json:"PaginadoPaginas"`
+}
+
+type wsFichaBuscarRequest struct {
+	AtlasCredentials
+	WSFichaFiltro WSFichaFiltro `json:"WSFichaFiltro"`
+}
+
+// WSFichaContacto es un pasajero/contacto asociado a una ficha de venta.
+type WSFichaContacto struct {
+	ContactoCodigo                         string `json:"ContactoCodigo"`
+	ContactoNombre                         string `json:"ContactoNombre"`
+	ContactoPrimerNombre                   string `json:"ContactoPrimerNombre"`
+	ContactoSegundoNombre                  string `json:"ContactoSegundoNombre"`
+	ContactoPrimerApellido                 string `json:"ContactoPrimerApellido"`
+	ContactoSegundoApellido                string `json:"ContactoSegundoApellido"`
+	ContactoDocumentoIdentificacionCodigo  string `json:"ContactoDocumentoIdentificacionCodigo"`
+	ContactoDocumentoPaisCodigo            string `json:"ContactoDocumentoPaisCodigo"`
+	ContactoDocumento                      string `json:"ContactoDocumento"`
+	ContactoDocumento2IdentificacionCodigo string `json:"ContactoDocumento2IdentificacionCodigo"`
+	ContactoDocumento2PaisCodigo           string `json:"ContactoDocumento2PaisCodigo"`
+	ContactoDocumento2                     string `json:"ContactoDocumento2"`
+	ContactoTelefono                       string `json:"ContactoTelefono"`
+	ContactoCelular                        string `json:"ContactoCelular"`
+	ContactoEmail                          string `json:"ContactoEmail"`
+	ContactoNacionalidadPaisCodigo         string `json:"ContactoNacionalidadPaisCodigo"`
+	ContactoNacionalidadPaisNombre         string `json:"ContactoNacionalidadPaisNombre"`
+	ContactoNacimiento                     string `json:"ContactoNacimiento"`
+	ContactoTipoCodigo                     string `json:"ContactoTipoCodigo"` // ADT | CHD | INF
+	ContactoEsPasajero                     string `json:"ContactoEsPasajero"`
+	ContactoEsCliente                      string `json:"ContactoEsCliente"`
+}
+
+// WSFicha es una ficha de venta con su listado de pasajeros asociados.
+type WSFicha struct {
+	AtlasEnvelope
+	FichaSerie               string            `json:"FichaSerie"`
+	FichaNumero              string            `json:"FichaNumero"`
+	FichaAsunto              string            `json:"FichaAsunto"`
+	FichaDescripcion         string            `json:"FichaDescripcion"`
+	FichaViajeEstimadoInicio string            `json:"FichaViajeEstimadoInicio"`
+	FichaViajeEstimadoFin    string            `json:"FichaViajeEstimadoFin"`
+	EstadoCodigo             string            `json:"EstadoCodigo"`
+	EstadoNombre             string            `json:"EstadoNombre"`
+	Vendedor1Nombre          string            `json:"Vendedor1Nombre"`
+	Contactos                []WSFichaContacto `json:"Contactos"`
+}
+
+type wsFichaBuscarResponse struct {
+	AtlasEnvelope
+	WSFichas []WSFicha `json:"WSFichas"`
+}
+
+// BuscarFicha trae la(s) ficha(s) de venta que matchean ese número exacto,
+// con el listado completo de pasajeros asociados.
+func BuscarFicha(cfg *models.AtlasConfig, fichaNumero string) ([]WSFicha, error) {
+	req := wsFichaBuscarRequest{
+		AtlasCredentials: credentialsFromConfig(cfg),
+		WSFichaFiltro: WSFichaFiltro{
+			Filtros:           "S",
+			FichaNumero:       fichaNumero,
+			Paginado:          "N",
+			PaginadoRegistros: "20",
+			PaginadoPaginas:   "1",
+		},
+	}
+	var resp wsFichaBuscarResponse
+	if err := doAtlasRequest(cfg, "wsfichabuscar", req, &resp); err != nil {
+		return nil, err
+	}
+	if err := resp.asError(); err != nil {
+		return nil, err
+	}
+	for i := range resp.WSFichas {
+		if err := resp.WSFichas[i].asError(); err != nil {
+			return nil, err
+		}
+	}
+	return resp.WSFichas, nil
 }
 
 // ---- Probar conexión (wscontactovendedorbuscar) ----
