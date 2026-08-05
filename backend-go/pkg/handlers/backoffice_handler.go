@@ -24,6 +24,11 @@ import (
 type BuscarContactoAtlasRequest struct {
 	FiltroTipo string `json:"filtro_tipo" binding:"required"` // documento | email | celular | nombre
 	Valor      string `json:"valor" binding:"required"`
+	// DocumentoTipo/DocumentoPais solo aplican cuando filtro_tipo="documento"
+	// (CI/PAS/DNI/RUT + país emisor ISO alpha-2, ej. "UY") — Atlas los exige
+	// para no ambigüar el mismo número de documento entre países/tipos.
+	DocumentoTipo string `json:"documento_tipo,omitempty"`
+	DocumentoPais string `json:"documento_pais,omitempty"`
 }
 
 // ContactoAtlasResumen es la fila que se muestra en la lista de resultados.
@@ -51,7 +56,12 @@ func BuscarContactoAtlas(c *gin.Context) {
 		return
 	}
 
-	resultados, err := services.BuscarContacto(cfg, input.FiltroTipo, input.Valor)
+	resultados, err := services.BuscarContacto(cfg, services.BuscarContactoParams{
+		FiltroTipo:    input.FiltroTipo,
+		Valor:         input.Valor,
+		DocumentoTipo: input.DocumentoTipo,
+		DocumentoPais: input.DocumentoPais,
+	})
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return

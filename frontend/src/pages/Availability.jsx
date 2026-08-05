@@ -65,6 +65,10 @@ export default function Availability() {
   const [atlasTarget, setAtlasTarget] = useState('contacto');
   const [atlasFiltroTipo, setAtlasFiltroTipo] = useState('documento');
   const [atlasValor, setAtlasValor] = useState('');
+  // Solo se usan cuando atlasFiltroTipo === 'documento' — Atlas los exige
+  // para no ambigüar el mismo número de documento entre países/tipos.
+  const [atlasDocumentoTipo, setAtlasDocumentoTipo] = useState('CI');
+  const [atlasDocumentoPais, setAtlasDocumentoPais] = useState('UY');
   const [atlasResultados, setAtlasResultados] = useState([]);
   const [atlasSearching, setAtlasSearching] = useState(false);
   const [atlasApplying, setAtlasApplying] = useState(false);
@@ -301,6 +305,8 @@ export default function Availability() {
     setAtlasTarget(target);
     setAtlasFiltroTipo('documento');
     setAtlasValor('');
+    setAtlasDocumentoTipo('CI');
+    setAtlasDocumentoPais('UY');
     setAtlasResultados([]);
     setAtlasError('');
     setAtlasModalOpen(true);
@@ -361,12 +367,19 @@ export default function Availability() {
       setAtlasError('Ingresá un valor para buscar.');
       return;
     }
+    if (atlasFiltroTipo === 'documento' && (!atlasDocumentoTipo || !atlasDocumentoPais.trim())) {
+      setAtlasError('Para buscar por documento completá el tipo y el país emisor.');
+      return;
+    }
 
     setAtlasSearching(true);
     setAtlasError('');
     setAtlasResultados([]);
     try {
-      const response = await AtlasService.buscarContacto(atlasFiltroTipo, valor);
+      const response = await AtlasService.buscarContacto(atlasFiltroTipo, valor, {
+        documentoTipo: atlasDocumentoTipo,
+        documentoPais: atlasDocumentoPais.trim().toUpperCase(),
+      });
       const contactos = response.contactos || [];
       if (contactos.length === 0) {
         setAtlasError('No se encontraron contactos en Atlas para ese criterio.');
@@ -1029,6 +1042,37 @@ export default function Availability() {
               />
             </div>
           </div>
+
+          {atlasFiltroTipo === 'documento' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700">Tipo de documento *</label>
+                <select
+                  value={atlasDocumentoTipo}
+                  onChange={(e) => setAtlasDocumentoTipo(e.target.value)}
+                  disabled={atlasSearching || atlasApplying}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 bg-white"
+                >
+                  <option value="CI">CI</option>
+                  <option value="PAS">Pasaporte</option>
+                  <option value="DNI">DNI</option>
+                  <option value="RUT">RUT</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700">País emisor *</label>
+                <input
+                  type="text"
+                  value={atlasDocumentoPais}
+                  onChange={(e) => setAtlasDocumentoPais(e.target.value.toUpperCase())}
+                  placeholder="Ej: UY"
+                  maxLength={2}
+                  disabled={atlasSearching || atlasApplying}
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 uppercase placeholder:text-slate-400 placeholder:normal-case focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+            </div>
+          )}
 
           {atlasResultados.length > 0 && (
             <div className="space-y-2">

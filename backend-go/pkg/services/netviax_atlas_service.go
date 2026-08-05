@@ -32,11 +32,17 @@ func atlasBaseURL(environment string) string {
 		if v := os.Getenv("ATLAS_API_URL_PROD"); v != "" {
 			return v
 		}
-		return "https://api-atlas-netviax-com.azurewebsites.net/rest"
+		// Confirmado por el usuario contra un request real: el dominio real es
+		// api-atlas.netviax.com, no el *.azurewebsites.net que se había
+		// asumido a partir del link de Gmail (probablemente un alias/redirect
+		// viejo, o el custom domain apunta al mismo backend de Azure).
+		return "https://api-atlas.netviax.com/rest"
 	}
 	if v := os.Getenv("ATLAS_API_URL_TEST"); v != "" {
 		return v
 	}
+	// Sin confirmar todavía (nadie probó el sandbox con esta URL real) — si
+	// falla, pedir la URL de test/sandbox correcta y setear ATLAS_API_URL_TEST.
 	return "https://api-atlas-netviax-com-test.azurewebsites.net/rest"
 }
 
@@ -120,16 +126,22 @@ func doAtlasRequest(cfg *models.AtlasConfig, endpoint string, body interface{}, 
 // ---- Búsqueda de contactos (wscontactobuscar) ----
 
 type WSContactoFiltro struct {
-	Filtros           string `json:"Filtros"`
-	ContactoCodigo    string `json:"ContactoCodigo,omitempty"`
-	ContactoNombre    string `json:"ContactoNombre,omitempty"`
-	ContactoTelefono  string `json:"ContactoTelefono,omitempty"`
-	ContactoCelular   string `json:"ContactoCelular,omitempty"`
-	ContactoEmail     string `json:"ContactoEmail,omitempty"`
-	ContactoDocumento string `json:"ContactoDocumento,omitempty"`
-	Paginado          string `json:"Paginado"`
-	PaginadoRegistros string `json:"PaginadoRegistros"`
-	PaginadoPaginas   string `json:"PaginadoPaginas"`
+	Filtros          string `json:"Filtros"`
+	ContactoCodigo   string `json:"ContactoCodigo,omitempty"`
+	ContactoNombre   string `json:"ContactoNombre,omitempty"`
+	ContactoTelefono string `json:"ContactoTelefono,omitempty"`
+	ContactoCelular  string `json:"ContactoCelular,omitempty"`
+	ContactoEmail    string `json:"ContactoEmail,omitempty"`
+	// Buscar por documento requiere los 3 juntos — Atlas soporta el mismo
+	// número de documento repetido en distintos países/tipos, así que sin
+	// IdentificacionCodigo (CI/PAS/DNI/RUT) y PaisCodigo (ISO alpha-2 del
+	// país emisor) el filtro queda ambiguo.
+	ContactoDocumento                     string `json:"ContactoDocumento,omitempty"`
+	ContactoDocumentoIdentificacionCodigo string `json:"ContactoDocumentoIdentificacionCodigo,omitempty"`
+	ContactoDocumentoPaisCodigo           string `json:"ContactoDocumentoPaisCodigo,omitempty"`
+	Paginado                              string `json:"Paginado"`
+	PaginadoRegistros                     string `json:"PaginadoRegistros"`
+	PaginadoPaginas                       string `json:"PaginadoPaginas"`
 }
 
 type wsContactoBuscarRequest struct {
@@ -152,21 +164,37 @@ type wsContactoBuscarResponse struct {
 	WSContactos []WSContactoResumen `json:"WSContactos"`
 }
 
+// BuscarContactoParams son los criterios de búsqueda — documentoTipo
+// (CI/PAS/DNI/RUT) y documentoPais (ISO alpha-2 del país emisor, ej. "UY")
+// solo aplican cuando FiltroTipo es "documento"; el resto de los tipos los
+// ignora.
+type BuscarContactoParams struct {
+	FiltroTipo    string
+	Valor         string
+	DocumentoTipo string
+	DocumentoPais string
+}
+
 // BuscarContacto arma un filtro con un único criterio relleno (documento,
 // email, celular o nombre) y devuelve los contactos que matchean.
-func BuscarContacto(cfg *models.AtlasConfig, filtroTipo, valor string) ([]WSContactoResumen, error) {
+func BuscarContacto(cfg *models.AtlasConfig, params BuscarContactoParams) ([]WSContactoResumen, error) {
 	filtro := WSContactoFiltro{Filtros: "S", Paginado: "N", PaginadoRegistros: "20", PaginadoPaginas: "1"}
-	switch filtroTipo {
+	switch params.FiltroTipo {
 	case "documento":
-		filtro.ContactoDocumento = valor
+		if params.DocumentoTipo == "" || params.DocumentoPais == "" {
+			return nil, fmt.Errorf("para buscar por documento hace falta el tipo (CI/PAS/DNI/RUT) y el país emisor")
+		}
+		filtro.ContactoDocumento = params.Valor
+		filtro.ContactoDocumentoIdentificacionCodigo = params.DocumentoTipo
+		filtro.ContactoDocumentoPaisCodigo = params.DocumentoPais
 	case "email":
-		filtro.ContactoEmail = valor
+		filtro.ContactoEmail = params.Valor
 	case "celular":
-		filtro.ContactoCelular = valor
+		filtro.ContactoCelular = params.Valor
 	case "nombre":
-		filtro.ContactoNombre = valor
+		filtro.ContactoNombre = params.Valor
 	default:
-		return nil, fmt.Errorf("tipo de filtro desconocido: %q", filtroTipo)
+		return nil, fmt.Errorf("tipo de filtro desconocido: %q", params.FiltroTipo)
 	}
 
 	req := wsContactoBuscarRequest{AtlasCredentials: credentialsFromConfig(cfg), WSContactoFiltro: filtro}
