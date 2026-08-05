@@ -353,7 +353,7 @@ func seedEmailTemplates(db *gorm.DB) {
 			Code:     "reservation_blocked",
 			Name:     "Reserva en bloqueo temporal",
 			Subject:  "Tu reserva {{pedido_id}} está en bloqueo temporal",
-			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> quedó en bloqueo temporal y vence el {{vence}}. Confirmala antes de esa fecha o el cupo se liberará automáticamente.</p>",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> hacia {{destino}} ({{compania}}) quedó en bloqueo temporal y vence el {{vence}}. Confirmala antes de esa fecha o el cupo se liberará automáticamente.</p><p>Pasajero(s): {{pasajeros}}</p><p>Precio de venta: {{precio_venta}}</p>",
 		},
 		{
 			Code:     "reservation_expiring_soon",
@@ -371,7 +371,13 @@ func seedEmailTemplates(db *gorm.DB) {
 			Code:     "reservation_confirmed",
 			Name:     "Reserva confirmada",
 			Subject:  "Tu reserva {{pedido_id}} fue confirmada",
-			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> fue confirmada correctamente.</p>",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> hacia {{destino}} ({{compania}}) fue confirmada correctamente.</p><p>Pasajero(s): {{pasajeros}}</p><p>Precio de venta: {{precio_venta}}</p>",
+		},
+		{
+			Code:     "passenger_confirmation",
+			Name:     "Confirmación al pasajero",
+			Subject:  "Tu reserva {{pedido_id}} está confirmada",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Te confirmamos tu reserva hacia {{destino}} con {{compania}}.</p><p>Número de pedido: <b>{{pedido_id}}</b></p><p>Pasajero(s): {{pasajeros}}</p>",
 		},
 		{
 			Code:     "new_product",

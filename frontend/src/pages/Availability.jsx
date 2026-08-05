@@ -138,7 +138,7 @@ export default function Availability() {
   };
 
   // ---- Reserva individual ----
-  const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', tipo_pasajero: 'Adulto' };
+  const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' };
 
   // Abre el modal SIN hold — lo sigue usando el Asistente IA (abrir_modal_reserva),
   // que no pasa por el flujo manual de "elegir cantidad" de abajo.
@@ -283,7 +283,7 @@ export default function Availability() {
   const handleAddPassenger = () => {
     setForm((prev) => ({
       ...prev,
-      passengers: [...prev.passengers, { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', tipo_pasajero: 'Adulto' }],
+      passengers: [...prev.passengers, { nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' }],
     }));
   };
 
@@ -337,6 +337,7 @@ export default function Availability() {
               documento: pasajero.documento || p.documento,
               nacimiento,
               nacionalidad: pasajero.nacionalidad || p.nacionalidad,
+              nacionalidadFromAtlas: !!pasajero.nacionalidad || p.nacionalidadFromAtlas,
               tipo_pasajero: nacimiento ? calcTipoPasajero(nacimiento, selectedProduct?.fecha_salida) : p.tipo_pasajero,
             };
           });
@@ -625,6 +626,7 @@ export default function Availability() {
         <TableComponent>
           <TableHeader>
             <TableRow>
+              <TableHead className="sticky left-0 z-10 bg-white dark:bg-zinc-900 text-center">Reservar</TableHead>
               <TableHead className="text-center">Cupo</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Destino</TableHead>
@@ -639,7 +641,6 @@ export default function Availability() {
               <TableHead>Adulto</TableHead>
               <TableHead>Bebé</TableHead>
               <TableHead>Niño</TableHead>
-              <TableHead>Reservar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -660,6 +661,17 @@ export default function Availability() {
             ) : (
               filteredData.map((item, index) => (
                 <TableRow key={index}>
+                  <TableCell className="sticky left-0 z-10 bg-white dark:bg-zinc-900 text-center">
+                    <Button
+                      size="sm"
+                      onClick={() => promptPassengerCountAndHold(item)}
+                      disabled={Number(item.disponibilidad) <= 0}
+                      title={Number(item.disponibilidad) <= 0 ? 'Sin disponibilidad' : 'Reservar este cupo'}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-1" />
+                      Reservar
+                    </Button>
+                  </TableCell>
                   <TableCell className="text-center font-medium">{item.codigo_cupo}</TableCell>
                   <TableCell className="text-center">{item.tipo_producto || '—'}</TableCell>
                   <TableCell className="text-center">{item.destino}</TableCell>
@@ -721,17 +733,6 @@ export default function Availability() {
                   </TableCell>
                   <TableCell className="text-center">
                     {item.chd_fare ? `$${Number(item.chd_fare).toLocaleString('es-AR')}` : '—'}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button
-                      size="sm"
-                      onClick={() => promptPassengerCountAndHold(item)}
-                      disabled={Number(item.disponibilidad) <= 0}
-                      title={Number(item.disponibilidad) <= 0 ? 'Sin disponibilidad' : 'Reservar este cupo'}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-1" />
-                      Reservar
-                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -834,10 +835,12 @@ export default function Availability() {
                           </button>
                         </div>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad</label>
-                        <input type="text" value={passenger.nacionalidad} onChange={(e) => handlePassengerChange(index, 'nacionalidad', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Argentina" />
-                      </div>
+                      {passenger.nacionalidadFromAtlas && passenger.nacionalidad && (
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad</label>
+                          <input type="text" value={passenger.nacionalidad} readOnly title="Dato traído de Atlas" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-100 text-slate-600 cursor-not-allowed" />
+                        </div>
+                      )}
                       <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-slate-500" />Fecha de nacimiento

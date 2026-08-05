@@ -16,6 +16,8 @@ const TIPOS_PRODUCTO = [
   { value: 'Crucero', label: 'Crucero' },
 ];
 
+const SERVICIO_OPTIONS = ['Cupo', 'Charter'];
+
 const RUTA_LABEL_BY_TIPO = {
   Hotel: 'Habitación',
   Crucero: 'Cabina',
@@ -173,7 +175,7 @@ const ProductForm = ({
         min={opts.min}
         className={errors[id] ? 'border-red-500' : ''}
       />
-      {errors[id] && <p className="text-xs text-red-500">{errors[id]}</p>}
+      {errors[id] ? <p className="text-xs text-red-500">{errors[id]}</p> : opts.help ? <p className="text-xs text-slate-400">{opts.help}</p> : null}
     </div>
   );
 
@@ -263,7 +265,7 @@ const ProductForm = ({
             {field('fecha_regreso', 'Fecha de Regreso', 'date')}
             {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
-            {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60' })}
+            {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60', help: 'Minutos que el cupo queda bloqueado si se reserva sin doc. contable. Vacío = usa el valor global del sistema.' })}
           </div>
         </div>
 
@@ -294,11 +296,34 @@ const ProductForm = ({
         <div>
           {sectionLabel('Clasificación')}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-            {field('ruta', rutaLabel)}
+            {field('ruta', rutaLabel, 'text', form.tipo_producto === 'Aereo' ? {
+              placeholder: 'Ej: 1JA 763 31DEC MVDGIG 1432 1715',
+              help: 'Un segmento de vuelo por línea (formato GDS): N° de segmento, aerolínea + N° de vuelo, fecha, aeropuertos origen+destino pegados, hora de salida y hora de llegada.',
+              className: 'col-span-2',
+            } : {})}
             {field('pnr', 'PNR')}
             {field('ficha', 'Ficha')}
             {field('temporada', 'Temporada')}
-            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje...', className: 'col-span-2' })}
+            <div className="space-y-1 col-span-2">
+              <Label htmlFor="servicio">Servicio</Label>
+              <select
+                id="servicio"
+                value={form.servicio}
+                onChange={(e) => set('servicio', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Sin especificar</option>
+                {SERVICIO_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                {/* Si el producto ya tenía un valor viejo (texto libre, de antes de
+                    que este campo fuera un desplegable), se muestra igual acá para
+                    no perderlo/resetearlo silenciosamente al editar. */}
+                {form.servicio && !SERVICIO_OPTIONS.includes(form.servicio) && (
+                  <option value={form.servicio}>{form.servicio}</option>
+                )}
+              </select>
+            </div>
           </div>
         </div>
 

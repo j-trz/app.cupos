@@ -59,6 +59,14 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const setMobileOpen = ctx ? ctx.setMobileOpen : () => {};
   const [openSubmenus, setOpenSubmenus] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
+  // Item de menú bajo el mouse (por path/clave) — reemplaza a las mutaciones
+  // directas de el.style.* que había antes en onMouseEnter/onMouseLeave. Esas
+  // mutaciones pisaban el DOM por fuera de React, y en la próxima navegación
+  // React podía "saltarse" la reescritura del estilo activo porque comparaba
+  // contra su propio registro interno del último render, no contra el DOM
+  // real — de ahí el bug de "se pierde el resaltado hasta que refrescás".
+  // Con esto, el color siempre sale de un solo render de React.
+  const [hoveredKey, setHoveredKey] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   const previousUnreadRef = useRef(null);
@@ -163,6 +171,18 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const isActive = (path) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
+
+  // Color de un ítem de menú (activo / hover / normal) — una sola fuente de
+  // verdad para que style y hover nunca se desincronicen entre sí.
+  const navItemColors = (key, active) => {
+    if (active) return { color: '#fff', backgroundColor: sbActiveBg };
+    if (hoveredKey === key) return { color: sbHoverText, backgroundColor: sbHoverBg };
+    return { color: sbText, backgroundColor: 'transparent' };
+  };
+  const navHoverHandlers = (key) => ({
+    onMouseEnter: () => setHoveredKey(key),
+    onMouseLeave: () => setHoveredKey((k) => (k === key ? null : k)),
+  });
 
   // Helper para estilos de items del sidebar
   const itemStyle = (active) => {
@@ -312,29 +332,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       collapsed ? 'justify-center px-2 py-2' : ''
                     );
                   }}
-                  style={({ isActive }) => {
-                    const active = isActive || location.pathname.startsWith(path + '/');
-                    return {
-                      color: active ? '#fff' : sbText,
-                      backgroundColor: active ? sbActiveBg : 'transparent',
-                    };
-                  }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget;
-                    const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                    if (!isActive) {
-                      el.style.backgroundColor = sbHoverBg;
-                      el.style.color = sbHoverText;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget;
-                    const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                    if (!isActive) {
-                      el.style.backgroundColor = 'transparent';
-                      el.style.color = sbText;
-                    }
-                  }}
+                  style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                  {...navHoverHandlers(path)}
                 >
                   {({ isActive }) => {
                     const active = isActive || location.pathname.startsWith(path + '/');
@@ -360,22 +359,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                     collapsed ? 'justify-center px-2 py-2' : ''
                   )}
-                  style={{
-                    color: isSubmenuActive(docsItems) ? '#fff' : sbText,
-                    backgroundColor: isSubmenuActive(docsItems) ? sbActiveBg : 'transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSubmenuActive(docsItems)) {
-                      e.currentTarget.style.backgroundColor = sbHoverBg;
-                      e.currentTarget.style.color = sbHoverText;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSubmenuActive(docsItems)) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = sbText;
-                    }
-                  }}
+                  style={navItemColors('docs-toggle', isSubmenuActive(docsItems))}
+                  {...navHoverHandlers('docs-toggle')}
                 >
                   <BookOpen className="h-4 w-4" style={{ color: isSubmenuActive(docsItems) ? '#fff' : sbText }} />
                   {!collapsed && (
@@ -391,30 +376,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       <NavLink
                         key={path}
                         to={path}
-                        className={() => 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200'}
-                        style={({ isActive }) => {
-                          const active = isActive || location.pathname.startsWith(path + '/');
-                          return {
-                            color: active ? '#fff' : sbText,
-                            backgroundColor: active ? sbActiveBg : 'transparent',
-                          };
-                        }}
-                        onMouseEnter={(e) => {
-                          const el = e.currentTarget;
-                          const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                          if (!isActive) {
-                            el.style.backgroundColor = sbHoverBg;
-                            el.style.color = sbHoverText;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          const el = e.currentTarget;
-                          const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                          if (!isActive) {
-                            el.style.backgroundColor = 'transparent';
-                            el.style.color = sbText;
-                          }
-                        }}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                        style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                        {...navHoverHandlers(path)}
                       >
                         {({ isActive }) => {
                           const active = isActive || location.pathname.startsWith(path + '/');
@@ -451,29 +415,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                           collapsed ? 'justify-center px-2 py-2' : ''
                         );
                       }}
-                      style={({ isActive }) => {
-                        const active = isActive || location.pathname.startsWith(path + '/');
-                        return {
-                          color: active ? '#fff' : sbText,
-                          backgroundColor: active ? sbActiveBg : 'transparent',
-                        };
-                      }}
-                      onMouseEnter={(e) => {
-                        const el = e.currentTarget;
-                        const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                        if (!isActive) {
-                          el.style.backgroundColor = sbHoverBg;
-                          el.style.color = '#fff';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        const el = e.currentTarget;
-                        const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                        if (!isActive) {
-                          el.style.backgroundColor = 'transparent';
-                          el.style.color = sbText;
-                        }
-                      }}
+                      style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                      {...navHoverHandlers(path)}
                     >
                       {({ isActive }) => {
                         const active = isActive || location.pathname.startsWith(path + '/');
@@ -510,22 +453,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
-                    style={{
-                      color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText,
-                      backgroundColor: isSubmenuActive(visibleSettingsItems) ? sbActiveBg : 'transparent',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSubmenuActive(visibleSettingsItems)) {
-                        e.currentTarget.style.backgroundColor = sbHoverBg;
-                        e.currentTarget.style.color = sbHoverText;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSubmenuActive(visibleSettingsItems)) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = sbText;
-                      }
-                    }}
+                    style={navItemColors('settings-toggle', isSubmenuActive(visibleSettingsItems))}
+                    {...navHoverHandlers('settings-toggle')}
                   >
                     <Settings className="h-4 w-4" style={{ color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText }} />
                     {!collapsed && (
@@ -541,34 +470,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                         <NavLink
                           key={path}
                           to={path}
-                          className={({ isActive }) =>
-                            clsx(
-                              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                            )
-                          }
-                          style={({ isActive }) => {
-                            const active = isActive || location.pathname.startsWith(path + '/');
-                            return {
-                              color: active ? '#fff' : sbText,
-                              backgroundColor: active ? sbActiveBg : 'transparent',
-                            };
-                          }}
-                          onMouseEnter={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = sbHoverBg;
-                              el.style.color = sbHoverText;
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = 'transparent';
-                              el.style.color = sbText;
-                            }
-                          }}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
                         >
                           {({ isActive }) => {
                             const active = isActive || location.pathname.startsWith(path + '/');
@@ -596,22 +500,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
-                    style={{
-                      color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText,
-                      backgroundColor: isSubmenuActive(visibleUserManagementItems) ? sbActiveBg : 'transparent',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSubmenuActive(visibleUserManagementItems)) {
-                        e.currentTarget.style.backgroundColor = sbHoverBg;
-                        e.currentTarget.style.color = sbHoverText;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSubmenuActive(visibleUserManagementItems)) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = sbText;
-                      }
-                    }}
+                    style={navItemColors('usermgmt-toggle', isSubmenuActive(visibleUserManagementItems))}
+                    {...navHoverHandlers('usermgmt-toggle')}
                   >
                     <Users className="h-4 w-4" style={{ color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText }} />
                     {!collapsed && (
@@ -627,34 +517,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                         <NavLink
                           key={path}
                           to={path}
-                          className={({ isActive }) =>
-                            clsx(
-                              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                            )
-                          }
-                          style={({ isActive }) => {
-                            const active = isActive || location.pathname.startsWith(path + '/');
-                            return {
-                              color: active ? '#fff' : sbText,
-                              backgroundColor: active ? sbActiveBg : 'transparent',
-                            };
-                          }}
-                          onMouseEnter={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = sbHoverBg;
-                              el.style.color = sbHoverText;
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = 'transparent';
-                              el.style.color = sbText;
-                            }
-                          }}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
                         >
                           {({ isActive }) => {
                             const active = isActive || location.pathname.startsWith(path + '/');

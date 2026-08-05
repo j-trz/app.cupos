@@ -41,6 +41,24 @@ type ReservationInput struct {
 	HoldID uint `json:"hold_id,omitempty"`
 }
 
+// buildReservationEmailVars centraliza las variables disponibles para las
+// plantillas de reserva (reservation_blocked/reservation_confirmed/
+// passenger_confirmation) — agregar una clave nueva acá la habilita
+// automáticamente en el editor de plantillas del frontend (ver
+// GetAvailableEmailVariables en email_config_handler.go, que debe listar las
+// mismas claves).
+func buildReservationEmailVars(reservation *models.Reservation, vence string, passengerNames []string) map[string]string {
+	return map[string]string{
+		"pedido_id":       reservation.PedidoID,
+		"contacto_nombre": reservation.NombrePasajero,
+		"destino":         reservation.VueloDestino,
+		"compania":        reservation.VueloCompania,
+		"precio_venta":    fmt.Sprintf("%.2f", reservation.PrecioVenta),
+		"pasajeros":       strings.Join(passengerNames, ", "),
+		"vence":           vence,
+	}
+}
+
 // canReserveProduct valida si el usuario puede reservar este producto: es
 // admin, es la agencia dueña, se lo cedieron puntualmente (RestrictedAgency)
 // o lo tiene compartido (ProductSharedAgency). Se usa tanto en CreateHold
@@ -508,11 +526,12 @@ func CreateReservation(c *gin.Context) {
 		if input.Reservation.BloqueoExpiraAt != nil {
 			vence = input.Reservation.BloqueoExpiraAt.Format("02/01/2006 15:04")
 		}
-		if err := services.SendTemplateEmail(input.Reservation.Agencia, templateCode, recipient, map[string]string{
-			"pedido_id":       input.Reservation.PedidoID,
-			"contacto_nombre": input.Reservation.NombrePasajero,
-			"vence":           vence,
-		}); err != nil {
+		passengerNames := make([]string, 0, len(input.Passengers))
+		for _, pi := range input.Passengers {
+			passengerNames = append(passengerNames, strings.TrimSpace(pi.Nombre+" "+pi.Apellido))
+		}
+		if err := services.SendTemplateEmail(input.Reservation.Agencia, templateCode, recipient,
+			buildReservationEmailVars(&input.Reservation, vence, passengerNames)); err != nil {
 			services.LogFailure("email",
 				fmt.Sprintf("No se pudo enviar el email de aviso para el pedido %s", input.Reservation.PedidoID),
 				fmt.Sprintf("template=%s pedido=%s error=%s", templateCode, input.Reservation.PedidoID, err.Error()))
@@ -709,13 +728,30 @@ func ConfirmReservation(c *gin.Context) {
 		fmt.Sprintf("Tu reserva del pedido %s fue confirmada", reservation.PedidoID),
 		map[string]string{"pedido_id": reservation.PedidoID})
 
+	var confirmedPassengers []models.Passenger
+	database.DB.Where("reservation_id = ?", reservation.ID).Find(&confirmedPassengers)
+	passengerNames := make([]string, 0, len(confirmedPassengers))
+	for _, p := range confirmedPassengers {
+		passengerNames = append(passengerNames, strings.TrimSpace(p.Nombre+" "+p.Apellido))
+	}
+	emailVars := buildReservationEmailVars(&reservation, "", passengerNames)
+
 	if recipient := services.ResolveReservationRecipientEmail(reservation.CreatedBy); recipient != "" {
-		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", recipient, map[string]string{
-			"pedido_id":       reservation.PedidoID,
-			"contacto_nombre": reservation.NombrePasajero,
-		}); err != nil {
+		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", recipient, emailVars); err != nil {
 			services.LogFailure("email",
 				fmt.Sprintf("No se pudo enviar el email de confirmación para el pedido %s", reservation.PedidoID),
+				fmt.Sprintf("pedido=%s error=%s", reservation.PedidoID, err.Error()))
+		}
+	}
+
+	// Mail de cortesía al pasajero/cliente final — a diferencia del de arriba
+	// (que siempre va a la agencia), este es opcional y depende de que la
+	// reserva tenga un email de contacto cargado. Plantilla propia
+	// ("passenger_confirmation") para poder redactarla sin jerga interna.
+	if reservation.ContactoEmail != "" {
+		if err := services.SendTemplateEmail(reservation.Agencia, "passenger_confirmation", reservation.ContactoEmail, emailVars); err != nil {
+			services.LogFailure("email",
+				fmt.Sprintf("No se pudo enviar el email de confirmación al pasajero para el pedido %s", reservation.PedidoID),
 				fmt.Sprintf("pedido=%s error=%s", reservation.PedidoID, err.Error()))
 		}
 	}
