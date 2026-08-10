@@ -138,7 +138,8 @@ function Field({ label, required, hint, children }) {
 const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function GestionReservas() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const myAgencia = user?.agencia;
   useCountdownTick(); // hace que la cuenta regresiva de vencimiento avance sola
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
@@ -676,13 +677,19 @@ export default function GestionReservas() {
                       <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
                         <ArrowRightLeft className="h-3 w-3" /> Cesión saliente
                       </Badge>
-                    ) : r.original_agency ? (
+                    ) : r.original_agency && !sameAgency(r.original_agency, myAgencia) ? (
                       <div className="flex flex-col gap-1">
                         <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
                           <ArrowRightLeft className="h-3 w-3" /> Cupo cedido
                         </Badge>
                         <span className="text-[10px] text-slate-500">de {agencyName(r.original_agency)}</span>
                       </div>
+                    ) : r.original_agency ? (
+                      // Soy la agencia cedente: esta venta la hizo la agencia
+                      // receptora sobre un cupo que yo cedí.
+                      <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
+                        <ArrowRightLeft className="h-3 w-3" /> Cedido a {agencyName(r.agencia)}
+                      </Badge>
                     ) : (() => {
                       // Producto compartido (visibilidad multi-agencia, mismo
                       // stock, sin fila espejo): esta reserva la tomó otra

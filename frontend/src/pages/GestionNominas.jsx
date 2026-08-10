@@ -120,9 +120,14 @@ const sameAgency = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim()
 // Adulto/Menor/Infante -> ADT/CHD/INF, la nomenclatura estándar de la industria.
 const TIPO_PASAJERO_CODES = { Adulto: 'ADT', Menor: 'CHD', Infante: 'INF' };
 
+// Cuenta solo pasajeros activos (excluye cancelados) — así el desglose
+// ADT/CHD/INF se mueve junto con los badges Confirmadas/Pendientes vecinos
+// en vez de ser un total histórico ciego al estado. 'expirada'/'cedido' ya
+// se filtran antes, al armar `reservations` (ver el filter de setReservations).
 const countPassengerTypes = (passengerRows) => {
   const counts = { ADT: 0, CHD: 0, INF: 0 };
   passengerRows.forEach((row) => {
+    if (row.estado === 'cancelada' || row.estado === 'cancelado') return;
     const code = TIPO_PASAJERO_CODES[row.tipoPasajero];
     if (code) counts[code]++;
   });
@@ -319,6 +324,8 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
 // ─── Product section (collapsible) ───────────────────────────────────────────
 
 function ProductSection({ product, reservations, agencyName, onEdit, onDelete, onDuplicate, onAdd }) {
+  const { user } = useAuth();
+  const myAgencia = user?.agencia;
   const [expanded, setExpanded] = useState(false);
 
   const estado = (r) => r.estado || '';
@@ -448,9 +455,16 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                     {agencyName(row.agencia)}
                   </TableCell>
                   <TableCell>
-                    {row.originalAgency ? (
+                    {row.originalAgency && !sameAgency(row.originalAgency, myAgencia) ? (
                       <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
                         Cupo de {agencyName(row.originalAgency)}
+                      </Badge>
+                    ) : row.originalAgency ? (
+                      // Soy la agencia cedente: esta venta la hizo la agencia
+                      // receptora sobre un cupo que yo cedí — no "cupo de mí
+                      // mismo", sino cesión saliente ya vendida por otro.
+                      <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                        Cedido a {agencyName(row.agencia)}
                       </Badge>
                     ) : product?.agencia && row.agencia && !sameAgency(row.agencia, product.agencia) ? (
                       // Producto compartido (visibilidad multi-agencia, mismo

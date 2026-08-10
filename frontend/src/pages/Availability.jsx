@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Search, MapPin, StickyNote, Minus, AlertCircle } from 'lucide-react';
+import { Plane, BarChart3, Clock3, ShoppingCart, X, User, Mail, Phone, Hash, Calendar, RefreshCw, Tag, Filter, Plus, Search, MapPin, StickyNote, Minus, AlertCircle, Package, Link as LinkIcon } from 'lucide-react';
 import ItineraryTable from '../components/ItineraryTable';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
 import CountdownTimer from '../components/CountdownTimer.jsx';
@@ -44,6 +44,9 @@ export default function Availability() {
   // Modal de ruta
   const [routeModalProduct, setRouteModalProduct] = useState(null);
   const [notesModalProduct, setNotesModalProduct] = useState(null);
+  const [packagesModalProduct, setPackagesModalProduct] = useState(null);
+  // Ordenamiento de la tabla (no hay filtro por columna, solo orden asc/desc)
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   // Bloqueos temporales propios (sección "¿espero o no?" — sin datos de pasajero)
   const [blockedReservations, setBlockedReservations] = useState([]);
   // Pre-hold de stock activo mientras se completa el modal (id/pedidoId/expiresAt)
@@ -142,6 +145,44 @@ export default function Availability() {
     if (temporadaFilter === 'Todas') return data;
     return data.filter((item) => (item.temporada || '').trim() === temporadaFilter);
   }, [data, temporadaFilter]);
+
+  // Cantidad de reservas en bloqueo_temporal por producto — para mostrar el
+  // badge inline en la línea del producto en vez de solo en el banner general.
+  const blockedByProductId = useMemo(() => {
+    const map = {};
+    blockedReservations.forEach((r) => {
+      const pid = String(r.product_id);
+      map[pid] = (map[pid] || 0) + 1;
+    });
+    return map;
+  }, [blockedReservations]);
+
+  const SORTABLE_COLUMNS = {
+    codigo_cupo: 'text', destino: 'text', compania: 'text', disponibilidad: 'number',
+    fecha_salida: 'date', fecha_regreso: 'date', temporada: 'text', precio: 'number',
+  };
+  const sortedData = useMemo(() => {
+    if (!sortConfig.key) return filteredData;
+    const type = SORTABLE_COLUMNS[sortConfig.key];
+    const dir = sortConfig.direction === 'asc' ? 1 : -1;
+    return [...filteredData].sort((a, b) => {
+      const va = a[sortConfig.key];
+      const vb = b[sortConfig.key];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (type === 'number') return (Number(va) - Number(vb)) * dir;
+      if (type === 'date') return (new Date(va) - new Date(vb)) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+  }, [filteredData, sortConfig]);
+  const toggleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+  const sortIndicator = (key) => (sortConfig.key === key ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '');
 
   const getAvailabilityVariant = (value) => {
     if (value > 5) return 'success';
@@ -271,12 +312,12 @@ export default function Availability() {
   }, []);
 
   useEffect(() => {
-    const visibleItems = filteredData.map((item) => ({
+    const visibleItems = sortedData.map((item) => ({
       id: String(item.id),
       label: `${item.destino} — ${item.compania} — $${item.precio || 0} — ${item.disponibilidad} cupo(s) disponibles`,
     }));
     setPageContext({ page: 'disponibilidad', visibleItems });
-  }, [filteredData, setPageContext]);
+  }, [sortedData, setPageContext]);
 
   useEffect(() => {
     const cleanup = registerActionHandlers({
@@ -433,7 +474,9 @@ export default function Availability() {
               nacimiento,
               nacionalidad: pasajero.nacionalidad || p.nacionalidad,
               nacionalidadFromAtlas: !!pasajero.nacionalidad || p.nacionalidadFromAtlas,
-              tipo_pasajero: nacimiento ? calcTipoPasajero(nacimiento, selectedProduct?.fecha_salida) : p.tipo_pasajero,
+              tipo_pasajero: nacimiento
+                ? calcTipoPasajero(nacimiento, selectedProduct?.fecha_regreso || selectedProduct?.fecha_salida)
+                : p.tipo_pasajero,
             };
           });
         }
@@ -498,19 +541,23 @@ export default function Availability() {
     }
   };
 
-  const calcTipoPasajero = (nacimiento, fechaSalida) => {
-    if (!nacimiento || !fechaSalida) return 'Adulto';
+  // Calcula el tipo de pasajero por la edad al REGRESO del viaje (no a la
+  // salida) — un pasajero puede cambiar de categoría entre la ida y la
+  // vuelta. Si no hay fecha de regreso (ej. producto solo ida), cae a la
+  // fecha de salida.
+  const calcTipoPasajero = (nacimiento, fechaReferencia) => {
+    if (!nacimiento || !fechaReferencia) return 'Adulto';
     const birth = new Date(nacimiento);
-    const departure = new Date(fechaSalida);
-    if (isNaN(birth.getTime()) || isNaN(departure.getTime())) return 'Adulto';
-    let age = departure.getFullYear() - birth.getFullYear();
-    const monthDiff = departure.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && departure.getDate() < birth.getDate())) {
+    const reference = new Date(fechaReferencia);
+    if (isNaN(birth.getTime()) || isNaN(reference.getTime())) return 'Adulto';
+    let age = reference.getFullYear() - birth.getFullYear();
+    const monthDiff = reference.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && reference.getDate() < birth.getDate())) {
       age--;
     }
-    const birthThisYear = new Date(departure.getFullYear(), birth.getMonth(), birth.getDate());
+    const birthThisYear = new Date(reference.getFullYear(), birth.getMonth(), birth.getDate());
     const msInYear = 365.25 * 24 * 60 * 60 * 1000;
-    const decimalAge = age + (departure - birthThisYear) / msInYear;
+    const decimalAge = age + (reference - birthThisYear) / msInYear;
     if (decimalAge < 2) return 'Infante';
     if (decimalAge < 12) return 'Menor';
     return 'Adulto';
@@ -522,7 +569,7 @@ export default function Availability() {
         if (i !== index) return p;
         const newP = { ...p, [field]: value };
         if (field === 'nacimiento') {
-          newP.tipo_pasajero = calcTipoPasajero(value, selectedProduct?.fecha_salida);
+          newP.tipo_pasajero = calcTipoPasajero(value, selectedProduct?.fecha_regreso || selectedProduct?.fecha_salida);
         }
         return newP;
       });
@@ -742,20 +789,20 @@ export default function Availability() {
           <TableHeader>
             <TableRow>
               <TableHead className="sticky left-0 z-10 bg-white dark:bg-zinc-900 text-center">Reservar</TableHead>
-              <TableHead className="text-center">Cupo</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Destino</TableHead>
-              <TableHead>Compañía</TableHead>
-              <TableHead>Disponibilidad</TableHead>
-              <TableHead>Salida</TableHead>
-              <TableHead>Regreso</TableHead>
-              <TableHead>Temporada</TableHead>
+              <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort('codigo_cupo')}>Cupo {sortIndicator('codigo_cupo')}</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('destino')}>Destino {sortIndicator('destino')}</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('compania')}>Compañía {sortIndicator('compania')}</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('disponibilidad')}>Disponibilidad {sortIndicator('disponibilidad')}</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('fecha_salida')}>Salida {sortIndicator('fecha_salida')}</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('fecha_regreso')}>Regreso {sortIndicator('fecha_regreso')}</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('temporada')}>Temporada {sortIndicator('temporada')}</TableHead>
               <TableHead>Ruta</TableHead>
+              <TableHead>Paquetes</TableHead>
               <TableHead>Notas</TableHead>
               <TableHead className="text-center">Equipaje</TableHead>
-              <TableHead>Adulto</TableHead>
-              <TableHead>Bebé</TableHead>
-              <TableHead>Niño</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('precio')}>ADT {sortIndicator('precio')}</TableHead>
+              <TableHead>INF</TableHead>
+              <TableHead>CHD</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -765,7 +812,7 @@ export default function Availability() {
                   Cargando disponibilidad...
                 </TableCell>
               </TableRow>
-            ) : filteredData.length === 0 ? (
+            ) : sortedData.length === 0 ? (
               <TableRow>
                 <TableCell className="text-center py-10" colSpan={15}>
                   {temporadaFilter !== 'Todas'
@@ -774,7 +821,7 @@ export default function Availability() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredData.map((item, index) => (
+              sortedData.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="sticky left-0 z-10 bg-white dark:bg-zinc-900 text-center">
                     <Button
@@ -788,21 +835,30 @@ export default function Availability() {
                     </Button>
                   </TableCell>
                   <TableCell className="text-center font-medium">{item.codigo_cupo}</TableCell>
-                  <TableCell className="text-center">{item.tipo_producto || '—'}</TableCell>
                   <TableCell className="text-center">{item.destino}</TableCell>
                   <TableCell className="text-center">{item.compania}</TableCell>
                   <TableCell className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => promptPassengerCountAndHold(item)}
-                      disabled={Number(item.disponibilidad) <= 0}
-                      title={Number(item.disponibilidad) <= 0 ? 'Sin disponibilidad' : 'Elegir cantidad de pasajeros y reservar'}
-                      className="disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      <Badge variant={getAvailabilityVariant(Number(item.disponibilidad))}>
-                        {item.disponibilidad}
-                      </Badge>
-                    </button>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => promptPassengerCountAndHold(item)}
+                        disabled={Number(item.disponibilidad) <= 0}
+                        title={Number(item.disponibilidad) <= 0 ? 'Sin disponibilidad' : 'Elegir cantidad de pasajeros y reservar'}
+                        className="disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        <Badge variant={getAvailabilityVariant(Number(item.disponibilidad))}>
+                          {item.disponibilidad}
+                        </Badge>
+                      </button>
+                      {blockedByProductId[String(item.id)] > 0 && (
+                        <span
+                          className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-amber-100 px-1 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          title={`${blockedByProductId[String(item.id)]} reserva(s) de tu agencia en bloqueo temporal sobre este cupo`}
+                        >
+                          {blockedByProductId[String(item.id)]}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">{formatDate(item.fecha_salida)}</TableCell>
                   <TableCell className="text-center">{formatDate(item.fecha_regreso)}</TableCell>
@@ -817,6 +873,21 @@ export default function Availability() {
                       >
                         <MapPin className="h-3 w-3" />
                         Ruta
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {Array.isArray(item.package_links) && item.package_links.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setPackagesModalProduct(item)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver paquetes asociados"
+                      >
+                        <Package className="h-3 w-3" />
+                        Paquetes
                       </button>
                     ) : (
                       <span className="text-slate-400">—</span>
@@ -1345,6 +1416,46 @@ export default function Availability() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ─── Modal Ver Paquetes ─── */}
+      {packagesModalProduct && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setPackagesModalProduct(null)}>
+          <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-2xl max-h-screen sm:max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <Package className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Paquetes asociados</h2>
+                  <p className="text-sm text-slate-500">
+                    {packagesModalProduct.codigo_cupo} — {packagesModalProduct.destino}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPackagesModalProduct(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-2">
+              {(packagesModalProduct.package_links || []).map((link, i) => (
+                <a
+                  key={i}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <LinkIcon className="h-4 w-4 text-slate-400 shrink-0" />
+                  <span className="truncate">{link.label || link.url}</span>
+                </a>
+              ))}
             </div>
           </div>
         </div>,

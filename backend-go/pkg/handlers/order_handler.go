@@ -683,13 +683,19 @@ func GetAllReservations(c *gin.Context) {
 	// completando el formulario.
 	query := database.DB.Preload("Passengers").Where("estado != ?", models.EstadoHoldTemporal)
 	if role == "agency_admin" {
-		// Además de lo reservado por mi propia agencia, también lo que OTRA
-		// agencia reservó sobre un producto que yo poseo (visibilidad
-		// compartida vía ProductSharedAgency) — al owner le tiene que caer la
-		// nómina/reserva igual, aunque la haya tomado otra agencia.
+		// Además de lo reservado por mi propia agencia, también:
+		// - lo que OTRA agencia reservó sobre un producto que yo poseo
+		//   (visibilidad compartida vía ProductSharedAgency);
+		// - lo que se vendió sobre un producto-espejo de una cesión que YO
+		//   otorgué (source_agency) — el espejo nace con Agencia="", así que
+		//   sin este match el cedente nunca veía esas ventas, aunque el
+		//   comentario de RosterProductID ya asumía que sí las vería. Sin
+		//   esto, una agencia que a la vez cede algunos cupos y recibe otros
+		//   (ej. UTG) ve su nómina/reservas incompleta o con los badges de
+		//   cedido/genuino cruzados entre ambos roles.
 		query = query.Where(
-			"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?))",
-			agencia, agencia,
+			"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?) OR LOWER(source_agency) = LOWER(?))",
+			agencia, agencia, agencia,
 		)
 	} else if role != "admin" {
 		userID, _ := c.Get("userID")
@@ -1193,6 +1199,10 @@ func GetBlockedReservations(c *gin.Context) {
 		result[i] = gin.H{
 			"id":                r.ID,
 			"pedido_id":         r.PedidoID,
+			// product_id (no es dato personal) permite que Disponibilidad
+			// muestre el bloqueo en la línea del producto puntual, en vez de
+			// solo en un banner general agrupado por destino.
+			"product_id":        r.ProductID,
 			"vuelo_destino":     r.VueloDestino,
 			"bloqueo_expira_at": r.BloqueoExpiraAt,
 			"vuelo_salida":      r.VueloSalida,

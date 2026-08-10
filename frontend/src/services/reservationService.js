@@ -37,6 +37,10 @@ const adaptProduct = (producto) => ({
   carryon: !!producto.carryon,
   handbag: !!producto.handbag,
   checkedbag: !!producto.checkedbag,
+  carryon_kg: producto.carryon_kg || 0,
+  handbag_kg: producto.handbag_kg || 0,
+  checkedbag_kg: producto.checkedbag_kg || 0,
+  package_links: Array.isArray(producto.package_links) ? producto.package_links : [],
 });
 
 const adaptRequest = (item) => ({
@@ -209,6 +213,7 @@ class ReservationService {
     const result = await ApiClient.get('/orders/blocked');
     return toArray(result).map((r) => ({
       id: r.id,
+      product_id: r.product_id,
       Pedido_ID: r.pedido_id,
       Vuelo_Destino: r.vuelo_destino,
       Bloqueo_Expira_At: r.bloqueo_expira_at,

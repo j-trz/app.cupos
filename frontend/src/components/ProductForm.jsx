@@ -62,6 +62,10 @@ const EMPTY_FORM = {
   carryon: false,
   handbag: false,
   checkedbag: false,
+  carryon_kg: '',
+  handbag_kg: '',
+  checkedbag_kg: '',
+  package_links: [],
   is_blocked_for_sale: false,
   notas_internas: '',
   notas_externas: '',
@@ -101,6 +105,10 @@ function toFormValues(product) {
     carryon: product.carryon ?? false,
     handbag: product.handbag ?? false,
     checkedbag: product.checkedbag ?? false,
+    carryon_kg: product.carryon_kg ?? '',
+    handbag_kg: product.handbag_kg ?? '',
+    checkedbag_kg: product.checkedbag_kg ?? '',
+    package_links: Array.isArray(product.package_links) ? product.package_links : [],
     is_blocked_for_sale: product.is_blocked_for_sale ?? false,
     notas_internas: product.notas_internas || '',
     notas_externas: product.notas_externas || '',
@@ -140,6 +148,11 @@ function toPayload(form) {
     carryon: form.carryon,
     handbag: form.handbag,
     checkedbag: form.checkedbag,
+    carryon_kg: num(form.carryon_kg),
+    handbag_kg: num(form.handbag_kg),
+    checkedbag_kg: num(form.checkedbag_kg),
+    // Se descartan los links sin URL (filas vacías que quedaron del editor).
+    package_links: (form.package_links || []).filter((l) => l.url?.trim()),
     is_blocked_for_sale: form.is_blocked_for_sale,
     notas_internas: form.notas_internas,
     notas_externas: form.notas_externas,
@@ -215,6 +228,19 @@ const ProductForm = ({
     </label>
   );
 
+  const addPackageLink = () => {
+    setForm((prev) => ({ ...prev, package_links: [...(prev.package_links || []), { url: '', label: '' }] }));
+  };
+  const updatePackageLink = (index, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      package_links: prev.package_links.map((l, i) => (i === index ? { ...l, [key]: value } : l)),
+    }));
+  };
+  const removePackageLink = (index) => {
+    setForm((prev) => ({ ...prev, package_links: prev.package_links.filter((_, i) => i !== index) }));
+  };
+
   const sectionLabel = (text) => (
     <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{text}</h4>
   );
@@ -235,6 +261,7 @@ const ProductForm = ({
               <div className="space-y-1">
                 <Label htmlFor="codigo_cupo">Código de Cupo</Label>
                 <Input id="codigo_cupo" type="text" value={form.codigo_cupo} disabled className="bg-slate-50 text-slate-500" />
+                <p className="text-xs text-slate-400">Formato: TIPO-DESTINO-secuencial. No incluye compañía ni fecha de salida.</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -242,6 +269,7 @@ const ProductForm = ({
                 <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm text-slate-400">
                   Se genera automáticamente
                 </div>
+                <p className="text-xs text-slate-400">Formato: TIPO-DESTINO-secuencial (ej. AER-BUE-04821). No incluye compañía ni fecha de salida.</p>
               </div>
             )}
             <div className="space-y-1 col-span-2">
@@ -340,7 +368,7 @@ const ProductForm = ({
               className: 'col-span-2',
             } : {})}
             {field('pnr', 'PNR')}
-            {field('ficha', 'Ficha')}
+            {field('ficha', 'Ficha Operativa')}
             <div className="space-y-1">
               <Label htmlFor="temporada">Temporada</Label>
               <select
@@ -413,9 +441,50 @@ const ProductForm = ({
         <div>
           {sectionLabel('Equipaje incluido')}
           <div className="flex flex-wrap gap-6">
-            {check('carryon', 'Carry-on')}
-            {check('handbag', 'Handbag')}
-            {check('checkedbag', 'Checked Bag')}
+            {[
+              { id: 'carryon', kgId: 'carryon_kg', label: 'Carry-on' },
+              { id: 'handbag', kgId: 'handbag_kg', label: 'Handbag' },
+              { id: 'checkedbag', kgId: 'checkedbag_kg', label: 'Checked Bag' },
+            ].map(({ id, kgId, label }) => (
+              <div key={id} className="flex items-center gap-2">
+                {check(id, label)}
+                <Input
+                  type="number" step="0.5" min="0" placeholder="Kg"
+                  value={form[kgId]}
+                  onChange={(e) => set(kgId, e.target.value)}
+                  className="w-20"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Paquetes */}
+        <div>
+          {sectionLabel('Links de paquetes')}
+          <div className="space-y-2">
+            {(form.package_links || []).map((link, i) => (
+              <div key={i} className="flex gap-2">
+                <Input
+                  placeholder="Etiqueta (opcional)"
+                  value={link.label}
+                  onChange={(e) => updatePackageLink(i, 'label', e.target.value)}
+                  className="w-1/3"
+                />
+                <Input
+                  placeholder="https://..."
+                  value={link.url}
+                  onChange={(e) => updatePackageLink(i, 'url', e.target.value)}
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => removePackageLink(i)}>
+                  Quitar
+                </Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={addPackageLink}>
+              + Agregar link
+            </Button>
           </div>
         </div>
 

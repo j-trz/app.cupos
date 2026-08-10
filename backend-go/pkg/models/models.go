@@ -58,6 +58,14 @@ type Product struct {
 	CarryOn                bool    `gorm:"column:carryon;default:false" json:"carryon"`
 	HandBag                bool    `gorm:"column:handbag;default:false" json:"handbag"`
 	CheckedBag             bool    `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	// Kilaje de cada franquicia de equipaje — puede variar por producto, por
+	// eso vive acá y no como una constante global.
+	CarryOnKg   float64 `gorm:"column:carryon_kg;default:0" json:"carryon_kg"`
+	HandBagKg   float64 `gorm:"column:handbag_kg;default:0" json:"handbag_kg"`
+	CheckedBagKg float64 `gorm:"column:checkedbag_kg;default:0" json:"checkedbag_kg"`
+	// PackageLinks son los paquetes armados a partir de este cupo (lista de
+	// {url, label}), mostrados en la columna "Paquetes" de Disponibilidad.
+	PackageLinks datatypes.JSON `gorm:"column:package_links;default:'[]'" json:"package_links,omitempty"`
 	InfFare                float64 `json:"inf_fare"`
 	TarifaInf              float64 `json:"tarifa_inf"`
 	ImpuestosInf           float64 `json:"impuestos_inf"`

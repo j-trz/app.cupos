@@ -626,6 +626,12 @@ func runSQLMigrations(db *gorm.DB) {
 		// CI (Documento) y Pasaporte son documentos distintos — un pasajero puede
 		// tener uno, el otro, o los dos.
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS pasaporte VARCHAR(50) DEFAULT '';`,
+		// Kilaje por franquicia de equipaje (puede variar por producto) y links
+		// de paquetes armados a partir del cupo, mostrados en Disponibilidad.
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS package_links JSONB DEFAULT '[]';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

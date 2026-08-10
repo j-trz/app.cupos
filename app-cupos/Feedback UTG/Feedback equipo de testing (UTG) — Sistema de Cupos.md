@@ -35,7 +35,7 @@ Normalizado y agrupado por módulo para planificar el próximo sprint. Incluye d
 - [ ] → decisión: **Hotel** y **Traslados** (sí/no + texto libre) van en una nueva sección **"Servicios"** del formulario, en vez de campos sueltos — tiene más sentido y mejora el layout visual.
 - [ ] Agregar campo **Vencimiento de documento** con opción **"vitalicio"**.
 - [ ] Convertir en **mandatorios**: la **ficha** y **todos los datos del pasajero**.
-- [ ] Bug: el cálculo de tipo de pasajero (adulto/CHD/infante) no se recalcula contra la fecha de **regreso** del viaje — usa solo fecha de salida/nacimiento. Caso de prueba: nacimiento 02/01/2027, regreso 09/01/2027, queda como infante cuando no correspondería.
+- [x] Bug: el cálculo de tipo de pasajero (adulto/CHD/infante) no se recalcula contra la fecha de **regreso** del viaje — usa solo fecha de salida/nacimiento. Caso de prueba: nacimiento 02/01/2027, regreso 09/01/2027, queda como infante cuando no correspondería. → **Corregido 2026-08-10**, ver [[Historial de Bugs Resueltos]].
 
 ## 4. Gestión de Nóminas
 
@@ -44,8 +44,8 @@ Normalizado y agrupado por módulo para planificar el próximo sprint. Incluye d
 - [ ] Reordenar columnas: botones de acción al inicio, luego Ficha, Vendedor, Ruta, Localizador/PNR — hoy "No trajo neto" y otros campos van antes.
 - [ ] Exportar a Excel: permitir filtrar antes de descargar (no exportar todo crudo).
 - [ ] Exportar a BO: a validar (estaba en pruebas al momento del mail).
-- [ ] Bug: al confirmar/vender pasajeros no se actualiza el contador **ADT-CHD-INF**.
-- [ ] Bug/inconsistencia: en los casos de prueba, las reservas "genuinas" aparecen marcadas como cedidas y viceversa (posiblemente ligado al rol UTG como agencia cedente/receptora — revisar lógica de cedidos por agencia).
+- [x] Bug: al confirmar/vender pasajeros no se actualiza el contador **ADT-CHD-INF**. → **Corregido 2026-08-10** (excluye cancelados del conteo), ver [[Historial de Bugs Resueltos]]. Confirmar con UTG si el criterio de "activo" (confirmados+pendientes, no solo confirmados) es lo que esperaban.
+- [x] Bug/inconsistencia: en los casos de prueba, las reservas "genuinas" aparecen marcadas como cedidas y viceversa (posiblemente ligado al rol UTG como agencia cedente/receptora — revisar lógica de cedidos por agencia). → **Corregido 2026-08-10** (fix de scoping en backend + badge en frontend), ver [[Historial de Bugs Resueltos]].
 
 ## 5. Cupos Solicitados
 

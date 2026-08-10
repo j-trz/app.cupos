@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
@@ -61,6 +61,27 @@ const GestionProductos = () => {
   // así la agencia cedente sigue viendo y gestionando lo que dio, aunque en
   // Disponibilidad (reserva real) ya no le aparezca.
   const { data: productsResult, isLoading, isError, isFetching } = useProducts({ search: searchTerm, scope: 'management' });
+
+  // Cesiones salientes por producto — para la columna "Cedidos". Se fetchea
+  // una vez (no es react-query, TransferService no tiene hook propio todavía)
+  // y se agrupa por AvailabilityTransfer.ProductID (el producto ORIGEN, no el
+  // espejo) para poder mostrar "cedido a X: N cupos" en la fila del producto
+  // dueño sin tener que buscar la fila del espejo aparte.
+  const [transfers, setTransfers] = useState([]);
+  useEffect(() => {
+    TransferService.listTransfers().then((data) => {
+      setTransfers(Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
+    }).catch(() => setTransfers([]));
+  }, []);
+  const cedidosByProductId = useMemo(() => {
+    const map = {};
+    transfers.forEach((t) => {
+      const pid = String(t.product_id);
+      if (!map[pid]) map[pid] = [];
+      map[pid].push({ agencia: t.target_agency, cantidad: t.quantity });
+    });
+    return map;
+  }, [transfers]);
 
   if (!can('PRODUCTS_VIEW')) {
     return (
@@ -482,6 +503,7 @@ const GestionProductos = () => {
                   <TableHead>Destino</TableHead>
                   <TableHead>Compañía</TableHead>
                   <TableHead>Agencia</TableHead>
+                  <TableHead>Cedidos</TableHead>
                   <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
                   <TableHead>PNR</TableHead>
                   <TableHead>Ficha</TableHead>
@@ -560,6 +582,19 @@ const GestionProductos = () => {
                           </span>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {(cedidosByProductId[String(product.id)] || []).length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {cedidosByProductId[String(product.id)].map((c, i) => (
+                            <Badge key={i} variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                              {agencyName(c.agencia)}: {c.cantidad}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {product.ruta ? (

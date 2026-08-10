@@ -291,6 +291,7 @@ func UpdateProduct(c *gin.Context) {
 		"ruta", "pnr", "ficha", "temporada", "tipo_producto",
 		"bloqueo_temporal_minutos",
 		"carryon", "handbag", "checkedbag",
+		"carryon_kg", "handbag_kg", "checkedbag_kg", "package_links",
 		"inf_fare", "chd_fare",
 		"is_blocked_for_sale",
 		"agencia", "source_agency",
