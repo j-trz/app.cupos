@@ -205,6 +205,8 @@ func main() {
 				reports.GET("/forecast-sales", handlers.ForecastSalesHandler)
 				reports.GET("/grupos", handlers.GetGroupsReport)
 			}
+			// Métricas personales para usuarios regulares (solo sesión, sin REPORTS_VIEW)
+			protected.GET("/reports/user-metrics", handlers.GetUserMetrics)
 
 			// Ajustes
 			settings := protected.Group("/settings")
