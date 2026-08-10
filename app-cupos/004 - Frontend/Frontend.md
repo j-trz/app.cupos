@@ -1,0 +1,332 @@
+
+Este documento describe la arquitectura del **frontend** del Sistema de Gestión de Cupos: una **Single Page Application (SPA)** que vive en la carpeta `frontend/` y consume la API de Go (`backend-go/`). Cubre el stack tecnológico, la estructura de carpetas, el enrutamiento y el árbol de providers, las páginas, los contextos globales, la capa de servicios HTTP, los hooks de datos, los componentes clave, la compatibilidad con móviles, la internacionalización y el build/despliegue.
+
+> Última verificación contra `package.json`, `App.jsx` y las carpetas `pages/`/`services/`/`hooks/`: 2026-08-10 (se agregaron 2 páginas, 1 servicio y 1 hook que faltaban).
+
+
+## Índice
+
+1. [Stack tecnológico](#1-stack-tecnológico)
+2. [Estructura de carpetas](#2-estructura-de-carpetas)
+3. [Enrutamiento y providers](#3-enrutamiento-y-providers)
+4. [Páginas](#4-páginas)
+5. [Contextos](#5-contextos)
+6. [Servicios](#6-servicios)
+7. [Hooks](#7-hooks)
+8. [Componentes clave](#8-componentes-clave)
+9. [Compatibilidad móvil](#9-compatibilidad-móvil)
+10. [Internacionalización](#10-internacionalización)
+11. [Build y despliegue](#11-build-y-despliegue)
+
+---
+
+## 1. Stack tecnológico
+
+El frontend está construido con tecnologías modernas del ecosistema React. Basado en `frontend/README.md` y `frontend/package.json`:
+
+- **Biblioteca principal**: [React 19](https://react.dev/).
+- **Entorno de compilación**: [Vite](https://vitejs.dev/) (bundler y servidor de desarrollo con HMR).
+- **Estilos y layout**: [Tailwind CSS v4](https://tailwindcss.com/), integrado vía `@tailwindcss/vite`.
+- **Componentes accesibles**: [Radix UI](https://www.radix-ui.com/) (Accordion, Dialog, Select, Dropdown, Tabs, Switch, Tooltip, etc.), envueltos en `components/ui/` (incluye variantes `shadcn-*`).
+- **Formularios y validación**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) (a través de `@hookform/resolvers`) para validación estricta del lado del cliente.
+- **Estado de servidor**: [TanStack React Query v5](https://tanstack.com/query/latest) para fetching, caché y sincronización de datos.
+- **Animaciones**: [Framer Motion](https://www.framer.com/motion/).
+- **Gráficos**: [Chart.js](https://www.chartjs.org/) y [Recharts](https://recharts.org/) para el dashboard y los reportes analíticos.
+- **Internacionalización**: la SPA usa un contexto propio de i18n (ver [sección 10](#10-internacionalización)); `i18next` figura como dependencia.
+- **Exportación de datos**: `xlsx` (SheetJS) para Excel, `jspdf` / `jspdf-autotable` para PDF (itinerarios, reportes) y `papaparse` para CSV.
+- **Iconografía**: [Lucide React](https://lucide.dev/), [Heroicons](https://heroicons.com/) y `react-icons` (mezcla de 3 sets de iconos, no solo los dos primeros).
+- **Otras dependencias no triviales de `package.json`**: `@headlessui/react` (componentes accesibles headless, en paralelo a Radix — no unificado en uno solo), `sweetalert2` (diálogos/alertas), `react-dropzone` (drag-and-drop de archivos, ej. carga masiva de productos o documentos de Expertos IA), `react-tooltip` (tooltips fuera de los de Radix), `chartjs-plugin-datalabels` (etiquetas sobre gráficos Chart.js), `pdfkit` (generación de PDF alternativa a `jspdf`, uso puntual a confirmar si se necesita).
+
+---
+
+## 2. Estructura de carpetas
+
+El código fuente vive en `frontend/src/` y está organizado por responsabilidad:
+
+| Carpeta / archivo | Propósito |
+| --- | --- |
+| `components/` | Componentes visuales reutilizables (formularios, modales, tablas, PDFs). Incluye las subcarpetas `AIChat/` (widget y pantalla del asistente), `AIExperts/` (expertos/base de conocimiento del LLM), `reports/` (gráficos y tablas de reportes) y `ui/` (primitivos accesibles sobre Radix y variantes `shadcn-*`). |
+| `contexts/` | Contextos globales de React: autenticación, tema, idioma, marca blanca, encabezado y contexto de página para la IA. |
+| `hooks/` | Custom hooks, en su mayoría envolviendo React Query, más utilidades como toasts y atajos de teclado. |
+| `i18n/` | Configuración de internacionalización (`i18n.js`). |
+| `lib/` | Inicialización de librerías y utilidades: cliente de React Query, `cva`/`clsx` para clases, helpers de fechas y expiración, secciones de documentación in-app, esquemas de importación, etc. |
+| `pages/` | Vistas completas asociadas a las rutas de la aplicación. |
+| `schemas/` | Esquemas de validación Zod para formularios. |
+| `services/` | Capa HTTP contra la API de Go, centralizada en `apiClient.js`. |
+| `styles/` | CSS global (`globals.css`) y utilidades adicionales. |
+| `App.jsx` | Enrutamiento principal (React Router) y árbol de providers internos. |
+| `main.jsx` | Punto de entrada: monta React en el DOM y envuelve la app con `AuthProvider` y `WhiteLabelProvider`. |
+| `index.css` | Archivo de entrada de estilos de Tailwind CSS. |
+
+```text
+frontend/src/
+├── components/
+│   ├── AIChat/          # Asistente IA (widget flotante + pantalla completa)
+│   ├── AIExperts/       # Expertos / base de conocimiento del LLM
+│   ├── reports/         # Gráficos y tablas del cockpit de reportes
+│   └── ui/              # Primitivos accesibles (Radix + shadcn-*)
+├── contexts/            # Estado global (Auth, Theme, I18n, WhiteLabel, Header, AIPage)
+├── hooks/               # Custom hooks (React Query, toasts, atajos)
+├── i18n/                # Configuración de internacionalización
+├── lib/                 # Inicialización de librerías y utilidades
+├── pages/               # Vistas por ruta
+├── schemas/             # Esquemas Zod
+├── services/            # Capa HTTP contra la API de Go
+├── styles/              # CSS global
+├── App.jsx              # Enrutamiento + providers internos
+├── main.jsx             # Entry point (AuthProvider + WhiteLabelProvider)
+└── index.css            # Entrada de Tailwind
+```
+
+---
+
+## 3. Enrutamiento y providers
+
+El árbol de providers se arma en dos niveles. En `frontend/src/main.jsx`, la app se envuelve con `AuthProvider` (sesión y permisos) y `WhiteLabelProvider` (marca blanca). Dentro, `frontend/src/App.jsx` anida el resto de los providers alrededor del `Router` de React Router DOM: `QueryClientProvider` → `ThemeProvider` → `I18nProvider` → `SidebarProvider` → `HeaderProvider` → `AIPageProvider` → `Router`.
+
+Cada ruta protegida se compone con `ProtectedRoute` (redirige a `/login` si no hay usuario en sesión) y `Layout` (sidebar + header + widget de IA). El chat de IA a pantalla completa (`/asistente`) es la excepción: se monta dentro de `ProtectedRoute` pero **fuera** de `Layout`, para maximizar el espacio.
+
+```mermaid
+flowchart TD
+    M["main.jsx"] --> AUTH["AuthProvider"]
+    AUTH --> WL["WhiteLabelProvider"]
+    WL --> APP["App.jsx"]
+    APP --> QC["QueryClientProvider"]
+    QC --> TH["ThemeProvider"]
+    TH --> I18N["I18nProvider"]
+    I18N --> SB["SidebarProvider"]
+    SB --> HD["HeaderProvider"]
+    HD --> AIP["AIPageProvider"]
+    AIP --> RT["Router (Routes)"]
+    RT --> PR["ProtectedRoute"]
+    PR --> LY["Layout (Sidebar + Header + AIChatWidget)"]
+    LY --> PG["Página de la ruta"]
+    RT --> LOGIN["/login sin protección"]
+    RT --> ASIST["/asistente ProtectedRoute sin Layout"]
+```
+
+### Tabla de rutas → página
+
+Rutas definidas en `frontend/src/App.jsx`:
+
+| Ruta | Página | Notas |
+| --- | --- | --- |
+| `/login` | `Login.jsx` | Pública (sin `ProtectedRoute`). |
+| `/` y `/dashboard` | `Dashboard.jsx` | Panel principal. |
+| `/availability` | `Availability.jsx` | Catálogo de disponibilidad / creación de reserva. |
+| `/requests` | `Requests.jsx` | Solicitudes. |
+| `/confirmations` | `Confirmations.jsx` | Confirmaciones. |
+| `/productos` | `GestionProductos.jsx` | Gestión de productos. |
+| `/grupos` | `GestionGrupos.jsx` | Grupos y vuelos a medida. |
+| `/reservas` | `GestionReservas.jsx` | Gestión de reservas. |
+| `/nominas` | `GestionNominas.jsx` | Nóminas de pasajeros. |
+| `/agencias` | `GestionAgencias.jsx` | Gestión de agencias. |
+| `/temas` | `GestionTemas.jsx` | Gestión de temas. |
+| `/temporadas` | `GestionTemporadas.jsx` | Catálogo global de temporadas (`Temporada`, ver [Modelo de Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md#9-catálogos-globales)). |
+| `/usuarios` | `GestionUsuarios.jsx` | Usuarios (RBAC). |
+| `/roles` | `GestionRoles.jsx` | Roles (RBAC). |
+| `/permisos` | `GestionPermisos.jsx` | Permisos (RBAC). |
+| `/panel-control` | `PanelControl.jsx` | Panel de control. |
+| `/reportes` | `Reportes.jsx` | Cockpit de reportes y analíticas. |
+| `/logs` | `LogsDelSitio.jsx` | **Estado del sistema** — monitoreo de base de datos, servicios, holds activos, rastreo de reservas y registro de logs. |
+| `/notificaciones` | `Notificaciones.jsx` | Bandeja de notificaciones. |
+| `/settings` | `Settings.jsx` | Ajustes generales. |
+| `/marca-blanca` | `WhiteLabelConfig.jsx` | Configuración de marca blanca. |
+| `/email-config` | `EmailConfig.jsx` | Configuración de email. |
+| `/atlas-config` | `AtlasConfig.jsx` | Credenciales de Netviax Atlas por agencia (ver [Flujos de Funcionalidades §17](../003%20-%20Funcionalidades/Flujos%20de%20Funcionalidades.md#17-integración-con-netviax-atlas-backoffice)). |
+| `/notification-config` | `NotificationTemplates.jsx` | Plantillas de notificación. |
+| `/config-ia` | `AIConfig.jsx` | Configuración de IA. |
+| `/asistente` | `AIChatPage.jsx` | Chat de IA a pantalla completa (fuera de `Layout`). |
+| `/profile` | `Profile.jsx` | Perfil del usuario. |
+| `/documentacion` | — | Redirige a `/documentacion/:section` (sección por defecto). |
+| `/documentacion/:section` | `Documentacion.jsx` | Documentación in-app por sección. |
+| `/test` | `TestPage.jsx` | Página de pruebas (protegida). |
+| `/test-public` | `TestPage.jsx` | Página de pruebas sin protección. |
+
+---
+
+## 4. Páginas
+
+Las vistas viven en `frontend/src/pages/`. Cada una corresponde a una o más rutas de la [tabla anterior](#3-enrutamiento-y-providers):
+
+- **Login** (`Login.jsx`): formulario de acceso; autentica contra la API y guarda la sesión.
+- **Dashboard** (`Dashboard.jsx`): panel principal con KPIs y gráficos de resumen.
+- **Availability** (`Availability.jsx`): catálogo de productos disponibles y punto de entrada para crear reservas.
+- **Requests** (`Requests.jsx`): solicitudes pendientes.
+- **Confirmations** (`Confirmations.jsx`): confirmaciones de reservas.
+- **GestionProductos** (`GestionProductos.jsx`): alta, edición, borrado y carga masiva de productos.
+- **GestionGrupos** (`GestionGrupos.jsx`): grupos y flujo de vuelos a medida.
+- **GestionReservas** (`GestionReservas.jsx`): administración de reservas y sus estados.
+- **GestionNominas** (`GestionNominas.jsx`): nóminas de pasajeros.
+- **GestionUsuarios** (`GestionUsuarios.jsx`): gestión de usuarios.
+- **GestionRoles** (`GestionRoles.jsx`): definición de roles (globales o por agencia).
+- **GestionPermisos** (`GestionPermisos.jsx`): catálogo de permisos del sistema.
+- **GestionAgencias** (`GestionAgencias.jsx`): administración de agencias.
+- **GestionTemas** (`GestionTemas.jsx`): gestión de temas visuales.
+- **GestionTemporadas** (`GestionTemporadas.jsx`): catálogo global de temporadas (`Temporada`).
+- **AtlasConfig** (`AtlasConfig.jsx`): credenciales de Netviax Atlas por agencia.
+- **Reportes** (`Reportes.jsx`): cockpit ejecutivo con gráficos y tablas analíticas (ver `components/reports/`).
+- **LogsDelSitio** (`LogsDelSitio.jsx`): **Estado del sistema** con dos pestañas:
+  - **Estado del sistema** — salud de la base de datos (conexión + latencia ms), servicios (API Go, SMTP, IA), métricas de conteo de entidades, tabla de **holds activos** (bloqueos temporales sin confirmar) y **holds expirados/estancados** con botón de **liberación manual** (devuelve stock).
+  - **Registro de logs** — tabla enriquecida con usuario, email, agencia, IP, método, ruta, status HTTP y duración. Filtros por nivel, fuente, fechas y búsqueda libre. **Exportar todos los logs filtrados como archivo `.json`** (máx. 5000 filas). Acordeón expandible por fila con visualizador JSON formateado, botón **Copiar JSON** y **Descargar JSON** individual.
+- **Notificaciones** (`Notificaciones.jsx`): bandeja de notificaciones del usuario.
+- **Settings** (`Settings.jsx`): ajustes generales del sistema.
+- **WhiteLabelConfig** (`WhiteLabelConfig.jsx`): configuración de marca blanca (identidad, colores, tipografías).
+- **EmailConfig** (`EmailConfig.jsx`): configuración del servicio de email.
+- **NotificationTemplates** (`NotificationTemplates.jsx`): plantillas de notificación.
+- **AIConfig** (`AIConfig.jsx`): configuración de proveedores y acciones de IA (solo administradores).
+- **AIChatPage** (`AIChatPage.jsx`): chat de IA a pantalla completa, con su propio topbar y barra lateral de conversaciones.
+- **Profile** (`Profile.jsx`): perfil y datos de la cuenta.
+- **PanelControl** (`PanelControl.jsx`): panel de control administrativo.
+- **Documentacion** (`Documentacion.jsx`): documentación in-app renderizada por secciones (una ruta por sección).
+
+> `TestPage.jsx` es una vista auxiliar de pruebas (rutas `/test` y `/test-public`).
+
+---
+
+## 5. Contextos
+
+Los contextos globales (en `frontend/src/contexts/`) concentran el estado transversal de la aplicación:
+
+- **AuthContext** (`AuthContext.jsx`): maneja la **autenticación** y los **permisos**. Guarda el usuario en sesión (token JWT y datos en `localStorage` vía `apiClient`), y tras el login llama a `GET /users/me/permissions` para cachear los códigos de permiso. Expone `signIn`, `signOut` y los helpers `can(code)` / `canModule(module, action)` que replican el bypass de `admin` del backend, de modo que la UI se filtre sin repetir la lógica de roles en cada componente.
+- **ThemeContext** (`ThemeContext.jsx`): estado del **tema** claro/oscuro. Inicializa desde `localStorage` o la preferencia del sistema, aplica/quita la clase `dark` en el `<html>` y persiste el cambio (`toggleTheme`, `setTheme`).
+- **I18nContext** (`I18nContext.jsx`): estado del **idioma** (`locale`, es/en). Expone `t(key)` para traducir a partir de un diccionario embebido y `changeLocale`, persistiendo la preferencia en `localStorage`.
+- **WhiteLabelContext** (`WhiteLabelContext.jsx`): configuración de **marca blanca** multi-tenant (identidad, colores, tipografías, botones, sidebar, layout). Trae la configuración vía `whiteLabelService` y la aplica como variables CSS; incluye una configuración por defecto.
+- **HeaderContext** (`HeaderContext.jsx`): estado del **encabezado** de la vista actual (título, descripción, ícono, badge, acción), que el `Layout` renderiza y cada página actualiza con `setHeaderData`.
+- **AIPageContext** (`AIPageContext.jsx`): contexto de **página para la IA**. Publica en qué pantalla está el usuario (`pageContext`) y permite que cada página registre handlers de acción (`registerActionHandlers`) para que el asistente ejecute `ui_actions` reales (abrir el modal de reserva, completar el formulario de pasajeros) devueltas por el backend.
+
+---
+
+## 6. Servicios
+
+La capa de servicios (`frontend/src/services/`) encapsula toda la comunicación HTTP contra la API de Go. El núcleo es **`apiClient.js`**: una clase con métodos `get`/`post`/`put`/`delete` que resuelve la URL base desde `VITE_API_URL` (normalizando la barra final), adjunta el token `Bearer` desde `localStorage`, envía cookies (`credentials: 'include'`), maneja `FormData` y parsea las respuestas de forma defensiva (leyendo el body como texto para dar errores legibles ante respuestas no-JSON). También administra la sesión (`getToken`/`setToken`, `getSessionUser`/`setSessionUser`, `clearSession`).
+
+El resto de los servicios exponen métodos estáticos por dominio que delegan en `apiClient`:
+
+```mermaid
+flowchart LR
+    C["Componente / Página"] --> H["Hook (React Query)"]
+    H --> S["Servicio de dominio"]
+    S --> AC["apiClient (get/post/put/delete)"]
+    AC --> API["API de Go (backend-go)"]
+    API --> AC
+    AC --> S
+    S --> H
+    H --> C
+```
+
+Servicios disponibles:
+
+- `authService` — login y autenticación.
+- `productService` — CRUD de productos, carga masiva y compartir/visibilidad entre agencias.
+- `reservationService` — reservas y sus estados.
+- `groupService` — grupos y vuelos a medida.
+- `transferService` — cesión de cupos entre agencias.
+- `agencyService` — agencias.
+- `userService` — usuarios.
+- `roleService` — roles (RBAC).
+- `permissionService` — permisos (RBAC).
+- `reportService` — datos de reportes y dashboard.
+- `notificationService` — notificaciones.
+- `notificationTemplatesService` — plantillas de notificación.
+- `aiService` — asistente IA (chat, sesiones, expertos).
+- `whiteLabelService` — configuración de marca blanca.
+- `emailConfigService` / `emailTemplateService` — configuración y plantillas de email.
+- `logService` — logs del sitio y diagnóstico de servicios.
+- `backupService` — copias de seguridad de BD.
+- `apiKeyService` — claves de API para integraciones externas M2M.
+- `exportService` — exportación de datos (Excel/PDF).
+- `alertRuleService` — reglas de alerta.
+- `atlasService` — búsqueda de contactos en Netviax Atlas (backoffice) para autocompletar el formulario de reserva.
+- `atlasConfigService` — configuración por agencia de las credenciales de Netviax Atlas.
+- `temporadaService` — catálogo global de temporadas.
+
+---
+
+## 7. Hooks
+
+Los custom hooks (`frontend/src/hooks/`) se apoyan en TanStack React Query para el estado de servidor: definen `queryKey`, `staleTime`/`gcTime` e invalidan la caché tras las mutaciones. El `QueryClient` global se configura en `lib/react-query.js`.
+
+- `useProducts` — lista, detalle y mutaciones (crear/editar/borrar) de productos.
+- `useReports` — datos de reportes y dashboard.
+- `useAgencies` — agencias.
+- `useGroups` — grupos y vuelos a medida.
+- `usePermissions` — permisos (RBAC).
+- `useRoles` — roles (RBAC).
+- `useUsers` — usuarios.
+- `useAIChat` — estado del asistente IA (mensajes, sesiones).
+- `useTemporadas` — catálogo global de temporadas.
+- `useKeyboardShortcut` — registro de atajos de teclado (utilidad de UI).
+- `use-toast` — sistema de notificaciones toast (utilidad de UI).
+
+---
+
+## 8. Componentes clave
+
+Componentes destacados en `frontend/src/components/`:
+
+- **`Layout.jsx`**: estructura general de la app autenticada — combina `Sidebar`, encabezado (desde `HeaderContext`) y el widget flotante de IA (`AIChat/AIChatWidget.jsx`).
+- **`ProtectedRoute.jsx`**: guarda de rutas; muestra un spinner mientras carga la sesión y redirige a `/login` si no hay usuario.
+- **`ui/Sidebar.jsx`**: navegación lateral. Los ítems de administración declaran el permiso `MODULO_ACCION` que los habilita, de modo que el menú se **filtra por permisos RBAC** (un `admin` los ve todos). Por debajo del breakpoint `md` se comporta como un drawer deslizante (ver [sección 9](#9-compatibilidad-móvil)).
+- **`Modal.jsx`**: modal genérico reutilizable; ocupa toda la pantalla en anchos móviles en vez de un tamaño fijo centrado.
+- **Formularios**: `ProductForm.jsx`, `UserForm.jsx`, `GroupForm.jsx` (React Hook Form + Zod), más `GroupOptionsFields.jsx` y `PermissionSelector.jsx`.
+- **`TransferModal.jsx`**: cesión de cupos entre agencias.
+- **`ShareProductModal.jsx`**: compartir la visibilidad de un producto con otras agencias.
+- **`ItineraryPDF.jsx` / `ItineraryTable.jsx`**: generación y presentación de itinerarios (PDF con `jspdf`).
+- **`CountdownTimer.jsx`**: cuenta regresiva del hold de stock al elegir cantidad de pasajeros en `Availability.jsx` (ver [Disponibilidad y Creación de Reserva](FLUJOS_FUNCIONALIDADES.html#2-disponibilidad-y-creación-de-reserva) para el flujo completo). La cuenta regresiva de una reserva ya creada en `bloqueo_temporal` (en `GestionReservas.jsx`) usa un mecanismo distinto, `lib/expiry.js`.
+- **`DashboardCharts.jsx`**: gráficos del dashboard (Chart.js/Recharts).
+- **`ExportButton.jsx`**: exportación a Excel/PDF.
+- **`GlobalSearch.jsx`**: búsqueda global.
+- **`ProductBulkUpload.jsx`**, **`AdvancedFilters.jsx`**, **`OnboardingGuide.jsx`**, **`KeyboardShortcuts.jsx`**, **`WhiteLabelPreviewModal.jsx`**, **`ThemeToggle.jsx`**, **`LanguageSelector.jsx`**, **`ToastNotification.jsx`** y estados auxiliares (`EmptyState.jsx`, `SkeletonTable.jsx`).
+- **`ui/`**: primitivos accesibles sobre Radix (`Dialog`, `Select`, `DropdownMenu`, `Tooltip`, `Table`, `Card`, `Button`, etc.) y sus variantes `shadcn-*`.
+- **`reports/`**: piezas del cockpit de reportes (`KPIsRow`, `EvolutionChart`, `OccupancyHeatmap`, `RiskAlertsTable`, `ProductPerformanceTable`, `TopDestinationsChart`, `DataTable`, etc.).
+- **`AIChat/`**: interfaz del asistente — `AIChatWidget` (flotante), `AIChatWindow`, `AIChatMessage` (renderiza las respuestas del asistente como Markdown con `react-markdown` + `remark-gfm`: encabezados, listas, código y tablas), `AIChatInput`, `AIChatTopbar`, `AIChatSessionsSidebar`, `AIChatItineraryResult`, `ExpertPicker`.
+- **`AIExperts/`**: gestión de expertos/base de conocimiento del LLM — `ExpertsTab`, `ExpertDocumentsPanel` (además de subir documentos, permite editar manualmente el contenido ya extraído de uno para corregir errores de OCR sin volver a subirlo).
+
+---
+
+## 9. Compatibilidad móvil
+
+El shell de la aplicación (sidebar, header, modales, grillas y tablas) sigue un enfoque **mobile-first**: las clases sin prefijo de Tailwind son la versión para pantallas chicas, y los breakpoints (`sm:`, `md:`, `lg:`) agregan el comportamiento de escritorio.
+
+- **Sidebar** (`ui/SidebarProvider.jsx` + `ui/Sidebar.jsx`): además de `collapsed` (el toggle de mini-sidebar de escritorio), el provider expone `mobileOpen`/`setMobileOpen`. Por debajo del breakpoint `md`, el `<aside>` se comporta como un **drawer deslizante** (`fixed` + `-translate-x-full`/`translate-x-0`) con un backdrop semitransparente que lo cierra al tocarlo; se cierra automáticamente al navegar a otra sección. `Layout.jsx` agrega el botón hamburguesa que lo abre, visible solo por debajo de `md`.
+- **`Modal.jsx`**: por debajo de `sm` ocupa todo el alto y ancho de la pantalla (`w-full h-full`, sin bordes redondeados) en vez de un tamaño fijo centrado; desde `sm` vuelve al comportamiento de escritorio. Como es el modal compartido, esto alcanza automáticamente a la mayoría de los modales del sistema sin tocarlos uno por uno.
+- **Grillas de KPIs y formularios**: `StatsHero.jsx` y `DashboardCharts.jsx` (grillas de 3 columnas del dashboard) y varias grillas de dos columnas dentro de modales de creación/edición (por ejemplo, en `GestionReservas.jsx` y `Availability.jsx`) pasan a una sola columna en pantallas angostas.
+- **`ui/Table.jsx`**: agrega una sombra de scroll horizontal a cada lado del contenedor (calculada a partir de `scrollLeft`/`scrollWidth` con un `ResizeObserver`) como señal visual de que hay más columnas para scrollear, sin cambiar el diseño de columnas de cada tabla.
+- **Chat de IA**: `AIChatPage.jsx` oculta el sidebar de sesiones por debajo de `md` y lo reemplaza por un botón en `AIChatTopbar.jsx` que abre la misma lista dentro de un `Modal`; el widget flotante (`AIChatWindow.jsx`) ajusta su ancho al viewport en vez de un tamaño fijo en píxeles.
+
+---
+
+## 10. Internacionalización
+
+La internacionalización se implementa mediante el **`I18nContext`** propio de la aplicación (`contexts/I18nContext.jsx`), que contiene un diccionario de traducciones (español e inglés) y expone `t(key)`, `locale` y `changeLocale`, persistiendo el idioma elegido en `localStorage` y actualizando el atributo `lang` del documento. El archivo `i18n/i18n.js` re-exporta `I18nProvider` como `i18n` para mantener compatibilidad con los imports existentes; `i18next` figura como dependencia en `package.json`.
+
+El componente **`LanguageSelector.jsx`** consume `useI18n()` y permite cambiar entre español (`es`) e inglés (`en`) llamando a `changeLocale`.
+
+---
+
+## 11. Build y despliegue
+
+Scripts definidos en `frontend/package.json`:
+
+| Script | Descripción |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo de Vite con HMR (expuesto en red local, `--host`). |
+| `npm run build` | Compila y optimiza la aplicación para producción en `dist/`. |
+| `npm run preview` | Previsualiza localmente la build de producción. |
+| `npm run lint` | Análisis de calidad de código con ESLint. |
+| `npm run format` | Formatea el código con Prettier. |
+
+**Variables de entorno**: el frontend lee `VITE_API_URL` para apuntar a la API de Go (por defecto `http://localhost:5001/api` si no está definida — codeado en `apiClient.js`; `apiClient` normaliza la barra final). Todas las variables expuestas al cliente deben llevar el prefijo `VITE_`.
+
+> Inconsistencia menor confirmada 2026-08-10: el backend local (`main.go`) arranca por defecto en el puerto **5002** (`PORT` no seteado), pero el fallback hardcodeado de `apiClient.js` es **5001**. En la práctica no importa porque el setup del README raíz del repo (carpeta `000 - README` de este vault) pide crear `.env.local` con `VITE_API_URL` apuntando a `:5002/api` explícitamente — pero si alguien saltea ese paso, el frontend intenta pegarle al puerto equivocado en silencio. Corregir el fallback a 5002 (o documentar por qué difiere) es un cambio menor pendiente.
+
+**Despliegue (SPA)**: el archivo `frontend/vercel.json` define un rewrite que redirige todas las rutas a `index.html`, comportamiento necesario para el enrutamiento del lado del cliente con React Router:
+
+```json
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```

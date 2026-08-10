@@ -27,6 +27,9 @@ admin
 *.sw?
 
 
+# Obsidian vault local app state (workspace layout, plugin cache) — not shared content
+app-cupos/.obsidian/
+
 # Go binaries & temporary files
 main
 *.exe
