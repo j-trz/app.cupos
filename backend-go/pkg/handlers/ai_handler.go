@@ -1242,7 +1242,9 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, productID).Error; err != nil {
 				return fmt.Errorf("Producto no encontrado")
 			}
-			if product.Disponibilidad <= 0 {
+			// El infante no ocupa lugar/cupo (ver CreateReservation en order_handler.go).
+			esInfante := strings.EqualFold(fmt.Sprintf("%v", args["pasajero_tipo"]), "Infante")
+			if !esInfante && product.Disponibilidad <= 0 {
 				return fmt.Errorf("El producto no tiene disponibilidad")
 			}
 
@@ -1298,10 +1300,15 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				return err
 			}
 
-			// Descontar disponibilidad e incrementar vendidos de forma atómica y segura
+			// Descontar disponibilidad (salvo infante, que no ocupa lugar) e
+			// incrementar vendidos de forma atómica y segura.
+			disponibilidad := product.Disponibilidad
+			if !esInfante {
+				disponibilidad--
+			}
 			if err := tx.Model(&models.Product{}).Where("id = ?", productID).
 				Updates(map[string]interface{}{
-					"disponibilidad": product.Disponibilidad - 1,
+					"disponibilidad": disponibilidad,
 					"vendidos":       product.Vendidos + 1,
 				}).Error; err != nil {
 				return err

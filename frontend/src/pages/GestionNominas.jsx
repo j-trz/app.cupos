@@ -335,6 +335,28 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
     [reservations]
   );
 
+  // Colores por familia/ficha: un tono distinto por grupo de pedidoId
+  // consecutivo, para distinguir visualmente dónde termina una ficha y
+  // empieza la siguiente (los pasajeros de un mismo pedido ya vienen
+  // contiguos en passengerRows).
+  const PEDIDO_ROW_TINTS = [
+    'bg-white dark:bg-zinc-900',
+    'bg-sky-50/60 dark:bg-sky-950/20',
+  ];
+  const rowTintByKey = useMemo(() => {
+    const map = {};
+    let groupIndex = -1;
+    let lastPedidoId = null;
+    passengerRows.forEach((row) => {
+      if (row.pedidoId !== lastPedidoId) {
+        groupIndex++;
+        lastPedidoId = row.pedidoId;
+      }
+      map[row.key] = PEDIDO_ROW_TINTS[groupIndex % PEDIDO_ROW_TINTS.length];
+    });
+    return map;
+  }, [passengerRows]);
+
   const tipoCounts = useMemo(() => countPassengerTypes(passengerRows), [passengerRows]);
 
   return (
@@ -398,6 +420,9 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
           <TableComponent>
             <TableHeader>
               <TableRow>
+                <TableHead className="text-center">Acciones</TableHead>
+                <TableHead>Ficha</TableHead>
+                <TableHead>Vendedor</TableHead>
                 <TableHead>Pedido ID</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Apellido</TableHead>
@@ -415,17 +440,52 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                 <TableHead>Tel. Contacto</TableHead>
                 <TableHead>Doc. Contable</TableHead>
                 <TableHead>Ticket</TableHead>
-                <TableHead>Ficha</TableHead>
-                <TableHead>Vendedor</TableHead>
                 <TableHead>Precio Venta</TableHead>
                 <TableHead>Neto 1</TableHead>
                 <TableHead>OP</TableHead>
-                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {passengerRows.map((row) => (
-                <TableRow key={row.key}>
+                <TableRow key={row.key} className={rowTintByKey[row.key]}>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      {row.passengerId && (
+                        <>
+                          <button
+                            onClick={() => onEdit(row)}
+                            title="Editar pasajero"
+                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => onDuplicate(row)}
+                            title="Duplicar pasajero"
+                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => onDelete(row)}
+                            title="Eliminar pasajero"
+                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => onAdd(row)}
+                        title="Agregar pasajero a este pedido"
+                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.vendedorEmail}</TableCell>
                   <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
                     {row.pedidoId}
                   </TableCell>
@@ -481,47 +541,9 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoTelefono}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.docContable}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300 font-mono text-xs">{row.numeroTicket}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.vendedorEmail}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.neto1)}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{product?.op ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      {row.passengerId && (
-                        <>
-                          <button
-                            onClick={() => onEdit(row)}
-                            title="Editar pasajero"
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => onDuplicate(row)}
-                            title="Duplicar pasajero"
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => onDelete(row)}
-                            title="Eliminar pasajero"
-                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => onAdd(row)}
-                        title="Agregar pasajero a este pedido"
-                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -801,15 +823,28 @@ export default function GestionNominas() {
   const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
   const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
 
+  // Reservas de los productos que quedaron visibles tras aplicar
+  // búsqueda/temporada/destino/rango de fechas — para exportar solo lo
+  // filtrado, no el crudo completo.
+  const visibleReservations = useMemo(
+    () => filteredProductIds.flatMap((pid) => grouped[pid] || []),
+    [filteredProductIds, grouped]
+  );
+
   // Stats
   const totalProducts = Object.keys(grouped).length;
   const totalReservations = reservations.length;
-  const totalConfirmed = reservations.filter((r) => {
-    const e = r.estado || '';
-    return e === 'confirmada' || e === 'confirmado';
-  }).length;
   const totalPassengers = useMemo(
     () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
+    [reservations]
+  );
+  // Total de PAX confirmados, no de fichas — una ficha con 4 pasajeros
+  // confirmados debe contar 4, no 1.
+  const totalConfirmed = useMemo(
+    () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).filter((row) => {
+      const e = row.estado || '';
+      return e === 'confirmada' || e === 'confirmado';
+    }).length, 0),
     [reservations]
   );
 
@@ -845,9 +880,10 @@ export default function GestionNominas() {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => exportToExcel(reservations, products)}
-              disabled={loading || reservations.length === 0}
+              onClick={() => exportToExcel(visibleReservations, products)}
+              disabled={loading || visibleReservations.length === 0}
               className="flex items-center gap-2"
+              title={hasActiveFilters || search.trim() ? 'Exporta solo lo que queda visible con los filtros actuales' : undefined}
             >
               <Download className="h-4 w-4" />
               Exportar Excel
@@ -855,10 +891,10 @@ export default function GestionNominas() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportToExcelBO(reservations, products, agencies)}
-              disabled={loading || reservations.length === 0}
+              onClick={() => exportToExcelBO(visibleReservations, products, agencies)}
+              disabled={loading || visibleReservations.length === 0}
               className="flex items-center gap-2"
-              title="Excel con el formato para importar a Netviax Atlas"
+              title="Excel con el formato para importar a Netviax Atlas (respeta los filtros activos)"
             >
               <Download className="h-4 w-4" />
               Exportar BO
@@ -885,10 +921,10 @@ export default function GestionNominas() {
             color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
           },
           {
-            label: 'Confirmadas',
+            label: 'PAX Confirmados',
             value: loading ? '—' : totalConfirmed,
             icon: CheckCircle2,
-            description: 'Reservas en estado confirmado.',
+            description: 'Pasajeros confirmados (no fichas).',
             color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
           },
         ]}

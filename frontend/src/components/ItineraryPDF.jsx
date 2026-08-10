@@ -139,7 +139,6 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
     'Estimado cliente, te deseamos un muy buen viaje! Favor verificá la documentación con la cual estarás viajando (visas y vacunas si fueran necesarias). No olvides solicitarle a tu asesor que ingrese tu número de viajero frecuente en la reserva. Te aconsejamos hacer el web check-in con anticipación. ¡Gracias por elegirnos!';
   const pdfShowLogo = config?.identity?.pdf_show_logo !== false;
 
-  const codigoReserva = product?.pnr || reservation?.pnr || reservation?.pedido_id || '—';
   const estadoLabel = ESTADO_LABELS[reservation?.estado] || null;
   const estadoColors = ESTADO_COLORS[estadoLabel] || { bg: '#dcfce7', text: '#166534' };
 
@@ -153,6 +152,15 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
 
   const passengerNames = passengers
     .map((p) => `${p.nombre || ''} ${p.apellido || ''}`.trim())
+    .filter(Boolean);
+  // Documento de cada pasajero, para que el voucher sirva también como
+  // comprobante de identidad en el check-in — no solo el nombre.
+  const passengerDetails = passengers
+    .map((p) => {
+      const nombre = `${p.nombre || ''} ${p.apellido || ''}`.trim();
+      const documento = p.documento;
+      return nombre ? (documento ? `${nombre} (Doc: ${documento})` : nombre) : null;
+    })
     .filter(Boolean);
 
   const headingFont = config?.fonts?.heading || 'Montserrat';
@@ -231,7 +239,7 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Itinerario – ${codigoReserva}</title>
+        <title>Itinerario – ${reservation?.pedido_id || ''}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
           * { margin: 0; padding: 0; }
@@ -314,13 +322,13 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
               <p className="info-label">Pasajero(s)</p>
               <div>
                 <div style={{ marginBottom: 0 }}>
-                  <p className="info-value">{passengerNames.length > 0 ? passengerNames.join(', ') : '—'}</p>
+                  <p className="info-value">{passengerDetails.length > 0 ? passengerDetails.join(', ') : '—'}</p>
                 </div>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <p className="info-label">Código de Reserva</p>
-              <p className="info-value">{codigoReserva}</p>
+              <p className="info-label">N° de Pedido</p>
+              <p className="info-value">{reservation?.pedido_id || '—'}</p>
             </div>
           </div>
         </div>

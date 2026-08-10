@@ -204,6 +204,7 @@ export default function GestionReservas() {
         x.vuelo_destino?.toLowerCase().includes(q) ||
         x.agencia?.toLowerCase().includes(q) ||
         x.nombre_pasajero?.toLowerCase().includes(q) ||
+        x.ficha_venta?.toLowerCase().includes(q) ||
         (x.passengers || []).some(p => `${p.nombre} ${p.apellido}`.toLowerCase().includes(q))
       );
     }
@@ -571,7 +572,7 @@ export default function GestionReservas() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero..."
+            <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero, ficha..."
               value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
           </div>
@@ -591,51 +592,52 @@ export default function GestionReservas() {
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead>ID Pedido</TableHead>
-              <TableHead>Agencia</TableHead>
-              <TableHead>Contacto</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Cía</TableHead>
+              <TableHead>Salida</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Apellido</TableHead>
+              <TableHead>Ficha</TableHead>
               <TableHead>Documento</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead>Destino</TableHead>
               <TableHead className="text-center">Ruta</TableHead>
-              <TableHead>Salida</TableHead>
               <TableHead>Vencimiento</TableHead>
-              <TableHead>Ficha</TableHead>
               <TableHead>Cesión</TableHead>
+              <TableHead>Contacto</TableHead>
               <TableHead>Doc.Contable</TableHead>
               <TableHead>Ticket</TableHead>
               <TableHead>Precio Venta</TableHead>
               <TableHead>Neto 1</TableHead>
               <TableHead>OP</TableHead>
               <TableHead>Vendedor</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>ID Pedido</TableHead>
+              <TableHead>Agencia</TableHead>
               <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={21} className="text-center py-10">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={22} className="text-center py-10">Cargando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={21} className="text-center py-10 text-slate-400">
+              <TableRow><TableCell colSpan={22} className="text-center py-10 text-slate-400">
                 {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
               </TableCell></TableRow>
             ) : filtered.flatMap(r => {
               const expiry = r.estado === 'bloqueo_temporal' ? formatExpiry(r.bloqueo_expira_at) : null;
               return buildPassengerRows(r).map(row => (
                 <TableRow key={row.key}>
-                  <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
-                  <TableCell>{agencyName(r.agencia)}</TableCell>
                   <TableCell>
-                    <div className="text-sm">{r.contacto_nombre || '—'}</div>
-                    <div className="text-xs text-slate-400">{r.contacto_email}</div>
+                    <Badge variant={getEstadoVariant(row.estado)}>{getEstadoLabel(row.estado)}</Badge>
                   </TableCell>
+                  <TableCell>{r.vuelo_destino || '—'}</TableCell>
+                  <TableCell>{r.vuelo_compania || '—'}</TableCell>
+                  <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
                   <TableCell className="font-medium text-slate-900">{row.nombre}</TableCell>
                   <TableCell>{row.apellido}</TableCell>
+                  <TableCell className="text-xs">{r.ficha_venta || '—'}</TableCell>
                   <TableCell>{row.documento}</TableCell>
                   <TableCell>{row.tipoPasajero}</TableCell>
-                  <TableCell>{r.vuelo_destino || '—'}</TableCell>
                   <TableCell className="text-center">
                     {r.vuelo_ruta || (products.find(p => p.id === r.product_id)?.ruta) ? (
                       <button
@@ -658,7 +660,6 @@ export default function GestionReservas() {
                       <span className="text-slate-400">—</span>
                     )}
                   </TableCell>
-                  <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs text-slate-600">{formatDate(r.bloqueo_expira_at) || '—'}</span>
@@ -669,7 +670,6 @@ export default function GestionReservas() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs">{r.ficha_venta || '—'}</TableCell>
                   {/* Cesión: en la agencia cedente muestra la salida de stock;
                       en la reserva real hecha con ese cupo, de qué agencia vino */}
                   <TableCell>
@@ -703,6 +703,10 @@ export default function GestionReservas() {
                     })()}
                   </TableCell>
                   <TableCell>
+                    <div className="text-sm">{r.contacto_nombre || '—'}</div>
+                    <div className="text-xs text-slate-400">{r.contacto_email}</div>
+                  </TableCell>
+                  <TableCell>
                     {row.docContable ? (
                       <span className="text-xs text-green-600 font-medium">✓ {row.docContable}</span>
                     ) : row.estado === 'bloqueo_temporal' ? (
@@ -728,9 +732,8 @@ export default function GestionReservas() {
                   <TableCell>{formatMoney(row.neto1)}</TableCell>
                   <TableCell>{productOp(r.product_id)}</TableCell>
                   <TableCell className="text-xs text-slate-500">{r.vendedor_email || '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant={getEstadoVariant(row.estado)}>{getEstadoLabel(row.estado)}</Badge>
-                  </TableCell>
+                  <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
+                  <TableCell>{agencyName(r.agencia)}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
                       {r.estado === 'solicitud_cancelacion' && (

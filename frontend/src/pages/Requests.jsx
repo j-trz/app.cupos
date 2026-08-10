@@ -392,6 +392,12 @@ export default function Requests() {
                       <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
                         Cancelación solicitada
                       </span>
+                    ) : item.Estado?.toLowerCase() === 'expirada' ? (
+                      // Se venció y liberó el cupo sola (cron) — ya está
+                      // resuelta, no tiene sentido "solicitar" su cancelación.
+                      <span className="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded">
+                        Cancelada (venció sola)
+                      </span>
                     ) : item.Estado?.toLowerCase() === 'cancelada' ? null : (
                       <Button
                         size="sm"

@@ -45,6 +45,7 @@ const adaptProduct = (producto) => ({
 
 const adaptRequest = (item) => ({
   id: item.id || item.ID || '',
+  ProductId: item.product_id ?? item.ProductID ?? item.product?.id ?? '',
   Pedido_ID: item.Pedido_ID || item.pedido_id || '',
   Agencia: item.Agencia || item.agencia || '',
   Contacto_Nombre: item.Contacto_Nombre || item.contacto_nombre || item.contacto?.nombre || '',

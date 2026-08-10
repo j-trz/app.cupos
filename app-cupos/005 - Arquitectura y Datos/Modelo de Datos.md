@@ -2,7 +2,7 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 > Fuente de verdad: el propio `models.go`. Este documento resume la forma y el *por qué* de cada tabla; ante cualquier duda puntual de tipo/columna, el código gana.
 >
-> Última lectura completa de `models.go` contra este documento: 2026-08-10.
+> Última lectura completa de `models.go` contra este documento: 2026-08-10 (actualizado el mismo día tras implementar la Fase 2 del backlog de [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]]: KG por franquicia, links de paquetes, sección Servicios, vencimiento de documento).
 
 ## Índice
 
@@ -27,7 +27,8 @@ Un **cupo** — bloqueo aéreo, paquete o servicio publicado por una agencia. Ca
 - **Identidad**: `CodigoCupo`, `Destino`, `Compania`, `Ruta`, `PNR`, `Ficha`, `Temporada`, `TipoProducto`, `Servicio` (texto libre distinto de `TipoProducto`, ej. "Traslado"/"Seguro de viaje").
 - **Stock**: `Disponibilidad` (lugares libres), `Cupo` (total original), `Vendidos`.
 - **Precios**: `TarifaAdt`/`ImpuestosAdt` y sus equivalentes `TarifaChd`/`ImpuestosChd`, `TarifaInf`/`ImpuestosInf` — tarifa e impuestos **ya están separados por tipo de pasajero**. `Neto1` y `OP` son hoy campos **únicos, no desglosados por tipo** (a diferencia de tarifa/impuestos). `Precio`/`ChdFare`/`InfFare` son la **Venta calculada** de cada tipo (`applyCalculatedPrices` en `product_handler.go`, server-side): `Tarifa + Impuestos + OP` de ese tipo — no se renombran a `venta_adt` etc. a propósito, porque `Availability.jsx`, reportes, PDFs y el payload de reserva ya consumen esos 3 nombres. Individualizar `Neto1`/`OP` por tipo de pasajero es un cambio de esquema pendiente — ver la nota de precios en [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]].
-- **Equipaje**: `CarryOn`/`HandBag`/`CheckedBag` (booleanos simples, sin kilaje — ver la misma nota de [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]]).
+- **Equipaje**: `CarryOn`/`HandBag`/`CheckedBag` (booleanos) + `CarryOnKg`/`HandBagKg`/`CheckedBagKg` (float64, kilaje de cada franquicia — puede variar por producto, agregado 2026-08-10).
+- **Paquetes**: `PackageLinks` (`datatypes.JSON`, array de `{url, label}`) — links a los paquetes armados a partir de este cupo, mostrados en la columna "Paquetes" de Disponibilidad (agregado 2026-08-10).
 - **Visibilidad multi-agencia**: `Agencia` (dueña), `RestrictedAgency` (si está seteado, solo esa agencia + admin ven el producto — usado en los productos-espejo de una cesión), `SourceAgency` (quién cedió este espejo puntual, distinto de quién lo tiene *hoy*), `TransferID` (vincula el espejo con su `AvailabilityTransfer`). Sin cesión de por medio, **un producto solo lo ve su agencia dueña** — no existe un catálogo general visible para todos.
 - **Bloqueo de venta**: `IsBlockedForSale` (oculta de Disponibilidad sin tocar reservas existentes).
 - **Notas**: `NotasExternas` (cualquier agencia) vs `NotasInternas` (solo admin — se limpia antes de serializar a no-admins).
@@ -43,10 +44,15 @@ Un pedido — puede agrupar varios `Passenger`. Estados canónicos en [[Historia
 - `StatusBack`: anotación libre de si ya se cargó en el backoffice externo — manual, no hay integración de escritura real (ver [[Flujos de Funcionalidades]] sección 17, Netviax Atlas es solo lectura).
 - `PreCancelEstado`/`CancelacionNotas`: permiten restaurar el estado exacto previo si se rechaza una solicitud de cancelación.
 - `ExpirationWarningSentAt`: evita reenviar el aviso de "por vencer" en cada corrida del cron.
+- **Servicios** (agregado 2026-08-10): `Hotel` (texto libre), `TrasladosIncluye` (bool), `TrasladosNotas` (texto libre) — sección "Servicios" del formulario de reserva.
 
 ### `Passenger` (tabla `passengers`)
 
-La unidad real de "cupo aéreo": **cada pasajero ocupa 1 lugar y se crea siempre de forma individual** (con su propio ticket), aunque varios comparten `PedidoID`/`ReservationID` por haberse reservado juntos. `NRO` distingue `1 = Venta` de `0 = Acompañante`. `Documento` (CI) y `Pasaporte` son campos separados — un pasajero puede tener uno, el otro, o ambos (típico si vino cargado desde Atlas). Cada pasajero progresa de forma independiente dentro del mismo pedido: tiene su propio `Estado`, `NumeroTicket`, `PrecioVenta`, `Neto1`, `DocContable`, `BloqueoExpiraAt`.
+La unidad real de "cupo aéreo": **cada pasajero ocupa 1 lugar y se crea siempre de forma individual** (con su propio ticket), aunque varios comparten `PedidoID`/`ReservationID` por haberse reservado juntos — **excepto el infante, que es pasajero pero no ocupa lugar/cupo** (ver más abajo). `NRO` distingue `1 = Venta` de `0 = Acompañante`. `Documento` (CI) y `Pasaporte` son campos separados — un pasajero puede tener uno, el otro, o ambos (típico si vino cargado desde Atlas). Cada pasajero progresa de forma independiente dentro del mismo pedido: tiene su propio `Estado`, `NumeroTicket`, `PrecioVenta`, `Neto1`, `DocContable`, `BloqueoExpiraAt`.
+
+- **Vencimiento de documento** (agregado 2026-08-10): `DocumentoVencimiento` (`*time.Time`) + `DocumentoVitalicio` (bool, si es true el vencimiento se ignora).
+
+**Infante no ocupa lugar** (implementado 2026-08-10): cada pasajero con `TipoPasajero == "Infante"` sigue creando su propia fila en `passengers` (sigue siendo pasajero, cuenta para `Vendidos`), pero **no** resta de `Product.Disponibilidad`. La lógica vive centralizada en `countPassengerSeats()` (`order_handler.go`) — separa "seats" (excluye infantes, para `Disponibilidad`) de "total" (todos, para `Vendidos`) — usada en los ~9 puntos donde se descuenta o devuelve stock: `CreateReservation`, `AddPassenger`, `DuplicatePassenger`, `DeletePassenger`, `DeleteReservation`, `ResolveCancellation`, `expireOverdueReservations` (cron), el tool de IA `crear_reserva`/cancelación, y `AdminReleaseHold`. El **hold** (`CreateHold`, antes de tener datos de pasajero) sigue descontando el conteo total sin distinguir tipo — todavía no se sabe qué tipo es cada uno — y la diferencia se reconcilia en `CreateReservation` una vez que el tipo real de cada pasajero es conocido.
 
 > Nota de negocio pendiente de reflejar en el modelo: el **infante no ocupa lugar/cupo pero sí es pasajero** — hoy `Passenger` no distingue esto a nivel de stock (cada fila resta 1 de `Disponibilidad` por igual). Ver [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]], sección Reserva.
 

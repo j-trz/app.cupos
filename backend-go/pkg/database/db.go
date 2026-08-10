@@ -470,6 +470,8 @@ func seedNotificationTemplates(db *gorm.DB) {
 			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene la fecha de emisión el {{fecha}} (en {{dias}} día(s))"},
 		{Code: "product_deadline_gastos", Name: "Producto: entrada en gastos próxima", Title: "Entrada en gastos próxima",
 			Message: "El cupo {{codigo_cupo}} hacia {{destino}} entra en gastos el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_changed", Name: "Producto: cambio de ruta o fecha", Title: "Tu cupo reservado cambió",
+			Message: "El producto {{codigo_cupo}} hacia {{destino}} de tu reserva {{pedido_id}} cambió: {{cambios}}"},
 	}
 
 	for _, tpl := range defaults {

@@ -283,6 +283,21 @@ func UpdateProduct(c *gin.Context) {
 	}
 	applyCalculatedPrices(&updated)
 
+	// Avisos: si cambia ruta o fechas de salida/regreso, las reservas activas
+	// sobre este producto quedan afectadas — se detecta ANTES de guardar
+	// (comparando contra `existing`) y se notifica DESPUÉS de guardar con
+	// éxito, más abajo.
+	var cambios []string
+	if existing.Ruta != updated.Ruta {
+		cambios = append(cambios, fmt.Sprintf("ruta: %s → %s", orGuion(existing.Ruta), orGuion(updated.Ruta)))
+	}
+	if !sameDatePtr(existing.FechaSalida, updated.FechaSalida) {
+		cambios = append(cambios, fmt.Sprintf("fecha de salida: %s → %s", formatDatePtr(existing.FechaSalida), formatDatePtr(updated.FechaSalida)))
+	}
+	if !sameDatePtr(existing.FechaRegreso, updated.FechaRegreso) {
+		cambios = append(cambios, fmt.Sprintf("fecha de regreso: %s → %s", formatDatePtr(existing.FechaRegreso), formatDatePtr(updated.FechaRegreso)))
+	}
+
 	if err := database.DB.Select(
 		"destino", "compania", "disponibilidad", "cupo",
 		"fecha_salida", "fecha_regreso", "salida", "regreso",
@@ -301,7 +316,54 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	if len(cambios) > 0 {
+		notifyProductChanged(&updated, cambios, createdByFromContext(c))
+	}
+
 	c.JSON(http.StatusOK, updated)
+}
+
+// notifyProductChanged avisa a cada reserva activa sobre este producto
+// (excluye hold_temporal/cancelada/expirada/cedido, que ya no representan un
+// viaje real esperando al pasajero) que su ruta o fechas cambiaron.
+func notifyProductChanged(product *models.Product, cambios []string, actor *uuid.UUID) {
+	var reservations []models.Reservation
+	database.DB.Where(
+		"product_id = ? AND estado NOT IN ?", product.ID,
+		[]string{models.EstadoHoldTemporal, models.EstadoCancelada, models.EstadoExpirada, models.EstadoCedida},
+	).Find(&reservations)
+
+	resumen := strings.Join(cambios, "; ")
+	for _, r := range reservations {
+		services.NotifyUserByCode(r.CreatedBy, actor, r.Agencia, "product_changed",
+			"Tu cupo reservado cambió",
+			fmt.Sprintf("El producto %s hacia %s de tu reserva %s cambió: %s", product.CodigoCupo, product.Destino, r.PedidoID, resumen),
+			map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "pedido_id": r.PedidoID, "cambios": resumen})
+	}
+}
+
+func orGuion(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
+}
+
+func sameDatePtr(a, b *time.Time) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(*b)
+}
+
+func formatDatePtr(t *time.Time) string {
+	if t == nil {
+		return "—"
+	}
+	return t.Format("2006-01-02")
 }
 
 // DeleteProduct elimina un producto. No existía ningún endpoint para esto —

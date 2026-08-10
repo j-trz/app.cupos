@@ -360,7 +360,7 @@ export default function Availability() {
     }
     setForm((prev) => ({
       ...prev,
-      passengers: [...prev.passengers, { nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' }],
+      passengers: [...prev.passengers, { ...EMPTY_PASSENGER }],
     }));
   };
 
@@ -587,12 +587,8 @@ export default function Availability() {
 
   const handleSubmitReservation = async (e) => {
     e.preventDefault();
-    if (!form.contacto_nombre?.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá el nombre del contacto.' });
-      return;
-    }
     if (!form.contacto_email?.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá el email del contacto.' });
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá el email de contacto (pasajero 1).' });
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -600,26 +596,40 @@ export default function Availability() {
       Swal.fire({ icon: 'warning', title: 'Email inválido', text: 'Ingresá un email de contacto válido.' });
       return;
     }
+    if (!form.ficha_venta?.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá la ficha de venta.' });
+      return;
+    }
     if (form.passengers.length === 0) {
       Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Agregá al menos un pasajero.' });
       return;
     }
-    const pasajeroInvalido = form.passengers.some((p) => !p.nombre?.trim() || !p.apellido?.trim());
+    // Mandatorio: todos los datos de cada pasajero (nombre, apellido,
+    // documento, nacimiento, nacionalidad) — no solo nombre/apellido.
+    const pasajeroInvalido = form.passengers.some((p) =>
+      !p.nombre?.trim() || !p.apellido?.trim() || !p.documento?.trim() || !p.nacimiento || !p.nacionalidad?.trim()
+    );
     if (pasajeroInvalido) {
-      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá nombre y apellido de todos los pasajeros.' });
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Completá nombre, apellido, documento, nacimiento y nacionalidad de todos los pasajeros.' });
       return;
     }
+
+    // El contacto ya no es una sección aparte — se deriva del pasajero 1.
+    const contactoNombre = `${form.passengers[0].nombre} ${form.passengers[0].apellido}`.trim();
 
     setSubmitting(true);
     try {
       const payload = {
         product_id: selectedProduct.id,
         pedido_id: form.pedido_id,
-        contacto_nombre: form.contacto_nombre,
+        contacto_nombre: contactoNombre,
         contacto_email: form.contacto_email,
         contacto_telefono: form.contacto_telefono,
         ficha_venta: form.ficha_venta || null,
         doc_contable: form.doc_contable || null,
+        hotel: form.hotel || null,
+        traslados_incluye: form.traslados_incluye,
+        traslados_notas: form.traslados_notas || null,
         vuelo_destino: selectedProduct.destino,
         vuelo_compania: selectedProduct.compania,
         vuelo_salida: selectedProduct.fecha_salida,
@@ -1100,11 +1110,33 @@ export default function Availability() {
               </fieldset>
 
               <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4 my-2">
-                <legend className="px-2.5 text-sm font-bold text-slate-800">Documentación (opcional)</legend>
+                <legend className="px-2.5 text-sm font-bold text-slate-800">Servicios</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">Ficha de venta</label>
-                    <input type="text" value={form.ficha_venta} onChange={(e) => handleFormChange('ficha_venta', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: FV-001" />
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">Hotel</label>
+                    <input type="text" value={form.hotel} onChange={(e) => handleFormChange('hotel', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Hotel Playa Sol" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-700">
+                      <input type="checkbox" checked={form.traslados_incluye} onChange={(e) => handleFormChange('traslados_incluye', e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                      Incluye traslados
+                    </label>
+                  </div>
+                  {form.traslados_incluye && (
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-700">Notas de traslados</label>
+                      <input type="text" value={form.traslados_notas} onChange={(e) => handleFormChange('traslados_notas', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: aeropuerto-hotel ida y vuelta" />
+                    </div>
+                  )}
+                </div>
+              </fieldset>
+
+              <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4 my-2">
+                <legend className="px-2.5 text-sm font-bold text-slate-800">Documentación</legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">Ficha de venta *</label>
+                    <input type="text" value={form.ficha_venta} onChange={(e) => handleFormChange('ficha_venta', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: FV-001" />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold text-slate-700">Doc. Contable</label>
