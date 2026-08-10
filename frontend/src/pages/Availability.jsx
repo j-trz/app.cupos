@@ -27,6 +27,10 @@ const EMPTY_FORM = {
   passengers: [],
   ficha_venta: '',
   doc_contable: '',
+  // Sección "Servicios"
+  hotel: '',
+  traslados_incluye: false,
+  traslados_notas: '',
 };
 
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
@@ -191,7 +195,11 @@ export default function Availability() {
   };
 
   // ---- Reserva individual ----
-  const EMPTY_PASSENGER = { nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '', nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto' };
+  const EMPTY_PASSENGER = {
+    nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '',
+    nacionalidadFromAtlas: false, tipo_pasajero: 'Adulto',
+    documento_vencimiento: '', documento_vitalicio: false,
+  };
 
   // Abre el modal SIN hold — lo sigue usando el Asistente IA (abrir_modal_reserva),
   // que no pasa por el flujo manual de "elegir cantidad" de abajo.
@@ -956,9 +964,24 @@ export default function Availability() {
                   <div><span className="text-slate-500">Salida:</span><span className="ml-2 font-semibold text-slate-900">{formatDate(selectedProduct?.fecha_salida)}</span></div>
                   <div><span className="text-slate-500">Regreso:</span><span className="ml-2 font-semibold text-slate-900">{formatDate(selectedProduct?.fecha_regreso)}</span></div>
                   <div><span className="text-slate-500">Temporada:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.temporada || '—'}</span></div>
-                  <div><span className="text-slate-500">Ruta:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.ruta || '—'}</span></div>
                   <div><span className="text-slate-500">Disponibles:</span><span className="ml-2 font-semibold text-slate-900">{selectedProduct?.disponibilidad}</span></div>
+                  <div className="sm:col-span-2">
+                    <span className="text-slate-500">Aplica para:</span>
+                    <span className="ml-2 font-semibold text-slate-900">
+                      {[
+                        Number(selectedProduct?.precio) > 0 && 'ADT',
+                        Number(selectedProduct?.chd_fare) > 0 && 'CHD',
+                        Number(selectedProduct?.inf_fare) > 0 && 'INF',
+                      ].filter(Boolean).join(' / ') || 'Adulto'}
+                    </span>
+                  </div>
                 </div>
+                {selectedProduct?.ruta && (
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <span className="mb-1.5 block text-sm text-slate-500">Ruta:</span>
+                    <ItineraryTable ruta={selectedProduct.ruta} />
+                  </div>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-2 my-2">
@@ -967,30 +990,6 @@ export default function Availability() {
                 </label>
                 <input type="text" value={form.pedido_id} readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2.5 text-sm text-slate-600 cursor-not-allowed font-mono" />
               </div>
-
-              <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4 my-2">
-                <legend className="px-2.5 text-sm font-bold text-slate-800">Datos de contacto</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1">
-                      <User className="h-3.5 w-3.5 text-slate-500" />Nombre contacto *
-                    </label>
-                    <input type="text" value={form.contacto_nombre} onChange={(e) => handleFormChange('contacto_nombre', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Juan Pérez" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1">
-                      <Mail className="h-3.5 w-3.5 text-slate-500" />Email contacto *
-                    </label>
-                    <input type="email" value={form.contacto_email} onChange={(e) => handleFormChange('contacto_email', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: juan@agencia.com" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1">
-                      <Phone className="h-3.5 w-3.5 text-slate-500" />Teléfono contacto
-                    </label>
-                    <input type="text" value={form.contacto_telefono} onChange={(e) => handleFormChange('contacto_telefono', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: +54 11 1234-5678" />
-                  </div>
-                </div>
-              </fieldset>
 
               <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4 my-2">
                 <legend className="px-2.5 text-sm font-bold text-slate-800">Datos del pasajero</legend>
@@ -1008,9 +1007,9 @@ export default function Availability() {
                           <input type="text" value={passenger.apellido} onChange={(e) => handlePassengerChange(index, 'apellido', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: González" />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-600">CI</label>
+                          <label className="mb-1 block text-xs font-medium text-slate-600">CI *</label>
                           <div className="flex gap-1.5">
-                            <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
+                            <input type="text" value={passenger.documento} onChange={(e) => handlePassengerChange(index, 'documento', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: 12345678" />
                             <button
                               type="button"
                               onClick={() => handleOpenAtlasSearch(index)}
@@ -1025,18 +1024,56 @@ export default function Availability() {
                           <label className="mb-1 block text-xs font-medium text-slate-600">Pasaporte</label>
                           <input type="text" value={passenger.pasaporte} onChange={(e) => handlePassengerChange(index, 'pasaporte', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: D740258" />
                         </div>
-                        {passenger.nacionalidadFromAtlas && passenger.nacionalidad && (
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad</label>
-                            <input type="text" value={passenger.nacionalidad} readOnly title="Dato traído de Atlas" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-100 text-slate-600 cursor-not-allowed" />
-                          </div>
-                        )}
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-600">Nacionalidad *</label>
+                          <input
+                            type="text" value={passenger.nacionalidad}
+                            onChange={(e) => handlePassengerChange(index, 'nacionalidad', e.target.value)}
+                            readOnly={passenger.nacionalidadFromAtlas}
+                            required
+                            title={passenger.nacionalidadFromAtlas ? 'Dato traído de Atlas' : undefined}
+                            className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 ${passenger.nacionalidadFromAtlas ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed' : 'border-slate-300 bg-white'}`}
+                            placeholder="Ej: Uruguay"
+                          />
+                        </div>
                         <div>
                           <label className="mb-1 block text-xs font-medium text-slate-600 flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-slate-500" />Fecha de nacimiento
+                            <Calendar className="h-3 w-3 text-slate-500" />Fecha de nacimiento *
                           </label>
-                          <input type="date" value={passenger.nacimiento} onChange={(e) => handlePassengerChange(index, 'nacimiento', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
+                          <input type="date" value={passenger.nacimiento} onChange={(e) => handlePassengerChange(index, 'nacimiento', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
                         </div>
+                        <div>
+                          <label className="mb-1 flex items-center justify-between text-xs font-medium text-slate-600">
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-slate-500" />Vencimiento de documento</span>
+                            <label className="flex items-center gap-1 font-normal text-slate-500">
+                              <input type="checkbox" checked={passenger.documento_vitalicio} onChange={(e) => handlePassengerChange(index, 'documento_vitalicio', e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                              Vitalicio
+                            </label>
+                          </label>
+                          <input
+                            type="date"
+                            value={passenger.documento_vencimiento}
+                            onChange={(e) => handlePassengerChange(index, 'documento_vencimiento', e.target.value)}
+                            disabled={passenger.documento_vitalicio}
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                          />
+                        </div>
+                        {index === 0 && (
+                          <>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-slate-600 flex items-center gap-1">
+                                <Mail className="h-3 w-3 text-slate-500" />Email de contacto *
+                              </label>
+                              <input type="email" value={form.contacto_email} onChange={(e) => handleFormChange('contacto_email', e.target.value)} required className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: juan@agencia.com" />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-slate-600 flex items-center gap-1">
+                                <Phone className="h-3 w-3 text-slate-500" />Teléfono de contacto
+                              </label>
+                              <input type="text" value={form.contacto_telefono} onChange={(e) => handleFormChange('contacto_telefono', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: +54 11 1234-5678" />
+                            </div>
+                          </>
+                        )}
                         <div>
                           <label className="mb-1 block text-xs font-medium text-slate-600">Tipo de pasajero</label>
                           <select value={passenger.tipo_pasajero} onChange={(e) => handlePassengerChange(index, 'tipo_pasajero', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 bg-white">

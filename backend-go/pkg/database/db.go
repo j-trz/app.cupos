@@ -632,6 +632,13 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS package_links JSONB DEFAULT '[]';`,
+		// Sección "Servicios" del formulario de reserva (Hotel/Traslados) y
+		// vencimiento de documento por pasajero (con opción "vitalicio").
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hotel VARCHAR(255) DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS traslados_incluye BOOLEAN DEFAULT false;`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS traslados_notas TEXT DEFAULT '';`,
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vencimiento TIMESTAMP WITH TIME ZONE;`,
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vitalicio BOOLEAN DEFAULT false;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

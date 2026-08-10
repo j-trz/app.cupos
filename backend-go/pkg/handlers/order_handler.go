@@ -31,6 +31,9 @@ type PassengerInput struct {
 	PrecioVenta  *float64 `json:"precio_venta,omitempty"`
 	Neto1        *float64 `json:"neto_1,omitempty"`
 	DocContable  string   `json:"doc_contable,omitempty"`
+	// Vencimiento de documento de viaje — Vitalicio=true ignora Vencimiento.
+	DocumentoVencimiento string `json:"documento_vencimiento,omitempty"`
+	DocumentoVitalicio   bool   `json:"documento_vitalicio,omitempty"`
 }
 
 type ReservationInput struct {
@@ -58,6 +61,21 @@ func buildReservationEmailVars(reservation *models.Reservation, vence string, pa
 		"pasajeros":       strings.Join(passengerNames, ", "),
 		"vence":           vence,
 	}
+}
+
+// countPassengerSeats cuenta los pasajeros de una reserva, separando el total
+// (para reponer Vendidos) de los que ocupan lugar/cupo (para reponer
+// Disponibilidad) — el infante es pasajero pero no ocupa lugar (ver
+// CreateReservation), así que al devolver stock por cancelación/expiración
+// hay que devolver solo los lugares que en verdad se habían descontado.
+func countPassengerSeats(reservationID uint) (seats int64, total int64) {
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservationID).Count(&total)
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ? AND tipo_pasajero != ?", reservationID, "Infante").Count(&seats)
+	if total == 0 {
+		total = 1
+		seats = 1
+	}
+	return seats, total
 }
 
 // canReserveProduct valida si el usuario puede reservar este producto: es
@@ -324,13 +342,15 @@ func parseDateFlexible(s string) *time.Time {
 // toPassengerModel convierte PassengerInput a models.Passenger
 func toPassengerModel(pi PassengerInput) models.Passenger {
 	return models.Passenger{
-		Nombre:       pi.Nombre,
-		Apellido:     pi.Apellido,
-		Documento:    pi.Documento,
-		Pasaporte:    pi.Pasaporte,
-		Nacimiento:   parseDateFlexible(pi.Nacimiento),
-		Nacionalidad: pi.Nacionalidad,
-		TipoPasajero: pi.TipoPasajero,
+		Nombre:               pi.Nombre,
+		Apellido:             pi.Apellido,
+		Documento:            pi.Documento,
+		Pasaporte:            pi.Pasaporte,
+		Nacimiento:           parseDateFlexible(pi.Nacimiento),
+		Nacionalidad:         pi.Nacionalidad,
+		TipoPasajero:         pi.TipoPasajero,
+		DocumentoVencimiento: parseDateFlexible(pi.DocumentoVencimiento),
+		DocumentoVitalicio:   pi.DocumentoVitalicio,
 	}
 }
 
@@ -427,25 +447,49 @@ func CreateReservation(c *gin.Context) {
 	if numPassengers == 0 {
 		numPassengers = 1
 	}
+	// El infante no ocupa lugar/cupo (Disponibilidad), pero sigue siendo
+	// pasajero: tiene su propia fila en `passengers` y cuenta para Vendidos.
+	// El hold (CreateHold) todavía no conoce el tipo de cada pasajero — por
+	// eso descontó de más (numPassengers a secas) — se reconcilia acá abajo.
+	seatsNeeded := 0
+	for _, p := range input.Passengers {
+		if p.TipoPasajero != "Infante" {
+			seatsNeeded++
+		}
+	}
+	if len(input.Passengers) == 0 && input.Reservation.TipoPasajero != "Infante" {
+		seatsNeeded = 1
+	}
 
 	if existingHold != nil {
-		// La cantidad quedó fija al crear el hold: si no coincide, el cliente
-		// está tratando de reservar más/menos lugares de los que en verdad
-		// tiene apartados.
+		// La cantidad TOTAL quedó fija al crear el hold: si no coincide, el
+		// cliente está tratando de reservar más/menos lugares de los que en
+		// verdad tiene apartados.
 		if numPassengers != existingHold.HoldPassengerCount {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "La cantidad de pasajeros no coincide con el bloqueo temporal"})
 			return
 		}
+		// El hold descontó numPassengers lugares (sin saber todavía cuáles
+		// eran infantes). Ahora que se conoce el tipo real, se devuelve la
+		// diferencia si hubo infantes entre los pasajeros del hold.
+		if seatsFreed := existingHold.HoldPassengerCount - seatsNeeded; seatsFreed > 0 {
+			product.Disponibilidad += seatsFreed
+			if err := tx.Save(&product).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+				return
+			}
+		}
 	} else {
-		if product.Disponibilidad < numPassengers {
+		if product.Disponibilidad < seatsNeeded {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente"})
 			return
 		}
 
 		// 2. Actualizar disponibilidad del producto
-		product.Disponibilidad -= numPassengers
+		product.Disponibilidad -= seatsNeeded
 		product.Vendidos += numPassengers
 		if err := tx.Save(&product).Error; err != nil {
 			tx.Rollback()
@@ -867,16 +911,11 @@ func DeleteReservation(c *gin.Context) {
 	// Devolver disponibilidad solo si el cron o una cancelación NO lo hizo ya.
 	// Las reservas expiradas o canceladas ya tuvieron su stock devuelto.
 	if found && reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada {
-		var passengersCount int64
-		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
-		if passengersCount == 0 {
-			passengersCount = 1
-		}
-
+		seats, total := countPassengerSeats(reservation.ID)
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 			})
 	}
 
@@ -917,14 +956,15 @@ func DeletePassenger(c *gin.Context) {
 		return
 	}
 
-	// Liberar únicamente el lugar de este pasajero si no estaba ya cancelado/expirado.
+	// Liberar únicamente el lugar de este pasajero si no estaba ya
+	// cancelado/expirado — y solo si ocupaba lugar (el infante no lo hacía).
 	if reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada &&
 		passenger.Estado != models.EstadoExpirada && passenger.Estado != models.EstadoCancelada {
-		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
-			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + 1)) ELSE GREATEST(0, disponibilidad + 1) END"),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - 1)"),
-			})
+		updates := map[string]interface{}{"vendidos": gorm.Expr("GREATEST(0, vendidos - 1)")}
+		if passenger.TipoPasajero != "Infante" {
+			updates["disponibilidad"] = gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + 1)) ELSE GREATEST(0, disponibilidad + 1) END")
+		}
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).Updates(updates)
 	}
 
 	if err := database.DB.Delete(&passenger).Error; err != nil {
@@ -1134,15 +1174,11 @@ func ResolveCancellation(c *gin.Context) {
 	actor := createdByFromContext(c)
 
 	if input.Decision == "approve" {
-		var passengersCount int64
-		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
-		if passengersCount == 0 {
-			passengersCount = 1
-		}
+		seats, total := countPassengerSeats(reservation.ID)
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 			})
 		database.DB.Model(&reservation).Updates(map[string]interface{}{
 			"estado":            models.EstadoCancelada,
@@ -1309,15 +1345,17 @@ func UpdatePassenger(c *gin.Context) {
 	}
 
 	var input struct {
-		Nombre       string   `json:"nombre"`
-		Apellido     string   `json:"apellido"`
-		Documento    string   `json:"documento"`
-		Pasaporte    string   `json:"pasaporte"`
-		Nacimiento   string   `json:"nacimiento"`
-		Nacionalidad string   `json:"nacionalidad"`
-		TipoPasajero string   `json:"tipo_pasajero"`
-		PrecioVenta  *float64 `json:"precio_venta"`
-		Neto1        *float64 `json:"neto_1"`
+		Nombre               string   `json:"nombre"`
+		Apellido             string   `json:"apellido"`
+		Documento            string   `json:"documento"`
+		Pasaporte            string   `json:"pasaporte"`
+		Nacimiento           string   `json:"nacimiento"`
+		Nacionalidad         string   `json:"nacionalidad"`
+		TipoPasajero         string   `json:"tipo_pasajero"`
+		PrecioVenta          *float64 `json:"precio_venta"`
+		Neto1                *float64 `json:"neto_1"`
+		DocumentoVencimiento string   `json:"documento_vencimiento"`
+		DocumentoVitalicio   bool     `json:"documento_vitalicio"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1325,13 +1363,15 @@ func UpdatePassenger(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{
-		"nombre":        input.Nombre,
-		"apellido":      input.Apellido,
-		"documento":     input.Documento,
-		"pasaporte":     input.Pasaporte,
-		"nacionalidad":  input.Nacionalidad,
-		"tipo_pasajero": input.TipoPasajero,
-		"nacimiento":    parseDateFlexible(input.Nacimiento),
+		"nombre":                 input.Nombre,
+		"apellido":               input.Apellido,
+		"documento":              input.Documento,
+		"pasaporte":              input.Pasaporte,
+		"nacionalidad":           input.Nacionalidad,
+		"tipo_pasajero":          input.TipoPasajero,
+		"nacimiento":             parseDateFlexible(input.Nacimiento),
+		"documento_vencimiento": parseDateFlexible(input.DocumentoVencimiento),
+		"documento_vitalicio":   input.DocumentoVitalicio,
 	}
 	if input.PrecioVenta != nil {
 		updates["precio_venta"] = *input.PrecioVenta
@@ -1382,13 +1422,18 @@ func DuplicatePassenger(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
 		return
 	}
-	if product.Disponibilidad < 1 {
+	// El infante no ocupa lugar/cupo — no hace falta disponibilidad para
+	// duplicar uno.
+	needsSeat := source.TipoPasajero != "Infante"
+	if needsSeat && product.Disponibilidad < 1 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente para duplicar el pasajero"})
 		return
 	}
 
-	product.Disponibilidad -= 1
+	if needsSeat {
+		product.Disponibilidad -= 1
+	}
 	product.Vendidos += 1
 	if err := tx.Save(&product).Error; err != nil {
 		tx.Rollback()
@@ -1441,15 +1486,17 @@ func AddPassenger(c *gin.Context) {
 	}
 
 	var input struct {
-		Nombre       string   `json:"nombre"`
-		Apellido     string   `json:"apellido"`
-		Documento    string   `json:"documento"`
-		Pasaporte    string   `json:"pasaporte"`
-		Nacimiento   string   `json:"nacimiento"`
-		Nacionalidad string   `json:"nacionalidad"`
-		TipoPasajero string   `json:"tipo_pasajero"`
-		PrecioVenta  *float64 `json:"precio_venta"`
-		Neto1        *float64 `json:"neto_1"`
+		Nombre               string   `json:"nombre"`
+		Apellido             string   `json:"apellido"`
+		Documento            string   `json:"documento"`
+		Pasaporte            string   `json:"pasaporte"`
+		Nacimiento           string   `json:"nacimiento"`
+		Nacionalidad         string   `json:"nacionalidad"`
+		TipoPasajero         string   `json:"tipo_pasajero"`
+		PrecioVenta          *float64 `json:"precio_venta"`
+		Neto1                *float64 `json:"neto_1"`
+		DocumentoVencimiento string   `json:"documento_vencimiento"`
+		DocumentoVitalicio   bool     `json:"documento_vitalicio"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1469,13 +1516,18 @@ func AddPassenger(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
 		return
 	}
-	if product.Disponibilidad < 1 {
+	// El infante no ocupa lugar/cupo — no hace falta disponibilidad para
+	// agregarlo.
+	needsSeat := input.TipoPasajero != "Infante"
+	if needsSeat && product.Disponibilidad < 1 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente para agregar un pasajero"})
 		return
 	}
 
-	product.Disponibilidad -= 1
+	if needsSeat {
+		product.Disponibilidad -= 1
+	}
 	product.Vendidos += 1
 	if err := tx.Save(&product).Error; err != nil {
 		tx.Rollback()
@@ -1492,19 +1544,21 @@ func AddPassenger(c *gin.Context) {
 	}
 
 	newPassenger := models.Passenger{
-		ReservationID:   reservation.ID,
-		PedidoID:        reservation.PedidoID,
-		Nombre:          input.Nombre,
-		Apellido:        input.Apellido,
-		Documento:       input.Documento,
-		Pasaporte:       input.Pasaporte,
-		Nacimiento:      parseDateFlexible(input.Nacimiento),
-		Nacionalidad:    input.Nacionalidad,
-		TipoPasajero:    input.TipoPasajero,
-		Estado:          reservation.Estado,
-		PrecioVenta:     precioVenta,
-		Neto1:           neto1,
-		BloqueoExpiraAt: reservation.BloqueoExpiraAt,
+		ReservationID:        reservation.ID,
+		PedidoID:             reservation.PedidoID,
+		Nombre:               input.Nombre,
+		Apellido:             input.Apellido,
+		Documento:            input.Documento,
+		Pasaporte:            input.Pasaporte,
+		Nacimiento:           parseDateFlexible(input.Nacimiento),
+		Nacionalidad:         input.Nacionalidad,
+		TipoPasajero:         input.TipoPasajero,
+		Estado:               reservation.Estado,
+		PrecioVenta:          precioVenta,
+		Neto1:                neto1,
+		BloqueoExpiraAt:      reservation.BloqueoExpiraAt,
+		DocumentoVencimiento: parseDateFlexible(input.DocumentoVencimiento),
+		DocumentoVitalicio:   input.DocumentoVitalicio,
 	}
 	if err := tx.Create(&newPassenger).Error; err != nil {
 		tx.Rollback()

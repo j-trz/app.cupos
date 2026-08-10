@@ -1368,15 +1368,11 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		var reserva models.Reservation
 		if database.DB.First(&reserva, id).Error == nil {
 			if reserva.Estado != models.EstadoExpirada && reserva.Estado != models.EstadoCancelada {
-				var passengersCount int64
-				database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reserva.ID).Count(&passengersCount)
-				if passengersCount == 0 {
-					passengersCount = 1
-				}
+				seats, total := countPassengerSeats(reserva.ID)
 				database.DB.Model(&models.Product{}).Where("id = ?", reserva.ProductID).
 					Updates(map[string]interface{}{
-						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 					})
 			}
 			database.DB.Where("reservation_id = ?", reserva.ID).Delete(&models.Passenger{})

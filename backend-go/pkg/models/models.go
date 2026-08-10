@@ -212,9 +212,13 @@ type Reservation struct {
 	PreCancelEstado string `gorm:"column:pre_cancel_estado" json:"pre_cancel_estado,omitempty"`
 	// CancelacionNotas son las notas que carga el admin al aprobar/rechazar
 	// una solicitud de cancelación.
-	CancelacionNotas string    `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	CancelacionNotas string `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
+	// Servicios adicionales de la reserva (sección "Servicios" del formulario).
+	Hotel             string    `gorm:"column:hotel" json:"hotel,omitempty"`
+	TrasladosIncluye  bool      `gorm:"column:traslados_incluye;default:false" json:"traslados_incluye"`
+	TrasladosNotas    string    `gorm:"column:traslados_notas" json:"traslados_notas,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 	// Passengers son los pasajeros desglosados de la reserva (puede haber más de
 	// uno). Si viene vacío, la UI debe usar los campos *Pasajero de arriba como
 	// fallback (reservas creadas sin desglose de pasajeros).
@@ -241,6 +245,10 @@ type Passenger struct {
 	Nacionalidad string     `json:"nacionalidad"`
 	TipoPasajero string     `json:"tipo_pasajero"`
 	NRO          int        `json:"nro"` // 1 = Venta, 0 = Acompañante
+	// Vencimiento del documento de viaje. Si DocumentoVitalicio es true,
+	// DocumentoVencimiento se ignora (el documento no vence).
+	DocumentoVencimiento *time.Time `gorm:"column:documento_vencimiento" json:"documento_vencimiento,omitempty"`
+	DocumentoVitalicio   bool       `gorm:"column:documento_vitalicio;default:false" json:"documento_vitalicio"`
 	// Campos de ticket individual: cada pasajero progresa de forma
 	// independiente dentro del mismo pedido.
 	Estado                  string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
