@@ -22,6 +22,7 @@ export const MODULES = [
   { value: 'permissions', label: 'Permisos', icon: '🔐' },
   { value: 'roles', label: 'Roles', icon: '🛡️' },
   { value: 'reports', label: 'Reportes', icon: '📈' },
+  { value: 'administracion', label: 'Administración', icon: '⚙️' },
 ];
 
 // Orden canónico de acciones para la matriz de permisos de GestionRoles.jsx —

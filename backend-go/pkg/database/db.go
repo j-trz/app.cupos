@@ -108,6 +108,7 @@ func seedRBAC(db *gorm.DB) {
 		{"TEMPORADAS_CREATE", "Crear Temporadas", "temporadas", "create", "Crear nuevas temporadas"},
 		{"TEMPORADAS_UPDATE", "Editar Temporadas", "temporadas", "update", "Modificar temporadas"},
 		{"TEMPORADAS_DELETE", "Eliminar Temporadas", "temporadas", "delete", "Eliminar temporadas"},
+		{"ADMINISTRACION_VIEW", "Ver Administración", "administracion", "view", "Ver el módulo de Administración"},
 
 		{"PRODUCTS_VIEW", "Ver Productos", "products", "view", "Listar y buscar productos"},
 		{"PRODUCTS_CREATE", "Crear Productos", "products", "create", "Crear nuevos productos"},

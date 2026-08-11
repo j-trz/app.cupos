@@ -31,6 +31,7 @@ const adminNavItems = [
   { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
   { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
   { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
+  { label: 'Administración', path: '/administracion', icon: Settings, permission: 'ADMINISTRACION_VIEW' },
 ];
 
 // Settings items (grouped under Ajustes)

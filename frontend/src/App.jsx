@@ -16,6 +16,7 @@ import GestionGrupos from './pages/GestionGrupos';
 import GestionReservas from './pages/GestionReservas';
 import GestionAgencias from './pages/GestionAgencias';
 import GestionTemporadas from './pages/GestionTemporadas';
+import Administracion from './pages/Administracion';
 import GestionTemas from './pages/GestionTemas';
 import GestionRoles from './pages/GestionRoles';
 import GestionPermisos from './pages/GestionPermisos';
@@ -139,6 +140,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <GestionTemporadas />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/administracion"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <Administracion />
                           </Layout>
                         </ProtectedRoute>
                       }
