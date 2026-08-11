@@ -895,136 +895,103 @@ export default function Documentacion() {
         icon={BookOpen}
       />
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Barra de navegación lateral de la documentación para pantallas grandes */}
-        <aside className="hidden lg:block w-72 shrink-0">
-          <div className="sticky top-24 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 shadow-sm space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-3 mb-2">Secciones</p>
-            {sections.map((s) => {
-              const Icon = s.icon;
-              const active = s.key === section;
-              return (
-                <button
-                  key={s.key}
-                  onClick={() => navigate(`/documentacion/${s.key}`)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-all duration-200 ${
-                    active
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/80 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${active ? '' : 'text-zinc-400 dark:text-zinc-500'}`} />
-                  <span className="truncate flex-1">{s.label}</span>
-                  {s.badge && (
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold border ${
-                      active
-                        ? 'bg-white/20 border-white/20 text-white dark:bg-black/10 dark:border-black/10 dark:text-zinc-950'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
-                    }`}>
-                      {s.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+      {/* Sin navegación lateral propia: la lista de secciones ya vive en el
+          Sidebar principal (submenú "Documentación") — tenerla duplicada acá
+          era redundante. Queda solo el selector móvil de abajo, que cubre el
+          caso en que el Sidebar no está visible en pantallas chicas. */}
+      <div className="min-w-0 space-y-6">
+        {/* Selector para móviles en la parte superior del contenido */}
+        <div className="lg:hidden">
+          <label htmlFor="docs-section-select" className="sr-only">Seleccionar sección</label>
+          <select
+            id="docs-section-select"
+            value={section}
+            onChange={(e) => navigate(`/documentacion/${e.target.value}`)}
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 shadow-sm focus:border-zinc-450 dark:focus:border-zinc-750 focus:outline-none"
+          >
+            {sections.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label} {s.badge ? `(${s.badge})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        {/* Contenido principal */}
-        <div className="flex-1 min-w-0 space-y-6">
-          {/* Selector para móviles en la parte superior del contenido */}
-          <div className="lg:hidden">
-            <label htmlFor="docs-section-select" className="sr-only">Seleccionar sección</label>
-            <select
-              id="docs-section-select"
-              value={section}
-              onChange={(e) => navigate(`/documentacion/${e.target.value}`)}
-              className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 shadow-sm focus:border-zinc-450 dark:focus:border-zinc-750 focus:outline-none"
-            >
-              {sections.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label} {s.badge ? `(${s.badge})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+        {section === DEFAULT_DOCS_SECTION && (
+          <div className="rounded-3xl border border-zinc-200 dark:border-zinc-850 bg-gradient-to-br from-zinc-900 via-zinc-850 to-zinc-950 text-white shadow-lg p-8 relative overflow-hidden">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
+            <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
 
-          {section === DEFAULT_DOCS_SECTION && (
-            <div className="rounded-3xl border border-zinc-200 dark:border-zinc-850 bg-gradient-to-br from-zinc-900 via-zinc-850 to-zinc-950 text-white shadow-lg p-8 relative overflow-hidden">
-              <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
-              <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
-              
-              <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
-                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white ring-2 ring-white/20 backdrop-blur-sm">
-                  <BookOpen className="h-8 w-8" />
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white ring-2 ring-white/20 backdrop-blur-sm">
+                <BookOpen className="h-8 w-8" />
+              </div>
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">Manual del Sistema</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-300">
+                    Bienvenido al centro de documentación de la plataforma de <strong>Gestión de Cupos</strong>.
+                    Aquí encontrarás instrucciones detalladas paso a paso para operar con éxito y sin necesidad de capacitación previa.
+                  </p>
                 </div>
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Manual del Sistema</h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-300">
-                      Bienvenido al centro de documentación de la plataforma de <strong>Gestión de Cupos</strong>.
-                      Aquí encontrarás instrucciones detalladas paso a paso para operar con éxito y sin necesidad de capacitación previa.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-3 gap-4 pt-4">
-                    {[
-                      { icon: TicketsPlane, title: 'Cupos Aéreos', desc: 'Consultá disponibilidad y reservá al instante.' },
-                      { icon: MapPinHouse, title: 'Agencias', desc: 'Operá de manera independiente y segura.' },
-                      { icon: Bot, title: 'Asistente IA', desc: 'Asistencia en lenguaje natural y lectura de Documentos.' },
-                    ].map((card, i) => (
-                      <div
-                        key={i}
-                        className="flex flex-col items-center text-center rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm hover:bg-white/10 transition-colors duration-200"
-                      >
-                        <card.icon className="h-5 w-5 text-zinc-300 mb-2" />
-                        <div className="font-semibold text-sm leading-tight text-white">{card.title}</div>
-                        <div className="text-xs text-zinc-400 mt-1">{card.desc}</div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="grid grid-cols-3 sm:grid-cols-3 gap-4 pt-4">
+                  {[
+                    { icon: TicketsPlane, title: 'Cupos Aéreos', desc: 'Consultá disponibilidad y reservá al instante.' },
+                    { icon: MapPinHouse, title: 'Agencias', desc: 'Operá de manera independiente y segura.' },
+                    { icon: Bot, title: 'Asistente IA', desc: 'Asistencia en lenguaje natural y lectura de Documentos.' },
+                  ].map((card, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col items-center text-center rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm hover:bg-white/10 transition-colors duration-200"
+                    >
+                      <card.icon className="h-5 w-5 text-zinc-300 mb-2" />
+                      <div className="font-semibold text-sm leading-tight text-white">{card.title}</div>
+                      <div className="text-xs text-zinc-400 mt-1">{card.desc}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {Content ? (
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-7">
-              <SectionHeader icon={current.icon} title={current.label} badge={current.badge} />
-              <Content isAdmin={isAdmin} />
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-12 text-center">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Esa sección de documentación no existe o no tenés permisos.</p>
-              <Link to={`/documentacion/${DEFAULT_DOCS_SECTION}`} className="inline-flex items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold px-4 py-2 hover:bg-zinc-850 dark:hover:bg-zinc-200 transition-colors">
-                Ir al inicio de la documentación
-              </Link>
-            </div>
-          )}
+        {Content ? (
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-7">
+            <SectionHeader icon={current.icon} title={current.label} badge={current.badge} />
+            <Content isAdmin={isAdmin} />
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-12 text-center">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Esa sección de documentación no existe o no tenés permisos.</p>
+            <Link to={`/documentacion/${DEFAULT_DOCS_SECTION}`} className="inline-flex items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold px-4 py-2 hover:bg-zinc-850 dark:hover:bg-zinc-200 transition-colors">
+              Ir al inicio de la documentación
+            </Link>
+          </div>
+        )}
 
-          {/* Navegación prev/next entre secciones */}
-          {Content && (
-            <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800/65">
-              {prev ? (
-                <button
-                  onClick={() => navigate(`/documentacion/${prev.key}`)}
-                  className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  {prev.label}
-                </button>
-              ) : <span />}
-              {next && (
-                <button
-                  onClick={() => navigate(`/documentacion/${next.key}`)}
-                  className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors ml-auto"
-                >
-                  {next.label}
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Navegación prev/next entre secciones */}
+        {Content && (
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800/65">
+            {prev ? (
+              <button
+                onClick={() => navigate(`/documentacion/${prev.key}`)}
+                className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                {prev.label}
+              </button>
+            ) : <span />}
+            {next && (
+              <button
+                onClick={() => navigate(`/documentacion/${next.key}`)}
+                className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors ml-auto"
+              >
+                {next.label}
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer */}

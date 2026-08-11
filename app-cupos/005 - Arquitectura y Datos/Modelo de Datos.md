@@ -2,7 +2,7 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 > Fuente de verdad: el propio `models.go`. Este documento resume la forma y el *por qué* de cada tabla; ante cualquier duda puntual de tipo/columna, el código gana.
 >
-> Última lectura completa de `models.go` contra este documento: 2026-08-11 (nuevo formato de `CodigoCupo`, corrección de la nota sobre `Neto1` vs `Product.Neto1` — ver [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]] §10-11 y regla 11-12 de [[Gotchas y Reglas de Oro]]).
+> Última lectura completa de `models.go` contra este documento: 2026-08-12 (nuevo `Reservation.NotasVendedor`, duplicar producto desde Gestión de Productos, itinerario de Grupos unificado con `ItineraryTable`).
 
 ## Índice
 
@@ -45,6 +45,7 @@ Un pedido — puede agrupar varios `Passenger`. Estados canónicos en [[Historia
 - `PreCancelEstado`/`CancelacionNotas`: permiten restaurar el estado exacto previo si se rechaza una solicitud de cancelación.
 - `ExpirationWarningSentAt`: evita reenviar el aviso de "por vencer" en cada corrida del cron.
 - **Servicios** (agregado 2026-08-10): `Hotel` (texto libre), `TrasladosIncluye` (bool), `TrasladosNotas` (texto libre) — sección "Servicios" del formulario de reserva.
+- `NotasVendedor` (agregado 2026-08-12, mismo nombre que `Group.NotasVendedor`): notas libres de quien solicita la reserva, siempre disponibles en el formulario de `Availability.jsx` (no gateadas por ninguna condición) — para dudas/comentarios al momento de cotizar. Visibles desde `Requests.jsx` (botón "Notas" si el campo no está vacío).
 
 ### `Passenger` (tabla `passengers`)
 

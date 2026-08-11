@@ -252,6 +252,10 @@ type Reservation struct {
 	Hotel             string    `gorm:"column:hotel" json:"hotel,omitempty"`
 	TrasladosIncluye  bool      `gorm:"column:traslados_incluye;default:false" json:"traslados_incluye"`
 	TrasladosNotas    string    `gorm:"column:traslados_notas" json:"traslados_notas,omitempty"`
+	// NotasVendedor son notas libres de quien solicita la reserva (dudas o
+	// comentarios para quien la procese) — siempre disponible al cotizar, no
+	// solo cuando algo puntual lo requiere (mismo campo/nombre que Group.NotasVendedor).
+	NotasVendedor     string    `gorm:"column:notas_vendedor" json:"notas_vendedor,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 	// Passengers son los pasajeros desglosados de la reserva (puede haber más de

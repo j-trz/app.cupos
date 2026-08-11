@@ -31,6 +31,10 @@ const EMPTY_FORM = {
   hotel: '',
   traslados_incluye: false,
   traslados_notas: '',
+  // Notas libres para quien procese la solicitud — siempre disponibles, no
+  // solo cuando hay un servicio adicional puntual (pedido explícito: el
+  // vendedor puede tener dudas al momento de cotizar).
+  notas_vendedor: '',
 };
 
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
@@ -635,6 +639,7 @@ export default function Availability() {
         hotel: form.hotel || null,
         traslados_incluye: form.traslados_incluye,
         traslados_notas: form.traslados_notas || null,
+        notas_vendedor: form.notas_vendedor || null,
         vuelo_destino: selectedProduct.destino,
         vuelo_compania: selectedProduct.compania,
         vuelo_salida: selectedProduct.fecha_salida,
@@ -1133,6 +1138,20 @@ export default function Availability() {
                       <input type="text" value={form.traslados_notas} onChange={(e) => handleFormChange('traslados_notas', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: aeropuerto-hotel ida y vuelta" />
                     </div>
                   )}
+                </div>
+              </fieldset>
+
+              <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4 my-2">
+                <legend className="px-2.5 text-sm font-bold text-slate-800">Notas</legend>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">Notas para quien procese la solicitud</label>
+                  <textarea
+                    value={form.notas_vendedor}
+                    onChange={(e) => handleFormChange('notas_vendedor', e.target.value)}
+                    rows={3}
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    placeholder="Cualquier duda o comentario sobre esta cotización — siempre disponible, no hace falta que haya un problema puntual para usarla."
+                  />
                 </div>
               </fieldset>
 

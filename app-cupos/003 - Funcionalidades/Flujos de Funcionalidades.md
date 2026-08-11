@@ -99,7 +99,8 @@ Transiciones reales:
 - **hold_temporal → (se borra la fila)**: al cerrar el modal sin confirmar (`ReleaseHold`) o cuando el cron vence el hold (ver sección 11) — en ningún caso pasa por `expirada`, porque nunca llegó a ser una reserva real.
 - **bloqueo_temporal → confirmada**: al cargar el documento contable (`AddDocContable`) o al confirmar (`ConfirmReservation`).
 - **bloqueo_temporal → expirada**: el cron libera el cupo cuando vence `bloqueo_expira_at` (ver sección 11).
-- **cualquiera → solicitud_cancelacion**: `RequestCancellation` guarda el estado previo en `pre_cancel_estado`.
+- **bloqueo_temporal → cancelada (directo, sin autorización)**: `RequestCancellation` detecta que la reserva todavía está en `bloqueo_temporal` — nadie más la confirmó — y cancela al instante, liberando el cupo, sin pasar por `solicitud_cancelacion`. Cambiado 2026-08-12; antes cualquier estado pasaba siempre por la aprobación de un admin.
+- **confirmada (u otro estado post-confirmación) → solicitud_cancelacion**: `RequestCancellation` guarda el estado previo en `pre_cancel_estado` y sí requiere aprobación — ya es una reserva que alguien dio por confirmada.
 - **solicitud_cancelacion → cancelada**: `ResolveCancellation` aprueba, libera el cupo y conserva la fila en el historial.
 - **solicitud_cancelacion → estado previo**: `ResolveCancellation` rechaza y restaura `pre_cancel_estado`.
 
@@ -115,8 +116,8 @@ stateDiagram-v2
     [*] --> confirmada: CreateReservation con doc_contable
     bloqueo_temporal --> confirmada: AddDocContable o ConfirmReservation
     bloqueo_temporal --> expirada: cron vence el bloqueo
-    bloqueo_temporal --> solicitud_cancelacion: RequestCancellation
-    confirmada --> solicitud_cancelacion: RequestCancellation
+    bloqueo_temporal --> cancelada: RequestCancellation (directo, sin autorización)
+    confirmada --> solicitud_cancelacion: RequestCancellation (requiere aprobación)
     solicitud_cancelacion --> cancelada: ResolveCancellation aprueba
     solicitud_cancelacion --> confirmada: ResolveCancellation rechaza y restaura
     expirada --> [*]
@@ -138,7 +139,7 @@ stateDiagram-v2
 
 Ambas vistas de agencia consumen el mismo endpoint `GET /api/orders/` (`GetAllReservations`, que ya filtra por rol/agencia) y separan las filas del lado del cliente en `reservationService.js`: **Solicitudes** excluye las reservas `confirmada` y `cedido`; **Confirmaciones** muestra solo las `confirmada`/`confirmado`.
 
-En **Solicitudes** la agencia puede cargar el documento contable (que confirma la reserva), solicitar la cancelación, y ve una cuenta regresiva mientras la reserva está en `bloqueo_temporal`. En **Confirmaciones** puede solicitar la cancelación y generar el **Itinerario PDF** (con la marca white-label de su agencia), obteniendo el detalle completo de pasajeros vía `GET /api/orders/:id`.
+En **Solicitudes** la agencia puede cargar el documento contable (que confirma la reserva), cancelar/solicitar la cancelación, y ve una cuenta regresiva mientras la reserva está en `bloqueo_temporal`. El botón de cancelar se comporta distinto según el estado: en `bloqueo_temporal` cancela directo sin pedir autorización (nadie más la confirmó todavía); en cualquier otro estado (`confirmada`, etc.) pasa por la solicitud de aprobación de siempre. En **Confirmaciones** puede solicitar la cancelación (ahí siempre requiere aprobación, porque todo lo que se lista ya está `confirmada`) y generar el **Itinerario PDF** (con la marca white-label de su agencia), obteniendo el detalle completo de pasajeros vía `GET /api/orders/:id`.
 
 - Frontend: `frontend/src/pages/Requests.jsx`, `frontend/src/pages/Confirmations.jsx`, `frontend/src/services/reservationService.js`.
 
@@ -149,11 +150,12 @@ flowchart TD
     B --> D["Confirmaciones: solo confirmada o confirmado"]
     C --> E{"Acción en Solicitudes"}
     E -->|"Agregar doc contable"| F["PUT /api/orders/:id/doc-contable pasa a confirmada"]
-    E -->|"Solicitar cancelación"| G["PUT /api/orders/:id/cancel-request pasa a solicitud_cancelacion"]
+    E -->|"Cancelar (bloqueo_temporal)"| G["PUT /api/orders/:id/cancel-request cancela directo, sin autorización"]
+    E -->|"Solicitar cancelación (otro estado)"| G2["PUT /api/orders/:id/cancel-request pasa a solicitud_cancelacion"]
     E -->|"Ver vencimiento"| H["Cuenta regresiva del bloqueo_temporal"]
     D --> I{"Acción en Confirmaciones"}
     I -->|"Itinerario PDF"| J["GET /api/orders/:id y arma el PDF con white-label"]
-    I -->|"Solicitar cancelación"| G
+    I -->|"Solicitar cancelación"| G2
 ```
 
 ---

@@ -72,6 +72,7 @@ const adaptRequest = (item) => ({
   Usuario_Email: item.Usuario_Email || item.usuario_email || '',
   Pnr: item.Pnr || item.pnr || item.product?.pnr || '',
   Ficha: item.Ficha || item.ficha || item.ficha_venta || '',
+  Notas_Vendedor: item.Notas_Vendedor || item.notas_vendedor || '',
   TipoProducto: item.product?.tipo_producto || item.tipo_producto || '',
   InfFare: item.product?.inf_fare ?? 0,
   ChdFare: item.product?.chd_fare ?? 0,

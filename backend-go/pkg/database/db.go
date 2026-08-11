@@ -440,6 +440,8 @@ func seedNotificationTemplates(db *gorm.DB) {
 			Message: "Tu reserva del pedido {{pedido_id}} fue confirmada"},
 		{Code: "reservation_deleted", Name: "Reserva eliminada", Title: "Reserva eliminada",
 			Message: "Se eliminó la reserva del pedido {{pedido_id}} y se liberó el cupo"},
+		{Code: "reservation_cancelled_direct", Name: "Reserva cancelada (bloqueo temporal, sin autorización)", Title: "Reserva cancelada",
+			Message: "Se canceló la reserva del pedido {{pedido_id}} (bloqueo temporal) y el cupo fue liberado"},
 		{Code: "passenger_deleted", Name: "Pasajero eliminado", Title: "Pasajero eliminado",
 			Message: "Se eliminó a {{nombre}} {{apellido}} del pedido {{pedido_id}} y se liberó su lugar"},
 		{Code: "cancellation_pending", Name: "Solicitud de cancelación pendiente", Title: "Solicitud de cancelación pendiente",
@@ -661,6 +663,7 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hotel VARCHAR(255) DEFAULT '';`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS traslados_incluye BOOLEAN DEFAULT false;`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS traslados_notas TEXT DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS notas_vendedor TEXT DEFAULT '';`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vencimiento TIMESTAMP WITH TIME ZONE;`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vitalicio BOOLEAN DEFAULT false;`,
 	}

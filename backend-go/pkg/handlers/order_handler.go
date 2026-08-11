@@ -1120,6 +1120,31 @@ func RequestCancellation(c *gin.Context) {
 		return
 	}
 
+	// Bloqueo temporal: todavía no es una reserva confirmada (nadie más la
+	// dio por buena) — quien la pidió puede cancelarla directo, sin pedir
+	// autorización a un admin, y el lugar se libera al instante. Solo a
+	// partir de "confirmada" (o cualquier otro estado post-confirmación)
+	// pasa por el flujo de aprobación de abajo.
+	if reservation.Estado == models.EstadoBloqueoTemporal {
+		seats, total := countPassengerSeats(reservation.ID)
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
+			Updates(map[string]interface{}{
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
+			})
+		database.DB.Model(&reservation).Update("estado", models.EstadoCancelada)
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Update("estado", models.EstadoCancelada)
+
+		database.DB.First(&reservation, id)
+
+		services.NotifyAgencyByCode(reservation.Agencia, createdByFromContext(c), "reservation_cancelled_direct", "Reserva cancelada",
+			fmt.Sprintf("Se canceló la reserva del pedido %s (bloqueo temporal) y el cupo fue liberado", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
+
+		c.JSON(http.StatusOK, reservation)
+		return
+	}
+
 	// Guarda el estado previo para poder restaurarlo tal cual si un admin
 	// rechaza la solicitud (ver ResolveCancellation más abajo).
 	prevEstado := reservation.Estado

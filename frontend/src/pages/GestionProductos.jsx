@@ -17,7 +17,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Copy } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -47,6 +47,10 @@ const GestionProductos = () => {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  // Datos con los que se precarga el modal al duplicar — a diferencia de
+  // editingProduct, sigue siendo un alta nueva (handleCreateProduct), solo
+  // que el formulario no arranca en blanco.
+  const [duplicatingProduct, setDuplicatingProduct] = useState(null);
   const [transferringProduct, setTransferringProduct] = useState(null);
   const [sharingProduct, setSharingProduct] = useState(null);
   const [routeModalProduct, setRouteModalProduct] = useState(null);
@@ -157,6 +161,7 @@ const GestionProductos = () => {
       });
       setIsModalOpen(false);
       setEditingProduct(null);
+      setDuplicatingProduct(null);
     } catch (error) {
       toast({
         title: 'Error',
@@ -205,6 +210,17 @@ const GestionProductos = () => {
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);
+    setIsModalOpen(true);
+  };
+
+  // Duplicar: abre el modal de alta (no edición) precargado con los datos
+  // del producto original — se descartan los campos que identifican a ESE
+  // producto puntual (id, código de cupo, vendidos, fechas de auditoría) y
+  // los de cesión (no tiene sentido que la copia nazca ya restringida/cedida).
+  const handleDuplicateProduct = (product) => {
+    const { id, codigo_cupo, vendidos, created_at, updated_at, restricted_agency, source_agency, transfer_id, ...rest } = product;
+    setEditingProduct(null);
+    setDuplicatingProduct(rest);
     setIsModalOpen(true);
   };
 
@@ -386,9 +402,9 @@ const GestionProductos = () => {
       </Modal>
 
       <Modal
-        title={editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
+        title={editingProduct ? 'Editar Producto' : duplicatingProduct ? 'Duplicar Producto' : 'Crear Nuevo Producto'}
         open={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingProduct(null); }}
+        onClose={() => { setIsModalOpen(false); setEditingProduct(null); setDuplicatingProduct(null); }}
         size="4xl"
       >
         <ProductForm
@@ -396,8 +412,9 @@ const GestionProductos = () => {
           onCancel={() => {
             setIsModalOpen(false);
             setEditingProduct(null);
+            setDuplicatingProduct(null);
           }}
-          defaultValues={editingProduct || {}}
+          defaultValues={editingProduct || duplicatingProduct || {}}
           isEditing={!!editingProduct}
         />
       </Modal>
@@ -540,6 +557,7 @@ const GestionProductos = () => {
                     <TableCell>
                       <div className="flex gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
+                        <ActionIconButton icon={Copy} onClick={() => handleDuplicateProduct(product)} title="Duplicar producto" />
                         <ActionIconButton icon={ArrowRightLeft} onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad" />
                         {/* Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra */}
                         {(user.role === 'admin' || product.agencia === user.agencia) && (

@@ -178,7 +178,9 @@ const ProductForm = ({
   defaultValues = {},
   isEditing = false,
 }) => {
-  const [form, setForm] = useState(() => toFormValues(isEditing ? defaultValues : null));
+  // No solo en edición: al duplicar un producto también llega precargado
+  // (isEditing=false, pero defaultValues trae los datos del original).
+  const [form, setForm] = useState(() => toFormValues(defaultValues));
   const [errors, setErrors] = useState({});
   const { data: agencies = [] } = useAgencies();
   const { data: temporadas = [] } = useTemporadas();

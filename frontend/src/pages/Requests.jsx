@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X, Luggage, Plus, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X, Luggage, Plus, CheckCircle2, ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
@@ -12,7 +12,6 @@ import Modal from '../components/Modal.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
-import { formatGroupItinerary } from '../lib/itineraryText.js';
 import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryTable from '../components/ItineraryTable.jsx';
 import BaggageFranchise from '../components/BaggageFranchise.jsx';
@@ -66,6 +65,7 @@ export default function Requests() {
   const [docValue, setDocValue] = useState('');
   const [docSaving, setDocSaving] = useState(false);
   const [routeModal, setRouteModal] = useState(null); // { codigo_cupo, destino, ruta }
+  const [notesModal, setNotesModal] = useState(null); // item con Notas_Vendedor
 
   // ─── Solicitud de grupos (vuelos a medida) ───────────────────────────────
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -216,22 +216,35 @@ export default function Requests() {
     setDocValue(item.Doc_Contable || '');
   };
 
+  // Bloqueo temporal todavía no es una reserva confirmada por nadie más —
+  // se puede cancelar directo, sin pedir autorización. El resto de los
+  // estados sigue necesitando aprobación de un admin (ver RequestCancellation
+  // en order_handler.go, que ya resuelve cuál de las dos hacer).
   const handleRequestCancellation = async (item) => {
+    const esBloqueoTemporal = item.Estado?.toLowerCase() === 'bloqueo_temporal';
     const result = await Swal.fire({
       icon: 'question',
-      title: '¿Solicitar cancelación?',
-      text: '¿Solicitás la cancelación de esta reserva? El administrador decidirá si se cancela.',
+      title: esBloqueoTemporal ? '¿Cancelar reserva?' : '¿Solicitar cancelación?',
+      text: esBloqueoTemporal
+        ? 'Todavía está en bloqueo temporal, se cancela al instante y el cupo se libera.'
+        : '¿Solicitás la cancelación de esta reserva? El administrador decidirá si se cancela.',
       showCancelButton: true,
-      confirmButtonText: 'Sí, solicitar',
+      confirmButtonText: esBloqueoTemporal ? 'Sí, cancelar' : 'Sí, solicitar',
       cancelButtonText: 'No',
     });
     if (!result.isConfirmed) return;
     try {
       await ReservationService.requestCancellation(item.id);
-      Swal.fire({ icon: 'success', title: 'Solicitud enviada', text: 'El administrador revisará tu pedido.', timer: 2000, showConfirmButton: false });
+      Swal.fire({
+        icon: 'success',
+        title: esBloqueoTemporal ? 'Reserva cancelada' : 'Solicitud enviada',
+        text: esBloqueoTemporal ? 'El cupo ya está liberado.' : 'El administrador revisará tu pedido.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
       fetchRequests();
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo enviar la solicitud.' });
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo procesar la cancelación.' });
     }
   };
 
@@ -327,19 +340,29 @@ export default function Requests() {
               data.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="text-center">
-                    {item.Estado?.toLowerCase() === 'solicitud_cancelacion' ? (
-                      <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                        Cancelación solicitada
-                      </span>
-                    ) : item.Estado?.toLowerCase() === 'expirada' ? (
-                      // Se venció y liberó el cupo sola (cron) — ya está
-                      // resuelta, no tiene sentido "solicitar" su cancelación.
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded">
-                        Cancelada (venció sola)
-                      </span>
-                    ) : item.Estado?.toLowerCase() === 'cancelada' ? null : (
-                      <ActionIconButton icon={XCircle} variant="danger" onClick={() => handleRequestCancellation(item)} title="Solicitar cancelación de esta reserva" />
-                    )}
+                    <div className="flex items-center justify-center gap-1">
+                      {item.Notas_Vendedor && (
+                        <ActionIconButton icon={StickyNote} onClick={() => setNotesModal(item)} title="Ver notas del vendedor" className="text-amber-600 hover:text-amber-800" />
+                      )}
+                      {item.Estado?.toLowerCase() === 'solicitud_cancelacion' ? (
+                        <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                          Cancelación solicitada
+                        </span>
+                      ) : item.Estado?.toLowerCase() === 'expirada' ? (
+                        // Se venció y liberó el cupo sola (cron) — ya está
+                        // resuelta, no tiene sentido "solicitar" su cancelación.
+                        <span className="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded">
+                          Cancelada (venció sola)
+                        </span>
+                      ) : item.Estado?.toLowerCase() === 'cancelada' ? null : (
+                        <ActionIconButton
+                          icon={XCircle}
+                          variant="danger"
+                          onClick={() => handleRequestCancellation(item)}
+                          title={item.Estado?.toLowerCase() === 'bloqueo_temporal' ? 'Cancelar reserva (sin autorización, todavía es bloqueo temporal)' : 'Solicitar cancelación de esta reserva'}
+                        />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center font-medium">{item.Pedido_ID}</TableCell>
                   <TableCell className="text-center">
@@ -538,6 +561,30 @@ export default function Requests() {
           </div>
         </div>
       )}
+
+      {notesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setNotesModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <StickyNote className="h-5 w-5 text-amber-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Notas del vendedor</h2>
+                  <p className="text-sm text-slate-500">{notesModal.Pedido_ID} — {notesModal.Nombre_Pasajero} {notesModal.Apellido_Pasajero}</p>
+                </div>
+              </div>
+              <button onClick={() => setNotesModal(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="whitespace-pre-wrap rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-slate-700">
+                {notesModal.Notas_Vendedor}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -597,7 +644,7 @@ function GroupOptionCard({ group, onAccept, onRequestCancellation }) {
         <div className="border-t border-slate-100 p-4 space-y-3">
           <p className="text-xs text-slate-500 sm:hidden">Lugares: {group.cantidad_lugares || '—'}</p>
           {group.itinerario && (
-            <p className="whitespace-pre-wrap text-xs text-slate-600">{formatGroupItinerary(group.itinerario)}</p>
+            <ItineraryTable ruta={group.itinerario} showCopyButton={false} />
           )}
 
           {group.estado_cotizacion === 'cotizada' && (
