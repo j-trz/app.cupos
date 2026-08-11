@@ -267,7 +267,7 @@ const ProductForm = ({
               <div className="space-y-1">
                 <Label htmlFor="codigo_cupo">Código de Cupo</Label>
                 <Input id="codigo_cupo" type="text" value={form.codigo_cupo} disabled className="bg-slate-50 text-slate-500" />
-                <p className="text-xs text-slate-400">Formato: TIPO-DESTINO-secuencial. No incluye compañía ni fecha de salida.</p>
+                <p className="text-xs text-slate-400">Formato: fecha de salida-destino-id_tipo-aerolínea (ej. 20/09/26-REC-431123_CH-AD). CH = Charter, CP = Cupo.</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -275,7 +275,7 @@ const ProductForm = ({
                 <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm text-slate-400">
                   Se genera automáticamente
                 </div>
-                <p className="text-xs text-slate-400">Formato: TIPO-DESTINO-secuencial (ej. AER-BUE-04821). No incluye compañía ni fecha de salida.</p>
+                <p className="text-xs text-slate-400">Formato: fecha de salida-destino-id_tipo-aerolínea (ej. 20/09/26-REC-431123_CH-AD). CH = Charter, CP = Cupo.</p>
               </div>
             )}
             <div className="space-y-1 col-span-2">
@@ -349,7 +349,7 @@ const ProductForm = ({
                 <div key={key} className="grid grid-cols-2 gap-4 items-end lg:grid-cols-4">
                   {field(`tarifa_${key}`, `Tarifa ${label}`, 'number', { step: '0.01', min: '0' })}
                   {field(`impuestos_${key}`, `Impuestos ${label}`, 'number', { step: '0.01', min: '0' })}
-                  {field(`op_${key}`, `OP ${label}`, 'number', { step: '0.01', min: '0', help: 'Ganancia — se suma a Neto 1 para armar la Venta.' })}
+                  {field(`op_${key}`, `OP ${label}`, 'number', { step: '0.01', min: '0' })}
                   <div className="space-y-1">
                     <Label>Venta {label}</Label>
                     <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700" title={`Neto 1 ${label}: $${neto1.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
@@ -360,7 +360,7 @@ const ProductForm = ({
               );
             })}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5 pt-2 border-t border-slate-200">
-              {field('neto_1', 'Neto 1 (legacy)', 'number', { step: '0.01', min: '0', help: 'Valor único usado hoy en "Riesgo" de reportes — no se individualizó por tipo en esta fase.' })}
+              {field('neto_1', 'Neto 1 (Riesgo)', 'number', { step: '0.01', min: '0', help: 'Valor manual aparte, usado solo para "Riesgo" en reportes. El Neto 1 real de cada pasajero (Tarifa+Impuestos de su tipo) se calcula solo arriba.' })}
             </div>
           </div>
         </div>

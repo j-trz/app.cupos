@@ -1,6 +1,6 @@
 Reglas operativas e invariantes que **no** son obvias leyendo un único archivo — se descubrieron a fuerza de incidentes repetidos en este repo. Léelo antes de tocar rutas, migraciones, RBAC o el entorno local. Complementa [[Historial de Bugs Resueltos]] (postmortems puntuales ya cerrados) y [Modelo de Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md) (detalle de esquema).
 
-> Última verificación de las reglas 1-11 contra código: 2026-08-10.
+> Última verificación de las reglas 1-12 contra código: 2026-08-11.
 
 ## 1. Dos entrypoints de backend duplican TODA la tabla de rutas
 
@@ -56,7 +56,11 @@ Las tools de tipo `UIAction` (`abrir_modal_reserva`, `navegar_a_pantalla`, `comp
 
 Desde que se individualizó la ganancia por tipo (`OPAdt`/`OPChd`/`OPInf`), cualquier cálculo nuevo que necesite "la ganancia de este producto" debe preguntar **de qué tipo de pasajero** — `Product.OP` (singular) es solo un valor legado sincronizado a `OPAdt`, no un promedio ni un total. Usar siempre `product.OPForTipo(tipoPasajero)` (Go) o el patrón `product[\`op_${suffix}\`] ?? product.op` (frontend, ver `passengerPriceSuffix` en `GestionNominas.jsx`) en vez de leer `.OP`/`.op` directo. Rentabilidad agregada (reportes/IA) se calcula como `Σ (OP_tipo × vendidos_tipo)` vía el helper `rentabilidadPonderada()` (`analytics_handler.go`), no como `OP × Vendidos` — ese criterio viejo subestimaba/sobreestimaba la ganancia real en cualquier producto con mezcla de ADT/CHD/INF.
 
-`Neto1` (singular) **no** se individualizó en esta pasada — sigue siendo un valor manual único, usado solo para "Riesgo" en reportes. Si alguna vez se pide individualizarlo también, no hace falta agregar columnas nuevas: ya es derivable como `TarifaX + ImpuestosX` (`Product.NetoForTipo()`).
+**`Neto1` NO es un valor único** — a diferencia de `OP` antes de esta pasada, el Neto1 real siempre fue por tipo de pasajero (`TarifaX + ImpuestosX`, `Product.NetoForTipo()`) y así se asigna al vender (`Passenger.Neto1` en `CreateReservation`/`AddPassenger`, `order_handler.go`). No confundir con `Product.Neto1` (singular) — ese es un campo manual aparte, sin relación con el Neto1 de ningún pasajero, usado solo como insumo de "Riesgo" en reportes. Corregido 2026-08-11: `AddPassenger` no tenía este fallback y dejaba `Neto1 = 0` si no venía explícito en el request — ahora usa `product.NetoForTipo(tipo)` igual que `CreateReservation`.
+
+## 12. Un campo/columna "no persiste" en local puede ser el backend viejo, no un bug de código
+
+El backend Go no tiene hot-reload: `go run cmd/api/main.go` compila una sola vez al arrancar. Si se agrega un campo nuevo a `models.go` (+ migración) mientras ese proceso ya está corriendo, el binario en memoria sigue sin conocer el campo — cualquier valor que el frontend mande para esa columna se ignora silenciosamente en el `json.Unmarshal`, con cero error visible. Síntoma típico: "el campo se ve en el formulario pero nunca queda guardado", con el código (modelo, migración, whitelist del `Select()`, frontend) leyéndose 100% correcto. **Antes de asumir un bug de lógica en un campo agregado recientemente, reiniciar el backend local primero.**
 
 ---
 

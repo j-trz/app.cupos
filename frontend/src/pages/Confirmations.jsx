@@ -3,6 +3,7 @@ import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, XCircle, FileTe
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -308,6 +309,7 @@ export default function Confirmations() {
         <TableComponent>
           <TableHeader>
             <TableRow>
+              <TableHead className="text-center">Acciones</TableHead>
               <TableHead className="text-center">Sel.</TableHead>
               <TableHead className="text-center">Pedido</TableHead>
               <TableHead className="text-center">Agencia</TableHead>
@@ -321,7 +323,6 @@ export default function Confirmations() {
               <TableHead className="text-center">Equipaje</TableHead>
               <TableHead className="text-center">Tarifa</TableHead>
               <TableHead className="text-center">Estado</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -340,6 +341,18 @@ export default function Confirmations() {
             ) : (
               filteredData.map((item, index) => (
                 <TableRow key={index}>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <ActionIconButton icon={XCircle} variant="danger" onClick={() => handleRequestCancellation(item)} title="Solicitar cancelación de esta reserva" />
+                      <ActionIconButton
+                        icon={FileText}
+                        className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        onClick={() => handleShowItinerary(item)}
+                        disabled={pdfLoadingId === item.id}
+                        title="Generar itinerario PDF"
+                      />
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center">
                     <input
                       type="checkbox"
@@ -376,28 +389,6 @@ export default function Confirmations() {
                   <TableCell className="text-center">{formatMoney(item.Vuelo_Precio)}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="success">{statusLabel(item.Estado)}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleRequestCancellation(item)}
-                        title="Solicitar cancelación de esta reserva"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleShowItinerary(item)}
-                        disabled={pdfLoadingId === item.id}
-                        title="Generar itinerario PDF"
-                      >
-                        <FileText className="h-4 w-4 text-blue-600" />
-                      </Button>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))

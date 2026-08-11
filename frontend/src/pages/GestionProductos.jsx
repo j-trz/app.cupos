@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import { Input } from '../components/ui/Input';
 import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
@@ -535,27 +536,17 @@ const GestionProductos = () => {
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)} title="Editar">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad">
-                          <ArrowRightLeft className="h-4 w-4" />
-                        </Button>
+                        <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
+                        <ActionIconButton icon={ArrowRightLeft} onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad" />
                         {/* Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra */}
                         {(user.role === 'admin' || product.agencia === user.agencia) && (
-                          <Button variant="outline" size="sm" onClick={() => handleOpenShare(product)} title="Compartir con otras agencias">
-                            <Share2 className="h-4 w-4" />
-                          </Button>
+                          <ActionIconButton icon={Share2} onClick={() => handleOpenShare(product)} title="Compartir con otras agencias" />
                         )}
                         {/* Botón para recuperar cupo cedido (si soy el cedente) */}
                         {product.restricted_agency && product.source_agency === user.agencia && (
-                          <Button variant="outline" size="sm" onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800">
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
+                          <ActionIconButton icon={RotateCcw} onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800" />
                         )}
-                        <Button variant="outline" size="sm" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>

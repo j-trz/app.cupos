@@ -1538,10 +1538,13 @@ func AddPassenger(c *gin.Context) {
 		return
 	}
 
-	var precioVenta, neto1 float64
+	var precioVenta float64
 	if input.PrecioVenta != nil {
 		precioVenta = *input.PrecioVenta
 	}
+	// Neto1 usa el desglose de SU tipo (ADT/CHD/INF) salvo que venga un
+	// override explícito — mismo criterio que CreateReservation.
+	neto1 := product.NetoForTipo(input.TipoPasajero)
 	if input.Neto1 != nil {
 		neto1 = *input.Neto1
 	}

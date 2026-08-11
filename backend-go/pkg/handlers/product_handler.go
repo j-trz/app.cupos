@@ -218,10 +218,10 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	if product.CodigoCupo == "" {
-		product.CodigoCupo = generateCodigoCupo(product.TipoProducto, product.Destino, 0)
+		product.CodigoCupo = generateCodigoCupo(&product, 0)
 	}
 	if product.TipoProducto == "" {
-		product.TipoProducto = categorizeProduct(product.CodigoCupo)
+		product.TipoProducto = "Aereo"
 	}
 
 	if product.Cupo > 0 && product.Disponibilidad > product.Cupo {
@@ -446,10 +446,10 @@ func BulkCreateProducts(c *gin.Context) {
 
 	for i := range input.Products {
 		if input.Products[i].CodigoCupo == "" {
-			input.Products[i].CodigoCupo = generateCodigoCupo(input.Products[i].TipoProducto, input.Products[i].Destino, i)
+			input.Products[i].CodigoCupo = generateCodigoCupo(&input.Products[i], i)
 		}
 		if input.Products[i].TipoProducto == "" {
-			input.Products[i].TipoProducto = categorizeProduct(input.Products[i].CodigoCupo)
+			input.Products[i].TipoProducto = "Aereo"
 		}
 		if input.Products[i].Cupo > 0 && input.Products[i].Disponibilidad > input.Products[i].Cupo {
 			input.Products[i].Disponibilidad = input.Products[i].Cupo
@@ -487,15 +487,24 @@ func BulkCreateProducts(c *gin.Context) {
 }
 
 // generateCodigoCupo arma un código legible y prácticamente único a partir
-// del tipo de producto y el destino (ej. "AER-BUE-04821"), para que el
+// de fecha de salida, destino, un secuencial, el tipo de servicio (Cupo/
+// Charter) y la aerolínea — ej. "20/09/26-REC-431123_CH-AD" — para que el
 // código de cupo deje de ser un campo manual — se completa solo si no vino
 // en el request (así la carga masiva que ya trae sus propios códigos no se
 // ve afectada).
-func generateCodigoCupo(tipoProducto, destino string, salt int) string {
-	tipoPrefix := letterPrefix(tipoProducto, 3, "GEN")
-	destPrefix := letterPrefix(destino, 3, "XXX")
-	unique := (time.Now().UnixNano()/1000 + int64(salt)) % 100000
-	return fmt.Sprintf("%s-%s-%05d", tipoPrefix, destPrefix, unique)
+func generateCodigoCupo(product *models.Product, salt int) string {
+	fecha := "00/00/00"
+	if product.FechaSalida != nil {
+		fecha = product.FechaSalida.Format("02/01/06")
+	}
+	destPrefix := letterPrefix(product.Destino, 3, "XXX")
+	unique := (time.Now().UnixNano()/1000 + int64(salt)) % 1000000
+	tipo := "CP"
+	if strings.EqualFold(strings.TrimSpace(product.Servicio), "Charter") {
+		tipo = "CH"
+	}
+	aerolinea := letterPrefix(product.Compania, 2, "XX")
+	return fmt.Sprintf("%s-%s-%06d_%s-%s", fecha, destPrefix, unique, tipo, aerolinea)
 }
 
 // letterPrefix devuelve las primeras n letras (sin espacios/acentos/símbolos)
@@ -514,15 +523,4 @@ func letterPrefix(s string, n int, fallback string) string {
 		return fallback
 	}
 	return b.String()
-}
-
-func categorizeProduct(codigo string) string {
-	codigo = strings.ToUpper(codigo)
-	if strings.Contains(codigo, "_CH-") || strings.Contains(codigo, "_CH_") {
-		return "CHARTERS"
-	}
-	if strings.Contains(codigo, "DEST_ARG") {
-		return "DESTINO ARG"
-	}
-	return "CUPOS"
 }

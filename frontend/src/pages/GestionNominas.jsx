@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
@@ -454,36 +455,12 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                     <div className="flex items-center justify-center gap-1">
                       {row.passengerId && (
                         <>
-                          <button
-                            onClick={() => onEdit(row)}
-                            title="Editar pasajero"
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => onDuplicate(row)}
-                            title="Duplicar pasajero"
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => onDelete(row)}
-                            title="Eliminar pasajero"
-                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <ActionIconButton icon={Pencil} onClick={() => onEdit(row)} title="Editar pasajero" />
+                          <ActionIconButton icon={Copy} onClick={() => onDuplicate(row)} title="Duplicar pasajero" />
+                          <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(row)} title="Eliminar pasajero" />
                         </>
                       )}
-                      <button
-                        onClick={() => onAdd(row)}
-                        title="Agregar pasajero a este pedido"
-                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
+                      <ActionIconButton icon={Plus} onClick={() => onAdd(row)} title="Agregar pasajero a este pedido" />
                     </div>
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>

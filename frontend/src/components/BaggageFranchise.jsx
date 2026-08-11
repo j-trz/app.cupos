@@ -46,7 +46,7 @@ function TravelLuggageIcon(props) {
 // Usado por Disponibilidad, Solicitudes, Confirmaciones y Gestión de Productos
 // para que la columna "Equipaje" se vea igual en toda la app. `kg`, si viene,
 // se muestra en el aria-label y en el title (tooltip nativo al hover).
-function BaggageIcon({ icon: Icon, included, label, kg }) {
+function BaggageIcon({ icon: Icon, included, label, kg, size = 'h-4 w-4' }) {
   const isIncluded = !!included;
   const kgText = isIncluded && kg ? ` (${kg} kg)` : '';
   return (
@@ -56,7 +56,7 @@ function BaggageIcon({ icon: Icon, included, label, kg }) {
       title={`${label}${isIncluded ? kgText || ' — incluido' : ' — no incluido'}`}
       className="relative inline-flex h-6 w-6 items-center justify-center"
     >
-      <Icon className={clsx('h-4 w-4', isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
+      <Icon className={clsx(size, isIncluded ? 'text-emerald-600' : 'text-slate-300')} />
       {!isIncluded && (
         <span className="pointer-events-none absolute h-[1.5px] w-5 -rotate-45 rounded-full bg-slate-400" />
       )}
@@ -74,11 +74,14 @@ export default function BaggageFranchise({ item }) {
   const carryOnKg = item.carryon_kg ?? item.CarryOnKg;
   const handBagKg = item.handbag_kg ?? item.HandBagKg;
   const checkedBagKg = item.checkedbag_kg ?? item.CheckedBagKg;
+  // Orden pedido: handbag (izq) - carry-on (centro) - checked bag (der),
+  // de izquierda a derecha va creciendo la franquicia — tamaño del ícono
+  // también crece en el mismo sentido para que se note a simple vista.
   return (
     <div className="flex items-center justify-center gap-2">
-      <BaggageIcon icon={CarryOnBagIcon} included={carryOn} label="Carry-on" kg={carryOnKg} />
-      <BaggageIcon icon={PersonalBagIcon} included={handBag} label="Handbag" kg={handBagKg} />
-      <BaggageIcon icon={TravelLuggageIcon} included={checkedBag} label="Valija despachada" kg={checkedBagKg} />
+      <BaggageIcon icon={PersonalBagIcon} included={handBag} label="Handbag" kg={handBagKg} size="h-3.5 w-3.5" />
+      <BaggageIcon icon={CarryOnBagIcon} included={carryOn} label="Carry-on" kg={carryOnKg} size="h-4 w-4" />
+      <BaggageIcon icon={TravelLuggageIcon} included={checkedBag} label="Valija despachada" kg={checkedBagKg} size="h-5 w-5" />
     </div>
   );
 }

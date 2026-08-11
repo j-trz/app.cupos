@@ -3,6 +3,7 @@ import { ClipboardList, Clock3, Clock, RefreshCw, FileText, XCircle, MapPin, X, 
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -293,6 +294,7 @@ export default function Requests() {
         <TableComponent>
           <TableHeader>
             <TableRow>
+              <TableHead className="text-center">Acciones</TableHead>
               <TableHead className="text-center">Pedido</TableHead>
               <TableHead className="text-center">Pasajero</TableHead>
               <TableHead className="text-center">Destino</TableHead>
@@ -306,7 +308,6 @@ export default function Requests() {
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="text-center">Vencimiento</TableHead>
               <TableHead className="text-center">Doc. Contable</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -325,6 +326,21 @@ export default function Requests() {
             ) : (
               data.map((item, index) => (
                 <TableRow key={index}>
+                  <TableCell className="text-center">
+                    {item.Estado?.toLowerCase() === 'solicitud_cancelacion' ? (
+                      <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                        Cancelación solicitada
+                      </span>
+                    ) : item.Estado?.toLowerCase() === 'expirada' ? (
+                      // Se venció y liberó el cupo sola (cron) — ya está
+                      // resuelta, no tiene sentido "solicitar" su cancelación.
+                      <span className="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded">
+                        Cancelada (venció sola)
+                      </span>
+                    ) : item.Estado?.toLowerCase() === 'cancelada' ? null : (
+                      <ActionIconButton icon={XCircle} variant="danger" onClick={() => handleRequestCancellation(item)} title="Solicitar cancelación de esta reserva" />
+                    )}
+                  </TableCell>
                   <TableCell className="text-center font-medium">{item.Pedido_ID}</TableCell>
                   <TableCell className="text-center">
                     {[item.Nombre_Pasajero, item.Apellido_Pasajero].filter(Boolean).join(' ') || item.Contacto_Nombre || '—'}
@@ -384,29 +400,6 @@ export default function Requests() {
                       >
                         <FileText className="h-3 w-3 mr-1" />
                         Agregar
-                      </Button>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {item.Estado?.toLowerCase() === 'solicitud_cancelacion' ? (
-                      <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                        Cancelación solicitada
-                      </span>
-                    ) : item.Estado?.toLowerCase() === 'expirada' ? (
-                      // Se venció y liberó el cupo sola (cron) — ya está
-                      // resuelta, no tiene sentido "solicitar" su cancelación.
-                      <span className="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded">
-                        Cancelada (venció sola)
-                      </span>
-                    ) : item.Estado?.toLowerCase() === 'cancelada' ? null : (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleRequestCancellation(item)}
-                        title="Solicitar cancelación de esta reserva"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Solicitar cancelación
                       </Button>
                     )}
                   </TableCell>
