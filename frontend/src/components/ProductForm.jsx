@@ -471,22 +471,24 @@ const ProductForm = ({
           {sectionLabel('Links de paquetes')}
           <div className="space-y-2">
             {(form.package_links || []).map((link, i) => (
-              <div key={i} className="flex gap-2">
-                <Input
-                  placeholder="Etiqueta (opcional)"
-                  value={link.label}
-                  onChange={(e) => updatePackageLink(i, 'label', e.target.value)}
-                  className="w-1/3"
-                />
+              <div key={i} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center">
                 <Input
                   placeholder="https://..."
                   value={link.url}
                   onChange={(e) => updatePackageLink(i, 'url', e.target.value)}
                   className="flex-1"
                 />
-                <Button type="button" variant="outline" size="sm" onClick={() => removePackageLink(i)}>
-                  Quitar
-                </Button>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Etiqueta (opcional)"
+                    value={link.label}
+                    onChange={(e) => updatePackageLink(i, 'label', e.target.value)}
+                    className="w-48"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => removePackageLink(i)}>
+                    Quitar
+                  </Button>
+                </div>
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={addPackageLink}>

@@ -35,6 +35,11 @@ const EMPTY_FORM = {
 
 const TIPO_PASAJERO_OPTIONS = ['Adulto', 'Menor', 'Infante'];
 
+// Sin protocolo, el navegador resuelve el link como ruta relativa al sitio
+// actual ("cupos.com/paquete.com/oferta" en vez de abrir paquete.com) — se
+// completa https:// por defecto si no viene ninguno.
+const absoluteUrl = (url) => (/^https?:\/\//i.test(url || '') ? url : `https://${url || ''}`);
+
 export default function Availability() {
   useCountdownTick(); // hace que la cuenta regresiva de bloqueos avance sola
   const [data, setData] = useState([]);
@@ -1516,7 +1521,7 @@ export default function Availability() {
               {(packagesModalProduct.package_links || []).map((link, i) => (
                 <a
                   key={i}
-                  href={link.url}
+                  href={absoluteUrl(link.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"

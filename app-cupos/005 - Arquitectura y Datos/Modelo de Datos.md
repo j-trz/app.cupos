@@ -2,7 +2,7 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 > Fuente de verdad: el propio `models.go`. Este documento resume la forma y el *por qué* de cada tabla; ante cualquier duda puntual de tipo/columna, el código gana.
 >
-> Última lectura completa de `models.go` contra este documento: 2026-08-10 (actualizado el mismo día tras implementar la Fase 2 del backlog de [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]]: KG por franquicia, links de paquetes, sección Servicios, vencimiento de documento).
+> Última lectura completa de `models.go` contra este documento: 2026-08-11 (nuevo formato de `CodigoCupo`, corrección de la nota sobre `Neto1` vs `Product.Neto1` — ver [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]] §10-11 y regla 11-12 de [[Gotchas y Reglas de Oro]]).
 
 ## Índice
 
