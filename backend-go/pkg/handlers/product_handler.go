@@ -71,6 +71,17 @@ func applyCalculatedPrices(product *models.Product) {
 	// OP legado: se sincroniza al de ADT para que cualquier lugar que todavía
 	// lea el campo único (en vez de OPForTipo) muestre algo razonable.
 	product.OP = product.OPAdt
+	product.Neto1 = prorratedRiskNeto1(product)
+}
+
+// prorratedRiskNeto1 autocompleta el Neto1 usado para "Riesgo" en reportes —
+// deja de ser un valor manual: es el promedio prorrateado entre ADT y CHD
+// (Tarifa+Impuestos de cada uno). El infante no ocupa lugar/cupo, así que no
+// participa de un cálculo de riesgo basado en lugares sin vender.
+func prorratedRiskNeto1(product *models.Product) float64 {
+	netoAdt := product.TarifaAdt + product.ImpuestosAdt
+	netoChd := product.TarifaChd + product.ImpuestosChd
+	return (netoAdt + netoChd) / 2
 }
 
 // reconcilePricesForImport se usa en la carga masiva (BulkCreateProducts),
@@ -99,6 +110,7 @@ func reconcilePricesForImport(product *models.Product) {
 	reconcileOne(&product.TarifaChd, &product.ImpuestosChd, product.OPChd, &product.ChdFare)
 	reconcileOne(&product.TarifaInf, &product.ImpuestosInf, product.OPInf, &product.InfFare)
 	product.OP = product.OPAdt
+	product.Neto1 = prorratedRiskNeto1(product)
 }
 
 // fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
@@ -224,9 +236,9 @@ func CreateProduct(c *gin.Context) {
 		product.TipoProducto = "Aereo"
 	}
 
-	if product.Cupo > 0 && product.Disponibilidad > product.Cupo {
-		product.Disponibilidad = product.Cupo
-	}
+	// Disponibilidad no es un dato que se cargue a mano — siempre es
+	// Cupo - Vendidos (ver recomputeDisponibilidad).
+	product.Disponibilidad = recomputeDisponibilidad(product.Cupo, product.Vendidos)
 	applyCalculatedPrices(&product)
 
 	database.DB.Create(&product)
@@ -288,9 +300,11 @@ func UpdateProduct(c *gin.Context) {
 	updated.TransferID = existing.TransferID
 	updated.CreatedAt = existing.CreatedAt
 
-	if updated.Cupo > 0 && updated.Disponibilidad > updated.Cupo {
-		updated.Disponibilidad = updated.Cupo
-	}
+	// Disponibilidad no se edita a mano — se recalcula siempre a partir del
+	// Cupo (ya reafirmado arriba que Vendidos no cambia por acá). Si se
+	// amplía el Cupo (ej. +10 lugares comprados), la disponibilidad libre
+	// sube sola sin pisar lo ya vendido.
+	updated.Disponibilidad = recomputeDisponibilidad(updated.Cupo, updated.Vendidos)
 	applyCalculatedPrices(&updated)
 
 	// Avisos: si cambia ruta o fechas de salida/regreso, las reservas activas
@@ -451,9 +465,7 @@ func BulkCreateProducts(c *gin.Context) {
 		if input.Products[i].TipoProducto == "" {
 			input.Products[i].TipoProducto = "Aereo"
 		}
-		if input.Products[i].Cupo > 0 && input.Products[i].Disponibilidad > input.Products[i].Cupo {
-			input.Products[i].Disponibilidad = input.Products[i].Cupo
-		}
+		input.Products[i].Disponibilidad = recomputeDisponibilidad(input.Products[i].Cupo, input.Products[i].Vendidos)
 		reconcilePricesForImport(&input.Products[i])
 	}
 
@@ -523,4 +535,16 @@ func letterPrefix(s string, n int, fallback string) string {
 		return fallback
 	}
 	return b.String()
+}
+
+// recomputeDisponibilidad: Disponibilidad no se carga a mano, siempre es
+// Cupo - Vendidos — así, si se amplía el Cupo (ej. se compran 10 lugares más),
+// la disponibilidad libre se recalcula sola en vez de quedar desalineada con
+// lo que ya se vendió.
+func recomputeDisponibilidad(cupo, vendidos int) int {
+	d := cupo - vendidos
+	if d < 0 {
+		return 0
+	}
+	return d
 }

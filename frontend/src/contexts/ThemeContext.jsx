@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 
 const ThemeContext = createContext();
 
@@ -10,39 +10,22 @@ export const useTheme = () => {
   return context;
 };
 
+// La app fuerza modo claro siempre — no sigue la preferencia de sistema/
+// navegador. El modo oscuro (basado en prefers-color-scheme + clase "dark")
+// dejaba texto blanco sobre fondos que no habían migrado a dark, así que se
+// retiró en vez de mantenerlo a medio terminar. `theme` queda fijo en
+// 'light' y toggleTheme/setTheme son no-ops — se mantiene la forma del
+// contexto para no tocar cada consumidor de useTheme().
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(() => {
-    // Obtener tema preferido del localStorage o sistema
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      return savedTheme;
-    }
-    
-    // Si no hay preferencia guardada, usar preferencia del sistema
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? 'dark' : 'light';
-  });
-
   useEffect(() => {
-    // Aplicar clase al body según el tema
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    
-    // Guardar preferencia en localStorage
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('theme');
+  }, []);
 
   const value = {
-    theme,
-    toggleTheme,
-    setTheme
+    theme: 'light',
+    toggleTheme: () => {},
+    setTheme: () => {},
   };
 
   return (

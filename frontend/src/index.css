@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Colors - Estilo Vercel/Zinc */
   --color-primary: #09090b;
@@ -16,15 +16,6 @@
   --color-warning: #ca8a04;
   --color-error: #dc2626;
   --color-info: #2563eb;
-
-  /* Dark mode colors */
-  --dark-background: #09090b;
-  --dark-surface: #18181b;
-  --dark-text-primary: #fafafa;
-  --dark-text-secondary: #a1a1aa;
-  --dark-border: #27272a;
-  --dark-primary: #fafafa;
-  --dark-primary-hover: #e4e4e7;
 
   /* Fonts */
   --font-heading: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -53,17 +44,6 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05);
-}
-
-/* Dark mode override */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--dark-background);
-    --color-surface: var(--dark-surface);
-    --color-text-primary: var(--dark-text-primary);
-    --color-text-secondary: var(--dark-text-secondary);
-    --color-border: var(--dark-border);
-  }
 }
 
 html,

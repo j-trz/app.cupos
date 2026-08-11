@@ -41,6 +41,7 @@ const EMPTY_FORM = {
   destino: '',
   compania: '',
   disponibilidad: '',
+  vendidos: 0,
   cupo: '',
   fecha_salida: '',
   fecha_regreso: '',
@@ -50,7 +51,6 @@ const EMPTY_FORM = {
   impuestos_chd: '',
   tarifa_inf: '',
   impuestos_inf: '',
-  neto_1: '',
   op_adt: '',
   op_chd: '',
   op_inf: '',
@@ -86,6 +86,7 @@ function toFormValues(product) {
     destino: product.destino || '',
     compania: product.compania || '',
     disponibilidad: product.disponibilidad ?? '',
+    vendidos: product.vendidos ?? 0,
     cupo: product.cupo ?? '',
     fecha_salida: fmt(product.fecha_salida),
     fecha_regreso: fmt(product.fecha_regreso),
@@ -95,7 +96,6 @@ function toFormValues(product) {
     impuestos_chd: product.impuestos_chd ?? '',
     tarifa_inf: product.tarifa_inf ?? '',
     impuestos_inf: product.impuestos_inf ?? '',
-    neto_1: product.neto_1 ?? '',
     op_adt: product.op_adt ?? '',
     op_chd: product.op_chd ?? '',
     op_inf: product.op_inf ?? '',
@@ -130,7 +130,8 @@ function toPayload(form) {
     agencia: form.agencia,
     destino: form.destino,
     compania: form.compania,
-    disponibilidad: num(form.disponibilidad),
+    // disponibilidad NO se manda — es un dato calculado (Cupo - Vendidos),
+    // el backend la recalcula siempre a partir de Cupo, ver product_handler.go.
     cupo: num(form.cupo),
     fecha_salida: form.fecha_salida || null,
     fecha_regreso: form.fecha_regreso || null,
@@ -140,7 +141,8 @@ function toPayload(form) {
     impuestos_chd: num(form.impuestos_chd),
     tarifa_inf: num(form.tarifa_inf),
     impuestos_inf: num(form.impuestos_inf),
-    neto_1: num(form.neto_1),
+    // neto_1 NO se manda — se autocompleta en el backend (promedio
+    // prorrateado ADT/CHD), ver applyCalculatedPrices en product_handler.go.
     op_adt: num(form.op_adt),
     op_chd: num(form.op_chd),
     op_inf: num(form.op_inf),
@@ -191,7 +193,6 @@ const ProductForm = ({
     if (!form.agencia) e.agencia = 'Requerido';
     if (!form.destino.trim()) e.destino = 'Requerido';
     if (!form.compania.trim()) e.compania = 'Requerido';
-    if (form.disponibilidad === '' || isNaN(Number(form.disponibilidad))) e.disponibilidad = 'Número requerido';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -318,8 +319,14 @@ const ProductForm = ({
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             {field('fecha_salida', 'Fecha de Salida', 'date')}
             {field('fecha_regreso', 'Fecha de Regreso', 'date')}
-            {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
+            <div className="space-y-1">
+              <Label>Disponibilidad</Label>
+              <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                {Math.max(0, (Number(form.cupo) || 0) - (Number(form.vendidos) || 0))}
+              </div>
+              <p className="text-xs text-slate-400">Calculada: Cupo Total − Vendidos ({form.vendidos || 0}). No se edita a mano.</p>
+            </div>
             {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60', help: 'Minutos que el cupo queda bloqueado si se reserva sin doc. contable. Vacío = usa el valor global del sistema.' })}
           </div>
         </div>
@@ -359,9 +366,22 @@ const ProductForm = ({
                 </div>
               );
             })}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5 pt-2 border-t border-slate-200">
-              {field('neto_1', 'Neto 1 (Riesgo)', 'number', { step: '0.01', min: '0', help: 'Valor manual aparte, usado solo para "Riesgo" en reportes. El Neto 1 real de cada pasajero (Tarifa+Impuestos de su tipo) se calcula solo arriba.' })}
-            </div>
+            {(() => {
+              const netoAdt = (Number(form.tarifa_adt) || 0) + (Number(form.impuestos_adt) || 0);
+              const netoChd = (Number(form.tarifa_chd) || 0) + (Number(form.impuestos_chd) || 0);
+              const neto1Riesgo = (netoAdt + netoChd) / 2;
+              return (
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5 pt-2 border-t border-slate-200">
+                  <div className="space-y-1">
+                    <Label>Neto 1 (Riesgo)</Label>
+                    <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                      ${neto1Riesgo.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <p className="text-xs text-slate-400">Calculado: promedio prorrateado entre Neto ADT y Neto CHD. No se edita a mano.</p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
