@@ -256,6 +256,42 @@ const exportToExcelBO = (reservations, products, agencies) => {
   XLSX.writeFile(wb, `nominas-bo-${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
+// ─── Excel export "Nómina" (por producto) ───────────────────────────────────
+// Reporte reducido para operativa/embarque — solo las columnas que se usan en
+// el papel, no todos los datos administrativos (a diferencia de Exportar
+// Excel/BO, que son "todo el dato"). Numeración corrida por asiento; el
+// infante no ocupa lugar así que no lleva número, va marcado "INF" (mismo
+// criterio que el resto de la app — ver countPassengerTypes/Disponibilidad).
+const exportFichaOperativa = (product, passengerRows) => {
+  const header = ['N°', 'CUPO', 'APELLIDO/NOMBRE', 'FICHA', 'CI', 'PP', 'F NACIM', 'VEND'];
+  let seatNumber = 0;
+  const dataRows = passengerRows
+    .filter((row) => row.estado !== 'cancelada' && row.estado !== 'cancelado')
+    .map((row) => {
+      const esInfante = row.tipoPasajero === 'Infante';
+      if (!esInfante) seatNumber++;
+      const apellido = row.apellido === '—' ? '' : row.apellido.toUpperCase();
+      const nombre = row.nombre === '—' ? '' : row.nombre.toUpperCase();
+      return [
+        esInfante ? 'INF' : seatNumber,
+        product?.codigo_cupo || '',
+        `${apellido}/${nombre}`,
+        row.fichaVenta === '—' ? '' : row.fichaVenta,
+        row.documento === '—' ? '' : row.documento,
+        row.pasaporte === '—' ? '' : row.pasaporte,
+        formatDate(row.nacimiento) || '',
+        row.vendedorEmail === '—' ? '' : row.vendedorEmail,
+      ];
+    });
+
+  const aoa = [[`F OPERATIVA ${product?.ficha || '—'}`], [], header, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Nomina');
+  const fileTag = product?.codigo_cupo || product?.ficha || 'ficha';
+  XLSX.writeFile(wb, `nomina-${fileTag}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
 // ─── Formulario compartido de datos de pasajero (editar / agregar) ──────────
 
 const passengerInputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
@@ -364,10 +400,12 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
 
   return (
     <Card className="overflow-hidden">
-      {/* Header row — always visible */}
+      {/* Header row — always visible. El botón de export va afuera del botón de
+          expandir/colapsar (no puede ir anidado dentro de otro <button>). */}
+      <div className="flex items-center">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+        className="flex-1 min-w-0 flex items-center gap-3 px-5 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
       >
         <span className="text-zinc-500 dark:text-zinc-400 shrink-0">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -416,6 +454,13 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
           {reservations.length}
         </Badge>
       </button>
+      <ActionIconButton
+        icon={Download}
+        onClick={() => exportFichaOperativa(product, passengerRows)}
+        title="Exportar Nómina (reporte reducido para operativa/embarque)"
+        className="mr-3 shrink-0"
+      />
+      </div>
 
       {/* Expandable table — una fila por pasajero, con todos los datos */}
       {expanded && (
