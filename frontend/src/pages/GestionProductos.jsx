@@ -17,7 +17,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -51,6 +51,7 @@ const GestionProductos = () => {
   const [sharingProduct, setSharingProduct] = useState(null);
   const [routeModalProduct, setRouteModalProduct] = useState(null);
   const [notesModalProduct, setNotesModalProduct] = useState(null);
+  const [movementsModalProduct, setMovementsModalProduct] = useState(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,7 +80,7 @@ const GestionProductos = () => {
     transfers.forEach((t) => {
       const pid = String(t.product_id);
       if (!map[pid]) map[pid] = [];
-      map[pid].push({ agencia: t.target_agency, cantidad: t.quantity });
+      map[pid].push({ agencia: t.target_agency, cantidad: t.quantity, fecha: t.created_at });
     });
     return map;
   }, [transfers]);
@@ -504,7 +505,6 @@ const GestionProductos = () => {
                   <TableHead>Destino</TableHead>
                   <TableHead>Compañía</TableHead>
                   <TableHead>Agencia</TableHead>
-                  <TableHead>Cedidos</TableHead>
                   <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
                   <TableHead>PNR</TableHead>
                   <TableHead>Ficha</TableHead>
@@ -532,7 +532,10 @@ const GestionProductos = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {filteredProducts.map((product) => {
+                  const tieneMovimientos = !!product.restricted_agency || !!product.source_agency
+                    || (cedidosByProductId[String(product.id)] || []).length > 0;
+                  return (
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex gap-1">
@@ -546,6 +549,10 @@ const GestionProductos = () => {
                         {product.restricted_agency && product.source_agency === user.agencia && (
                           <ActionIconButton icon={RotateCcw} onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800" />
                         )}
+                        {/* Movimientos: historial de cesiones/préstamos — solo si hay algo que mostrar */}
+                        {tieneMovimientos && (
+                          <ActionIconButton icon={History} onClick={() => setMovementsModalProduct(product)} title="Ver movimientos (cesiones/préstamos)" className="text-blue-600 hover:text-blue-800" />
+                        )}
                         <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
                       </div>
                     </TableCell>
@@ -553,40 +560,11 @@ const GestionProductos = () => {
                     <TableCell>{product.tipo_producto || '—'}</TableCell>
                     <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
                     <TableCell>{product.compania}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="font-medium text-slate-700">
-                          {product.agencia ? agencyName(product.agencia) : (
-                            <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
-                              Sin agencia dueña
-                            </span>
-                          )}
+                    <TableCell className="font-medium text-slate-700">
+                      {product.agencia ? agencyName(product.agencia) : (
+                        <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
+                          Sin agencia dueña
                         </span>
-                        {/* Si soy el dueño original (o el admin viendo todo) */}
-                        {product.restricted_agency && (user.role === 'admin' || user.agencia === product.source_agency) && (
-                          <Badge variant="outline" className="w-fit text-[10px]">
-                            Prestado a {agencyName(product.restricted_agency)}
-                          </Badge>
-                        )}
-                        {/* Si soy la agencia que recibió el cupo */}
-                        {product.source_agency && (user.role === 'admin' || user.agencia === product.restricted_agency) && (
-                          <span className="text-[10px] text-slate-400">
-                            Cedido por {agencyName(product.source_agency)}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {(cedidosByProductId[String(product.id)] || []).length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {cedidosByProductId[String(product.id)].map((c, i) => (
-                            <Badge key={i} variant="outline" className="w-fit text-[10px] whitespace-nowrap">
-                              {agencyName(c.agencia)}: {c.cantidad}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-300">—</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -648,7 +626,8 @@ const GestionProductos = () => {
                       </Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </TableComponent>
           </div>
@@ -752,6 +731,75 @@ const GestionProductos = () => {
                 <p className="whitespace-pre-wrap rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-slate-700">
                   {notesModalProduct.notas_internas || 'Sin notas internas.'}
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Movimientos: cesiones/préstamos de este cupo, con trazabilidad
+          completa (a quién, cuánto, cuándo) en vez de badges apretados en la fila. */}
+      {movementsModalProduct && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setMovementsModalProduct(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <History className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Movimientos del Cupo</h2>
+                  <p className="text-sm text-slate-500">{movementsModalProduct.codigo_cupo} — {movementsModalProduct.destino}</p>
+                </div>
+              </div>
+              <button onClick={() => setMovementsModalProduct(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Estado actual: si soy dueño/cedente, o receptor de un espejo */}
+              {movementsModalProduct.restricted_agency && (user.role === 'admin' || user.agencia === movementsModalProduct.source_agency) && (
+                <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm">
+                  <ArrowRightLeft className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span className="text-slate-700">
+                    Actualmente <strong>prestado a {agencyName(movementsModalProduct.restricted_agency)}</strong> ({movementsModalProduct.disponibilidad} lugares).
+                  </span>
+                </div>
+              )}
+              {movementsModalProduct.source_agency && (user.role === 'admin' || user.agencia === movementsModalProduct.restricted_agency) && (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <ArrowRightLeft className="h-4 w-4 text-slate-500 shrink-0" />
+                  <span className="text-slate-700">
+                    Este cupo es un <strong>préstamo recibido de {agencyName(movementsModalProduct.source_agency)}</strong>.
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Historial de cesiones salientes</h3>
+                {(cedidosByProductId[String(movementsModalProduct.id)] || []).length > 0 ? (
+                  <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 text-xs text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Agencia destino</th>
+                          <th className="px-3 py-2 text-right font-medium">Cantidad</th>
+                          <th className="px-3 py-2 text-right font-medium">Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {cedidosByProductId[String(movementsModalProduct.id)].map((c, i) => (
+                          <tr key={i}>
+                            <td className="px-3 py-2 text-slate-700">{agencyName(c.agencia)}</td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-900">{c.cantidad}</td>
+                            <td className="px-3 py-2 text-right text-slate-500">{formatDate(c.fecha) || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">Este cupo no tiene cesiones registradas.</p>
+                )}
               </div>
             </div>
           </div>
