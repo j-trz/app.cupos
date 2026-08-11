@@ -499,7 +499,7 @@ export default function AIConfig() {
                                                 <label className="block text-sm font-medium mb-1">Modelo por defecto</label>
                                                 <input
                                                     list={`models-${providerForm.provider_type}`}
-                                                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
+                                                    className="w-full px-3 py-2 border rounded-lg bg-white text-sm"
                                                     value={providerForm.default_model}
                                                     onChange={(e) => setProviderForm({ ...providerForm, default_model: e.target.value })}
                                                     placeholder="Selecciona o escribe un modelo..."

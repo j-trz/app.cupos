@@ -1,7 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { useTheme } from '../contexts/ThemeContext.jsx';
 import { useI18n } from '../contexts/I18nContext.jsx';
 import { useHeader } from '../contexts/HeaderContext.jsx';
 import { useSidebar } from './ui/SidebarProvider.jsx';
@@ -10,7 +9,6 @@ import AIChatWidget from './AIChat/AIChatWidget.jsx';
 
 export default function Layout({ children }) {
   const { user, signOut } = useAuth();
-  const { theme } = useTheme();
   const { t } = useI18n();
   const { headerData } = useHeader();
   const sidebarCtx = useSidebar();
@@ -78,36 +76,36 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex h-screen overflow-hidden bg-zinc-50">
       <Sidebar user={user} onLogout={handleLogout} />
-      <div className="flex flex-col flex-1 w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950">
-        <header className="sticky top-0 z-10 flex justify-between items-center px-3 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-sm">
+      <div className="flex flex-col flex-1 w-full overflow-hidden bg-zinc-50">
+        <header className="sticky top-0 z-10 flex justify-between items-center px-3 sm:px-6 py-4 border-b border-zinc-200 bg-white/80 backdrop-blur-md shadow-sm">
           <div className="flex items-center space-x-3.5 min-w-0">
             <button
               onClick={() => sidebarCtx?.setMobileOpen(true)}
-              className="shrink-0 -ml-1 flex items-center justify-center h-9 w-9 rounded-lg text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 md:hidden"
+              className="shrink-0 -ml-1 flex items-center justify-center h-9 w-9 rounded-lg text-zinc-600 hover:bg-zinc-100 md:hidden"
               aria-label="Abrir menú"
             >
               <Menu className="h-5 w-5" />
             </button>
             {headerData.icon && (
-              <div className="flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 p-2 text-zinc-900 dark:text-zinc-100 shrink-0">
+              <div className="flex items-center justify-center rounded-lg bg-zinc-100 p-2 text-zinc-900 shrink-0">
                 <headerData.icon className="h-4.5 w-4.5" />
               </div>
             )}
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                <h1 className="text-lg font-semibold text-zinc-900 truncate">
                   {headerData.title || getTitleByPath()}
                 </h1>
                 {headerData.badge && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
                     {headerData.badge}
                   </span>
                 )}
               </div>
               {headerData.description && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-xs sm:max-w-md md:max-w-xl lg:max-w-2xl mt-0.5">
+                <p className="text-xs text-zinc-500 truncate max-w-xs sm:max-w-md md:max-w-xl lg:max-w-2xl mt-0.5">
                   {headerData.description}
                 </p>
               )}
@@ -122,10 +120,10 @@ export default function Layout({ children }) {
           </div>
         </header>
         <main
-          className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-3 sm:p-6 animate-fade-in"
+          className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-zinc-50 p-3 sm:p-6 animate-fade-in"
           style={{ minHeight: 'calc(100vh - 100px)' }}
         >
-          <div className="text-zinc-900 dark:text-zinc-100 min-h-full max-w-full md:max-w-[95%] mx-auto">
+          <div className="text-zinc-900 min-h-full max-w-full md:max-w-[95%] mx-auto">
             {children || <Outlet context={{ user }} />}
           </div>
         </main>

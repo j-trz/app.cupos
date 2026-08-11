@@ -379,8 +379,8 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
   // empieza la siguiente (los pasajeros de un mismo pedido ya vienen
   // contiguos en passengerRows).
   const PEDIDO_ROW_TINTS = [
-    'bg-white dark:bg-zinc-900',
-    'bg-sky-50/60 dark:bg-sky-950/20',
+    'bg-white',
+    'bg-sky-50/60',
   ];
   const rowTintByKey = useMemo(() => {
     const map = {};
@@ -405,37 +405,37 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
       <div className="flex items-center">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex-1 min-w-0 flex items-center gap-3 px-5 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+        className="flex-1 min-w-0 flex items-center gap-3 px-5 py-4 text-left hover:bg-zinc-50 transition-colors"
       >
-        <span className="text-zinc-500 dark:text-zinc-400 shrink-0">
+        <span className="text-zinc-500 shrink-0">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </span>
 
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-4 items-center">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+            <p className="text-sm font-semibold text-zinc-900 truncate">
               {product?.destino || 'Destino desconocido'}
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+            <p className="text-xs text-zinc-500 truncate">
               {product?.codigo_cupo || '—'}
               {product?.tipo_producto && ` · ${product.tipo_producto}`}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Salida</p>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            <p className="text-xs text-zinc-500">Salida</p>
+            <p className="text-sm text-zinc-700">
               {formatDate(product?.fecha_salida || product?.salida) || '—'}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Temporada</p>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            <p className="text-xs text-zinc-500">Temporada</p>
+            <p className="text-sm text-zinc-700">
               {product?.temporada || '—'}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">ADT · CHD · INF</p>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <p className="text-xs text-zinc-500">ADT · CHD · INF</p>
+            <p className="text-sm font-medium text-zinc-700">
               {tipoCounts.ADT} · {tipoCounts.CHD} · {tipoCounts.INF}
             </p>
           </div>
@@ -464,7 +464,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
 
       {/* Expandable table — una fila por pasajero, con todos los datos */}
       {expanded && (
-        <div className="border-t border-zinc-100 dark:border-zinc-800 overflow-x-auto">
+        <div className="border-t border-zinc-100 overflow-x-auto">
           <TableComponent>
             <TableHeader>
               <TableRow>
@@ -508,34 +508,34 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                       <ActionIconButton icon={Plus} onClick={() => onAdd(row)} title="Agregar pasajero a este pedido" />
                     </div>
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.vendedorEmail}</TableCell>
-                  <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                  <TableCell className="text-zinc-700">{row.fichaVenta}</TableCell>
+                  <TableCell className="text-zinc-700">{row.vendedorEmail}</TableCell>
+                  <TableCell className="font-mono text-xs text-zinc-600">
                     {row.pedidoId}
                   </TableCell>
-                  <TableCell className="text-zinc-900 dark:text-zinc-100 font-medium">
+                  <TableCell className="text-zinc-900 font-medium">
                     {row.nombre}
                     {row.esVentaPrincipal === false && (
                       <Badge variant="secondary" className="ml-2 text-xs">Acompañante</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.apellido}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.documento}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatDate(row.nacimiento)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.nacionalidad}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.tipoPasajero}</TableCell>
+                  <TableCell className="text-zinc-700">{row.apellido}</TableCell>
+                  <TableCell className="text-zinc-700">{row.documento}</TableCell>
+                  <TableCell className="text-zinc-700">{formatDate(row.nacimiento)}</TableCell>
+                  <TableCell className="text-zinc-700">{row.nacionalidad}</TableCell>
+                  <TableCell className="text-zinc-700">{row.tipoPasajero}</TableCell>
                   <TableCell>
                     <Badge variant={getBadgeVariant(row.estado)}>
                       {getEstadoLabel(row.estado)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">
                     {formatDate(product?.fecha_salida || product?.salida) || '—'}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">
                     {product?.temporada || '—'}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">
                     {agencyName(row.agencia)}
                   </TableCell>
                   <TableCell>
@@ -557,17 +557,17 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                         Compartido — otra agencia
                       </Badge>
                     ) : (
-                      <span className="text-zinc-300 dark:text-zinc-600" title="Producto propio">—</span>
+                      <span className="text-zinc-300" title="Producto propio">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoEmail}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoTelefono}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.docContable}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300 font-mono text-xs">{row.numeroTicket}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.neto1)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">{row.contactoNombre}</TableCell>
+                  <TableCell className="text-zinc-700">{row.contactoEmail}</TableCell>
+                  <TableCell className="text-zinc-700">{row.contactoTelefono}</TableCell>
+                  <TableCell className="text-zinc-700">{row.docContable}</TableCell>
+                  <TableCell className="text-zinc-700 font-mono text-xs">{row.numeroTicket}</TableCell>
+                  <TableCell className="text-zinc-700">{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell className="text-zinc-700">{formatMoney(row.neto1)}</TableCell>
+                  <TableCell className="text-zinc-700">
                     {product?.[`op_${passengerPriceSuffix(row.tipoPasajero)}`] ?? product?.op ?? '—'}
                   </TableCell>
                 </TableRow>
@@ -965,49 +965,49 @@ export default function GestionNominas() {
             placeholder="Filtrar por destino o código de cupo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
           />
         </div>
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Temporada</label>
+            <label className="text-xs font-medium text-zinc-500">Temporada</label>
             <select
               value={filters.temporada}
               onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas</option>
               {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Destino</label>
+            <label className="text-xs font-medium text-zinc-500">Destino</label>
             <select
               value={filters.destino}
               onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos</option>
               {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida desde</label>
+            <label className="text-xs font-medium text-zinc-500">Salida desde</label>
             <input
               type="date"
               value={filters.desde}
               onChange={(e) => setFilters((f) => ({ ...f, desde: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida hasta</label>
+            <label className="text-xs font-medium text-zinc-500">Salida hasta</label>
             <input
               type="date"
               value={filters.hasta}
               onChange={(e) => setFilters((f) => ({ ...f, hasta: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {hasActiveFilters && (
@@ -1017,7 +1017,7 @@ export default function GestionNominas() {
           )}
         </div>
 
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="text-xs text-zinc-400">
           {filters.desde || filters.hasta
             ? 'Mostrando histórico según el rango de fechas seleccionado.'
             : 'Por defecto solo se muestran las salidas que todavía no ocurrieron. Filtrá por fecha para consultar el histórico.'}
@@ -1026,8 +1026,8 @@ export default function GestionNominas() {
 
       {/* Error state */}
       {error && (
-        <Card className="px-5 py-4 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <Card className="px-5 py-4 border-red-200 bg-red-50">
+          <p className="text-sm text-red-600">{error}</p>
         </Card>
       )}
 
@@ -1042,8 +1042,8 @@ export default function GestionNominas() {
       {/* Empty state */}
       {!loading && !error && filteredProductIds.length === 0 && (
         <Card className="px-5 py-12 text-center">
-          <Users className="h-10 w-10 mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+          <Users className="h-10 w-10 mx-auto mb-3 text-zinc-300" />
+          <p className="text-sm font-medium text-zinc-500">
             {search ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay reservas registradas.'}
           </p>
         </Card>

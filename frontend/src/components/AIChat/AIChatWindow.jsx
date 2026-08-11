@@ -78,16 +78,16 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
     };
 
     return (
-        <div className="w-[calc(100vw-2rem)] max-w-[380px] h-[70vh] max-h-[580px] bg-white dark:bg-zinc-900 rounded-xl shadow-xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
+        <div className="w-[calc(100vw-2rem)] max-w-[380px] h-[70vh] max-h-[580px] bg-white rounded-xl shadow-xl flex flex-col overflow-hidden border border-zinc-200">
             {/* Header - Estilo Vercel minimalista */}
-            <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shrink-0">
+            <div className="px-4 py-3 border-b border-zinc-200 bg-white flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-white dark:text-zinc-900" />
+                    <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Asistente IA</h3>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        <h3 className="text-sm font-semibold text-zinc-900">Asistente IA</h3>
+                        <p className="text-xs text-zinc-500">
                             {isTyping ? 'Escribiendo...' : 'En línea'}
                         </p>
                     </div>
@@ -97,7 +97,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Nueva conversación */}
                     <button
                         onClick={handleNewSessionClick}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        className="p-1.5 hover:bg-zinc-100 rounded-md transition-colors text-zinc-500 hover:text-zinc-700"
                         title="Nueva conversación"
                     >
                         <MessageSquarePlus className="w-4 h-4" />
@@ -106,7 +106,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Historial */}
                     <button
                         onClick={() => setShowSessions(!showSessions)}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        className="p-1.5 hover:bg-zinc-100 rounded-md transition-colors text-zinc-500 hover:text-zinc-700"
                         title="Historial de conversaciones"
                     >
                         <RotateCcw className="w-4 h-4" />
@@ -115,7 +115,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Expandir a pantalla completa */}
                     <button
                         onClick={handleExpand}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        className="p-1.5 hover:bg-zinc-100 rounded-md transition-colors text-zinc-500 hover:text-zinc-700"
                         title="Expandir a pantalla completa"
                     >
                         <Maximize2 className="w-4 h-4" />
@@ -125,7 +125,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {can('AI_UPDATE') && (
                         <button
                             onClick={() => window.location.href = '/config-ia'}
-                            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                            className="p-1.5 hover:bg-zinc-100 rounded-md transition-colors text-zinc-500 hover:text-zinc-700"
                             title="Configuración IA"
                         >
                             <Settings className="w-4 h-4" />
@@ -135,7 +135,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                     {/* Minimizar */}
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        className="p-1.5 hover:bg-zinc-100 rounded-md transition-colors text-zinc-500 hover:text-zinc-700"
                         title="Minimizar"
                     >
                         <Minus className="w-4 h-4" />
@@ -144,13 +144,13 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
             </div>
 
             {/* Selector de experto (solo si la agencia configuró alguno) */}
-            <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+            <div className="px-4 py-2 border-b border-zinc-200 shrink-0">
                 <ExpertPicker selectedExpertId={selectedExpertId} onSelectExpert={setSelectedExpertId} compact />
             </div>
 
             {/* Panel de sesiones */}
             {showSessions && (
-                <div className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 max-h-36 overflow-y-auto shrink-0">
+                <div className="border-b border-zinc-200 bg-zinc-50 max-h-36 overflow-y-auto shrink-0">
                     <AIChatSessionsSidebar
                         sessions={sessions.slice(0, 5)}
                         currentSessionId={currentSessionId}
@@ -162,11 +162,11 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
             )}
 
             {/* Área de mensajes */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white dark:bg-zinc-900">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
                 {isLoading && messages.length === 0 ? (
                     <div className="flex items-center justify-center h-full min-h-[200px]">
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 border-t-zinc-900 dark:border-t-zinc-100 animate-spin"></div>
+                            <div className="w-10 h-10 rounded-xl border-2 border-zinc-200 border-t-zinc-900 animate-spin"></div>
                         </div>
                     </div>
                 ) : (
@@ -187,14 +187,14 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         {/* Indicador de escritura */}
                         {isTyping && (
                             <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center flex-shrink-0 shadow-sm">
-                                    <Bot className="w-4 h-4 text-white dark:text-zinc-900" />
+                                <div className="w-8 h-8 rounded-xl bg-zinc-900 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                    <Bot className="w-4 h-4 text-white" />
                                 </div>
-                                <div className="bg-zinc-100 dark:bg-zinc-800 rounded-xl rounded-tl-none px-4 py-3 border border-zinc-200 dark:border-zinc-700">
+                                <div className="bg-zinc-100 rounded-xl rounded-tl-none px-4 py-3 border border-zinc-200">
                                     <div className="flex gap-1.5">
-                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                                     </div>
                                 </div>
                             </div>
@@ -202,7 +202,7 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
 
                         {/* Error */}
                         {error && (
-                            <div className="text-center text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-lg border border-red-200 dark:border-red-800">
+                            <div className="text-center text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">
                                 {error}
                             </div>
                         )}
@@ -210,10 +210,10 @@ export default function AIChatWindow({ isOpen, onClose, onNewMessage }) {
                         {!isTyping && messages.length === 0 && (
                             <div className="flex items-center justify-center h-full min-h-[200px] text-center">
                                 <div>
-                                    <div className="w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center mb-3 mx-auto">
-                                        <Bot className="w-6 h-6 text-white dark:text-zinc-900" />
+                                    <div className="w-12 h-12 rounded-xl bg-zinc-900 flex items-center justify-center mb-3 mx-auto">
+                                        <Bot className="w-6 h-6 text-white" />
                                     </div>
-                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                                    <p className="text-sm text-zinc-600">
                                         Soy tu asistente IA. ¿En qué puedo ayudarte hoy?
                                     </p>
                                 </div>

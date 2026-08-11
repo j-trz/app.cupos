@@ -280,7 +280,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCollapsed(true)}
-                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
                       aria-label="Colapsar sidebar"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -294,7 +294,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCollapsed(false)}
-                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
                       aria-label="Expandir sidebar"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -307,7 +307,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
             {/* Separador sutil */}
             {!collapsed && (
-              <div className="mx-3 border-t border-zinc-200 dark:border-zinc-800" />
+              <div className="mx-3 border-t border-zinc-200" />
             )}
 
 
@@ -602,10 +602,10 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     </TooltipTrigger>
                     <TooltipContent side="top">Opciones de perfil</TooltipContent>
                   </Tooltip>
-                  <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg">
+                  <DropdownMenuContent align="end" className="w-56 bg-white border border-zinc-200 shadow-lg">
                     <DropdownMenuLabel className="px-3 py-2">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                        <span className="text-sm font-semibold text-zinc-900 truncate">
                           {user.nombre || user.email || 'Invitado'}
                         </span>
                         <span className="text-xs text-zinc-500 truncate">
@@ -615,23 +615,23 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                      <a href="/profile" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <a href="/profile" className="flex items-center gap-2 text-zinc-700 hover:bg-zinc-100">
                         <User className="h-4 w-4 text-zinc-500" />
                         <span>Perfil</span>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                      <a href="/settings" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <a href="/settings" className="flex items-center gap-2 text-zinc-700 hover:bg-zinc-100">
                         <Settings className="h-4 w-4 text-zinc-500" />
                         <span>Ajustes</span>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                      <a href="/notificaciones" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <a href="/notificaciones" className="flex items-center gap-2 text-zinc-700 hover:bg-zinc-100">
                         <div className="relative">
                           <Bell className="h-4 w-4 text-zinc-500" />
                           {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white dark:ring-zinc-900" />
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white" />
                           )}
                         </div>
                         <span>Notificaciones</span>
@@ -643,7 +643,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={onLogout}
-                      className="gap-2 cursor-pointer text-red-600 hover:bg-red-30 dark:hover:bg-red-950/30 focus:bg-red-50 dark:focus:bg-red-950/30"
+                      className="gap-2 cursor-pointer text-red-600 hover:bg-red-30 focus:bg-red-50"
                     >
                       <LogOut className="h-4 w-4" />
                       <span>Cerrar sesión</span>

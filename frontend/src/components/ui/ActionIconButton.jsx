@@ -10,8 +10,8 @@ export default function ActionIconButton({ icon: Icon, variant = 'default', clas
       className={clsx(
         'rounded-lg p-1.5 transition-colors',
         variant === 'danger'
-          ? 'text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30'
-          : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
+          ? 'text-red-500 hover:bg-red-50 hover:text-red-700'
+          : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900',
         className
       )}
       {...props}

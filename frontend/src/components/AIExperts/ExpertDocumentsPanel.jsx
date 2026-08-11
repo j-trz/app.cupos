@@ -166,7 +166,7 @@ export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
                     {documents.map((doc) => {
                         const status = STATUS_BADGE[doc.status] || STATUS_BADGE.ready;
                         return (
-                            <li key={doc.id} className="bg-gray-50 dark:bg-zinc-800 rounded-lg px-3 py-2">
+                            <li key={doc.id} className="bg-gray-50 rounded-lg px-3 py-2">
                                 <div className="flex items-center justify-between gap-2 text-sm">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <FileText className="w-4 h-4 text-gray-400 shrink-0" />
@@ -183,7 +183,7 @@ export default function ExpertDocumentsPanel({ expertId, onDocumentsChanged }) {
                                     </div>
                                 </div>
                                 {doc.status === 'error' && doc.error_message && (
-                                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{doc.error_message}</p>
+                                    <p className="mt-1 text-xs text-red-600">{doc.error_message}</p>
                                 )}
                             </li>
                         );

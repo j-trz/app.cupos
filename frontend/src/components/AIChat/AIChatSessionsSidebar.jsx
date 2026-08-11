@@ -39,12 +39,12 @@ export default function AIChatSessionsSidebar({
     return (
         <div className="p-2">
             {!compact && (
-                <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-1">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 px-2 py-1">
                     Conversaciones
                 </p>
             )}
             {compact && (
-                <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 px-2 py-1">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 px-2 py-1">
                     Conversaciones recientes
                 </p>
             )}
@@ -52,7 +52,7 @@ export default function AIChatSessionsSidebar({
             {onNewSession && (
                 <button
                     onClick={onNewSession}
-                    className="flex items-center gap-2 w-full px-2 py-2 mb-1 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="flex items-center gap-2 w-full px-2 py-2 mb-1 rounded-md text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
                 >
                     <MessageSquarePlus className="w-4 h-4" />
                     Nueva conversación
@@ -67,8 +67,8 @@ export default function AIChatSessionsSidebar({
                         key={session.id}
                         onClick={() => onSelectSession(session.id)}
                         className={`group flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors my-0.5 ${currentSessionId === session.id
-                            ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
-                            : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                            ? 'bg-zinc-200 text-zinc-900'
+                            : 'hover:bg-zinc-100 text-zinc-700'
                             }`}
                     >
                         {editingId === session.id ? (
@@ -78,12 +78,12 @@ export default function AIChatSessionsSidebar({
                                     value={editingTitle}
                                     onChange={(e) => setEditingTitle(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && commitRename(e, session.id)}
-                                    className="flex-1 text-sm bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 outline-none"
+                                    className="flex-1 text-sm bg-white border border-zinc-300 rounded px-1.5 py-0.5 outline-none"
                                 />
-                                <button onClick={(e) => commitRename(e, session.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md">
+                                <button onClick={(e) => commitRename(e, session.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-md">
                                     <Check className="w-3.5 h-3.5" />
                                 </button>
-                                <button onClick={cancelRename} className="p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md">
+                                <button onClick={cancelRename} className="p-1 text-zinc-400 hover:bg-zinc-100 rounded-md">
                                     <X className="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -99,7 +99,7 @@ export default function AIChatSessionsSidebar({
                                     {onRenameSession && (
                                         <button
                                             onClick={(e) => startRename(e, session)}
-                                            className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-md transition-colors"
+                                            className="p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 rounded-md transition-colors"
                                             title="Renombrar"
                                         >
                                             <Pencil className="w-3.5 h-3.5" />
@@ -107,7 +107,7 @@ export default function AIChatSessionsSidebar({
                                     )}
                                     <button
                                         onClick={(e) => onDeleteSession(session.id, e)}
-                                        className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-600 rounded-md transition-colors"
+                                        className="p-1 hover:bg-red-100 text-zinc-400 hover:text-red-600 rounded-md transition-colors"
                                         title="Eliminar"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />

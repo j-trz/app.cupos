@@ -43,10 +43,10 @@ const Table = ({ className, ...props }) => {
   return (
     <div className="relative w-full">
       {showLeftShadow && (
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-white to-transparent" />
       )}
       {showRightShadow && (
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-white to-transparent" />
       )}
       <div ref={scrollRef} onScroll={updateShadows} className="w-full overflow-auto">
         <table

@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../contexts/I18nContext.jsx';
-import { useTheme } from '../contexts/ThemeContext.jsx';
 
 const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
   const { t } = useI18n();
-  const { theme } = useTheme();
   const [step, setStep] = useState(0);
 
   // Pasos del tutorial
@@ -23,11 +21,6 @@ const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
       title: t('search'),
       description: t('onboarding_search_message'),
       element: '.search-element'
-    },
-    {
-      title: t('theme_change'),
-      description: t('onboarding_theme_message'),
-      element: '.theme-toggle-element'
     },
     {
       title: t('language_change'),
@@ -70,9 +63,7 @@ const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg shadow-xl max-w-lg w-full ${
-        theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
-      }`}>
+      <div className="rounded-lg shadow-xl max-w-lg w-full bg-white text-gray-900">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">
@@ -80,9 +71,7 @@ const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
             </h2>
             <button
               onClick={onClose}
-              className={`p-1 rounded-full ${
-                theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-              }`}
+              className="p-1 rounded-full hover:bg-gray-200"
             >
               <svg
                 className="w-6 h-6"
@@ -102,7 +91,7 @@ const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
           
           <div className="mb-6">
             <div className="text-lg font-semibold mb-2">{steps[step].title}</div>
-            <p className="text-gray-600 dark:text-gray-300">{steps[step].description}</p>
+            <p className="text-gray-600">{steps[step].description}</p>
           </div>
           
           <div className="flex justify-between items-center">
@@ -110,11 +99,7 @@ const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
               onClick={handlePrev}
               disabled={step === 0}
               className={`px-4 py-2 rounded-md ${
-                step === 0
-                  ? 'opacity-50 cursor-not-allowed'
-                  : theme === 'dark'
-                  ? 'bg-gray-700 hover:bg-gray-600'
-                  : 'bg-gray-200 hover:bg-gray-300'
+                step === 0 ? 'opacity-50 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300'
               }`}
             >
               {t('previous')}
@@ -125,7 +110,7 @@ const OnboardingGuide = ({ onComplete, isOpen, onClose }) => {
                 <div
                   key={index}
                   className={`w-2 h-2 rounded-full ${
-                    index === step ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                    index === step ? 'bg-blue-500' : 'bg-gray-300'
                   }`}
                 />
               ))}

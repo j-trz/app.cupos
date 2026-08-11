@@ -217,7 +217,7 @@ const ProductBulkUpload = ({ onUpload, onCancel }) => {
         {uploadStatus === 'success' && (
           <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30 flex items-center space-x-2">
             <CheckCircle className="h-5 w-5 text-green-500" />
-            <p className="text-green-700 dark:text-green-300">
+            <p className="text-green-700">
               Se crearon {uploadResult?.created ?? validRows.length} productos.
               {uploadResult?.skipped ? ` ${uploadResult.skipped} fila(s) no se importaron por errores.` : ''}
             </p>

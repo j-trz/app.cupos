@@ -730,14 +730,14 @@ export default function Availability() {
           que un cupo en 0 tiene un bloqueo de un compañero esperando
           confirmación y pueda decidir si esperar o no. */}
       {blockedReservations.length > 0 && (
-        <div className="rounded-2xl border border-amber-100 dark:border-amber-950/30 bg-amber-50/10 dark:bg-amber-950/5 p-5 shadow-xs">
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/10 p-5 shadow-xs">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shrink-0">
               <Clock3 className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-amber-900 dark:text-amber-200">Reservas bloqueadas temporalmente</h2>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              <h2 className="text-sm font-bold text-amber-900">Reservas bloqueadas temporalmente</h2>
+              <p className="text-xs text-amber-700 mt-0.5">
                 {blockedReservations.length} reserva{blockedReservations.length > 1 ? 's' : ''} de tu agencia esperando confirmación. El cupo se liberará automáticamente al vencer.
               </p>
             </div>
@@ -748,12 +748,12 @@ export default function Availability() {
               return (
                 <div
                   key={item.Pedido_ID || item.id}
-                  className="flex flex-col justify-between gap-2.5 rounded-xl border border-amber-250/30 dark:border-amber-900/10 bg-white dark:bg-zinc-900 p-4 shadow-sm"
+                  className="flex flex-col justify-between gap-2.5 rounded-xl border border-amber-250/30 bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">{item.Vuelo_Destino || '—'}</p>
-                      <p className="truncate text-[10px] text-zinc-400 dark:text-zinc-550 font-mono mt-0.5">{item.Pedido_ID}</p>
+                      <p className="truncate text-sm font-bold text-zinc-900">{item.Vuelo_Destino || '—'}</p>
+                      <p className="truncate text-[10px] text-zinc-400 font-mono mt-0.5">{item.Pedido_ID}</p>
                     </div>
                     {expiry && (
                       <span className={`flex shrink-0 items-center gap-1 text-xs font-bold ${expiry.color}`}>
@@ -763,14 +763,14 @@ export default function Availability() {
                     )}
                   </div>
                   {(item.Vuelo_Salida || item.Temporada) && (
-                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-500 dark:text-zinc-400">
+                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-zinc-100 text-[10px] text-zinc-500">
                       {item.Vuelo_Salida && (
-                        <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-medium">
+                        <span className="bg-zinc-100 px-2 py-0.5 rounded-md font-medium">
                           Salida: {formatDate(item.Vuelo_Salida)}
                         </span>
                       )}
                       {item.Temporada && (
-                        <span className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-md font-medium border border-amber-100 dark:border-amber-900/30">
+                        <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-medium border border-amber-100">
                           {item.Temporada}
                         </span>
                       )}
@@ -816,7 +816,7 @@ export default function Availability() {
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 z-10 bg-white dark:bg-zinc-900 text-center">Reservar</TableHead>
+              <TableHead className="sticky left-0 z-10 bg-white text-center">Reservar</TableHead>
               <TableHead className="text-center cursor-pointer select-none" onClick={() => toggleSort('codigo_cupo')}>Cupo {sortIndicator('codigo_cupo')}</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('destino')}>Destino {sortIndicator('destino')}</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('compania')}>Compañía {sortIndicator('compania')}</TableHead>
@@ -851,7 +851,7 @@ export default function Availability() {
             ) : (
               sortedData.map((item, index) => (
                 <TableRow key={index}>
-                  <TableCell className="sticky left-0 z-10 bg-white dark:bg-zinc-900 text-center">
+                  <TableCell className="sticky left-0 z-10 bg-white text-center">
                     <Button
                       size="sm"
                       onClick={() => promptPassengerCountAndHold(item)}
@@ -880,7 +880,7 @@ export default function Availability() {
                       </button>
                       {blockedByProductId[String(item.id)] > 0 && (
                         <span
-                          className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-amber-100 px-1 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-amber-100 px-1 text-[10px] font-bold text-amber-700"
                           title={`${blockedByProductId[String(item.id)]} reserva(s) de tu agencia en bloqueo temporal sobre este cupo`}
                         >
                           {blockedByProductId[String(item.id)]}

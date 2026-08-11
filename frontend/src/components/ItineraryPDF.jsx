@@ -153,13 +153,13 @@ export default function ItineraryPDF({ reservation, passengers = [], product }) 
   const passengerNames = passengers
     .map((p) => `${p.nombre || ''} ${p.apellido || ''}`.trim())
     .filter(Boolean);
-  // Documento de cada pasajero, para que el voucher sirva también como
-  // comprobante de identidad en el check-in — no solo el nombre.
+  // Tipo de pasajero (Adulto/Menor/Infante) junto al nombre — no el número de
+  // documento, que no debe figurar en este comprobante.
   const passengerDetails = passengers
     .map((p) => {
       const nombre = `${p.nombre || ''} ${p.apellido || ''}`.trim();
-      const documento = p.documento;
-      return nombre ? (documento ? `${nombre} (Doc: ${documento})` : nombre) : null;
+      const tipoPasajero = p.tipo_pasajero || p.TipoPasajero;
+      return nombre ? (tipoPasajero ? `${nombre} (${tipoPasajero})` : nombre) : null;
     })
     .filter(Boolean);
 

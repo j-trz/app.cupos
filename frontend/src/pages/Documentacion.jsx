@@ -12,14 +12,14 @@ function SectionHeader({ icon: Icon, title, badge }) {
   const { config } = useWhiteLabel();
   const primaryColor = config?.colors?.primary || '#3b82f6';
   return (
-    <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+    <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-zinc-100">
       {Icon && (
-        <span className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800" style={{ color: primaryColor }}>
+        <span className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-100" style={{ color: primaryColor }}>
           <Icon className="w-5.5 h-5.5" />
         </span>
       )}
       <div className="flex flex-wrap items-center gap-2.5">
-        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{title}</h2>
+        <h2 className="text-lg font-bold text-zinc-900 tracking-tight">{title}</h2>
         {badge && (
           <span
             className="text-[10px] px-2 py-0.5 rounded-full font-semibold border select-none tracking-wide"
@@ -35,7 +35,7 @@ function SectionHeader({ icon: Icon, title, badge }) {
 
 // ─── Componentes de contenido rediseñados ──────────────────────────────────────
 function DocParagraph({ children }) {
-  return <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-[13px]">{children}</p>;
+  return <p className="text-zinc-600 leading-relaxed text-[13px]">{children}</p>;
 }
 
 function DocSubsection({ title, children, icon: Icon, color = 'blue' }) {
@@ -46,21 +46,21 @@ function DocSubsection({ title, children, icon: Icon, color = 'blue' }) {
   const error = config?.colors?.error || '#ef4444';
 
   const colorMap = {
-    blue: { border: primary, text: 'text-blue-600 dark:text-blue-400', borderLeft: 'border-l-blue-500' },
-    green: { border: success, text: 'text-emerald-600 dark:text-emerald-400', borderLeft: 'border-l-emerald-500' },
-    orange: { border: warning, text: 'text-amber-600 dark:text-amber-400', borderLeft: 'border-l-amber-500' },
-    purple: { border: primary, text: 'text-indigo-600 dark:text-indigo-400', borderLeft: 'border-l-indigo-500' },
-    red: { border: error, text: 'text-rose-600 dark:text-rose-400', borderLeft: 'border-l-rose-500' },
+    blue: { border: primary, text: 'text-blue-600', borderLeft: 'border-l-blue-500' },
+    green: { border: success, text: 'text-emerald-600', borderLeft: 'border-l-emerald-500' },
+    orange: { border: warning, text: 'text-amber-600', borderLeft: 'border-l-amber-500' },
+    purple: { border: primary, text: 'text-indigo-600', borderLeft: 'border-l-indigo-500' },
+    red: { border: error, text: 'text-rose-600', borderLeft: 'border-l-rose-500' },
   };
 
   const c = colorMap[color] || colorMap.blue;
 
   return (
     <div
-      className={`rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 p-5 mb-5 shadow-sm border-l-4 ${c.borderLeft}`}
+      className={`rounded-2xl border border-zinc-200/80 bg-zinc-50/50 p-5 mb-5 shadow-sm border-l-4 ${c.borderLeft}`}
     >
       {title && (
-        <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
+        <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 mb-3 flex items-center gap-2">
           {Icon && <Icon className={`w-4 h-4 ${c.text}`} />}
           {title}
         </h4>
@@ -79,7 +79,7 @@ function DocSteps({ steps }) {
   return (
     <ol className="space-y-4 my-4">
       {steps.map((step, i) => (
-        <li key={i} className="flex items-start gap-3.5 text-[13px] text-zinc-600 dark:text-zinc-400">
+        <li key={i} className="flex items-start gap-3.5 text-[13px] text-zinc-600">
           <span
             className="w-6 h-6 rounded-full text-white flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5 shadow-sm"
             style={{ backgroundColor: primaryColor }}
@@ -112,7 +112,7 @@ function DocList({ items, color = 'blue' }) {
   return (
     <ul className="space-y-3 my-3">
       {items.map((item, i) => (
-        <li key={i} className="flex items-start gap-3 text-[13px] text-zinc-600 dark:text-zinc-400">
+        <li key={i} className="flex items-start gap-3 text-[13px] text-zinc-600">
           <span
             className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2 shadow-sm"
             style={{ backgroundColor: activeColor }}
@@ -132,10 +132,10 @@ function DocAlert({ type = 'info', children }) {
   const error = config?.colors?.error || '#ef4444';
 
   const styles = {
-    info: { border: primary, bg: 'bg-blue-50/50 dark:bg-blue-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-blue-200 dark:border-blue-900/30', colorText: 'text-blue-600 dark:text-blue-400', Icon: Info },
-    warning: { border: warning, bg: 'bg-amber-50/50 dark:bg-amber-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-amber-200 dark:border-amber-900/30', colorText: 'text-amber-600 dark:text-amber-400', Icon: AlertTriangle },
-    success: { border: success, bg: 'bg-emerald-50/50 dark:bg-emerald-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-emerald-200 dark:border-emerald-900/30', colorText: 'text-emerald-600 dark:text-emerald-400', Icon: CheckCircle },
-    tip: { border: primary, bg: 'bg-indigo-50/50 dark:bg-indigo-950/10', text: 'text-zinc-800 dark:text-zinc-200', borderColor: 'border-indigo-200 dark:border-indigo-900/30', colorText: 'text-indigo-600 dark:text-indigo-400', Icon: Star },
+    info: { border: primary, bg: 'bg-blue-50/50', text: 'text-zinc-800', borderColor: 'border-blue-200', colorText: 'text-blue-600', Icon: Info },
+    warning: { border: warning, bg: 'bg-amber-50/50', text: 'text-zinc-800', borderColor: 'border-amber-200', colorText: 'text-amber-600', Icon: AlertTriangle },
+    success: { border: success, bg: 'bg-emerald-50/50', text: 'text-zinc-800', borderColor: 'border-emerald-200', colorText: 'text-emerald-600', Icon: CheckCircle },
+    tip: { border: primary, bg: 'bg-indigo-50/50', text: 'text-zinc-800', borderColor: 'border-indigo-200', colorText: 'text-indigo-600', Icon: Star },
   };
 
   const s = styles[type] || styles.info;
@@ -152,7 +152,7 @@ function DocAlert({ type = 'info', children }) {
 
 function DocCode({ children }) {
   return (
-    <code className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-200/60 dark:border-zinc-700/50">
+    <code className="bg-zinc-100 text-zinc-900 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-200/60">
       {children}
     </code>
   );
@@ -160,11 +160,11 @@ function DocCode({ children }) {
 
 function DocBadge({ status }) {
   const map = {
-    bloqueo_temporal: 'bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-900',
-    procesando: 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/20 dark:text-blue-300 dark:border-blue-900',
-    confirmado: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900',
-    cancelado: 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/20 dark:text-red-300 dark:border-red-900',
-    cedido: 'bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
+    bloqueo_temporal: 'bg-yellow-50 text-yellow-800 border-yellow-200',
+    procesando: 'bg-blue-50 text-blue-800 border-blue-200',
+    confirmado: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    cancelado: 'bg-red-50 text-red-800 border-red-200',
+    cedido: 'bg-zinc-100 text-zinc-800 border-zinc-200',
   };
   return (
     <span className={`px-2 py-0.5 border rounded-full text-[10px] font-semibold tracking-wide uppercase select-none shrink-0 ${
@@ -245,7 +245,7 @@ function ReservasSection({ isAdmin }) {
           ].map(r => (
             <div key={r.status} className="flex items-start gap-3">
               <DocBadge status={r.status} />
-              <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+              <span className="text-sm text-slate-600">{r.desc}</span>
             </div>
           ))}
         </div>
@@ -626,7 +626,7 @@ function UsuariosSection() {
           ].map(r => (
             <div key={r.role} className="flex items-start gap-3">
               <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.color} flex-shrink-0 mt-0.5`}>{r.role}</span>
-              <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+              <span className="text-sm text-slate-600">{r.desc}</span>
             </div>
           ))}
         </div>
@@ -907,7 +907,7 @@ export default function Documentacion() {
             id="docs-section-select"
             value={section}
             onChange={(e) => navigate(`/documentacion/${e.target.value}`)}
-            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 shadow-sm focus:border-zinc-450 dark:focus:border-zinc-750 focus:outline-none"
+            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 shadow-sm focus:border-zinc-450 focus:outline-none"
           >
             {sections.map((s) => (
               <option key={s.key} value={s.key}>
@@ -918,7 +918,7 @@ export default function Documentacion() {
         </div>
 
         {section === DEFAULT_DOCS_SECTION && (
-          <div className="rounded-3xl border border-zinc-200 dark:border-zinc-850 bg-gradient-to-br from-zinc-900 via-zinc-850 to-zinc-950 text-white shadow-lg p-8 relative overflow-hidden">
+          <div className="rounded-3xl border border-zinc-200 bg-gradient-to-br from-zinc-900 via-zinc-850 to-zinc-950 text-white shadow-lg p-8 relative overflow-hidden">
             <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
             <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
 
@@ -956,14 +956,14 @@ export default function Documentacion() {
         )}
 
         {Content ? (
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-7">
+          <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm px-8 py-7">
             <SectionHeader icon={current.icon} title={current.label} badge={current.badge} />
             <Content isAdmin={isAdmin} />
           </div>
         ) : (
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm px-8 py-12 text-center">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Esa sección de documentación no existe o no tenés permisos.</p>
-            <Link to={`/documentacion/${DEFAULT_DOCS_SECTION}`} className="inline-flex items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold px-4 py-2 hover:bg-zinc-850 dark:hover:bg-zinc-200 transition-colors">
+          <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm px-8 py-12 text-center">
+            <p className="text-sm text-zinc-500 mb-4">Esa sección de documentación no existe o no tenés permisos.</p>
+            <Link to={`/documentacion/${DEFAULT_DOCS_SECTION}`} className="inline-flex items-center justify-center rounded-xl bg-zinc-900 text-white text-xs font-semibold px-4 py-2 hover:bg-zinc-850 transition-colors">
               Ir al inicio de la documentación
             </Link>
           </div>
@@ -971,11 +971,11 @@ export default function Documentacion() {
 
         {/* Navegación prev/next entre secciones */}
         {Content && (
-          <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800/65">
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-100">
             {prev ? (
               <button
                 onClick={() => navigate(`/documentacion/${prev.key}`)}
-                className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                className="flex items-center gap-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
                 {prev.label}
@@ -984,7 +984,7 @@ export default function Documentacion() {
             {next && (
               <button
                 onClick={() => navigate(`/documentacion/${next.key}`)}
-                className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors ml-auto"
+                className="flex items-center gap-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors ml-auto"
               >
                 {next.label}
                 <ChevronRight className="w-4 h-4" />
@@ -995,7 +995,7 @@ export default function Documentacion() {
       </div>
 
       {/* Footer */}
-      <div className="text-center text-xs text-zinc-400 dark:text-zinc-650 pt-6 pb-10 select-none">
+      <div className="text-center text-xs text-zinc-400 pt-6 pb-10 select-none">
         <p>Sistema de Gestión de Cupos de Viajes Aéreos — Documentación v3.0</p>
         <p className="mt-1">¿Algo no está claro? Abrí el Chat de IA para preguntar directamente al asistente.</p>
       </div>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DEFAULT_DOCS_SECTION } from './lib/docsSections.js';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { HeaderProvider } from './contexts/HeaderContext';
 import { AIPageProvider } from './contexts/AIPageContext';
@@ -46,8 +45,7 @@ import './i18n/i18n';
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <I18nProvider>
+      <I18nProvider>
           <SidebarProvider>
             <HeaderProvider>
               <AIPageProvider>
@@ -366,8 +364,7 @@ function App() {
               </AIPageProvider>
             </HeaderProvider>
           </SidebarProvider>
-        </I18nProvider>
-      </ThemeProvider>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

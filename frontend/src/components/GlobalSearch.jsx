@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../contexts/I18nContext.jsx';
-import { useTheme } from '../contexts/ThemeContext.jsx';
 
 const GlobalSearch = ({ onSearch, placeholder, autoFocus = false }) => {
   const { t } = useI18n();
-  const { theme } = useTheme();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const searchRef = useRef(null);
@@ -63,17 +61,13 @@ const GlobalSearch = ({ onSearch, placeholder, autoFocus = false }) => {
           value={query}
           onChange={handleInputChange}
           placeholder={placeholder || t('search') + '...'}
-          className={`w-full px-4 py-2 pl-10 rounded-lg border ${
-            theme === 'dark'
-              ? 'bg-gray-700 border-gray-600 text-white'
-              : 'bg-white border-gray-300 text-gray-900'
-          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+          className="w-full px-4 py-2 pl-10 rounded-lg border bg-white border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           autoComplete="off"
           autoFocus={autoFocus}
         />
         <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
           <svg
-            className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
+            className="h-5 w-5 text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -87,9 +81,7 @@ const GlobalSearch = ({ onSearch, placeholder, autoFocus = false }) => {
           </svg>
         </div>
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-          <kbd className={`hidden md:inline-block text-xs px-2 py-1 rounded ${
-            theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-100 text-gray-500'
-          }`}>
+          <kbd className="hidden md:inline-block text-xs px-2 py-1 rounded bg-gray-100 text-gray-500">
             Ctrl K
           </kbd>
         </div>
@@ -97,15 +89,13 @@ const GlobalSearch = ({ onSearch, placeholder, autoFocus = false }) => {
 
       {isOpen && (
         <div
-          className={`absolute z-50 mt-2 w-full rounded-md shadow-lg ${
-            theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
-          }`}
+          className="absolute z-50 mt-2 w-full rounded-md shadow-lg bg-white border border-gray-200"
         >
           <div className="p-2">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <div className="text-xs font-medium text-gray-500 mb-1">
               {t('search_results')}:
             </div>
-            <div className="text-sm text-gray-700 dark:text-gray-300">
+            <div className="text-sm text-gray-700">
               {query ? `${t('results_for')} "${query}"` : t('enter_search_term')}
             </div>
           </div>
