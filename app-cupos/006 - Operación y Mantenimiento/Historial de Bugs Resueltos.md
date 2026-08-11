@@ -2,6 +2,14 @@ Postmortems de bugs ya corregidos, para no re-investigar desde cero si un sínto
 
 > Entradas verificadas contra código al momento de escribirse; fecha propia en cada una.
 
+## Notificación "nuevo producto" llegaba a usuarios de TODAS las agencias, no solo a la dueña
+
+**Síntoma** (reportado por Julian, auditoría a pedido): pidió revisar las notificaciones porque sospechaba que llegaban avisos que no le correspondían a un usuario común.
+
+**Causa raíz**: `CreateProduct` y `BulkCreateProducts` (`product_handler.go`) usaban `services.NotifyBroadcastByCode(..., "new_product"/"new_product_bulk", ...)` — un producto es privado de su agencia dueña (nadie más lo ve ni lo puede reservar salvo cesión/compartir explícito), pero el aviso de "se cargó" se mandaba a todos los usuarios del sistema sin excepción, de cualquier agencia. Auditando el resto de los `Notify*ByCode` del código (`order_handler.go`, `group_handler.go`, `cron_handler.go`, `transfer_handler.go`, `deadline_cron_handler.go`) no se encontró ningún otro caso mal scopeado — todos usan `NotifyUserByCode`/`NotifyAgencyByCode`/`NotifyRoleByCode("admin")` correctamente.
+
+**Fix** (2026-08-12): cambiado a `NotifyAgencyByCode(product.Agencia, ...)` — en la carga masiva, agrupado por agencia (`countByAgency`) ya que un mismo import puede traer productos de varias agencias a la vez. Además se detectó que ninguno de los dos casos (ni `product_changed`, el aviso de cambio de itinerario a quien tiene el cupo reservado) disparaba un email real, solo la notificación in-app — se agregó `services.SendTemplateEmailToAgency()` (nuevo, para "toda la agencia por email") y las plantillas de email faltantes. Ver regla 13 de [[Gotchas y Reglas de Oro]] para el detalle completo y el patrón a seguir en notificaciones nuevas.
+
 ## `AddPassenger` guardaba Neto1 = 0 si no venía explícito en el request
 
 **Síntoma**: Julian corrigió una nota mal formulada donde se describía `Neto1` como un valor "legado"/global — en realidad el Neto1 real de una venta siempre es `Tarifa + Impuestos` del tipo de ESE pasajero (ADT/CHD/INF), igual que `OP` (ver regla 11 de [[Gotchas y Reglas de Oro]]). Al re-auditar todos los puntos donde se asigna `Passenger.Neto1`, `CreateReservation` ya estaba bien (usa `product.NetoForTipo(tipoPasajero)` desde la Fase 3 del backlog UTG) pero **`AddPassenger` no tenía ese mismo fallback**.

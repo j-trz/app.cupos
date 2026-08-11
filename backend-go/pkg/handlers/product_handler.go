@@ -243,9 +243,16 @@ func CreateProduct(c *gin.Context) {
 
 	database.DB.Create(&product)
 
-	services.NotifyBroadcastByCode(createdByFromContext(c), "new_product", "Nuevo producto disponible",
+	// Antes era NotifyBroadcastByCode: llegaba a TODOS los usuarios del
+	// sistema, de cualquier agencia — un producto es privado de su agencia
+	// dueña, así que el aviso también debe serlo (sin agencia dueña, no se
+	// avisa a nadie; NotifyAgencyByCode ya maneja ese caso).
+	services.NotifyAgencyByCode(product.Agencia, createdByFromContext(c), "new_product", "Nuevo producto disponible",
 		fmt.Sprintf("Se agregó el producto %s hacia %s (%s)", product.CodigoCupo, product.Destino, product.Compania),
 		map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania})
+	services.SendTemplateEmailToAgency(product.Agencia, "new_product", map[string]string{
+		"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania,
+	})
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -359,10 +366,18 @@ func notifyProductChanged(product *models.Product, cambios []string, actor *uuid
 
 	resumen := strings.Join(cambios, "; ")
 	for _, r := range reservations {
+		data := map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "pedido_id": r.PedidoID, "cambios": resumen}
 		services.NotifyUserByCode(r.CreatedBy, actor, r.Agencia, "product_changed",
 			"Tu cupo reservado cambió",
 			fmt.Sprintf("El producto %s hacia %s de tu reserva %s cambió: %s", product.CodigoCupo, product.Destino, r.PedidoID, resumen),
-			map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "pedido_id": r.PedidoID, "cambios": resumen})
+			data)
+		if recipient := services.ResolveReservationRecipientEmail(r.CreatedBy); recipient != "" {
+			if err := services.SendTemplateEmail(r.Agencia, "product_changed", recipient, data); err != nil {
+				services.LogFailure("email",
+					fmt.Sprintf("No se pudo enviar el aviso de cambio de producto para el pedido %s", r.PedidoID),
+					err.Error())
+			}
+		}
 	}
 }
 
@@ -489,10 +504,19 @@ func BulkCreateProducts(c *gin.Context) {
 
 	tx.Commit()
 
-	if len(input.Products) > 0 {
-		services.NotifyBroadcastByCode(createdByFromContext(c), "new_product_bulk", "Nuevos productos disponibles",
-			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", len(input.Products)),
-			map[string]string{"cantidad": fmt.Sprintf("%d", len(input.Products))})
+	// Igual que en CreateProduct: por agencia dueña, no un broadcast global —
+	// una carga masiva puede traer productos de varias agencias a la vez.
+	countByAgency := map[string]int{}
+	for _, p := range input.Products {
+		if p.Agencia != "" {
+			countByAgency[p.Agencia]++
+		}
+	}
+	for agencia, count := range countByAgency {
+		services.NotifyAgencyByCode(agencia, createdByFromContext(c), "new_product_bulk", "Nuevos productos disponibles",
+			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", count),
+			map[string]string{"cantidad": fmt.Sprintf("%d", count)})
+		services.SendTemplateEmailToAgency(agencia, "new_product_bulk", map[string]string{"cantidad": fmt.Sprintf("%d", count)})
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Bulk creation successful", "count": len(input.Products)})

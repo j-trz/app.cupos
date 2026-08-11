@@ -1,6 +1,6 @@
 Reglas operativas e invariantes que **no** son obvias leyendo un único archivo — se descubrieron a fuerza de incidentes repetidos en este repo. Léelo antes de tocar rutas, migraciones, RBAC o el entorno local. Complementa [[Historial de Bugs Resueltos]] (postmortems puntuales ya cerrados) y [Modelo de Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md) (detalle de esquema).
 
-> Última verificación de las reglas 1-12 contra código: 2026-08-11.
+> Última verificación de las reglas 1-13 contra código: 2026-08-12.
 
 ## 1. Dos entrypoints de backend duplican TODA la tabla de rutas
 
@@ -61,6 +61,12 @@ Desde que se individualizó la ganancia por tipo (`OPAdt`/`OPChd`/`OPInf`), cual
 ## 12. Un campo/columna "no persiste" en local puede ser el backend viejo, no un bug de código
 
 El backend Go no tiene hot-reload: `go run cmd/api/main.go` compila una sola vez al arrancar. Si se agrega un campo nuevo a `models.go` (+ migración) mientras ese proceso ya está corriendo, el binario en memoria sigue sin conocer el campo — cualquier valor que el frontend mande para esa columna se ignora silenciosamente en el `json.Unmarshal`, con cero error visible. Síntoma típico: "el campo se ve en el formulario pero nunca queda guardado", con el código (modelo, migración, whitelist del `Select()`, frontend) leyéndose 100% correcto. **Antes de asumir un bug de lógica en un campo agregado recientemente, reiniciar el backend local primero.**
+
+## 13. `NotifyBroadcastByCode` es "todo el sistema, cualquier agencia" — reservarlo para avisos genuinamente globales
+
+Un `Notification` sin `TargetUserID`/`TargetRole`/`TargetAgency` matchea el `OR (target_user_id IS NULL AND target_role = '' AND target_agency = '')` de `GetNotifications`/`GetUnreadCount` (`notification_handler.go`) — es decir, le llega a **todos los usuarios de todas las agencias**, sin excepción. Un evento de negocio ligado a una agencia o producto puntual (ej. "se cargó un producto nuevo") casi nunca debería usar `NotifyBroadcastByCode`: si el dato es privado de una agencia (como `Product`, que solo ve su dueña), el aviso también debe serlo — usar `NotifyAgencyByCode(product.Agencia, ...)`, no `NotifyBroadcastByCode`. **Caso real corregido 2026-08-12**: `new_product`/`new_product_bulk` (`product_handler.go`, `CreateProduct`/`BulkCreateProducts`) usaban `NotifyBroadcastByCode` — cualquier agencia que cargaba un cupo privado le avisaba a los usuarios de TODAS las demás agencias del sistema, que ni siquiera podían ver ese producto. `NotifyBroadcastByCode` queda reservado para avisos de sistema real (mantenimiento, etc.), hoy sin ningún caller.
+
+También en esa corrección: se detectó que ni `product_changed` ni `new_product` disparaban un email real — solo creaban la `Notification` in-app, pese a tener plantilla de `EmailTemplate` (o merecerla). Se agregó `services.SendTemplateEmailToAgency()` (`email_service.go`) para el caso "aviso a toda la agencia por email" (antes solo existía `SendTemplateEmail`, un destinatario puntual) y se sumaron las plantillas de email faltantes (`new_product_bulk`, `product_changed`) a `seedEmailTemplates()` (`db.go`). Patrón a seguir para cualquier notificación nueva: `Notify*ByCode` (in-app) + `SendTemplateEmail`/`SendTemplateEmailToAgency` (email) en el mismo call site, igual que ya hacía `warnExpiringReservations` (`cron_handler.go`) — no asumir que uno implica el otro.
 
 ---
 

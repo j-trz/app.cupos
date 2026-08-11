@@ -396,6 +396,18 @@ func seedEmailTemplates(db *gorm.DB) {
 			BodyHTML: "<p>Se agregó un nuevo producto a disponibilidad:</p><p><b>{{codigo_cupo}}</b> hacia {{destino}} ({{compania}})</p>",
 		},
 		{
+			Code:     "new_product_bulk",
+			Name:     "Nuevos productos disponibles (carga masiva)",
+			Subject:  "Nuevos productos disponibles ({{cantidad}})",
+			BodyHTML: "<p>Se agregaron <b>{{cantidad}}</b> productos nuevos a disponibilidad.</p>",
+		},
+		{
+			Code:     "product_changed",
+			Name:     "Producto: cambio de ruta o fecha",
+			Subject:  "Tu cupo reservado cambió: {{codigo_cupo}}",
+			BodyHTML: "<p>El producto <b>{{codigo_cupo}}</b> hacia {{destino}} de tu reserva <b>{{pedido_id}}</b> cambió:</p><p>{{cambios}}</p>",
+		},
+		{
 			Code:     "test_email",
 			Name:     "Email de prueba",
 			Subject:  "Email de prueba",
