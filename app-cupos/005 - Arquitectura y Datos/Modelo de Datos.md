@@ -44,7 +44,7 @@ Un pedido — puede agrupar varios `Passenger`. Estados canónicos en [[Historia
 - `StatusBack`: anotación libre de si ya se cargó en el backoffice externo — manual, no hay integración de escritura real (ver [[Flujos de Funcionalidades]] sección 17, Netviax Atlas es solo lectura).
 - `PreCancelEstado`/`CancelacionNotas`: permiten restaurar el estado exacto previo si se rechaza una solicitud de cancelación.
 - `ExpirationWarningSentAt`: evita reenviar el aviso de "por vencer" en cada corrida del cron.
-- **Servicios** (agregado 2026-08-10): `Hotel` (texto libre), `TrasladosIncluye` (bool), `TrasladosNotas` (texto libre) — sección "Servicios" del formulario de reserva.
+- **Servicios** (agregado 2026-08-10): `Hotel` (texto libre), `TrasladosIncluye` (bool), `TrasladosNotas` (texto libre) — sección "Servicios" del formulario de reserva (`Availability.jsx`). Hasta 2026-08-12 solo se podían cargar ahí; no se veían ni se podían editar desde `GestionReservas.jsx` — se agregó la misma sección "Servicios" al modal de edición, más una columna en la tabla (botón "Servicios", solo si hay algo cargado) con un modal de solo lectura.
 - `NotasVendedor` (agregado 2026-08-12, mismo nombre que `Group.NotasVendedor`): notas libres de quien solicita la reserva, siempre disponibles en el formulario de `Availability.jsx` (no gateadas por ninguna condición) — para dudas/comentarios al momento de cotizar. Visibles desde `Requests.jsx` (botón "Notas" si el campo no está vacío).
 
 ### `Passenger` (tabla `passengers`)

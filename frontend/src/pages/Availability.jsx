@@ -1126,18 +1126,15 @@ export default function Availability() {
                     <label className="mb-1.5 block text-xs font-semibold text-slate-700">Hotel</label>
                     <input type="text" value={form.hotel} onChange={(e) => handleFormChange('hotel', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: Hotel Playa Sol" />
                   </div>
-                  <div>
-                    <label className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                       <input type="checkbox" checked={form.traslados_incluye} onChange={(e) => handleFormChange('traslados_incluye', e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
                       Incluye traslados
                     </label>
+                    {form.traslados_incluye && (
+                      <input type="text" value={form.traslados_notas} onChange={(e) => handleFormChange('traslados_notas', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Notas de traslados — ej: aeropuerto-hotel ida y vuelta" />
+                    )}
                   </div>
-                  {form.traslados_incluye && (
-                    <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-xs font-semibold text-slate-700">Notas de traslados</label>
-                      <input type="text" value={form.traslados_notas} onChange={(e) => handleFormChange('traslados_notas', e.target.value)} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Ej: aeropuerto-hotel ida y vuelta" />
-                    </div>
-                  )}
                 </div>
               </fieldset>
 

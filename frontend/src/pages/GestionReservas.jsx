@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock, BedDouble } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import { useAuth } from '../contexts/AuthContext';
 import ApiClient from '../services/apiClient';
@@ -43,6 +43,9 @@ const emptyForm = {
   ficha_venta: '',
   estado_interno: '',
   status_back: '',
+  hotel: '',
+  traslados_incluye: false,
+  traslados_notas: '',
 };
 
 const ESTADO_INTERNO_OPTIONS = ['', 'Pendiente', 'Seña', 'Pagado', 'Emitido'];
@@ -160,6 +163,7 @@ export default function GestionReservas() {
   const [ticketValue, setTicketValue] = useState('');
   const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
   const [routeModalProduct, setRouteModalProduct] = useState(null); // { codigo_cupo, destino, ruta }
+  const [serviciosModal, setServiciosModal] = useState(null); // reserva con hotel/traslados a mostrar
 
   const { data: agencies = [] } = useAgencies();
 
@@ -288,6 +292,9 @@ export default function GestionReservas() {
       ficha_venta: r.ficha_venta || '',
       estado_interno: r.estado_interno || '',
       status_back: r.status_back || '',
+      hotel: r.hotel || '',
+      traslados_incluye: r.traslados_incluye || false,
+      traslados_notas: r.traslados_notas || '',
     });
     setProductInfo(null);
     setDialogOpen(true);
@@ -612,6 +619,7 @@ export default function GestionReservas() {
               <TableHead>Documento</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead className="text-center">Ruta</TableHead>
+              <TableHead className="text-center">Servicios</TableHead>
               <TableHead>Vencimiento</TableHead>
               <TableHead>Cesión</TableHead>
               <TableHead>Contacto</TableHead>
@@ -627,9 +635,9 @@ export default function GestionReservas() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={22} className="text-center py-10">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={23} className="text-center py-10">Cargando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={22} className="text-center py-10 text-slate-400">
+              <TableRow><TableCell colSpan={23} className="text-center py-10 text-slate-400">
                 {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
               </TableCell></TableRow>
             ) : filtered.flatMap(r => {
@@ -702,6 +710,21 @@ export default function GestionReservas() {
                       >
                         <MapPin className="h-3 w-3" />
                         Ruta
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(r.hotel || r.traslados_incluye) ? (
+                      <button
+                        type="button"
+                        onClick={() => setServiciosModal(r)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver hotel / traslados"
+                      >
+                        <BedDouble className="h-3 w-3" />
+                        Servicios
                       </button>
                     ) : (
                       <span className="text-slate-400">—</span>
@@ -974,6 +997,28 @@ export default function GestionReservas() {
             </div>
           </section>
 
+          {/* SERVICIOS */}
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Servicios</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Hotel">
+                <input type="text" value={form.hotel} onChange={e => setField('hotel', e.target.value)}
+                  className={inputCls} placeholder="Ej: Hotel Playa Sol" />
+              </Field>
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                  <input type="checkbox" checked={form.traslados_incluye} onChange={e => setField('traslados_incluye', e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300" />
+                  Incluye traslados
+                </label>
+                {form.traslados_incluye && (
+                  <input type="text" value={form.traslados_notas} onChange={e => setField('traslados_notas', e.target.value)}
+                    className={inputCls} placeholder="Notas de traslados — ej: aeropuerto-hotel ida y vuelta" />
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* DOC CONTABLE */}
           <section className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
             <div className="flex items-start gap-2 mb-2">
@@ -1045,6 +1090,26 @@ export default function GestionReservas() {
             passengers={pdfModalData.passengers} 
             product={pdfModalData.product} 
           />
+        )}
+      </Modal>
+
+      {/* ─── Modal Servicios (Hotel/Traslados) ─── */}
+      <Modal title="Servicios" open={!!serviciosModal} onClose={() => setServiciosModal(null)} size="sm">
+        {serviciosModal && (
+          <div className="space-y-3 text-sm">
+            <div>
+              <span className="text-xs font-medium text-slate-500">Hotel</span>
+              <p className="text-slate-800">{serviciosModal.hotel || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs font-medium text-slate-500">Traslados</span>
+              <p className="text-slate-800">
+                {serviciosModal.traslados_incluye
+                  ? (serviciosModal.traslados_notas || 'Incluidos, sin notas adicionales')
+                  : 'No incluidos'}
+              </p>
+            </div>
+          </div>
         )}
       </Modal>
 
