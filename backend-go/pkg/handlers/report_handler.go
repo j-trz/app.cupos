@@ -271,7 +271,6 @@ func GetDestinationsDetail(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -289,7 +288,7 @@ func GetDestinationsDetail(c *gin.Context) {
 		}
 
 		item := grouped[key]
-		item.Rentabilidad += opUnit * float64(vendidos)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.CostoReal += neto1Unit * float64(vendidos)
 		item.VentaReal += precioUnit * float64(vendidos)
 		item.Riesgo += riesgoItem
@@ -350,7 +349,7 @@ func GetEvolutionRevenue(c *gin.Context) {
 		}
 		item := evol[period]
 		item.Ventas += float64(cupo.Vendidos) * cupo.Precio
-		item.Rentabilidad += float64(cupo.Vendidos) * cupo.OP
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Riesgo += float64(disp) * cupo.Neto1
 		item.Cupos += cupo.Cupo
 		item.Vendidos += cupo.Vendidos
@@ -496,7 +495,7 @@ func GetTopProducts(c *gin.Context) {
 		if disp < 0 {
 			disp = 0
 		}
-		rentabilidad := float64(cupo.Vendidos) * cupo.OP
+		rentabilidad := rentabilidadPonderada(cupo)
 		riesgo := float64(disp) * cupo.Neto1
 		ocupacion := 0.0
 		if cupo.Cupo > 0 {

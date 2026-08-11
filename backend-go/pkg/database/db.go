@@ -634,6 +634,16 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS package_links JSONB DEFAULT '[]';`,
+		// OP individualizado por tipo de pasajero (antes era un solo valor
+		// aplicado a los 3 tipos por igual). Backfill: los productos ya
+		// cargados heredan el OP viejo en los 3 tipos, para que su Venta
+		// calculada no cambie hasta que alguien edite y guarde de nuevo.
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS op_adt numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS op_chd numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS op_inf numeric DEFAULT 0;`,
+		`UPDATE products SET op_adt = op WHERE op_adt = 0 AND op != 0;`,
+		`UPDATE products SET op_chd = op WHERE op_chd = 0 AND op != 0;`,
+		`UPDATE products SET op_inf = op WHERE op_inf = 0 AND op != 0;`,
 		// Sección "Servicios" del formulario de reserva (Hotel/Traslados) y
 		// vencimiento de documento por pasajero (con opción "vitalicio").
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hotel VARCHAR(255) DEFAULT '';`,

@@ -51,7 +51,9 @@ const EMPTY_FORM = {
   tarifa_inf: '',
   impuestos_inf: '',
   neto_1: '',
-  op: '',
+  op_adt: '',
+  op_chd: '',
+  op_inf: '',
   ruta: '',
   pnr: '',
   ficha: '',
@@ -94,7 +96,9 @@ function toFormValues(product) {
     tarifa_inf: product.tarifa_inf ?? '',
     impuestos_inf: product.impuestos_inf ?? '',
     neto_1: product.neto_1 ?? '',
-    op: product.op ?? '',
+    op_adt: product.op_adt ?? '',
+    op_chd: product.op_chd ?? '',
+    op_inf: product.op_inf ?? '',
     ruta: product.ruta || '',
     pnr: product.pnr || '',
     ficha: product.ficha || '',
@@ -137,7 +141,9 @@ function toPayload(form) {
     tarifa_inf: num(form.tarifa_inf),
     impuestos_inf: num(form.impuestos_inf),
     neto_1: num(form.neto_1),
-    op: num(form.op),
+    op_adt: num(form.op_adt),
+    op_chd: num(form.op_chd),
+    op_inf: num(form.op_inf),
     ruta: form.ruta,
     pnr: form.pnr,
     ficha: form.ficha,
@@ -336,15 +342,17 @@ const ProductForm = ({
             {PASSENGER_PRICE_TYPES.map(({ key, label }) => {
               const tarifa = Number(form[`tarifa_${key}`]) || 0;
               const impuestos = Number(form[`impuestos_${key}`]) || 0;
-              const op = Number(form.op) || 0;
-              const venta = tarifa + impuestos + op;
+              const neto1 = tarifa + impuestos;
+              const op = Number(form[`op_${key}`]) || 0;
+              const venta = neto1 + op;
               return (
-                <div key={key} className="grid grid-cols-3 gap-4 items-end">
+                <div key={key} className="grid grid-cols-2 gap-4 items-end lg:grid-cols-4">
                   {field(`tarifa_${key}`, `Tarifa ${label}`, 'number', { step: '0.01', min: '0' })}
                   {field(`impuestos_${key}`, `Impuestos ${label}`, 'number', { step: '0.01', min: '0' })}
+                  {field(`op_${key}`, `OP ${label}`, 'number', { step: '0.01', min: '0', help: 'Ganancia — se suma a Neto 1 para armar la Venta.' })}
                   <div className="space-y-1">
                     <Label>Venta {label}</Label>
-                    <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                    <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700" title={`Neto 1 ${label}: $${neto1.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
                       ${venta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
@@ -352,8 +360,7 @@ const ProductForm = ({
               );
             })}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5 pt-2 border-t border-slate-200">
-              {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
-              {field('op', 'OP', 'number', { step: '0.01', min: '0', help: 'Se suma a la Venta de los 3 tipos de pasajero, arriba.' })}
+              {field('neto_1', 'Neto 1 (legacy)', 'number', { step: '0.01', min: '0', help: 'Valor único usado hoy en "Riesgo" de reportes — no se individualizó por tipo en esta fase.' })}
             </div>
           </div>
         </div>

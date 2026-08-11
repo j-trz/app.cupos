@@ -1,6 +1,6 @@
 Reglas operativas e invariantes que **no** son obvias leyendo un único archivo — se descubrieron a fuerza de incidentes repetidos en este repo. Léelo antes de tocar rutas, migraciones, RBAC o el entorno local. Complementa [[Historial de Bugs Resueltos]] (postmortems puntuales ya cerrados) y [Modelo de Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md) (detalle de esquema).
 
-> Última verificación de las reglas 1-10 contra código: 2026-08-10.
+> Última verificación de las reglas 1-11 contra código: 2026-08-10.
 
 ## 1. Dos entrypoints de backend duplican TODA la tabla de rutas
 
@@ -51,6 +51,12 @@ Las tools de tipo `UIAction` (`abrir_modal_reserva`, `navegar_a_pantalla`, `comp
 ## 10. Antes de re-derivar "por qué Reportes sigue mostrando X", revisar los dos matchers de filtro
 
 `Reportes.jsx`/`analytics_handler.go` tienen dos matchers de filtro **independientes y no simétricos**: `passengerMatches` (filtra por `Reservation.Agencia`, quién *vendió*) y `productMatches` (filtra por `Product.Agencia`, quién *es dueño* del cupo). Un filtro nuevo en `FiltersPanel.jsx` puede funcionar en los handlers que iteran pasajeros y ser un no-op silencioso en los que iteran productos (o viceversa) si no se agrega a ambos matchers.
+
+## 11. OP (ganancia) es por tipo de pasajero desde el 2026-08-10 — no uses `Product.OP` a secas
+
+Desde que se individualizó la ganancia por tipo (`OPAdt`/`OPChd`/`OPInf`), cualquier cálculo nuevo que necesite "la ganancia de este producto" debe preguntar **de qué tipo de pasajero** — `Product.OP` (singular) es solo un valor legado sincronizado a `OPAdt`, no un promedio ni un total. Usar siempre `product.OPForTipo(tipoPasajero)` (Go) o el patrón `product[\`op_${suffix}\`] ?? product.op` (frontend, ver `passengerPriceSuffix` en `GestionNominas.jsx`) en vez de leer `.OP`/`.op` directo. Rentabilidad agregada (reportes/IA) se calcula como `Σ (OP_tipo × vendidos_tipo)` vía el helper `rentabilidadPonderada()` (`analytics_handler.go`), no como `OP × Vendidos` — ese criterio viejo subestimaba/sobreestimaba la ganancia real en cualquier producto con mezcla de ADT/CHD/INF.
+
+`Neto1` (singular) **no** se individualizó en esta pasada — sigue siendo un valor manual único, usado solo para "Riesgo" en reportes. Si alguna vez se pide individualizarlo también, no hace falta agregar columnas nuevas: ya es derivable como `TarifaX + ImpuestosX` (`Product.NetoForTipo()`).
 
 ---
 

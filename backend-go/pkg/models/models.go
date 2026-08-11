@@ -48,7 +48,15 @@ type Product struct {
 	TarifaAdt              float64 `json:"tarifa_adt"`
 	ImpuestosAdt           float64 `json:"impuestos_adt"`
 	Neto1                  float64 `json:"neto_1"`
-	OP                     float64 `json:"op"`
+	// OP es el campo legado (un solo valor, aplicado a los 3 tipos por
+	// igual) — se mantiene por compatibilidad con lo que todavía lo lea
+	// directo, sincronizado a OPAdt en applyCalculatedPrices. OPAdt/OPChd/
+	// OPInf (agregados 2026-08-10) son los reales desde que se individualizó
+	// la ganancia por tipo de pasajero — ver NetoForTipo/OPForTipo abajo.
+	OP    float64 `json:"op"`
+	OPAdt float64 `gorm:"column:op_adt;default:0" json:"op_adt"`
+	OPChd float64 `gorm:"column:op_chd;default:0" json:"op_chd"`
+	OPInf float64 `gorm:"column:op_inf;default:0" json:"op_inf"`
 	Ruta                   string  `json:"ruta"`
 	PNR                    string  `json:"pnr"`
 	Ficha                  string  `json:"ficha"`
@@ -118,6 +126,33 @@ type Product struct {
 	AvisoGastosEnviado     bool      `gorm:"column:aviso_gastos_enviado;default:false" json:"-"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
+}
+
+// NetoForTipo devuelve Tarifa+Impuestos del tipo de pasajero indicado
+// ("Adulto"/"Menor"/"Infante", default Adulto) — no hay un campo Neto1
+// separado por tipo: siempre es derivado de Tarifa+Impuestos de ese tipo,
+// para no duplicar estado que ya existe.
+func (p Product) NetoForTipo(tipoPasajero string) float64 {
+	switch tipoPasajero {
+	case "Menor":
+		return p.TarifaChd + p.ImpuestosChd
+	case "Infante":
+		return p.TarifaInf + p.ImpuestosInf
+	default:
+		return p.TarifaAdt + p.ImpuestosAdt
+	}
+}
+
+// OPForTipo devuelve la ganancia (OP) del tipo de pasajero indicado.
+func (p Product) OPForTipo(tipoPasajero string) float64 {
+	switch tipoPasajero {
+	case "Menor":
+		return p.OPChd
+	case "Infante":
+		return p.OPInf
+	default:
+		return p.OPAdt
+	}
 }
 
 // Estados posibles de Reservation.Estado (antes convivían "confirmado"/"confirmada" como

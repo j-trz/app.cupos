@@ -608,7 +608,10 @@ func CreateReservation(c *gin.Context) {
 		if pi.PrecioVenta != nil {
 			pax.PrecioVenta = *pi.PrecioVenta
 		}
-		pax.Neto1 = input.Reservation.Neto1
+		// Neto1 por pasajero usa el desglose de SU tipo (ADT/CHD/INF), no un
+		// valor único heredado de la reserva — antes todos los pasajeros de
+		// un mismo pedido compartían el Neto1 del tipo principal.
+		pax.Neto1 = product.NetoForTipo(pi.TipoPasajero)
 		if pi.Neto1 != nil {
 			pax.Neto1 = *pi.Neto1
 		}

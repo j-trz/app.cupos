@@ -161,7 +161,7 @@ const buildRow = (r, products) => {
     'Vendedor': row.vendedorEmail,
     'Precio Venta': row.precioVenta ?? '',
     'Neto 1': row.neto1 ?? '',
-    'OP': product?.op ?? '',
+    'OP': product?.[`op_${passengerPriceSuffix(row.tipoPasajero)}`] ?? product?.op ?? '',
     'Salida': formatDate(r.vuelo_salida || product?.fecha_salida || product?.salida),
   }));
 };
@@ -207,7 +207,6 @@ const passengerPriceSuffix = (tipoPasajero) => {
 
 const buildBORow = (r, products, agencies) => {
   const product = products.find((p) => String(p.id) === String(r.product_id));
-  const op = Number(product?.op) || 0;
   const agencyDisplayName = agencies.find((a) => a.code === r.agencia)?.name || r.agencia || '';
 
   return buildPassengerRows(r).map((row) => {
@@ -215,6 +214,9 @@ const buildBORow = (r, products, agencies) => {
     const tarifa = Number(product?.[`tarifa_${suffix}`]) || 0;
     const impuestos = Number(product?.[`impuestos_${suffix}`]) || 0;
     const neto1 = tarifa + impuestos;
+    // OP según el tipo real de ESTE pasajero — antes era un solo valor
+    // (product.op) aplicado a todos los tipos por igual.
+    const op = Number(product?.[`op_${suffix}`] ?? product?.op) || 0;
     const netoVendedor = neto1 + op;
 
     return {
@@ -543,7 +545,9 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                   <TableCell className="text-zinc-700 dark:text-zinc-300 font-mono text-xs">{row.numeroTicket}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.neto1)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{product?.op ?? '—'}</TableCell>
+                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                    {product?.[`op_${passengerPriceSuffix(row.tipoPasajero)}`] ?? product?.op ?? '—'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

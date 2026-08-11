@@ -159,6 +159,31 @@ func isEmptyFilters(filters map[string]interface{}) bool {
 	return true
 }
 
+// rentabilidadPonderada suma OP_tipo × vendidos_tipo de un producto — desde
+// que la ganancia (OP) se individualiza por tipo de pasajero (ADT/CHD/INF),
+// ya no alcanza con `product.OP × product.Vendidos` (un solo valor aplicado
+// a todos los tipos por igual). Cuenta pasajeros activos (excluye
+// cancelada/expirada) de este producto agrupados por tipo.
+func rentabilidadPonderada(product models.Product) float64 {
+	var counts []struct {
+		TipoPasajero string
+		Count        int64
+	}
+	database.DB.Model(&models.Passenger{}).
+		Select("tipo_pasajero, count(*) as count").
+		Where("reservation_id IN (?) AND LOWER(estado) NOT IN ?",
+			database.DB.Model(&models.Reservation{}).Select("id").Where("product_id = ?", product.ID),
+			[]string{"cancelada", "expirada"}).
+		Group("tipo_pasajero").
+		Scan(&counts)
+
+	var total float64
+	for _, c := range counts {
+		total += product.OPForTipo(c.TipoPasajero) * float64(c.Count)
+	}
+	return total
+}
+
 func filterUniqueProducts(products []models.Product) []models.Product {
 	seen := make(map[string]bool)
 	var unique []models.Product
@@ -854,7 +879,6 @@ func DetalleDestinosHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio // Tarifa o precio de venta is "Neto Vendedor" or Precio base
 
@@ -877,7 +901,7 @@ func DetalleDestinosHandler(c *gin.Context) {
 		item.LugaresVendidos += vendidos
 		item.LugaresCancelados += cancelados
 		item.LugaresDisponibles += disponibles
-		item.Rentabilidad += opUnit * float64(vendidos)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Costo += neto1Unit * float64(vendidos)
 		item.CostoTotal += float64(tomados) * neto1Unit
 		item.Venta += precioUnit * float64(vendidos)
@@ -964,7 +988,6 @@ func DestinosCompaniaHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -980,7 +1003,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 		m.Vendidos += vendidos
 		m.Disponibles += disponibles
 		m.Cancelados += cancelados
-		m.Rentabilidad += opUnit * float64(vendidos)
+		m.Rentabilidad += rentabilidadPonderada(cupo)
 		m.Costo += neto1Unit * float64(vendidos)
 		m.Venta += precioUnit * float64(vendidos)
 	}
@@ -1407,7 +1430,6 @@ func PorSalidaHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -1439,7 +1461,7 @@ func PorSalidaHandler(c *gin.Context) {
 			LugaresVendidos:    vendidos,
 			LugaresCancelados:  cancelados,
 			LugaresDisponibles: disponibles,
-			Rentabilidad:       opUnit * float64(vendidos),
+			Rentabilidad:       rentabilidadPonderada(cupo),
 			Costo:              neto1Unit * float64(vendidos),
 			CostoTotal:         float64(tomados) * neto1Unit,
 			Venta:              precioUnit * float64(vendidos),
@@ -1611,7 +1633,6 @@ func DashboardDataHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -1634,7 +1655,7 @@ func DashboardDataHandler(c *gin.Context) {
 		item.LugaresVendidos += vendidos
 		item.LugaresCancelados += cancelados
 		item.LugaresDisponibles += disponibles
-		item.Rentabilidad += opUnit * float64(vendidos)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Costo += neto1Unit * float64(vendidos)
 		item.CostoTotal += float64(tomados) * neto1Unit
 		item.Venta += precioUnit * float64(vendidos)
@@ -1735,14 +1756,13 @@ func MetricsSummaryHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1 := cupo.Neto1
 		precioUnit := cupo.Precio
 
 		cuposTomados += tomados
 		vendidos += v
 		cancelados += canc
-		rentabilidad += opUnit * float64(v)
+		rentabilidad += rentabilidadPonderada(cupo)
 		costo += neto1 * float64(v)
 		venta += precioUnit * float64(v)
 		costoTotal += float64(tomados) * neto1
@@ -1837,7 +1857,6 @@ func MetricsByDestinationHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1 := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -1855,7 +1874,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		item.CuposTomados += tomados
 		item.Vendidos += v
 		item.Cancelados += canc
-		item.Rentabilidad += opUnit * float64(v)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Costo += neto1 * float64(v)
 		item.Venta += precioUnit * float64(v)
 		item.Riesgo += float64(disponiblesCupo) * neto1

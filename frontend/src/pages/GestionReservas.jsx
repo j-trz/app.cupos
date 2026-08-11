@@ -212,7 +212,15 @@ export default function GestionReservas() {
   }, [reservations, estadoFilter, searchTerm]);
 
   const agencyName = (code) => agencies.find(a => a.code === code)?.name || code || '—';
-  const productOp = (productId) => products.find(p => String(p.id) === String(productId))?.op ?? '—';
+  // OP según el tipo real del pasajero (ADT/CHD/INF) — ya no es un valor
+  // único por producto.
+  const productOp = (productId, tipoPasajero) => {
+    const p = products.find(pr => String(pr.id) === String(productId));
+    if (!p) return '—';
+    if (tipoPasajero === 'Menor') return p.op_chd ?? p.op ?? 0;
+    if (tipoPasajero === 'Infante') return p.op_inf ?? p.op ?? 0;
+    return p.op_adt ?? p.op ?? 0;
+  };
 
   // ─── Producto lookup ─────────────────────────
   const lookupProduct = useCallback(async (id) => {
@@ -730,7 +738,7 @@ export default function GestionReservas() {
                   </TableCell>
                   <TableCell>{formatMoney(row.precioVenta)}</TableCell>
                   <TableCell>{formatMoney(row.neto1)}</TableCell>
-                  <TableCell>{productOp(r.product_id)}</TableCell>
+                  <TableCell>{productOp(r.product_id, row.tipoPasajero)}</TableCell>
                   <TableCell className="text-xs text-slate-500">{r.vendedor_email || '—'}</TableCell>
                   <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
                   <TableCell>{agencyName(r.agencia)}</TableCell>

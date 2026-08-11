@@ -35,7 +35,7 @@ func createdByFromContext(c *gin.Context) *uuid.UUID {
 // fixNumbers convierte strings numéricos a float64/int para evitar errores de unmarshal
 func fixNumbers(data map[string]interface{}) {
 	floatFields := []string{
-		"precio", "neto_1", "op", "inf_fare", "chd_fare",
+		"precio", "neto_1", "op", "op_adt", "op_chd", "op_inf", "inf_fare", "chd_fare",
 		"tarifa_adt", "impuestos_adt", "tarifa_chd", "impuestos_chd", "tarifa_inf", "impuestos_inf",
 	}
 	intFields := []string{"disponibilidad", "cupo", "vendidos", "bloqueo_temporal_minutos"}
@@ -65,9 +65,12 @@ func fixNumbers(data map[string]interface{}) {
 // Tarifa/Impuestos (por tipo) + OP (compartido). Se llama tanto en
 // CreateProduct como en UpdateProduct para que nunca queden desincronizados.
 func applyCalculatedPrices(product *models.Product) {
-	product.Precio = product.TarifaAdt + product.ImpuestosAdt + product.OP
-	product.ChdFare = product.TarifaChd + product.ImpuestosChd + product.OP
-	product.InfFare = product.TarifaInf + product.ImpuestosInf + product.OP
+	product.Precio = product.TarifaAdt + product.ImpuestosAdt + product.OPAdt
+	product.ChdFare = product.TarifaChd + product.ImpuestosChd + product.OPChd
+	product.InfFare = product.TarifaInf + product.ImpuestosInf + product.OPInf
+	// OP legado: se sincroniza al de ADT para que cualquier lugar que todavía
+	// lea el campo único (en vez de OPForTipo) muestre algo razonable.
+	product.OP = product.OPAdt
 }
 
 // reconcilePricesForImport se usa en la carga masiva (BulkCreateProducts),
@@ -79,16 +82,23 @@ func applyCalculatedPrices(product *models.Product) {
 // recalcula el precio (evita sumarle el OP encima a un precio que ya era
 // correcto).
 func reconcilePricesForImport(product *models.Product) {
-	reconcileOne := func(tarifa, impuestos *float64, venta *float64) {
+	// Si la fila de import solo trae el OP legado (una columna, no las 3
+	// nuevas), se replica a los 3 tipos — mismo criterio que el backfill de
+	// la migración de productos ya cargados.
+	if product.OPAdt == 0 && product.OPChd == 0 && product.OPInf == 0 && product.OP != 0 {
+		product.OPAdt, product.OPChd, product.OPInf = product.OP, product.OP, product.OP
+	}
+	reconcileOne := func(tarifa, impuestos *float64, op float64, venta *float64) {
 		if *tarifa != 0 || *impuestos != 0 {
-			*venta = *tarifa + *impuestos + product.OP
+			*venta = *tarifa + *impuestos + op
 		} else if *venta != 0 {
 			*tarifa = *venta
 		}
 	}
-	reconcileOne(&product.TarifaAdt, &product.ImpuestosAdt, &product.Precio)
-	reconcileOne(&product.TarifaChd, &product.ImpuestosChd, &product.ChdFare)
-	reconcileOne(&product.TarifaInf, &product.ImpuestosInf, &product.InfFare)
+	reconcileOne(&product.TarifaAdt, &product.ImpuestosAdt, product.OPAdt, &product.Precio)
+	reconcileOne(&product.TarifaChd, &product.ImpuestosChd, product.OPChd, &product.ChdFare)
+	reconcileOne(&product.TarifaInf, &product.ImpuestosInf, product.OPInf, &product.InfFare)
+	product.OP = product.OPAdt
 }
 
 // fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
@@ -301,7 +311,7 @@ func UpdateProduct(c *gin.Context) {
 	if err := database.DB.Select(
 		"destino", "compania", "disponibilidad", "cupo",
 		"fecha_salida", "fecha_regreso", "salida", "regreso",
-		"precio", "neto_1", "op",
+		"precio", "neto_1", "op", "op_adt", "op_chd", "op_inf",
 		"tarifa_adt", "impuestos_adt", "tarifa_chd", "impuestos_chd", "tarifa_inf", "impuestos_inf",
 		"ruta", "pnr", "ficha", "temporada", "tipo_producto",
 		"bloqueo_temporal_minutos",

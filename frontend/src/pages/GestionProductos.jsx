@@ -523,7 +523,9 @@ const GestionProductos = () => {
                   <TableHead>INF</TableHead>
                   <TableHead>CHD</TableHead>
                   <TableHead>Neto 1</TableHead>
-                  <TableHead>OP</TableHead>
+                  <TableHead>OP ADT</TableHead>
+                  <TableHead>OP INF</TableHead>
+                  <TableHead>OP CHD</TableHead>
                   <TableHead>Equipaje</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -643,7 +645,9 @@ const GestionProductos = () => {
                     <TableCell>{formatMoney(product.inf_fare)}</TableCell>
                     <TableCell>{formatMoney(product.chd_fare)}</TableCell>
                     <TableCell>{formatMoney(product.neto_1)}</TableCell>
-                    <TableCell>{formatMoney(product.op)}</TableCell>
+                    <TableCell>{formatMoney(product.op_adt)}</TableCell>
+                    <TableCell>{formatMoney(product.op_inf)}</TableCell>
+                    <TableCell>{formatMoney(product.op_chd)}</TableCell>
                     <TableCell>
                       <BaggageFranchise item={product} />
                     </TableCell>
