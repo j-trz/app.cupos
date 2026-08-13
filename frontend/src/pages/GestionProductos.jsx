@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
@@ -17,7 +17,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Copy, CheckCircle2, Clock } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Copy, CheckCircle2, Clock, Columns3 } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -89,15 +89,6 @@ const GestionProductos = () => {
     return map;
   }, [transfers]);
 
-  if (!can('PRODUCTS_VIEW')) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Lock className="h-12 w-12 text-slate-300 mb-3" />
-        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
-        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
-      </div>
-    );
-  }
   // El backend devuelve el array "pelado" (no { data: [...] }) — igual que
   // consumen /products el resto de las pantallas (Nóminas, Disponibilidad,
   // Reservas). Sin este fallback, products.data siempre daba undefined y la
@@ -134,6 +125,36 @@ const GestionProductos = () => {
 
   const hasActiveFilters = !!(filters.agencia || filters.destino || filters.compania || filters.temporada || filters.tipo_producto || filters.estado);
   const clearFilters = () => setFilters({ agencia: '', destino: '', compania: '', temporada: '', tipo_producto: '', estado: '' });
+
+  // Mostrar/ocultar columnas de la tabla principal (30 columnas es demasiado
+  // para escanear de una) — persistido para no rearmarlo cada sesión. La
+  // columna Acciones no entra acá: siempre visible y fija a la izquierda.
+  const [hiddenColumns, setHiddenColumns] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('gestionProductos.hiddenColumns') || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem('gestionProductos.hiddenColumns', JSON.stringify(hiddenColumns));
+  }, [hiddenColumns]);
+  const isColumnVisible = (key) => !hiddenColumns.includes(key);
+  const toggleColumn = (key) => setHiddenColumns((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
+  const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
+  const columnsMenuRef = useRef(null);
+  useEffect(() => {
+    if (!isColumnsMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target)) {
+        setIsColumnsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isColumnsMenuOpen]);
 
   // Productos convertidos desde una Oportunidad que todavía no aprobó un
   // admin — se muestran aparte (ver sección "Pendientes de aprobación") y no
@@ -372,6 +393,96 @@ const GestionProductos = () => {
     return result;
   };
 
+  // Gestión de columnas visibles de la tabla principal (30 columnas es
+  // demasiado para escanear de una — se pueden ocultar las que no importan
+  // ahora mismo). Persistido en localStorage para no tener que rearmarlo
+  // cada sesión. La columna Acciones no se lista acá: siempre está visible
+  // y fija a la izquierda (sticky) mientras se scrollea horizontalmente.
+  const productColumns = [
+    { key: 'codigo', label: 'Código', cellClassName: 'font-mono text-xs font-medium', render: (p) => p.codigo_cupo },
+    { key: 'tipo', label: 'Tipo', render: (p) => p.tipo_producto || '—' },
+    { key: 'destino', label: 'Destino', cellClassName: 'font-medium text-slate-900', render: (p) => p.destino },
+    { key: 'compania', label: 'Compañía', render: (p) => p.compania },
+    {
+      key: 'agencia', label: 'Agencia', cellClassName: 'font-medium text-slate-700',
+      render: (p) => (p.agencia ? agencyName(p.agencia) : (
+        <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
+          Sin agencia dueña
+        </span>
+      )),
+    },
+    {
+      key: 'ruta', label: 'Ruta / Cabina / Hab.',
+      render: (p) => (p.ruta ? (
+        <button
+          type="button"
+          onClick={() => setRouteModalProduct(p)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+          title="Ver detalle de la ruta"
+        >
+          <MapPin className="h-3 w-3" />
+          Ruta
+        </button>
+      ) : <span className="text-slate-400">—</span>),
+    },
+    { key: 'pnr', label: 'PNR', render: (p) => p.pnr || '—' },
+    { key: 'ficha', label: 'Ficha', render: (p) => p.ficha || '—' },
+    { key: 'servicio', label: 'Servicio', render: (p) => p.servicio || '—' },
+    {
+      key: 'notas', label: 'Notas',
+      render: (p) => ((p.notas_externas || p.notas_internas) ? (
+        <button
+          type="button"
+          onClick={() => setNotesModalProduct(p)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+          title="Ver notas"
+        >
+          <StickyNote className="h-3 w-3" />
+          Notas
+        </button>
+      ) : <span className="text-slate-400">—</span>),
+    },
+    { key: 'temporada', label: 'Temporada', render: (p) => p.temporada || '—' },
+    { key: 'disponibilidad', label: 'Disp.', render: (p) => p.disponibilidad },
+    { key: 'cupo', label: 'Cupo', render: (p) => p.cupo || '—' },
+    { key: 'salida', label: 'Salida', render: (p) => formatDate(p.fecha_salida) },
+    { key: 'regreso', label: 'Regreso', render: (p) => formatDate(p.fecha_regreso) },
+    { key: 'vencimiento_pago', label: 'Venc. Pago', render: (p) => formatDate(p.vencimiento_pago) },
+    { key: 'nomination', label: 'Nómina', render: (p) => formatDate(p.nomination_date) },
+    { key: 'emision', label: 'Emisión', render: (p) => formatDate(p.fecha_emision) },
+    { key: 'gastos', label: 'Gastos', render: (p) => formatDate(p.fecha_gastos) },
+    { key: 'bloqueo', label: 'Bloqueo (min)', render: (p) => p.bloqueo_temporal_minutos || '—' },
+    { key: 'adt', label: 'ADT', render: (p) => formatMoney(p.precio) },
+    { key: 'inf', label: 'INF', render: (p) => formatMoney(p.inf_fare) },
+    { key: 'chd', label: 'CHD', render: (p) => formatMoney(p.chd_fare) },
+    { key: 'neto1', label: 'Neto 1', render: (p) => formatMoney(p.neto_1) },
+    { key: 'op_adt', label: 'OP ADT', render: (p) => formatMoney(p.op_adt) },
+    { key: 'op_inf', label: 'OP INF', render: (p) => formatMoney(p.op_inf) },
+    { key: 'op_chd', label: 'OP CHD', render: (p) => formatMoney(p.op_chd) },
+    { key: 'equipaje', label: 'Equipaje', render: (p) => <BaggageFranchise item={p} /> },
+    {
+      key: 'estado', label: 'Estado',
+      render: (p) => (
+        <Badge variant={p.is_blocked_for_sale ? 'danger' : 'success'}>
+          {p.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
+        </Badge>
+      ),
+    },
+  ];
+
+  // Guards después de TODOS los hooks (ver regla 5 de Gotchas y Reglas de
+  // Oro) — antes estaba antes de varios useMemo/mutations, encontrado por la
+  // auditoría del 2026-08-13 como violación crítica de reglas de hooks.
+  if (!can('PRODUCTS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <div className="space-y-6">
@@ -585,6 +696,27 @@ const GestionProductos = () => {
               Limpiar filtros
             </Button>
           )}
+          <div className="relative ml-auto" ref={columnsMenuRef}>
+            <Button variant="outline" size="sm" onClick={() => setIsColumnsMenuOpen((v) => !v)}>
+              <Columns3 className="h-4 w-4 mr-2" />
+              Columnas
+            </Button>
+            {isColumnsMenuOpen && (
+              <div className="absolute right-0 z-30 mt-2 max-h-80 w-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                {productColumns.map((c) => (
+                  <label key={c.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={isColumnVisible(c.key)}
+                      onChange={() => toggleColumn(c.key)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -593,40 +725,16 @@ const GestionProductos = () => {
         <SkeletonTable columns={8} rows={5} />
       ) : filteredProducts.length > 0 ? (
         <Card>
-          <div className="overflow-x-auto">
-            <TableComponent>
-              <TableHeader>
+          {/* containerClassName acota el alto y hace que el header/columna
+              sticky sean relativos a este mismo contenedor con scroll — ver
+              comentario en Table.jsx sobre por qué no envolver con otro div. */}
+          <TableComponent containerClassName="max-h-[70vh]">
+              <TableHeader className="sticky top-0 z-20 [&_th]:bg-slate-50">
                 <TableRow>
-                  <TableHead>Acciones</TableHead>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Destino</TableHead>
-                  <TableHead>Compañía</TableHead>
-                  <TableHead>Agencia</TableHead>
-                  <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
-                  <TableHead>PNR</TableHead>
-                  <TableHead>Ficha</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Notas</TableHead>
-                  <TableHead>Temporada</TableHead>
-                  <TableHead>Disp.</TableHead>
-                  <TableHead>Cupo</TableHead>
-                  <TableHead>Salida</TableHead>
-                  <TableHead>Regreso</TableHead>
-                  <TableHead>Venc. Pago</TableHead>
-                  <TableHead>Nómina</TableHead>
-                  <TableHead>Emisión</TableHead>
-                  <TableHead>Gastos</TableHead>
-                  <TableHead>Bloqueo (min)</TableHead>
-                  <TableHead>ADT</TableHead>
-                  <TableHead>INF</TableHead>
-                  <TableHead>CHD</TableHead>
-                  <TableHead>Neto 1</TableHead>
-                  <TableHead>OP ADT</TableHead>
-                  <TableHead>OP INF</TableHead>
-                  <TableHead>OP CHD</TableHead>
-                  <TableHead>Equipaje</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="sticky left-0 z-30">Acciones</TableHead>
+                  {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
+                    <TableHead key={c.key}>{c.label}</TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -635,7 +743,7 @@ const GestionProductos = () => {
                     || (cedidosByProductId[String(product.id)] || []).length > 0;
                   return (
                   <TableRow key={product.id}>
-                    <TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-white">
                       <div className="flex gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
                         <ActionIconButton icon={Copy} onClick={() => handleDuplicateProduct(product)} title="Duplicar producto" />
@@ -655,81 +763,14 @@ const GestionProductos = () => {
                         <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>
-                    <TableCell>{product.tipo_producto || '—'}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
-                    <TableCell>{product.compania}</TableCell>
-                    <TableCell className="font-medium text-slate-700">
-                      {product.agencia ? agencyName(product.agencia) : (
-                        <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
-                          Sin agencia dueña
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {product.ruta ? (
-                        <button
-                          type="button"
-                          onClick={() => setRouteModalProduct(product)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
-                          title="Ver detalle de la ruta"
-                        >
-                          <MapPin className="h-3 w-3" />
-                          Ruta
-                        </button>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.pnr || '—'}</TableCell>
-                    <TableCell>{product.ficha || '—'}</TableCell>
-                    <TableCell>{product.servicio || '—'}</TableCell>
-                    <TableCell>
-                      {(product.notas_externas || product.notas_internas) ? (
-                        <button
-                          type="button"
-                          onClick={() => setNotesModalProduct(product)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
-                          title="Ver notas"
-                        >
-                          <StickyNote className="h-3 w-3" />
-                          Notas
-                        </button>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.temporada || '—'}</TableCell>
-                    <TableCell>{product.disponibilidad}</TableCell>
-                    <TableCell>{product.cupo || '—'}</TableCell>
-                    <TableCell>{formatDate(product.fecha_salida)}</TableCell>
-                    <TableCell>{formatDate(product.fecha_regreso)}</TableCell>
-                    <TableCell>{formatDate(product.vencimiento_pago)}</TableCell>
-                    <TableCell>{formatDate(product.nomination_date)}</TableCell>
-                    <TableCell>{formatDate(product.fecha_emision)}</TableCell>
-                    <TableCell>{formatDate(product.fecha_gastos)}</TableCell>
-                    <TableCell>{product.bloqueo_temporal_minutos || '—'}</TableCell>
-                    <TableCell>{formatMoney(product.precio)}</TableCell>
-                    <TableCell>{formatMoney(product.inf_fare)}</TableCell>
-                    <TableCell>{formatMoney(product.chd_fare)}</TableCell>
-                    <TableCell>{formatMoney(product.neto_1)}</TableCell>
-                    <TableCell>{formatMoney(product.op_adt)}</TableCell>
-                    <TableCell>{formatMoney(product.op_inf)}</TableCell>
-                    <TableCell>{formatMoney(product.op_chd)}</TableCell>
-                    <TableCell>
-                      <BaggageFranchise item={product} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={product.is_blocked_for_sale ? 'danger' : 'success'}>
-                        {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
-                      </Badge>
-                    </TableCell>
+                    {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
+                      <TableCell key={c.key} className={c.cellClassName}>{c.render(product)}</TableCell>
+                    ))}
                   </TableRow>
                   );
                 })}
               </TableBody>
             </TableComponent>
-          </div>
         </Card>
       ) : products.length > 0 ? (
         <EmptyState

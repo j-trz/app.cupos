@@ -114,7 +114,8 @@ Paridad de rutas `main.go`/`index.go`: **actual mente sincronizadas** (186 handl
 
 ### Crítico
 
-- [ ] **Violación de reglas de hooks de React (regla 5 de este mismo documento) en 2 páginas**: `GestionProductos.jsx:92` y `GestionGrupos.jsx:77` tienen el guard `if (!can(...)) return` **antes** de varios hooks (`useMemo`/mutations). Si `can()` cambia de `false` a `true` con el componente ya montado, React crashea ("Rendered fewer/more hooks"). Todas las demás páginas `Gestion*.jsx` auditadas cumplen la regla correctamente — estas 2 son la excepción.
+- [x] **Violación de reglas de hooks de React (regla 5): `GestionProductos.jsx:92`** — guard `if (!can(...)) return` antes de varios hooks (`useMemo`/mutations). **Resuelto 2026-08-13**: guard movido al final, después de todos los hooks.
+- [ ] **Misma violación en `GestionGrupos.jsx:77`** — mismo patrón (`useCreateGroup`/`useUpdateGroup`/`useDeleteGroup`/`useConfirmGroup`/`useSendGroupQuote`/`useResolveGroupCancellation` llamados después del guard). Sigue pendiente.
 
 ### Alto
 
@@ -148,7 +149,7 @@ Sin `<img>` sin `alt`. Sin `console.log`/`debugger` sobrantes. Sin clases `dark:
 
 Mejoras reales encontradas (ninguna urgente):
 
-1. **Tablas anchas sin gestión de columnas** (`GestionProductos.jsx`, 30 columnas) — sin mostrar/ocultar columnas ni fijar la columna identificadora (Código) al hacer scroll horizontal. Es el único lugar donde valdría la pena adoptar convenciones actuales de tablas de datos. Esfuerzo: medio.
+1. ~~**Tablas anchas sin gestión de columnas** (`GestionProductos.jsx`, 30 columnas)~~ — **Implementado 2026-08-13**: toggle de mostrar/ocultar columnas (persistido en localStorage) + columna Acciones y header sticky (`Table.jsx` ganó un prop `containerClassName` reutilizable para esto).
 2. Sin header de tabla `sticky` — se pierde el encabezado al hacer scroll vertical en tablas largas. Esfuerzo: bajo.
 3. Doble sistema de feedback (toast propio + `Swal.fire` para confirmaciones) — no roto, pero el modal bloqueante de SweetAlert2 para confirmar un borrado simple se siente un poco anticuado frente a patrones de confirmación inline/popover. Esfuerzo: bajo, no prioritario.
 

@@ -17,26 +17,40 @@ import (
 	"gorm.io/gorm"
 )
 
-// fixOpportunityDates convierte fechas "YYYY-MM-DD" a RFC3339
+// fixOpportunityDates convierte fechas "YYYY-MM-DD" a RFC3339 y vacíos a nil
 func fixOpportunityDates(data map[string]interface{}) {
 	dateFields := []string{"validez", "fecha_salida", "fecha_llegada"}
 	for _, field := range dateFields {
-		if v, ok := data[field]; ok && v != nil {
-			if s, ok := v.(string); ok && len(s) == 10 {
-				data[field] = s + "T00:00:00Z"
+		if v, ok := data[field]; ok {
+			if v == nil {
+				continue
+			}
+			if s, ok := v.(string); ok {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					data[field] = nil
+				} else if len(s) == 10 {
+					data[field] = s + "T00:00:00Z"
+				}
 			}
 		}
 	}
 }
 
-// fixOpportunityNumbers convierte strings numéricos a float64/int
+// fixOpportunityNumbers convierte strings numéricos a float64/int y vacíos a nil/0
 func fixOpportunityNumbers(data map[string]interface{}) {
 	floatFields := []string{"neto_1", "neto_2"}
 	intFields := []string{"total_lugares", "total_liberados"}
 	for _, field := range floatFields {
 		if v, ok := data[field]; ok {
+			if v == nil {
+				continue
+			}
 			if s, ok := v.(string); ok {
-				if f, err := strconv.ParseFloat(s, 64); err == nil {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					data[field] = nil
+				} else if f, err := strconv.ParseFloat(s, 64); err == nil {
 					data[field] = f
 				}
 			}
@@ -44,8 +58,14 @@ func fixOpportunityNumbers(data map[string]interface{}) {
 	}
 	for _, field := range intFields {
 		if v, ok := data[field]; ok {
+			if v == nil {
+				continue
+			}
 			if s, ok := v.(string); ok {
-				if i, err := strconv.Atoi(s); err == nil {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					data[field] = 0
+				} else if i, err := strconv.Atoi(s); err == nil {
 					data[field] = i
 				}
 			}
@@ -242,6 +262,7 @@ func UpdateOpportunity(c *gin.Context) {
 	fixOpportunityNumbers(rawData)
 
 	// No permitir editar campos críticos ni relaciones GORM (causan HTTP 500)
+	delete(rawData, "id")
 	delete(rawData, "usuario_cargador")
 	delete(rawData, "fecha_cargado")
 	delete(rawData, "agencia")
@@ -259,12 +280,13 @@ func UpdateOpportunity(c *gin.Context) {
 
 	// Aplicar cambios
 	if err := database.DB.Where("id = ?", id).Model(&opp).Updates(rawData).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar"})
+		fmt.Printf("ERROR updating opportunity %s: %v\n", id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar oportunidad: " + err.Error()})
 		return
 	}
 
-	// Re-fetch
-	database.DB.First(&opp, "id = ?", id)
+	// Re-fetch con relaciones
+	database.DB.Preload("CargadorUser").Preload("AutorizadorUser").First(&opp, "id = ?", id)
 	c.JSON(http.StatusOK, opp)
 }
 
