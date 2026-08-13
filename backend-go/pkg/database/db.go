@@ -674,6 +674,9 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS notas_vendedor TEXT DEFAULT '';`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vencimiento TIMESTAMP WITH TIME ZONE;`,
 		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vitalicio BOOLEAN DEFAULT false;`,
+		// Motivo de rechazo cuando estado_interno (Estado Aerolínea) de una
+		// oportunidad pasa a "rechazado" — capturado vía popup en el frontend.
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(50) DEFAULT '';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

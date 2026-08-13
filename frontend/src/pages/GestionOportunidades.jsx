@@ -1,22 +1,26 @@
 import { useState, useMemo } from 'react';
 import Swal from 'sweetalert2';
+import { Sparkles, Plus, Edit3, Trash2, CheckCircle2, Eye, Search, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOpportunities, useDeleteOpportunity, useApproveOpportunity } from '../hooks/useOpportunities';
 import { OportunityForm } from '../components/OportunityForm';
-import { ShadcnButton as Button } from '../components/ui/shadcn-button';
-import { ShadcnInput as Input } from '../components/ui/shadcn-input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/shadcn-table';
+import Button from '../components/ui/Button.jsx';
+import { Input } from '../components/ui/Input.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import { Card } from '../components/ui/Card.jsx';
+import Badge from '../components/ui/Badge.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import TableComponent from '../components/ui/Table.jsx';
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useToast } from '../hooks/use-toast';
-import { Edit2, Trash2, CheckCircle, Eye, Search } from 'lucide-react';
 
-export const GestionOportunidades = () => {
+const getBadgeVariant = (estado) => {
+  if (estado === 'aprobada') return 'success';
+  if (estado === 'rechazada') return 'danger';
+  return 'warning';
+};
+
+export default function GestionOportunidades() {
   const { user, can } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,8 +40,23 @@ export const GestionOportunidades = () => {
   const deleteMutation = useDeleteOpportunity();
   const approveMutation = useApproveOpportunity();
 
-  const handleEdit = (oportunidad) => {
-    setSelectedOportunity(oportunidad);
+  const isAdmin = can('USERS_VIEW');
+  const canEdit = can('OPPORTUNITIES_UPDATE');
+  const canDelete = can('OPPORTUNITIES_DELETE');
+  const canCreate = can('OPPORTUNITIES_CREATE');
+  const canApprove = can('OPPORTUNITIES_APPROVE');
+
+  const filteredOportunidades = useMemo(() => {
+    if (!oportunidades) return [];
+    // No-admin solo ve sus propias oportunidades cargadas.
+    return oportunidades.filter((opp) => isAdmin || opp.usuario_cargador === user?.id);
+  }, [oportunidades, isAdmin, user]);
+
+  const canEditRow = (opp) => isAdmin || (opp.usuario_cargador === user?.id && opp.estado === 'pendiente');
+  const canDeleteRow = (opp) => isAdmin || (opp.usuario_cargador === user?.id && opp.estado === 'pendiente');
+
+  const handleEdit = (opp) => {
+    setSelectedOportunity(opp);
     setIsFormOpen(true);
   };
 
@@ -74,82 +93,61 @@ export const GestionOportunidades = () => {
     }
   };
 
-  const isAdmin = can('USERS_VIEW');
-  const canEdit = can('OPPORTUNITIES_UPDATE');
-  const canDelete = can('OPPORTUNITIES_DELETE');
-  const canCreate = can('OPPORTUNITIES_CREATE');
-  const canApprove = can('OPPORTUNITIES_APPROVE');
-
-  const filteredOportunidades = useMemo(() => {
-    if (!oportunidades) return [];
-    return oportunidades.filter((opp) => {
-      if (!isAdmin) {
-        // Non-admin can only see their own oportunities
-        return opp.usuario_cargador === user?.id;
-      }
-      return true;
-    });
-  }, [oportunidades, isAdmin, user]);
-
-  const canEditRow = (opp) => {
-    if (isAdmin) return true;
-    return opp.usuario_cargador === user?.id && opp.estado === 'pendiente';
-  };
-
-  const canDeleteRow = (opp) => {
-    if (isAdmin) return true;
-    return opp.usuario_cargador === user?.id && opp.estado === 'pendiente';
-  };
+  // Guard después de todos los hooks (ver regla 5 de Gotchas y Reglas de Oro).
+  if (!can('OPPORTUNITIES_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Oportunidades</h1>
-        {canCreate && (
-          <Button onClick={handleCreateNew}>+ Nueva Oportunidad</Button>
-        )}
-      </div>
+      <PageHeader
+        title="Oportunidades"
+        description="Vuelos con lugares liberados o excedentes para ofrecer como cupo nuevo."
+        icon={Sparkles}
+        action={
+          canCreate && (
+            <Button size="sm" onClick={handleCreateNew}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nueva Oportunidad
+            </Button>
+          )
+        }
+      />
 
-      {/* Filtros */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="flex items-center gap-2">
-          <Search className="w-4 h-4" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+          <Search className="h-4 w-4 text-slate-400 shrink-0" />
           <Input
             placeholder="Buscar por destino/compañía..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1"
           />
         </div>
         <select
           value={filterEstado}
           onChange={(e) => setFilterEstado(e.target.value)}
-          className="px-3 py-2 border rounded-md text-sm"
+          className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
         >
           <option value="">Todos los estados</option>
           <option value="pendiente">Pendiente</option>
           <option value="aprobada">Aprobada</option>
           <option value="rechazada">Rechazada</option>
         </select>
-        <Input
-          placeholder="Filtrar temporada..."
-          value={filterTemporada}
-          onChange={(e) => setFilterTemporada(e.target.value)}
-        />
-        <Input
-          placeholder="Filtrar destino..."
-          value={filterDestino}
-          onChange={(e) => setFilterDestino(e.target.value)}
-        />
+        <Input placeholder="Filtrar temporada..." value={filterTemporada} onChange={(e) => setFilterTemporada(e.target.value)} className="w-44" />
+        <Input placeholder="Filtrar destino..." value={filterDestino} onChange={(e) => setFilterDestino(e.target.value)} className="w-44" />
       </div>
 
-      {/* Tabla */}
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
+      <Card>
+        <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">Acciones</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Destino</TableHead>
               <TableHead>Compañía</TableHead>
@@ -162,92 +160,56 @@ export const GestionOportunidades = () => {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan="9" className="text-center py-4">
-                  Cargando...
-                </TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
             ) : filteredOportunidades.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan="9" className="text-center py-4">
-                  No hay oportunidades
-                </TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
             ) : (
               filteredOportunidades.map((opp) => (
-                <TableRow key={opp.id} className="hover:bg-gray-50">
-                  <TableCell className="flex gap-2">
-                    {canEditRow(opp) && canEdit && (
-                      <button
-                        onClick={() => handleEdit(opp)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    {canDeleteRow(opp) && canDelete && (
-                      <button
-                        onClick={() => handleDelete(opp)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    {isAdmin && opp.estado === 'pendiente' && canApprove && (
-                      <button
-                        onClick={() => handleApprove(opp.id)}
-                        className="text-green-600 hover:text-green-800"
-                        title="Aprobar"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button
-                        onClick={() => handleEdit(opp)}
-                        className="text-gray-600 hover:text-gray-800"
-                        title="Ver detalles"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    )}
+                <TableRow key={opp.id}>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      {canEditRow(opp) && canEdit && (
+                        <ActionIconButton icon={Edit3} onClick={() => handleEdit(opp)} title="Editar" />
+                      )}
+                      {canDeleteRow(opp) && canDelete && (
+                        <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDelete(opp)} title="Eliminar" />
+                      )}
+                      {isAdmin && opp.estado === 'pendiente' && canApprove && (
+                        <ActionIconButton
+                          icon={CheckCircle2}
+                          onClick={() => handleApprove(opp.id)}
+                          title="Aprobar"
+                          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                        />
+                      )}
+                      {isAdmin && (
+                        <ActionIconButton icon={Eye} onClick={() => handleEdit(opp)} title="Ver detalles" />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      opp.estado === 'aprobada' ? 'bg-green-100 text-green-800' :
-                      opp.estado === 'rechazada' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {opp.estado}
-                    </span>
+                    <Badge variant={getBadgeVariant(opp.estado)}>{opp.estado}</Badge>
                   </TableCell>
-                  <TableCell>{opp.destino}</TableCell>
+                  <TableCell className="font-medium text-slate-900">{opp.destino}</TableCell>
                   <TableCell>{opp.compania}</TableCell>
-                  <TableCell>{opp.temporada || '-'}</TableCell>
-                  <TableCell>{new Date(opp.fecha_salida).toLocaleDateString()}</TableCell>
+                  <TableCell>{opp.temporada || '—'}</TableCell>
+                  <TableCell>{opp.fecha_salida ? new Date(opp.fecha_salida).toLocaleDateString() : '—'}</TableCell>
                   <TableCell>{opp.total_lugares}</TableCell>
-                  <TableCell>${opp.neto_1 || '-'}</TableCell>
-                  <TableCell className="text-xs">{opp.usuario_cargador?.name || 'N/A'}</TableCell>
+                  <TableCell>{opp.neto_1 ? `$${opp.neto_1}` : '—'}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{opp.usuario_cargador?.name || 'N/A'}</TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
-        </Table>
-      </div>
+        </TableComponent>
+      </Card>
 
-      {/* Formulario Modal */}
       <OportunityForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         initialData={selectedOportunity}
-        onSuccess={() => {
-          setSelectedOportunity(null);
-        }}
+        onSuccess={() => setSelectedOportunity(null)}
       />
     </div>
   );
-};
-
-export default GestionOportunidades;
+}

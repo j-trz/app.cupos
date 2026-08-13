@@ -727,7 +727,8 @@ type Opportunity struct {
 	TotalLiberados     int        `gorm:"not null;default:0" json:"total_liberados"`
 	Neto1              *float64   `json:"neto_1"`
 	Neto2              *float64   `json:"neto_2"`
-	EstadoInterno      *string    `json:"estado_interno"`
+	EstadoInterno      *string    `json:"estado_interno"` // Estado Aerolínea: cotizado, rechazado, confirmado, vencido
+	MotivoRechazo      *string    `json:"motivo_rechazo"`
 	FechaCargado       time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_cargado"`
 	UsuarioCargador    uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_cargador"`
 	UsuarioAutorizador *uuid.UUID `gorm:"type:uuid" json:"usuario_autorizador"`

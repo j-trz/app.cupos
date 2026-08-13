@@ -18,6 +18,21 @@ Lo demás (paquetes npm `react-hook-form`/`@hookform/resolvers`/`zod`, permisos 
 
 **Cómo evitar que se repita**: si aparece código nuevo (propio o pegado de otra fuente/herramienta) que importe con alias `@/` o que use nombres de componente `components/ui/algo` sin el prefijo `shadcn-`, es una señal de que se generó para otra estructura de proyecto — revisar contra los imports reales de `Notificaciones.jsx`/`Settings.jsx` antes de asumir que va a compilar.
 
+**Segunda pasada, mismo día**: el build ya compilaba pero la página no tenía el mismo diseño que el resto (Julian: "el topbar dice Panel y no Oportunidades, falta el logo, faltan los botones"). Causa: `GestionOportunidades.jsx` nunca usaba `<PageHeader>` — el componente que alimenta el título/ícono/acción del topbar vía `HeaderContext` (`Layout.jsx` solo cae al título por defecto de `getTitleByPath()` si la página no llama a `PageHeader`). Se rehizo la página completa con los componentes propios de la app (`PageHeader`, `Card`, `TableComponent`, `Badge`, `ActionIconButton` con Acciones como primera columna) en vez de los `shadcn-*`, y `OportunityForm.jsx` pasó de `react-hook-form` (que necesita inputs con `forwardRef`, y el `Input.jsx` de esta app no lo tiene) a un formulario controlado simple, mismo patrón que `GestionTemporadas.jsx`.
+
+**Tercera pasada, mismo día**: ajustes puntuales al modal `OportunityForm.jsx` pedidos por Julian —
+- **Temporada**: pasó de input de texto libre a `<select>` poblado con `useTemporadas()`, mismo patrón que `ProductForm.jsx` (filtra `t.activa || t.nombre === form.temporada`, más un `<option>` de fallback si el valor viejo ya no está activo).
+- **Labels**: "Estado (Admin)" → "Estado", "Estado Interno" → "Estado Aerolínea" — solo el label visible, el campo sigue siendo `estado_interno` en el modelo/API (no se tocó backend).
+- **Compañía**: sigue siendo texto libre (por si la aerolínea no está en el diccionario) pero ahora autocompleta con `<datalist>` nativo contra `airlineNames` (`frontend/src/lib/data/airlineNames.js`, el mismo diccionario integrado antes para `ItineraryTable.jsx`).
+
+Aprovechando el cambio, auditoría de "componentes sin uso" en `frontend/src/`: un primer script bash (grep por nombre de archivo) dio 32 candidatos pero con falsos positivos conocidos, así que se re-verificó cada uno individualmente con Grep dirigido (import real, no coincidencia de substring) antes de borrar nada. Confirmados y eliminados 35 archivos genuinamente huérfanos:
+- `components/ExportButton.jsx`, `GlobalSearch.jsx`, `KeyboardShortcuts.jsx`, `LanguageSelector.jsx`, `OnboardingGuide.jsx` — restos de un shell de app abandonado, nunca importados en ninguna página.
+- `components/reports/{AgencyShareChart,DestinationDetailTable,EvolutionChart,KPIsRow,OccupancyHeatmap,ProductPerformanceTable,ProgressLoader,ReportFilters,RiskAlertsTable,TopDestinationsChart,TooltipForIcons}` — versión vieja/duplicada del dashboard de Reportes; `Reportes.jsx` real usa otro set con otros nombres (`DashboardChart`, `DataTable`, `DepartureTable`, `FiltersPanel`, `KpiPanel`, `PeriodSelector`, `TabsCharts`, que sí siguen en uso).
+- `components/ui/{Accordion,Dialog,DropdownMenu,FilterBadge,SidebarTrigger,Tooltip}.jsx` + 8 componentes `shadcn-*` sin uso (`shadcn-accordion/alert/avatar/checkbox/popover/progress/radio-group/separator/skeleton/slider/switch/tabs`) — nunca importados; los `shadcn-*` realmente usados por `Settings.jsx`/`Notificaciones.jsx` (button/card/input/label/table/dialog/textarea/select/badge/dropdown-menu/tooltip) no se tocaron.
+- `schemas/opportunitySchema.ts` — huérfano directo de esta misma tercera pasada, ya que `OportunityForm.jsx` había dejado de usar `react-hook-form`/`zod` en la segunda pasada.
+
+Verificado con `npm run build` (limpio) y `npm run lint` (0 errores en cualquier archivo tocado o borrado; el lint completo del repo tiene ~800 errores preexistentes que vienen de lintear `dist/` por un gap de config, no relacionado a este cambio).
+
 ## Notificación "nuevo producto" llegaba a usuarios de TODAS las agencias, no solo a la dueña
 
 **Síntoma** (reportado por Julian, auditoría a pedido): pidió revisar las notificaciones porque sospechaba que llegaban avisos que no le correspondían a un usuario común.
