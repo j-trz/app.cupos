@@ -9,14 +9,16 @@ class ApiClient {
   }
 
   static getToken() {
-    return localStorage.getItem('api_token');
+    const token = localStorage.getItem('api_token') || localStorage.getItem('token');
+    return token && token !== 'null' && token !== 'undefined' ? token : null;
   }
 
   static setToken(token) {
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       localStorage.setItem('api_token', token);
     } else {
       localStorage.removeItem('api_token');
+      localStorage.removeItem('token');
     }
   }
 
@@ -31,7 +33,7 @@ class ApiClient {
   static getSessionUser() {
     try {
       const stored = localStorage.getItem('api_user');
-      return stored ? JSON.parse(stored) : null;
+      return stored && stored !== 'null' && stored !== 'undefined' ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
@@ -39,6 +41,7 @@ class ApiClient {
 
   static clearSession() {
     localStorage.removeItem('api_token');
+    localStorage.removeItem('token');
     localStorage.removeItem('api_user');
   }
 

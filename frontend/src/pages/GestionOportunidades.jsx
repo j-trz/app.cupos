@@ -270,19 +270,24 @@ export default function GestionOportunidades() {
             <TableRow>
               <TableHead className="text-center">Acciones</TableHead>
               <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Estado Aerolínea</TableHead>
               <TableHead className="text-center">Destino</TableHead>
               <TableHead className="text-center">Compañía</TableHead>
               <TableHead className="text-center">Temporada</TableHead>
+              <TableHead className="text-center">Validez</TableHead>
               <TableHead className="text-center">Salida</TableHead>
+              <TableHead className="text-center">Llegada</TableHead>
               <TableHead className="text-center">Lugares</TableHead>
+              <TableHead className="text-center">Liberados</TableHead>
               <TableHead className="text-center">Neto 1</TableHead>
+              <TableHead className="text-center">Neto 2</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={13} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
             ) : filteredOportunidades.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={13} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
             ) : (
               filteredOportunidades.map((opp) => (
                 <TableRow key={opp.id}>
@@ -325,14 +330,36 @@ export default function GestionOportunidades() {
                       <div className="mt-1 text-[11px] text-slate-400">Producto #{opp.producto_id}</div>
                     )}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {opp.estado_interno ? (
+                      <div>
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                          {opp.estado_interno}
+                        </span>
+                        {opp.motivo_rechazo && (
+                          <div className="mt-0.5 text-[11px] text-rose-500 font-normal">{opp.motivo_rechazo}</div>
+                        )}
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
                   <TableCell className="text-center font-medium text-slate-900">{opp.destino}</TableCell>
                   <TableCell className="text-center">{opp.compania}</TableCell>
                   <TableCell className="text-center">{opp.temporada || '—'}</TableCell>
+                  <TableCell className="text-center">{formatDate(opp.validez)}</TableCell>
                   <TableCell className="text-center">{formatDate(opp.fecha_salida)}</TableCell>
+                  <TableCell className="text-center">{formatDate(opp.fecha_llegada)}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="info">{opp.total_lugares ?? 0}</Badge>
                   </TableCell>
+                  <TableCell className="text-center">
+                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      {opp.total_liberados ?? 0}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-center">{opp.neto_1 ? `$${opp.neto_1}` : '—'}</TableCell>
+                  <TableCell className="text-center">{opp.neto_2 ? `$${opp.neto_2}` : '—'}</TableCell>
                 </TableRow>
               ))
             )}

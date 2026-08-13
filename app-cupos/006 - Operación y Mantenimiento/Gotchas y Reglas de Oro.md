@@ -1,6 +1,6 @@
 Reglas operativas e invariantes que **no** son obvias leyendo un único archivo — se descubrieron a fuerza de incidentes repetidos en este repo. Léelo antes de tocar rutas, migraciones, RBAC o el entorno local. Complementa [[Historial de Bugs Resueltos]] (postmortems puntuales ya cerrados) y [Modelo de Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md) (detalle de esquema).
 
-> Última verificación de las reglas 1-13 contra código: 2026-08-12.
+> Última verificación de las reglas 1-13 contra código: 2026-08-12. Reglas 14-24 agregadas 2026-08-13 tras la [[Auditoría de Seguridad y QA - 2026-08-13|auditoría integral de seguridad/QA]] (5 agentes en paralelo) — documentan prácticas nuevas, no necesariamente bugs ya corregidos (ver el link para el detalle completo y el estado pendiente/resuelto de cada hallazgo).
 
 ## 1. Dos entrypoints de backend duplican TODA la tabla de rutas
 
@@ -68,6 +68,55 @@ Un `Notification` sin `TargetUserID`/`TargetRole`/`TargetAgency` matchea el `OR 
 
 También en esa corrección: se detectó que ni `product_changed` ni `new_product` disparaban un email real — solo creaban la `Notification` in-app, pese a tener plantilla de `EmailTemplate` (o merecerla). Se agregó `services.SendTemplateEmailToAgency()` (`email_service.go`) para el caso "aviso a toda la agencia por email" (antes solo existía `SendTemplateEmail`, un destinatario puntual) y se sumaron las plantillas de email faltantes (`new_product_bulk`, `product_changed`) a `seedEmailTemplates()` (`db.go`). Patrón a seguir para cualquier notificación nueva: `Notify*ByCode` (in-app) + `SendTemplateEmail`/`SendTemplateEmailToAgency` (email) en el mismo call site, igual que ya hacía `warnExpiringReservations` (`cron_handler.go`) — no asumir que uno implica el otro.
 
+## 14. Todo handler con `:id` verifica ownership, no solo el permiso de rol
+
+`RequirePermission("MODULE_ACTION")` responde "¿este rol puede hacer X en general?" — no "¿puede hacer X en ESTE registro puntual?". La auditoría del 2026-08-13 encontró la misma clase de bug repetida en `orders/:id` (`ConfirmReservation`/`UpdateReservation`/`AddDocContable`/`DeletePassenger`), `group_handler.go` (`UpdateGroup`/`DeleteGroup`/etc.), `email-config`/`atlas-config`, templates de notificación/email y `transfers/all`: el endpoint exige el permiso correcto pero nunca compara `Agencia`/`created_by` del registro contra el caller — cualquier usuario con ese permiso en SU agencia puede mutar/leer el de OTRA. Regla: todo handler que reciba un `:id` de un recurso con dueño (`Agencia`, `AgencyID`, `created_by`) debe comparar explícitamente contra `c.Get("agencia")`/`c.Get("userID")` para roles no-admin — igual que ya hace `GetProductByID`/`canReserveProduct`. Al escribir un handler nuevo, copiar el chequeo de su "hermano" ya correcto en el mismo archivo (ej. `GetUserTransfers` scopea bien, `ListTransfers` no).
+
+## 15. Nunca bindear campos de privilegio/tenant directo de un body público
+
+`Register` (`user_handler.go:323-390`) bindea `models.Profile` completo desde el JSON del request, incluyendo `Agencia` — solo pisa `Role`/`Admin`/`ID` después, dejando que un registro anónimo declare pertenecer a cualquier agencia. Regla: `role`, `admin`, `agencia`/`agency_id`, `is_active` (o cualquier campo que determine privilegio o alcance de datos) nunca se leen del body de un endpoint público o de bajo privilegio — se resuelven server-side (contexto de sesión, invitación, decisión de un admin) y se pisan explícitamente ANTES de cualquier `Create`/`Update`, no después ni "probablemente no importa".
+
+## 16. Un endpoint de asignación de rol/permiso nunca deja que el caller otorgue más de lo que él mismo tiene
+
+`setUserRole`/`AssignRoleToUser` (`rbac_handler.go`) solo comparaban agencia cuando `role.AgencyID != nil` — los roles globales sembrados (`SUPER_ADMIN` incluido) tienen `AgencyID == nil`, así que un `agency_admin` con `ROLES_ASSIGN_PERMISSIONS` podía auto-asignarse `SUPER_ADMIN` sin ningún chequeo adicional. Regla: cualquier endpoint que asigne un rol o adjunte permisos a un rol debe validar que el caller no esté otorgando (a sí mismo o a otro) un privilegio que excede su propio nivel — comparar explícitamente contra el rol/agencia del caller, nunca asumir que el permiso de "puedo asignar roles" ya implica "solo roles razonables".
+
+## 17. Sin secretos de fallback hardcodeados — fallar cerrado, siempre
+
+`user_handler.go` firmaba JWTs con `"fallback_secret_key"` si `JWT_SECRET` no estaba seteada, mientras que `middleware/auth.go` (que valida esos mismos tokens) sí fallaba con 500 en ese caso — una inconsistencia que silenciosamente emite tokens válidos firmados con un secreto ahora público. Regla: si una env var contiene un secreto de firma/cifrado, TODO punto del código que la use debe fallar cerrado (error explícito, nunca un valor por defecto) de forma consistente — no alcanza con que un solo lugar lo haga bien.
+
+## 18. Todo campo-modelo de secreto lleva `json:"-"` a nivel de modelo
+
+`EmailSMTPConfig.SMTPPass` no tenía `json:"-"` (a diferencia de `AtlasConfig.Clave`, que sí se limpia explícitamente antes de responder) — cualquier usuario autenticado podía leer la contraseña SMTP en texto plano vía `GetEmailConfig`. Regla: cualquier campo de modelo que sea un secreto (API key, password de servicio externo, token) lleva `json:"-"` en el propio struct de `models.go`, no una limpieza manual handler-por-handler — la limpieza manual solo protege el endpoint que alguien se acordó de tocar; el struct-tag protege todos, incluyendo backups/exports/list futuros.
+
+## 19. Nunca un endpoint de CRUD genérico (tabla+columna arbitraria) en una app multi-tenant
+
+Existía `/api/data` (`data_handler.go`): un endpoint gateado solo por autenticación (sin `RequirePermission`) que aceptaba un nombre de tabla y de columna arbitrarios del query/body y los usaba directo en un `WHERE`/`Create`/`Update`/`Delete` de GORM — cualquier usuario autenticado podía dumpear cualquier tabla (incluyendo password hashes) o auto-promoverse a admin escribiendo `role: "admin"` en su propia fila de `profiles`. Regla: no crear "endpoints de administración de base de datos" genéricos ni siquiera para debugging interno — si hace falta un browser de datos admin, es admin-only explícito, con allow-list de tablas/columnas, nunca con el nombre de columna interpolado en SQL.
+
+## 20. Cualquier lectura-y-luego-escritura de `Product.Disponibilidad` debe lockear la fila primero
+
+`CreateHold`/`AdjustHold` y la tool de IA `crear_reserva` ya usan `tx.Clauses(clause.Locking{Strength: "UPDATE"})` antes de leer `Disponibilidad` — pero `CreateReservation` (el flujo de reserva NORMAL, no el del asistente) y `AddPassenger`/`DuplicatePassenger`/`CreateTransfer` no lo hacían, permitiendo que dos requests concurrentes lean el mismo valor de stock antes de que ninguno confirme y ambos pasen la validación de disponibilidad — sobreventa real del mismo asiento. Regla: todo código nuevo que lea `Product.Disponibilidad` con intención de decrementarla/incrementarla en el mismo flujo DEBE hacer `tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, id)` antes de leer el valor — nunca un `First()` simple seguido de un `Save()`. Vale la pena extraer esto a un helper (`lockProductForUpdate(tx, id)`) para que no dependa de que cada autor se acuerde de copiar el boilerplate.
+
+## 21. Nunca descartar el error de una escritura a DB que dispara notificaciones o responde éxito al cliente
+
+`CreateProduct` (ignora el error de `Create`) y `ConfirmReservation` (ignora el de `Save`/`Update` en la transición de estado) seguían notificando por email/in-app y devolviendo 200/201 aunque la escritura real hubiera fallado — el cliente ve "confirmado"/"creado" mientras la DB puede no reflejarlo. Regla: en cualquier handler que dispare un side-effect visible (notificación, email, respuesta de éxito) después de una escritura, chequear `.Error` de esa escritura y abortar con un error explícito antes de disparar el side-effect — nunca asumir que un `Create`/`Save`/`Update` de GORM "prácticamente nunca falla".
+
+## 22. Toda secuencia que toque stock de Producto + Reserva/Pasajero va en una transacción
+
+`CreateReservation`/`CreateHold`/`ConvertOpportunityToProduct` ya usan `database.DB.Transaction(...)` correctamente, pero los flujos de cancelación/borrado (`DeleteReservation`, cancelación directa, `ResolveCancellation`, `DeletePassenger`) son secuencias de escrituras sueltas sin transacción — un fallo a mitad de camino puede dejar el stock ya devuelto pero la reserva sin borrar (o viceversa). Regla: cualquier operación que toque en el mismo flujo lógico tanto los contadores de `Product` como filas de `Reservation`/`Passenger` va envuelta en `database.DB.Transaction(func(tx *gorm.DB) error {...})`, sin excepción — no solo el camino de creación, también cancelación/borrado.
+
+## 23. Todo hook de listado maneja `isError` explícitamente, no solo `isLoading`
+
+`GestionOportunidades.jsx`/`GestionTemporadas.jsx` solo destructuran `isLoading` de su query — en un fetch fallido, `data` cae al default `[]` y la tabla se ve idéntica a "no hay datos todavía", sin ninguna señal de que algo salió mal. Regla: todo componente que consuma un hook de listado (`useX()` de TanStack Query) debe destructurar y renderizar `isError` con un estado visual distinto al de "vacío" — comparar contra `GestionProductos.jsx`/`GestionUsuarios.jsx`, que ya lo hacen bien.
+
+## 24. Prácticas menores que se repiten seguido, en una sola línea cada una
+
+- Formularios con 2 fechas relacionadas (salida/regreso, inicio/fin) validan `fin >= inicio` al submit — el auto-ajuste de una al cambiar la otra no reemplaza la validación.
+- Todo prop tipo `isLoading`/disabled-durante-mutación de un componente compartido (ej. `ProductForm`) debe ser pasado por CADA caller, no solo declarado — un prop sin usar es peor que no tenerlo, porque en code review parece manejado.
+- Librerías que parsean archivos subidos por el usuario (Excel/CSV/PDF) son una clase de dependencia de escrutinio alto — chequear mantenimiento activo del paquete, no solo el rango de semver (`xlsx`/SheetJS en npm es un ejemplo real: semver verde, seguridad muerta).
+- Todo token de auth se lee/escribe únicamente vía `ApiClient.getToken()`/`setToken()` (frontend) — ningún service llama `localStorage` directo para esto (pasó en `exportService.js`, quedó leyendo una clave que nadie escribe).
+- Código muerto de fallback de auth (cookies no usadas, `?token=` en query, claves de storage no escritas) se borra al notarlo — no se deja "por si acaso", porque es exactamente lo que una feature futura activa sin querer.
+- Páginas nuevas se registran con `React.lazy()` + `Suspense` en `App.jsx`, no `import` estático — evita que cada página nueva siga engordando el bundle único.
+
 ---
 
 ## Antes de escribir código nuevo, checklist rápido
@@ -78,6 +127,8 @@ También en esa corrección: se detectó que ni `product_changed` ni `new_produc
 - ¿El guard de página está después de todos los hooks? (regla 5)
 - ¿Una tool de IA nueva con datos sensibles replica el patrón de 3 niveles? (regla 8)
 - ¿Una feature "quién más ve esto" está scopeada por agencia y no por creador, salvo que el dato sea genuinamente privado? (regla 7)
+- ¿El handler nuevo con `:id` compara `Agencia`/`created_by` del registro contra el caller, no solo el permiso de rol? (regla 14)
+- ¿El flujo nuevo que lee-y-escribe `Product.Disponibilidad` lockea la fila (`clause.Locking`) y va envuelto en transacción si toca Reserva/Pasajero en el mismo paso? (reglas 20 y 22)
 
 ---
 
