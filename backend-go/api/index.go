@@ -77,7 +77,7 @@ func init() {
 	{
 		// Rutas públicas
 		api.POST("/auth/login", handlers.Login)
-		api.POST("/auth/register", handlers.Register)
+		// No hay auto-registro público — ver comentario en cmd/api/main.go.
 
 		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
 		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
@@ -120,16 +120,16 @@ func init() {
 				orders.PUT("/hold/:id", handlers.AdjustHold)
 				orders.DELETE("/hold/:id", handlers.ReleaseHold)
 				orders.GET("/:id", handlers.GetReservationByID)
-				orders.PUT("/:id", handlers.UpdateReservation)
-				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
+				orders.PUT("/:id", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.UpdateReservation)
+				orders.PUT("/:id/doc-contable", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.AddDocContable)
 				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
 				orders.PUT("/:id/cancel-request/resolve", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.ResolveCancellation)
-				orders.POST("/:id/confirm", handlers.ConfirmReservation)
+				orders.POST("/:id/confirm", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.ConfirmReservation)
 				orders.PUT("/:id/passengers/:passengerId", handlers.UpdatePassengerTicket)
 				orders.PUT("/:id/passengers/:passengerId/full", handlers.UpdatePassenger)
 				orders.POST("/:id/passengers", handlers.AddPassenger)
 				orders.POST("/:id/passengers/:passengerId/duplicate", handlers.DuplicatePassenger)
-				orders.DELETE("/:id/passengers/:passengerId", handlers.DeletePassenger)
+				orders.DELETE("/:id/passengers/:passengerId", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.DeletePassenger)
 				orders.DELETE("/:id", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.DeleteReservation)
 			}
 
@@ -278,14 +278,7 @@ func init() {
 				ai.PUT("/experts/:id/documents/:docId", middleware.AgencyAdminOrAdmin(), handlers.UpdateAIExpertDocument)
 			}
 
-			// CRUD Dinámico (Data)
-			data := protected.Group("/data")
-			{
-				data.GET("", handlers.GetData)
-				data.POST("", handlers.ExecuteCRUD)
-				data.PUT("", handlers.ExecuteCRUD)
-				data.DELETE("", handlers.ExecuteCRUD)
-			}
+			// Eliminado 2026-08-13 — ver comentario en cmd/api/main.go.
 
 			// Agencias
 			agencies := protected.Group("/agencies")

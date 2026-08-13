@@ -223,6 +223,39 @@ func AssignPermissionsToRole(c *gin.Context) {
 		return
 	}
 
+	// Hallazgo de la auditoría de seguridad 2026-08-13: callerCanAccessRole
+	// solo valida que el CALLER pueda administrar este rol (por agencia) —
+	// nunca restringía QUÉ permisos le puede adjuntar. Un agency_admin podía
+	// crear un rol personalizado para su propia agencia y asignarle permisos
+	// que él mismo no tiene (BACKUP_CREATE, USERS_DELETE, etc.), y después
+	// asignárselo a sí mismo. Filtrar a un subset de los permisos propios del
+	// caller (admin no se filtra, ya tiene todos).
+	callerRole, _ := c.Get("role")
+	if callerRole != "admin" {
+		userID, _ := c.Get("userID")
+		var callerCodes []string
+		database.DB.Table("user_roles").
+			Joins("join role_permissions on role_permissions.role_id = user_roles.role_id").
+			Joins("join permissions on permissions.id = role_permissions.permission_id").
+			Where("user_roles.user_id = ? and permissions.is_active = true", userID).
+			Distinct().
+			Pluck("permissions.code", &callerCodes)
+		callerCodeSet := make(map[string]bool, len(callerCodes))
+		for _, code := range callerCodes {
+			callerCodeSet[code] = true
+		}
+
+		var requested []models.Permission
+		database.DB.Where("id IN ?", input.Permissions).Find(&requested)
+		filtered := make([]uuid.UUID, 0, len(requested))
+		for _, p := range requested {
+			if callerCodeSet[p.Code] {
+				filtered = append(filtered, p.ID)
+			}
+		}
+		input.Permissions = filtered
+	}
+
 	// Eliminar permisos existentes
 	if err := database.DB.Where("role_id = ?", roleId).Delete(&models.RolePermission{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al limpiar los permisos existentes."})
@@ -351,11 +384,28 @@ func GetMyPermissions(c *gin.Context) {
 // agencia que userAgencia (comparando por código o nombre, igual de laxo que
 // el resto del sistema — ver services.FindAgencyByCodeOrName), para que un
 // agency_admin no pueda asignar el rol de otra agencia.
-func setUserRole(userID uuid.UUID, roleID uuid.UUID, userAgencia string) error {
+//
+// Hallazgo de la auditoría de seguridad 2026-08-13: ninguno de los dos
+// chequeos de arriba corría para los roles de sistema sembrados (SUPER_ADMIN,
+// AGENCY_ADMIN, etc. — todos con AgencyID nil), así que un agency_admin podía
+// auto-asignarse SUPER_ADMIN (que tiene TODOS los permisos, ver seedRBAC en
+// db.go) sin ningún chequeo. Se agregan dos guards nuevos usando el caller
+// desde el propio *gin.Context: SUPER_ADMIN nunca lo asigna nadie que no sea
+// ya admin, y el resto de los roles de sistema quedan scopeados a la propia
+// agencia del caller igual que los roles personalizados.
+func setUserRole(c *gin.Context, userID uuid.UUID, roleID uuid.UUID, userAgencia string) error {
 	var role models.Role
 	if err := database.DB.First(&role, "id = ?", roleID).Error; err != nil {
 		return fmt.Errorf("rol no encontrado")
 	}
+
+	callerRole, _ := c.Get("role")
+	isCallerAdmin := callerRole == "admin"
+
+	if !isCallerAdmin && strings.EqualFold(role.Code, "SUPER_ADMIN") {
+		return fmt.Errorf("no tenés permiso para asignar el rol SUPER_ADMIN")
+	}
+
 	if role.AgencyID != nil {
 		var agency models.Agency
 		if err := database.DB.First(&agency, "id = ?", *role.AgencyID).Error; err != nil {
@@ -364,14 +414,21 @@ func setUserRole(userID uuid.UUID, roleID uuid.UUID, userAgencia string) error {
 		if !strings.EqualFold(agency.Code, userAgencia) && !strings.EqualFold(agency.Name, userAgencia) {
 			return fmt.Errorf("el rol pertenece a otra agencia")
 		}
+	} else if role.IsSystem && !isCallerAdmin {
+		agenciaVal, _ := c.Get("agencia")
+		callerAgenciaRaw, _ := agenciaVal.(string)
+		if !strings.EqualFold(services.ResolveAgencyCode(callerAgenciaRaw), services.ResolveAgencyCode(userAgencia)) {
+			return fmt.Errorf("no podés asignar roles de sistema a usuarios de otra agencia")
+		}
 	}
+
 	database.DB.Where("user_id = ?", userID).Delete(&models.UserRole{})
 	return database.DB.Create(&models.UserRole{UserID: userID, RoleID: roleID}).Error
 }
 
 // AssignRoleToUser asigna (reemplazando cualquier rol previo) un rol a un
 // usuario. Valida que el rol sea global o de la misma agencia que el usuario
-// destino.
+// destino (ver guards de escalada de privilegios en setUserRole).
 func AssignRoleToUser(c *gin.Context) {
 	var input struct {
 		UserID uuid.UUID `json:"user_id"`
@@ -388,7 +445,7 @@ func AssignRoleToUser(c *gin.Context) {
 		return
 	}
 
-	if err := setUserRole(input.UserID, input.RoleID, targetUser.Agencia); err != nil {
+	if err := setUserRole(c, input.UserID, input.RoleID, targetUser.Agencia); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

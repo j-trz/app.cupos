@@ -99,6 +99,24 @@ func canReserveProduct(tx *gorm.DB, product *models.Product, role interface{}, u
 	return count > 0
 }
 
+// callerOwnsReservation: admin siempre puede; el resto solo si la reserva es
+// de su propia agencia. Hallazgo de la auditoría de seguridad 2026-08-13:
+// ConfirmReservation/UpdateReservation/AddDocContable/DeletePassenger no
+// tenían NINGÚN chequeo de este tipo — cualquier usuario autenticado de
+// cualquier agencia podía confirmar/editar/borrar pasajeros de una reserva
+// ajena (incluyendo liberar el stock de un competidor para reservarlo uno
+// mismo). Mismo criterio de scoping que canReserveProduct usa para productos.
+func callerOwnsReservation(c *gin.Context, reservation *models.Reservation) bool {
+	role, _ := c.Get("role")
+	if role == "admin" {
+		return true
+	}
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
+	return strings.EqualFold(reservation.Agencia, agencia)
+}
+
 // CreateHold descuenta de inmediato N lugares de un producto, antes de que
 // el usuario haya cargado ningún dato de pasajero, para que nadie más se
 // lleve esos cupos mientras completa el formulario. Vive `bloqueo_hold_minutos`
@@ -851,6 +869,11 @@ func ConfirmReservation(c *gin.Context) {
 		return
 	}
 
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
+		return
+	}
+
 	// Las reservas expiradas volvieron al stock; no se pueden reactivar.
 	if reservation.Estado == models.EstadoExpirada ||
 		reservation.Estado == models.EstadoCancelada ||
@@ -959,6 +982,11 @@ func DeletePassenger(c *gin.Context) {
 		return
 	}
 
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
+		return
+	}
+
 	// Liberar únicamente el lugar de este pasajero si no estaba ya
 	// cancelado/expirado — y solo si ocupaba lugar (el infante no lo hacía).
 	if reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada &&
@@ -996,6 +1024,11 @@ func UpdateReservation(c *gin.Context) {
 	var reservation models.Reservation
 	if err := database.DB.First(&reservation, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
 		return
 	}
 
@@ -1057,6 +1090,11 @@ func AddDocContable(c *gin.Context) {
 	var reservation models.Reservation
 	if err := database.DB.First(&reservation, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
 		return
 	}
 

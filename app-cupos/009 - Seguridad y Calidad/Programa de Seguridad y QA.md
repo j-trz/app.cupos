@@ -15,7 +15,12 @@ Punto de entrada del apartado de seguridad/QA/QC del proyecto — pedido por Jul
 |---|---|---|---|
 | 2026-08-13 | Seguridad backend + frontend, QA/QC backend + frontend, UX/UI (primera corrida completa) | 5 en seguridad backend (incl. endpoint CRUD genérico sin permisos con auto-elevación a admin), 1 en seguridad frontend (`xlsx` sin parchear), 1 en QA backend (race condition de sobreventa en `CreateReservation`), 2 en QA frontend (violación de reglas de hooks — 1 de 2 ya resuelta) | [[Auditoría de Seguridad y QA - 2026-08-13]] |
 
-**Resuelto desde esta corrida (2026-08-13)**: violación de reglas de hooks en `GestionProductos.jsx` (queda pendiente la misma en `GestionGrupos.jsx`), y la mejora de UX/UI de gestión de columnas en tablas anchas. El resto de los hallazgos (críticos de seguridad backend/frontend, race condition de QA backend) sigue sin resolver — ver el detalle en el reporte.
+**Resuelto desde esta corrida (2026-08-13)**:
+- Los 5 críticos de seguridad backend: `/api/data` eliminado, escalada de privilegios RBAC cerrada (+ mismo hallazgo corregido de paso en `CreateUser`/`UpdateUser`), `/auth/register` eliminado, secreto JWT de fallback quitado, ownership+permiso agregado a los 4 endpoints de `/orders/:id`.
+- Violación de reglas de hooks en `GestionProductos.jsx` (queda pendiente la misma en `GestionGrupos.jsx`).
+- Mejora de UX/UI de gestión de columnas en tablas anchas.
+
+**Sigue sin resolver**: todo lo de seguridad backend "Alto"/"Medio"/"Bajo" (incluyendo `agency_admin` confundido con `admin` en varios lugares, reportes/transfers/templates sin scoping cross-agencia, CVEs de dependencias), la crítica de seguridad frontend (`xlsx`), la race condition de sobreventa en `CreateReservation` (QA backend), y el resto de QA frontend — ver el detalle completo en el reporte.
 
 ## Cómo correr esta auditoría (a demanda)
 

@@ -52,13 +52,98 @@ Si se quiere un aislamiento más fuerte (que no dependa de que un desarrollador 
 
 **Recomendación si se retoma esto en serio**: RLS es el punto medio razonable, y es independiente de la migración a Azure — se puede adoptar hoy mismo en Neon sin esperar a mudarse. Vale la pena evaluarlo como respuesta directa a los hallazgos de la auditoría de seguridad, no solo como preparación para Azure.
 
-### Eje 2: multi-tenancy de IDENTIDAD (Azure AD / Entra ID)
+### Eje 2: Autenticación Corporativa y Login con Microsoft (SSO con Entra ID)
 
-Esto es otra cosa: hoy la app tiene su propio sistema de login (JWT propio, `Profile`/`Role` en la DB). Un registro de aplicación **multi-tenant en Azure AD (Entra ID)** permitiría que cada agencia inicie sesión con SU PROPIO tenant de Microsoft 365/Azure AD (SSO corporativo), en vez de un usuario/contraseña propio de esta app.
+Dado que las agencias clientes utilizan el ecosistema de **Microsoft 365 / Azure AD (Entra ID)**, la integración de **Login con Microsoft** permite ofrecer SSO corporativo (un-click login), eliminando la gestión de contraseñas locales y centralizando las bajas de usuarios.
 
-- Tiene sentido si las agencias clientes ya son organizaciones con Microsoft 365 y quieren SSO corporativo (menos contraseñas que administrar, revocación de acceso centralizada del lado del cliente).
-- Es un cambio de arquitectura de auth significativo: reemplaza (o convive con) el JWT propio, necesita mapear el `oid`/tenant de Azure AD a la `Agencia` interna, y probablemente scoping vía Azure AD B2B (invitar usuarios externos al tenant de la app) o multi-tenant app registration (cada agencia usa SU tenant).
-- **No hay indicio de que las agencias clientes de este sistema (Jetmar, Tienda, Buemes, TocToc, mencionadas en el borrador de email a Netviax en 007) tengan o quieran usar Azure AD propio** — esto es especulativo hasta que alguna agencia lo pida explícitamente. No recomendado como parte de un lift-and-shift simple; evaluarlo solo si surge un requisito concreto de un cliente.
+#### 1. Convivencia con la Autenticación Actual
+- **Transparente y Retrocompatible**: El Login con Microsoft **convive** con el sistema actual de email/contraseña (bcrypt).
+- **Emisión del Mismo JWT Interno**: Sin importar si el usuario ingresó por contraseña o por Microsoft, una vez validada la identidad, el backend emite exactamente el **mismo token JWT de sesión** (con `id`, `role`, `agencia`, `admin`).
+- **Impacto Cero en RBAC**: Los middlewares (`RequirePermission`, `can()`) y el filtrado por agencia en los handlers siguen funcionando exactamente igual sin enterarse de cómo se autenticó el usuario.
+
+#### 2. Modelo de Datos e Identificador Vinculante (`Profile`)
+
+Para vincular las identidades de Microsoft (o Google en el futuro) con la tabla `profiles` (`models.go`), se agregan campos explícitos de binding:
+
+```go
+type Profile struct {
+    ID                uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+    Email             string    `gorm:"unique;not null" json:"email"`
+    Password          string    `gorm:"-" json:"password,omitempty"`
+    EncryptedPassword string    `gorm:"column:encrypted_password" json:"-"` // Nullable para usuarios 100% SSO
+    Nombre            string    `json:"nombre"`
+    Apellido          string    `json:"apellido"`
+    Agencia           string    `json:"agencia"`
+    Role              string    `gorm:"default:'agency_user'" json:"role"`
+    IsActive          bool      `gorm:"default:true" json:"activo"`
+
+    // Identificador vinculante SSO (Microsoft / Google)
+    SSOProvider       *string   `gorm:"column:sso_provider" json:"sso_provider,omitempty"` // "microsoft", "google"
+    SSOID             *string   `gorm:"column:sso_id;index" json:"sso_id,omitempty"`       // Azure AD 'oid' o OIDC 'sub'
+}
+```
+
+Además, en la tabla de agencias (`Agencies` / configuración) se explicita el **Dominio Corporativo** asignado:
+- `Agency.Dominio` (ej. `"jetmar.com.uy"`, `"tiendavictoria.com.uy"`, `"buemes.com.uy"`).
+
+#### 3. Restricción Estricta por Dominios y Auto-aprovisionamiento JIT (Just-In-Time)
+
+> [!IMPORTANT]
+> **Regla de Seguridad No Negociable**: Un usuario de Microsoft que NO pertenezca a un dominio de agencia autorizado **NO puede auto-crearse una cuenta ni acceder al sistema**.
+
+El flujo de inicio de sesión con Microsoft valida estrictamente el dominio del correo antes de permitir el ingreso o la creación de un perfil:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Usuario Agencia
+    participant F as Frontend (React / MSAL)
+    participant B as Backend Go (/api/auth/microsoft)
+    participant MS as Microsoft Entra ID
+    participant DB as Postgres (Profile / Agency)
+
+    U->>F: Click "Iniciar sesión con Microsoft"
+    F->>MS: Redirect a login Microsoft (OIDC PKCE)
+    MS-->>F: Retorna Token / Code de Microsoft
+    F->>B: POST /api/auth/microsoft/callback (code / id_token)
+    B->>MS: Valida token y obtiene claims (email, oid, nombre, apellido)
+    
+    rect rgb(240, 240, 255)
+        note over B: 1. Extraer dominio del email (ej. @jetmar.com.uy)
+        B->>DB: Consultar si existe Agencia con ese dominio
+        alt Dominio NO Autorizado
+            DB-->>B: Agencia no encontrada para ese dominio
+            B-->>F: HTTP 403 ("Dominio @empresa.com no autorizado en la plataforma")
+        else Dominio Autorizado
+            DB-->>B: Devuelve Agencia (ej: "JETMAR")
+        end
+    end
+
+    rect rgb(240, 255, 240)
+        note over B: 2. Buscar / Vinculación / Creación de Usuario
+        B->>DB: Buscar Profile por sso_id u o por email
+        alt Usuario Ya Existe
+            DB-->>B: Devuelve Profile existente
+            B->>DB: Actualizar sso_provider='microsoft' y sso_id=oid (si no estaban vinculados)
+        else Usuario NO Existe (Nuevo ingreso desde dominio autorizado)
+            B->>DB: Crear Profile JIT (Agencia=AgenciaDetectada, Role='agency_user', IsActive=true, SSOProvider='microsoft', SSOID=oid)
+        end
+    end
+
+    B-->>F: Retorna JWT de Sesión de la App (mismo formato estándar)
+    F-->>U: Redirección al Dashboard
+```
+
+#### 4. Pasos para Configurar Microsoft Entra ID en Azure
+1. **App Registration Multi-Tenant**: En Azure Portal, crear un App Registration configurado como *"Accounts in any organizational directory (Any Microsoft Entra ID directory - Multitenant)"*.
+2. **Redirect URIs**: Configurar la URL de retorno del frontend/backend (ej: `https://app.tuempresa.com/auth/callback` o `https://api.tuempresa.com/api/auth/microsoft/callback`).
+3. **API Permissions**: Solicitar scopes estándar `openid`, `profile`, `email`, `User.Read`.
+4. **Variables de Entorno Backend**:
+   - `AZURE_CLIENT_ID`: ID de aplicación de Azure.
+   - `AZURE_CLIENT_SECRET`: Guardado de forma segura en **Azure Key Vault**.
+   - `AZURE_TENANT_ID`: `common` (para permitir que cualquier agencia inicie sesión con sus credenciales de Microsoft 365).
+
+---
 
 ## 5. Qué NO cambiaría con esta migración
 

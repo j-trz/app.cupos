@@ -2,6 +2,18 @@ Postmortems de bugs ya corregidos, para no re-investigar desde cero si un sínto
 
 > Entradas verificadas contra código al momento de escribirse; fecha propia en cada una.
 
+## 5 vulnerabilidades críticas de seguridad backend (auditoría 2026-08-13) — corregidas
+
+Detalle completo del hallazgo original en [[Auditoría de Seguridad y QA - 2026-08-13]] — acá solo el resumen de los fixes, ya aplicados.
+
+1. **`/api/data` (CRUD dinámico sin permisos, auto-elevación a admin)**: eliminado el endpoint y `data_handler.go` entero (sin ningún caller real en el frontend, confirmado con Grep antes de borrar).
+2. **Escalada de privilegios RBAC** (`agency_admin` podía auto-asignarse `SUPER_ADMIN`): `setUserRole` (`rbac_handler.go`) ahora recibe el `*gin.Context` del caller — bloquea asignar `SUPER_ADMIN` a quien no sea ya admin, y extiende el chequeo de agencia a TODOS los roles de sistema (antes solo corría para roles personalizados). `AssignPermissionsToRole` filtra los permisos otorgables al subset propio del caller. **De yapa, mismo hallazgo pero más directo** en `CreateUser`/`UpdateUser` (`user_handler.go`): `profile.Role`/`profile.Admin` se aplicaban del body sin restricción — cualquier caller con `USERS_CREATE`/`USERS_UPDATE` podía poner `role:"admin"` directo. Corregido con el mismo criterio "se ignora en vez de error" que el archivo ya usa para la reasignación de agencia cross-scope.
+3. **`POST /auth/register` público aceptaba cualquier agencia** en el body: eliminada la ruta y la función `Register` (sin ninguna página de auto-registro en el frontend — el alta de usuarios sigue existiendo, pero solo vía `CreateUser` autenticado).
+4. **Secreto JWT de fallback hardcodeado** (`"fallback_secret_key"` si faltaba `JWT_SECRET`): `Login` ahora falla cerrado (500), igual que `middleware/auth.go` ya hacía para validar tokens.
+5. **`/orders/:id` (Confirmar/Editar/Doc.Contable/Borrar Pasajero) sin permiso ni ownership**: se agregó `RequirePermission("RESERVATIONS_UPDATE")` (ya otorgado por default a los roles base, no rompe flujos existentes) + un helper `callerOwnsReservation()` en los 4 handlers.
+
+Verificado con `go build ./...` y `go vet ./...`, ambos limpios.
+
 ## Deploy roto: módulo "Oportunidades" armado con la estructura de OTRO proyecto (alias `@/`, componentes shadcn con otro nombre)
 
 **Síntoma**: build de Vercel fallaba con `Rollup failed to resolve import "@/contexts/AuthContext" from ".../GestionOportunidades.jsx"`.

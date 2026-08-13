@@ -78,7 +78,12 @@ func main() {
 	{
 		// Rutas públicas
 		api.POST("/auth/login", handlers.Login)
-		api.POST("/auth/register", handlers.Register)
+		// No hay auto-registro público: el alta de usuarios la hace un admin
+		// desde Gestión de Usuarios (CreateUser, autenticado). Existió un
+		// /auth/register público que dejaba a cualquier anónimo declararse
+		// miembro de cualquier agencia vía el body del request — eliminado
+		// 2026-08-13 (hallazgo de la auditoría de seguridad, sin ningún
+		// caller real en el frontend).
 
 		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
 		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
@@ -121,16 +126,16 @@ func main() {
 				orders.PUT("/hold/:id", handlers.AdjustHold)
 				orders.DELETE("/hold/:id", handlers.ReleaseHold)
 				orders.GET("/:id", handlers.GetReservationByID)
-				orders.PUT("/:id", handlers.UpdateReservation)
-				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
+				orders.PUT("/:id", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.UpdateReservation)
+				orders.PUT("/:id/doc-contable", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.AddDocContable)
 				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
 				orders.PUT("/:id/cancel-request/resolve", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.ResolveCancellation)
-				orders.POST("/:id/confirm", handlers.ConfirmReservation)
+				orders.POST("/:id/confirm", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.ConfirmReservation)
 				orders.PUT("/:id/passengers/:passengerId", handlers.UpdatePassengerTicket)
 				orders.PUT("/:id/passengers/:passengerId/full", handlers.UpdatePassenger)
 				orders.POST("/:id/passengers", handlers.AddPassenger)
 				orders.POST("/:id/passengers/:passengerId/duplicate", handlers.DuplicatePassenger)
-				orders.DELETE("/:id/passengers/:passengerId", handlers.DeletePassenger)
+				orders.DELETE("/:id/passengers/:passengerId", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.DeletePassenger)
 				orders.DELETE("/:id", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.DeleteReservation)
 			}
 
@@ -279,14 +284,14 @@ func main() {
 				ai.PUT("/experts/:id/documents/:docId", middleware.AgencyAdminOrAdmin(), handlers.UpdateAIExpertDocument)
 			}
 
-			// CRUD Dinámico (Data)
-			data := protected.Group("/data")
-			{
-				data.GET("/", handlers.GetData)
-				data.POST("/", handlers.ExecuteCRUD)
-				data.PUT("/", handlers.ExecuteCRUD)
-				data.DELETE("/", handlers.ExecuteCRUD)
-			}
+			// Eliminado 2026-08-13 (hallazgo crítico de la auditoría de
+			// seguridad): existía un "CRUD Dinámico" (/data) que aceptaba
+			// nombre de tabla Y de columna arbitrarios del request sin
+			// ninguna allowlist ni permiso más allá de estar logueado —
+			// cualquier usuario autenticado podía volcar cualquier tabla
+			// (incluyendo password hashes) o auto-promoverse a admin
+			// escribiendo directo su propia fila de profiles. Sin ningún
+			// caller real en el frontend (`grep` no encontró ningún uso).
 
 			// Agencias
 			agencies := protected.Group("/agencies")
