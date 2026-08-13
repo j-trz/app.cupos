@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { Sparkles } from 'lucide-react';
+import Swal from 'sweetalert2';
+import ApiClient from '../services/apiClient';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
@@ -208,6 +211,62 @@ const ProductForm = ({
     return Object.keys(e).length === 0;
   };
 
+  const handleGenerateInfantFare = async () => {
+    const tarifaAdt = Number(form.tarifa_adt) || 0;
+    const impuestosAdt = Number(form.impuestos_adt) || 0;
+    const totalAdulto = tarifaAdt + impuestosAdt;
+
+    if (totalAdulto <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Atención',
+        text: 'Debes ingresar primero la tarifa e impuestos del adulto para poder calcular la del infant.',
+      });
+      return;
+    }
+
+    let pctInfant = 15;
+    let pctImpuestos = 10;
+
+    try {
+      const res = await ApiClient.get('/settings');
+      let settingsObj = {};
+      if (Array.isArray(res)) {
+        res.forEach((s) => { settingsObj[s.key] = s.value; });
+      } else if (res && typeof res === 'object') {
+        settingsObj = res;
+      }
+      if (settingsObj.porcentaje_tarifa_infant !== undefined) {
+        pctInfant = Number(settingsObj.porcentaje_tarifa_infant) || 15;
+      }
+      if (settingsObj.porcentaje_impuestos_infant !== undefined) {
+        pctImpuestos = Number(settingsObj.porcentaje_impuestos_infant) || 10;
+      }
+    } catch {
+      // usa los defaults 15% y 10%
+    }
+
+    const totalInfant = totalAdulto * (pctInfant / 100);
+    const impuestosInf = Math.round(totalInfant * (pctImpuestos / 100) * 100) / 100;
+    const tarifaInf = Math.round((totalInfant - impuestosInf) * 100) / 100;
+
+    setForm((prev) => ({
+      ...prev,
+      tarifa_inf: String(tarifaInf),
+      impuestos_inf: String(impuestosInf),
+    }));
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Tarifa Infant Generada',
+      html: `Se aplicó un <b>${pctInfant}%</b> sobre el total adulto ($${totalAdulto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}):<br/><br/>` +
+            `• Tarifa INF (${100 - pctImpuestos}%): <b>$${tarifaInf.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</b><br/>` +
+            `• Impuestos INF (${pctImpuestos}%): <b>$${impuestosInf.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</b>`,
+      timer: 3000,
+      showConfirmButton: false,
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -372,14 +431,31 @@ const ProductForm = ({
               const op = Number(form[`op_${key}`]) || 0;
               const venta = neto1 + op;
               return (
-                <div key={key} className="grid grid-cols-2 gap-4 items-end lg:grid-cols-4">
-                  {field(`tarifa_${key}`, `Tarifa ${label}`, 'number', { step: '0.01', min: '0' })}
-                  {field(`impuestos_${key}`, `Impuestos ${label}`, 'number', { step: '0.01', min: '0' })}
-                  {field(`op_${key}`, `OP ${label}`, 'number', { step: '0.01', min: '0' })}
-                  <div className="space-y-1">
-                    <Label>Venta {label}</Label>
-                    <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700" title={`Neto 1 ${label}: $${neto1.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
-                      ${venta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div key={key} className="space-y-1">
+                  {key === 'inf' && (
+                    <div className="flex items-center justify-between pb-0.5">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bebés (INF)</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateInfantFare}
+                        className="h-7 text-xs text-sky-700 border-sky-200 bg-sky-50 hover:bg-sky-100 px-2 py-0"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1 text-sky-600" />
+                        Generar Tarifa Infant
+                      </Button>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4 items-end lg:grid-cols-4">
+                    {field(`tarifa_${key}`, `Tarifa ${label}`, 'number', { step: '0.01', min: '0' })}
+                    {field(`impuestos_${key}`, `Impuestos ${label}`, 'number', { step: '0.01', min: '0' })}
+                    {field(`op_${key}`, `OP ${label}`, 'number', { step: '0.01', min: '0' })}
+                    <div className="space-y-1">
+                      <Label>Venta {label}</Label>
+                      <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700" title={`Neto 1 ${label}: $${neto1.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
+                        ${venta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
                     </div>
                   </div>
                 </div>

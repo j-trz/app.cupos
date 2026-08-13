@@ -19,10 +19,13 @@ const ESTADO_AEROLINEA_OPTIONS = ['Cotizado', 'Rechazado por la aerolínea', 'Co
 const MOTIVO_RECHAZO_OPTIONS = ['Tarifa alta', 'Fechas incorrectas', 'Exceso de oferta', 'Vencido'];
 const RECHAZADO = 'Rechazado por la aerolínea';
 
+const SERVICIO_OPTIONS = ['Cupo', 'Charter'];
+
 const emptyForm = {
   destino: '',
   compania: '',
   temporada: '',
+  servicio: '',
   validez: '',
   fecha_salida: '',
   fecha_llegada: '',
@@ -33,6 +36,12 @@ const emptyForm = {
   estado_interno: '',
   motivo_rechazo: '',
   estado: 'pendiente',
+  carryon: false,
+  handbag: false,
+  checkedbag: false,
+  carryon_kg: '',
+  handbag_kg: '',
+  checkedbag_kg: '',
 };
 
 // Formulario controlado simple, mismo patrón que el resto de los modales de
@@ -170,50 +179,133 @@ export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess 
               {temporadas.filter((t) => t.activa || t.nombre === form.temporada).map((t) => (
                 <option key={t.id} value={t.nombre}>{t.nombre}</option>
               ))}
-              {/* Si la oportunidad ya tenía un valor viejo (texto libre) que ni
-                  siquiera está en Gestión de Temporadas, se muestra igual para
-                  no perderlo. */}
               {form.temporada && !temporadas.some((t) => t.nombre === form.temporada) && (
                 <option value={form.temporada}>{form.temporada}</option>
               )}
             </select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="validez">Validez</Label>
-            <Input id="validez" type="date" value={form.validez} onChange={(e) => setField('validez', e.target.value)} />
+            <Label htmlFor="servicio">Tipo de Servicio</Label>
+            <select
+              id="servicio"
+              value={form.servicio}
+              onChange={(e) => setField('servicio', e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            >
+              <option value="">Sin especificar</option>
+              {SERVICIO_OPTIONS.map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="validez">Validez</Label>
+            <Input id="validez" type="date" value={form.validez} onChange={(e) => setField('validez', e.target.value)} />
+          </div>
           <div className="space-y-1">
             <Label htmlFor="fecha_salida">Fecha de Salida *</Label>
             <Input id="fecha_salida" type="date" value={form.fecha_salida} onChange={(e) => handleFechaSalidaChange(e.target.value)} required />
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label htmlFor="fecha_llegada">Fecha de Llegada</Label>
             <Input id="fecha_llegada" type="date" value={form.fecha_llegada} onChange={(e) => setField('fecha_llegada', e.target.value)} />
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label htmlFor="total_lugares">Total de Lugares *</Label>
             <Input id="total_lugares" type="number" min="0" value={form.total_lugares} onChange={(e) => setField('total_lugares', e.target.value)} />
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label htmlFor="total_liberados">Total Liberados</Label>
             <Input id="total_liberados" type="number" min="0" value={form.total_liberados} onChange={(e) => setField('total_liberados', e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="neto_1">Neto 1</Label>
+            <Input id="neto_1" type="number" step="0.01" placeholder="Ej: 350.50" value={form.neto_1} onChange={(e) => setField('neto_1', e.target.value)} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label htmlFor="neto_1">Neto 1</Label>
-            <Input id="neto_1" type="number" step="0.01" placeholder="Ej: 350.50" value={form.neto_1} onChange={(e) => setField('neto_1', e.target.value)} />
-          </div>
-          <div className="space-y-1">
             <Label htmlFor="neto_2">Neto 2</Label>
             <Input id="neto_2" type="number" step="0.01" placeholder="Ej: 400.00" value={form.neto_2} onChange={(e) => setField('neto_2', e.target.value)} />
+          </div>
+        </div>
+
+        {/* Franquicia de equipaje */}
+        <div className="border-t border-slate-200 pt-3 space-y-3">
+          <Label className="font-semibold text-slate-800">Franquicia de Equipaje</Label>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3 bg-slate-50/50">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.handbag}
+                  onChange={(e) => setField('handbag', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Mochila / Objeto Personal
+              </label>
+              {form.handbag && (
+                <Input
+                  type="number"
+                  placeholder="Kg (ej: 8)"
+                  value={form.handbag_kg}
+                  onChange={(e) => setField('handbag_kg', e.target.value)}
+                  className="h-8 text-xs bg-white"
+                />
+              )}
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3 bg-slate-50/50">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.carryon}
+                  onChange={(e) => setField('carryon', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Carry-on / Cabina
+              </label>
+              {form.carryon && (
+                <Input
+                  type="number"
+                  placeholder="Kg (ej: 10)"
+                  value={form.carryon_kg}
+                  onChange={(e) => setField('carryon_kg', e.target.value)}
+                  className="h-8 text-xs bg-white"
+                />
+              )}
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3 bg-slate-50/50">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.checkedbag}
+                  onChange={(e) => setField('checkedbag', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Bodega / Despachado
+              </label>
+              {form.checkedbag && (
+                <Input
+                  type="number"
+                  placeholder="Kg (ej: 23)"
+                  value={form.checkedbag_kg}
+                  onChange={(e) => setField('checkedbag_kg', e.target.value)}
+                  className="h-8 text-xs bg-white"
+                />
+              )}
+            </div>
           </div>
         </div>
 

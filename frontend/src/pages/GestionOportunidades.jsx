@@ -55,10 +55,17 @@ const opportunityToProductDefaults = (opp) => ({
   compania: opp.compania || '',
   agencia: opp.agencia || '',
   temporada: opp.temporada || '',
+  servicio: opp.servicio || '',
   fecha_salida: opp.fecha_salida || '',
   fecha_regreso: opp.fecha_llegada || '',
   cupo: opp.total_liberados || opp.total_lugares || 0,
   tarifa_adt: opp.neto_1 || '',
+  carryon: opp.carryon || false,
+  handbag: opp.handbag || false,
+  checkedbag: opp.checkedbag || false,
+  carryon_kg: opp.carryon_kg || '',
+  handbag_kg: opp.handbag_kg || '',
+  checkedbag_kg: opp.checkedbag_kg || '',
 });
 
 export default function GestionOportunidades() {
@@ -271,12 +278,14 @@ export default function GestionOportunidades() {
               <TableHead className="text-center">Acciones</TableHead>
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="text-center">Estado Aerolínea</TableHead>
+              <TableHead className="text-center">Servicio</TableHead>
               <TableHead className="text-center">Destino</TableHead>
               <TableHead className="text-center">Compañía</TableHead>
               <TableHead className="text-center">Temporada</TableHead>
               <TableHead className="text-center">Validez</TableHead>
               <TableHead className="text-center">Salida</TableHead>
               <TableHead className="text-center">Llegada</TableHead>
+              <TableHead className="text-center">Equipaje</TableHead>
               <TableHead className="text-center">Lugares</TableHead>
               <TableHead className="text-center">Liberados</TableHead>
               <TableHead className="text-center">Neto 1</TableHead>
@@ -285,9 +294,9 @@ export default function GestionOportunidades() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={13} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={15} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
             ) : filteredOportunidades.length === 0 ? (
-              <TableRow><TableCell colSpan={13} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={15} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
             ) : (
               filteredOportunidades.map((opp) => (
                 <TableRow key={opp.id}>
@@ -344,12 +353,28 @@ export default function GestionOportunidades() {
                       '—'
                     )}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {opp.servicio ? (
+                      <span className="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                        {opp.servicio}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
                   <TableCell className="text-center font-medium text-slate-900">{opp.destino}</TableCell>
                   <TableCell className="text-center">{opp.compania}</TableCell>
                   <TableCell className="text-center">{opp.temporada || '—'}</TableCell>
                   <TableCell className="text-center">{formatDate(opp.validez)}</TableCell>
                   <TableCell className="text-center">{formatDate(opp.fecha_salida)}</TableCell>
                   <TableCell className="text-center">{formatDate(opp.fecha_llegada)}</TableCell>
+                  <TableCell className="text-center text-xs">
+                    {[
+                      opp.handbag && `Mochila (${opp.handbag_kg || 0}kg)`,
+                      opp.carryon && `Cabina (${opp.carryon_kg || 0}kg)`,
+                      opp.checkedbag && `Bodega (${opp.checkedbag_kg || 0}kg)`,
+                    ].filter(Boolean).join(' • ') || '—'}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="info">{opp.total_lugares ?? 0}</Badge>
                   </TableCell>

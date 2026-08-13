@@ -738,6 +738,13 @@ type Opportunity struct {
 	Neto2              *float64   `gorm:"column:neto_2" json:"neto_2"`
 	EstadoInterno      *string    `json:"estado_interno"` // Estado Aerolínea: cotizado, rechazado, confirmado, vencido
 	MotivoRechazo      *string    `json:"motivo_rechazo"`
+	Servicio           string     `gorm:"column:servicio" json:"servicio"`
+	CarryOn            bool       `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag            bool       `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag         bool       `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	CarryOnKg          float64    `gorm:"column:carryon_kg;default:0" json:"carryon_kg"`
+	HandBagKg          float64    `gorm:"column:handbag_kg;default:0" json:"handbag_kg"`
+	CheckedBagKg       float64    `gorm:"column:checkedbag_kg;default:0" json:"checkedbag_kg"`
 	// ProductoID: se completa al convertir la oportunidad en producto (ver
 	// ConvertOpportunityToProduct) — puramente informativo, no hay lectura
 	// automática de vuelta desde Product. Cuando está seteado, Estado pasa a

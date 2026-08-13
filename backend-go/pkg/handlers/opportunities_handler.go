@@ -39,7 +39,7 @@ func fixOpportunityDates(data map[string]interface{}) {
 
 // fixOpportunityNumbers convierte strings numéricos a float64/int y vacíos a nil/0
 func fixOpportunityNumbers(data map[string]interface{}) {
-	floatFields := []string{"neto_1", "neto_2"}
+	floatFields := []string{"neto_1", "neto_2", "carryon_kg", "handbag_kg", "checkedbag_kg"}
 	intFields := []string{"total_lugares", "total_liberados"}
 	for _, field := range floatFields {
 		if v, ok := data[field]; ok {

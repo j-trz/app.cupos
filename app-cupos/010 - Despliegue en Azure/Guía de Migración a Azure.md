@@ -145,14 +145,46 @@ sequenceDiagram
 
 ---
 
-## 5. Qué NO cambiaría con esta migración
+## 5. Entorno de test/staging (con o sin Neon)
+
+Conversación con Julian (2026-08-13): hoy no hay entorno de test/staging (regla de oro #3) — local y producción comparten el mismo Neon. Vale la pena armarlo, pero **la forma cambia según si el Postgres final queda en Neon o en Azure**.
+
+### Si el Postgres se queda en Neon (o se pasa a Neon vía Azure Marketplace, ver más abajo)
+
+Neon tiene **branching copy-on-write instantáneo** — un branch de la base de producción se crea en segundos, comparte storage con el original (no duplica el disco), y es prácticamente gratis. Esto resuelve el riesgo real ("cualquier dato que cargues en local es dato real de producción") con muy poco esfuerzo:
+
+1. **Branch de Neon** (~1 hora, sin tocar código): crear un branch de la DB de producción, apuntar el `.env` local (o el backend de un ambiente de prueba) a esa connection string en vez de a la real.
+2. **Preview por PR apuntando a ese branch**: si el frontend/backend siguen en Vercel, sus Preview Deployments (automáticos por rama/PR) ya existen — solo hace falta configurar un `DATABASE_URL` distinto para el entorno "Preview" apuntando al branch de Neon. Si el backend se muda a Azure Container Apps, ver la sección siguiente para el equivalente.
+
+### Si el Postgres se muda a Azure Database for PostgreSQL Flexible Server
+
+**Azure NO tiene un equivalente nativo al branching de Neon.** Opciones reales, de más simple a más parecida a un "branch":
+
+- **Point-in-time restore a un servidor nuevo**: restaura un backup a una instancia Flexible Server separada — funciona, pero no es instantáneo ni gratis (es un servidor Postgres nuevo corriendo, con su propio costo de cómputo mientras exista).
+- **`pg_dump`/`pg_restore` manual** a un Flexible Server de staging dedicado — el enfoque más tradicional, más manual.
+- **Recomendado si se migra del todo a Azure**: un segundo Flexible Server, tier **Burstable B1ms** (barato, apto para staging/dev), refrescado periódicamente con un restore. Menos elegante que un branch de Neon, pero estándar y sin sorpresas.
+
+Del lado de "preview por PR": **Azure Static Web Apps ya trae staging environments integrados** (URL de preview automática por PR, igual que Vercel) — esa mitad se cumple gratis para el frontend. **Azure Container Apps no arma un preview por PR solo** — hay que armarlo a mano en el pipeline de GitHub Actions (deployar la rama del PR a una revisión/instancia separada apuntando al Postgres de staging). No es difícil, pero es trabajo de CI/CD que hoy no existe.
+
+### Alternativas a Neon que dan lo mismo (branching/copy-on-write), investigado 2026-08-13
+
+Si en algún momento se quiere mantener la capacidad de branching sin depender pura y exclusivamente de un Flexible Server tradicional:
+
+- **Neon vía Azure Marketplace / Azure Native ISV Service (recomendado si el objetivo real es "todo facturado y administrado desde Azure", no necesariamente "Postgres nativo de Azure")**: Neon está disponible como **Azure Native Integration, GA desde mayo 2025** — se provisiona y administra directo desde el portal de Azure, aparece junto a los servicios de base de datos de Microsoft, con facturación unificada de Azure, SSO con la cuenta de Azure, y soporte de Azure CLI/SDK. Esto significa que **se puede seguir usando el branching de Neon sin salir del ecosistema de facturación/administración de Azure** — probablemente la opción de menor esfuerzo si "todo dentro de Azure" es más un tema de procurement/administración que de insistir en el Postgres nativo de Microsoft. (Nota: Neon fue adquirida por Databricks en mayo 2025 — no debería afectar la integración con Azure, pero vale la pena tenerlo presente como dato de contexto/riesgo de continuidad a largo plazo.)
+- **Xata**: la alternativa más parecida en concepto — también ofrece branching copy-on-write sobre Postgres, con scale-to-zero. Suma búsqueda full-text (Elasticsearch) integrada, que este proyecto no usa hoy. No es un servicio nativo de Azure — se usaría cross-cloud, igual que Neon hoy se usa cross-cloud con Vercel.
+- **Supabase**: la opción más "todo en uno" (Postgres + auth + storage + realtime) — tiene branching, pero sobre instancias dedicadas (sin la penalización de cold-start de Neon, pero tampoco la misma eficiencia de storage compartido). No nativo de Azure.
+- **PlanetScale para Postgres**: GA desde septiembre 2025, con su propio modelo de branching — pero PlanetScale nació como MySQL/Vitess y su oferta de Postgres es más nueva/con menos historial que Neon/Xata; verificar madurez antes de apostar a esto en un proyecto con datos reales.
+
+**Recomendación**: si la razón para migrar a Azure es procurement/facturación (todo bajo un mismo proveedor/contrato), la opción de Neon vía Azure Marketplace logra eso SIN perder el branching — vale la pena confirmarlo con Julian antes de asumir que "migrar a Azure" implica necesariamente abandonar Neon.
+
+## 6. Qué NO cambiaría con esta migración
 
 - El modelo de datos (`models.go`), la lógica de negocio, RBAC granular, y el 99% del código Go/React — todo esto es agnóstico de dónde corre.
-- Neon como base de datos (a menos que se decida migrar explícitamente, ver sección 2).
+- Neon como base de datos (a menos que se decida migrar explícitamente, ver sección 2 y sección 5).
 - El flujo de cron vía GitHub Actions (solo cambia la URL de destino).
 
-## 6. Antes de ejecutar cualquiera de estos pasos de verdad
+## 7. Antes de ejecutar cualquiera de estos pasos de verdad
 
-- Confirmar con Julian el motivo real de la migración (¿costo? ¿requisito de un cliente/compliance? ¿preferencia de infraestructura del equipo?) — cambia qué tan a fondo vale la pena ir en la sección 4.
-- Presupuestar el costo real de Azure Container Apps + Static Web Apps + Key Vault para el volumen de tráfico actual, comparado contra el plan de Vercel actual — puede que no sea una mejora de costos, dependiendo del tier.
+- Confirmar con Julian el motivo real de la migración (¿costo? ¿requisito de un cliente/compliance? ¿preferencia de infraestructura del equipo?) — cambia qué tan a fondo vale la pena ir en la sección 4, y si de verdad hace falta abandonar Neon (ver sección 5) o alcanza con la integración de Azure Marketplace.
+- Presupuestar el costo real de Azure Container Apps + Static Web Apps + Key Vault (+ un Flexible Server de staging si se abandona Neon) para el volumen de tráfico actual, comparado contra el plan de Vercel/Neon actual — puede que no sea una mejora de costos, dependiendo del tier.
 - Re-verificar esta guía contra el estado real del repo antes de actuar (es un snapshot fechado 2026-08-13) — en particular, confirmar el nombre exacto de la env var del frontend para la URL del backend (`VITE_API_URL` es la asumida en `CLAUDE.md`, pero confirmar en `vite.config.js` antes de usarla en un paso real).

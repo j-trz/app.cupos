@@ -349,10 +349,12 @@ func seedRBAC(db *gorm.DB) {
 // arranque y GetIntSetting tenga algo que leer aunque nadie los haya tocado.
 func seedSystemSettings(db *gorm.DB) {
 	defaults := map[string]interface{}{
-		"bloqueo_minutos_default": 60,
-		"ai_historial_horas":      4,
-		"dias_aviso_vencimientos": 3,
-		"bloqueo_hold_minutos":    10,
+		"bloqueo_minutos_default":     60,
+		"ai_historial_horas":          4,
+		"dias_aviso_vencimientos":     3,
+		"bloqueo_hold_minutos":        10,
+		"porcentaje_tarifa_infant":    15,
+		"porcentaje_impuestos_infant": 10,
 	}
 	for key, value := range defaults {
 		var count int64
@@ -685,6 +687,14 @@ func runSQLMigrations(db *gorm.DB) {
 		// admin lo apruebe) y la oportunidad guarda el ID a modo informativo.
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS pendiente_aprobacion BOOLEAN DEFAULT false;`,
 		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS producto_id INTEGER REFERENCES products(id) ON DELETE SET NULL;`,
+		// Servicio y Franquicia de Equipaje en Oportunidades (se heredan al crear producto)
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS servicio VARCHAR(100) DEFAULT '';`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS carryon BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS handbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS checkedbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

@@ -724,14 +724,14 @@ const GestionProductos = () => {
       {isLoading ? (
         <SkeletonTable columns={8} rows={5} />
       ) : filteredProducts.length > 0 ? (
-        <Card>
+        <Card className="overflow-hidden">
           {/* containerClassName acota el alto y hace que el header/columna
               sticky sean relativos a este mismo contenedor con scroll — ver
               comentario en Table.jsx sobre por qué no envolver con otro div. */}
           <TableComponent containerClassName="max-h-[70vh]">
               <TableHeader className="sticky top-0 z-20 [&_th]:bg-slate-50">
                 <TableRow>
-                  <TableHead className="sticky left-0 z-30">Acciones</TableHead>
+                  <TableHead className="sticky left-0 z-30 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
                   {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
                     <TableHead key={c.key}>{c.label}</TableHead>
                   ))}
@@ -742,8 +742,8 @@ const GestionProductos = () => {
                   const tieneMovimientos = !!product.restricted_agency || !!product.source_agency
                     || (cedidosByProductId[String(product.id)] || []).length > 0;
                   return (
-                  <TableRow key={product.id}>
-                    <TableCell className="sticky left-0 z-10 bg-white">
+                  <TableRow key={product.id} className="group">
+                    <TableCell className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                       <div className="flex gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
                         <ActionIconButton icon={Copy} onClick={() => handleDuplicateProduct(product)} title="Duplicar producto" />
