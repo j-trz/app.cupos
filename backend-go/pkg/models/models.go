@@ -709,3 +709,28 @@ type UserAgency struct {
 
 // Agregar campos de cesión a Reservation
 // (Ya existen en el model, pero aseguramos compatibilidad)
+
+// Opportunity representa una oportunidad/cotización de pedido con aerolínea
+// — paso previo a Product (Gestión de Productos). Se carga, analiza y aprueba
+// antes de convertirse en un producto real del catálogo.
+type Opportunity struct {
+	ID                 uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Agencia            string     `gorm:"not null;index" json:"agencia"`
+	Temporada          *string    `json:"temporada"`
+	Estado             string     `gorm:"not null;default:'pendiente';index" json:"estado"` // pendiente, aprobada, rechazada
+	Destino            string     `gorm:"not null;index" json:"destino"`
+	Compania           string     `gorm:"not null;index" json:"compania"`
+	Validez            *time.Time `json:"validez"`
+	FechaSalida        time.Time  `gorm:"not null" json:"fecha_salida"`
+	FechaLlegada       *time.Time `json:"fecha_llegada"`
+	TotalLugares       int        `gorm:"not null;default:0" json:"total_lugares"`
+	TotalLiberados     int        `gorm:"not null;default:0" json:"total_liberados"`
+	Neto1              *float64   `json:"neto_1"`
+	Neto2              *float64   `json:"neto_2"`
+	EstadoInterno      *string    `json:"estado_interno"`
+	FechaCargado       time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_cargado"`
+	UsuarioCargador    uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_cargador"`
+	UsuarioAutorizador *uuid.UUID `gorm:"type:uuid" json:"usuario_autorizador"`
+	CreatedAt          time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt          time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+}

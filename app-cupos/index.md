@@ -1,0 +1,15 @@
+Catálogo de este vault — un LLM (o una persona) que arranca una sesión nueva debería poder orientarse leyendo solo esta página. Estructura y protocolo de mantenimiento en [[Gotchas y Reglas de Oro]] (sección final); historial cronológico de altas/consultas/lints en [[log]].
+
+> **Última revisión de este mapa contra el código**: 2026-08-12.
+
+- **[000 - README](../000%20-%20README/Sistema%20de%20Gestión%20de%20Cupos.md)** — qué es el proyecto, cómo levantarlo local, cómo se despliega.
+- **[001 - API](../001%20-%20API/Referencia%20de%20API.md)** — catálogo completo de endpoints REST, convenciones de auth/errores/permisos.
+- **[002 - Quickstart](../002%20-%20Quickstart/Quickstart.md)** — primera llamada autenticada, flujo mínimo de reserva por API.
+- **[003 - Funcionalidades](../003%20-%20Funcionalidades/Flujos%20de%20Funcionalidades.md)** — cómo funciona cada módulo por dentro, con diagramas (17 secciones: auth, disponibilidad, ciclo de vida de reserva, cesión, grupos, RBAC, IA, cron de expiración, reportes, notificaciones, configuración, API keys, backups, Netviax Atlas).
+- **[004 - Frontend](../004%20-%20Frontend/Frontend.md)** — arquitectura de la SPA: stack, rutas, contextos, servicios, hooks, componentes, mobile, i18n, build.
+- **[005 - Arquitectura y Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md)** — catálogo de tablas/modelos (GORM), relaciones y por qué están diseñadas así.
+- **[006 - Operación y Mantenimiento](../006%20-%20Operación%20y%20Mantenimiento/Gotchas%20y%20Reglas%20de%20Oro.md)** — invariantes no obvias del repo (dos entrypoints de backend, sin DB de test, RBAC, scoping de agencia) + [historial de bugs ya resueltos](../006%20-%20Operación%20y%20Mantenimiento/Historial%20de%20Bugs%20Resueltos.md), para no re-investigar un síntoma ya conocido.
+- **[007 - Integración Netviax Atlas](../007%20-%20Integración%20Netviax%20Atlas/Conexión%20y%20Estructura%20General.md)** — carpeta separada y activamente mantenida sobre la integración con el backoffice Netviax Atlas: conexión/credenciales, los flujos de lectura ya construidos (contactos, fichas) y la fase de escritura pendiente (reportar tickets emitidos) con el checklist de preguntas para Netviax.
+- **[008 - Backlog y Feedback](../008%20-%20Backlog%20y%20Feedback/Feedback%20equipo%20de%20testing%20(UTG)%20—%20Sistema%20de%20Cupos.md)** — backlog vivo de feedback del equipo de testing, normalizado por módulo, y trabajo pendiente/diferido en general (drafts de comunicación externa incluidos, ej. el borrador de email a Netviax en 007).
+
+**Convención al agregar una nota nueva**: si documenta *cómo funciona* algo ya construido, va en 003/004/005. Si es una regla operativa o un bug ya cerrado, va en 006. Si es trabajo pendiente/backlog (incluye borradores de comunicación externa), va en 008. Evitar duplicar contenido entre notas — enlazar con Markdown/wikilink en su lugar. Toda carpeta nueva de primer nivel entra numerada al final de esta lista.

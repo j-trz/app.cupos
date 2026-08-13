@@ -25,6 +25,7 @@ const navItems = [
 const adminNavItems = [
   { label: 'Productos', path: '/productos', icon: Package, permission: 'PRODUCTS_VIEW' },
   { label: 'Grupos', path: '/grupos', icon: Luggage, permission: 'GROUPS_VIEW' },
+  { label: 'Oportunidades', path: '/oportunidades', icon: Sparkles, permission: 'OPPORTUNITIES_VIEW' },
   { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
   { label: 'Temporadas', path: '/temporadas', icon: Tag, permission: 'TEMPORADAS_VIEW' },
   { label: 'Reservas', path: '/reservas', icon: CreditCard, permission: 'RESERVATIONS_VIEW' },
@@ -403,7 +404,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                 <>
                   {!collapsed && (
                     <div className="my-2 px-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Administración</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Gestión</p>
                     </div>
                   )}
                   {visibleAdminNavItems.map(({ label, path, icon: Icon }) => (

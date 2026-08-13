@@ -9,6 +9,7 @@ export const MODULES = [
   { value: 'agencies', label: 'Agencias', icon: '🏢' },
   { value: 'products', label: 'Productos', icon: '📦' },
   { value: 'groups', label: 'Grupos', icon: '🧳' },
+  { value: 'opportunities', label: 'Oportunidades', icon: '✨' },
   { value: 'reservations', label: 'Reservas', icon: '📅' },
   { value: 'transfers', label: 'Cesiones', icon: '🔄' },
   { value: 'notifications', label: 'Notificaciones', icon: '🔔' },

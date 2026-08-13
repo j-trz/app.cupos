@@ -1,5 +1,7 @@
 # form-cupos
 
+> `AGENTS.md` (ChatGPT/Codex) y `GEMINI.md` (Gemini) son punteros de una línea a este archivo — no duplicar contenido ahí, editar siempre acá.
+
 Sistema de Gestión de Cupos: plataforma B2B de asignación de cupos aéreos/paquetes para agencias. Backend Go (Gin + GORM + Postgres/Neon) en `backend-go/`, frontend React (Vite + Tailwind v4 + React Router 7) en `frontend/`, deploy en Vercel.
 
 ## Correr en local
@@ -22,7 +24,7 @@ Build/verificación rápida: `go build ./...` (backend), `npm run build` / `npm 
 
 ## Más contexto
 
-Hay una base de conocimiento persistente del proyecto en el vault de Obsidian **`app-cupos`**, dentro de este mismo repo (`form-cupos/app-cupos/`, versionado en git; se interactúa vía el CLI `obsidian`): arquitectura, catálogo de API, modelo de datos, flujos de negocio con diagramas, historial de bugs resueltos, la integración con Netviax Atlas (carpeta separada, desarrollo activo) y el backlog de feedback de testing. Consultarlo antes de re-derivar algo de cero — especialmente `006 - Operación y Mantenimiento` (gotchas + bugs ya cerrados), `005 - Arquitectura y Datos` (modelo de datos) y `007 - Integración Netviax Atlas` si el trabajo toca esa integración.
+Hay una base de conocimiento persistente del proyecto en el vault de Obsidian **`app-cupos`**, dentro de este mismo repo (`form-cupos/app-cupos/`, versionado en git; se interactúa vía el CLI `obsidian`): arquitectura, catálogo de API, modelo de datos, flujos de negocio con diagramas, historial de bugs resueltos, la integración con Netviax Atlas (carpeta separada, desarrollo activo) y el backlog de feedback de testing. Empezar por `app-cupos/index.md` (catálogo de todas las notas por carpeta) y `app-cupos/log.md` (historial cronológico de altas/consultas/lints) antes de explorar carpeta por carpeta. Consultarlo antes de re-derivar algo de cero — especialmente `006 - Operación y Mantenimiento` (gotchas + bugs ya cerrados), `005 - Arquitectura y Datos` (modelo de datos) y `007 - Integración Netviax Atlas` si el trabajo toca esa integración.
 
 ## Antes de actuar / al terminar
 

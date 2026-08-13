@@ -6,7 +6,7 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 ## Índice
 
-1. [Núcleo del negocio: Product, Reservation, Passenger](#1-núcleo-del-negocio-product-reservation-passenger)
+1. [Núcleo del negocio: Opportunity, Product, Reservation, Passenger](#1-núcleo-del-negocio-opportunity-product-reservation-passenger)
 2. [Identidad y acceso: Profile, Agency, UserAgency](#2-identidad-y-acceso-profile-agency-useragency)
 3. [RBAC: Permission, Role, UserRole, RolePermission](#3-rbac-permission-role-userrole-rolepermission)
 4. [Cesión y compartición de cupos](#4-cesión-y-compartición-de-cupos)
@@ -18,7 +18,18 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 ---
 
-## 1. Núcleo del negocio: Product, Reservation, Passenger
+## 1. Núcleo del negocio: Opportunity, Product, Reservation, Passenger
+
+### `Opportunity` (tabla `opportunities`)
+
+Una oportunidad de negocio con aerolínea: es la **pre-carga de un pedido** antes de que se convierta en un `Product` real del catálogo/stock. Sirve para registrar una propuesta comercial, analizarla, evaluarla y aprobarla por la agencia o el admin antes de materializarla como cupo disponible. Campos clave:
+
+- **Identidad**: `Agencia`, `Temporada` (opcional), `Destino`, `Compania`, `Validez` (fecha de vigencia), `FechaSalida`, `FechaLlegada` (opcional), `Estado` (`pendiente` / `aprobada` / `rechazada`).
+- **Stock y economía**: `TotalLugares`, `TotalLiberados`, `Neto1`, `Neto2`. `Neto1`/`Neto2` son valores de negocio del cupo potencial (no el neto de un pasajero real), útiles para comparar propuestas y luego convertirlas en un producto normal.
+- **Control operativo**: `EstadoInterno` (texto libre del área, ej. "En análisis", "Pendiente aprobación"), `FechaCargado`, `UsuarioCargador`, `UsuarioAutorizador`. `FechaCargado` y `UsuarioCargador` se completan automáticamente en el backend desde el JWT y la hora actual; no se aceptan desde el request para evitar spoofing.
+- **Auditoría**: `CreatedAt`, `UpdatedAt`.
+
+La intención funcional es mantener un registro separado del `Product`: una oportunidad puede rechazarse, modificarse varias veces y aprobarse sin dejar residuos de catálogo. El flujo de negocio va en el sentido `Oportunidad -> Aprobar -> Product` o, si se rechaza, queda como historial administrativo. La carga usa permisos granulares del RBAC (`OPPORTUNITIES_VIEW`, `OPPORTUNITIES_CREATE`, `OPPORTUNITIES_UPDATE`, `OPPORTUNITIES_DELETE`, `OPPORTUNITIES_APPROVE`) y el scoping por agencia se aplica igual que en `Product`/`Reservation`: admin ve todo, usuarios no-admin solo las de su propia agencia y solo pueden editar/eliminar si son el creador y la oportunidad todavía está en `pendiente`.
 
 ### `Product` (tabla `products`)
 

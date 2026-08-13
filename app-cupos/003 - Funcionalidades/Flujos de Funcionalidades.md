@@ -1,7 +1,7 @@
 
 Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** junto con su diagrama de flujo. Cada sección incluye una breve descripción textual y un diagrama que refleja la lógica real implementada en el repositorio (validaciones, estados y endpoints).
 
-> Secciones 1-16 sin re-verificar en la pasada del 2026-08-10 (se asume su contenido previo vigente); sección 17 agregada y verificada ese día.
+> Secciones 1-16 sin re-verificar en la pasada del 2026-08-10 (se asume su contenido previo vigente); sección 17 agregada y verificada ese día; sección 18 agregada y verificada el 2026-08-12.
 
 
 ## Índice
@@ -23,6 +23,7 @@ Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** 
 15. [Claves de API para Integraciones Externas (M2M)](#15-claves-de-api-para-integraciones-externas-m2m)
 16. [Estado del Sistema y Backups](#16-estado-del-sistema-y-backups)
 17. [Integración con Netviax Atlas (Backoffice)](#17-integración-con-netviax-atlas-backoffice)
+18. [Administración (módulo en construcción)](#18-administración-módulo-en-construcción)
 
 ---
 
@@ -501,4 +502,19 @@ Integración con el backoffice externo Netviax Atlas: permite buscar un contacto
 
 - Backend: `pkg/services/netviax_atlas_service.go`, `handlers/backoffice_handler.go`, `handlers/atlas_config_handler.go`.
 - Frontend: `services/atlasService.js`, `services/atlasConfigService.js`, botón de búsqueda en `Availability.jsx`, página `AtlasConfig.jsx`.
+
+---
+
+## 18. Administración (módulo en construcción)
+
+**Solo el andamiaje está construido — sin funcionalidad todavía.** Julian pidió crear la base de un módulo nuevo llamado "Administración", ubicado dentro del propio grupo "Administración" del Sidebar (no confundir el nombre del ítem de menú con el del grupo que lo contiene), para ir agregándole funciones incrementalmente en próximas conversaciones.
+
+Lo que existe hoy (2026-08-12):
+
+- Página `frontend/src/pages/Administracion.jsx`: shell con guard de permiso (`can('ADMINISTRACION_VIEW')`, después de todos los hooks, ver regla 5 de [[Gotchas y Reglas de Oro]]) y un placeholder ("Todavía no hay nada configurado acá").
+- Ruta `/administracion` en `App.jsx`, mismo patrón `ProtectedRoute` + `Layout` que el resto de las páginas admin.
+- Ítem "Administración" en `adminNavItems` (`Sidebar.jsx`), ícono `Settings`, gateado por el mismo permiso.
+- Permiso `ADMINISTRACION_VIEW` sembrado en `seedRBAC()` (`db.go`, módulo `administracion`) y registrado en `frontend/src/lib/permissionModules.js` para que aparezca en la matriz de Roles.
+
+**No hay endpoint de backend, tabla, ni acciones (CREATE/UPDATE/DELETE) todavía** — no se agregó nada a `main.go`/`index.go` porque no hay ningún dato que servir aún. Cuando se defina el contenido real del módulo, seguir el mismo patrón dual-entrypoint (regla 1 de [[Gotchas y Reglas de Oro]]) y sumar los permisos de acción que correspondan (`ADMINISTRACION_CREATE`/`_UPDATE`/`_DELETE`) junto a `ADMINISTRACION_VIEW`.
 

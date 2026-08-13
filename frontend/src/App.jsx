@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import GestionUsuarios from './pages/GestionUsuarios';
 import GestionProductos from './pages/GestionProductos';
 import GestionGrupos from './pages/GestionGrupos';
+import GestionOportunidades from './pages/GestionOportunidades';
 import GestionReservas from './pages/GestionReservas';
 import GestionAgencias from './pages/GestionAgencias';
 import GestionTemporadas from './pages/GestionTemporadas';
@@ -100,6 +101,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <GestionGrupos />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/oportunidades"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <GestionOportunidades />
                           </Layout>
                         </ProtectedRoute>
                       }

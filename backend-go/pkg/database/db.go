@@ -60,6 +60,7 @@ func InitDB() {
 		&models.AIExpertChunk{},
 		&models.APIKey{},
 		&models.Temporada{},
+		&models.Opportunity{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -170,6 +171,12 @@ func seedRBAC(db *gorm.DB) {
 
 		{"REPORTS_VIEW", "Ver Reportes", "reports", "view", "Acceder a reportes y estadísticas"},
 		{"REPORTS_EXPORT", "Exportar Datos", "reports", "export", "Exportar datos en CSV/Excel/PDF"},
+
+		{"OPPORTUNITIES_VIEW", "Ver Oportunidades", "opportunities", "view", "Listar y buscar oportunidades"},
+		{"OPPORTUNITIES_CREATE", "Crear Oportunidades", "opportunities", "create", "Crear nuevas oportunidades"},
+		{"OPPORTUNITIES_UPDATE", "Editar Oportunidades", "opportunities", "update", "Modificar oportunidades"},
+		{"OPPORTUNITIES_DELETE", "Eliminar Oportunidades", "opportunities", "delete", "Eliminar oportunidades"},
+		{"OPPORTUNITIES_APPROVE", "Aprobar Oportunidades", "opportunities", "approve", "Aprobar oportunidades"},
 	}
 	for _, p := range permissions {
 		var count int64

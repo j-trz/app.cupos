@@ -151,6 +151,17 @@ func init() {
 				groups.POST("/:id/resolve-cancellation", middleware.RequirePermission("GROUPS_UPDATE"), handlers.ResolveGroupCancellation)
 			}
 
+			// Oportunidades (análisis de pedidos antes de convertirse en Productos)
+			opportunities := protected.Group("/opportunities")
+			{
+				opportunities.GET("", middleware.RequirePermission("OPPORTUNITIES_VIEW"), handlers.GetOpportunities)
+				opportunities.GET("/:id", middleware.RequirePermission("OPPORTUNITIES_VIEW"), handlers.GetOpportunity)
+				opportunities.POST("", middleware.RequirePermission("OPPORTUNITIES_CREATE"), handlers.CreateOpportunity)
+				opportunities.PUT("/:id", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.UpdateOpportunity)
+				opportunities.DELETE("/:id", middleware.RequirePermission("OPPORTUNITIES_DELETE"), handlers.DeleteOpportunity)
+				opportunities.PUT("/:id/approve", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.ApproveOpportunity)
+			}
+
 			// Mis permisos resueltos (cualquier usuario autenticado, no solo admin —
 			// se registra sobre "protected" y no sobre el grupo "/users" de abajo
 			// para no heredar su middleware.AdminOnly()).
