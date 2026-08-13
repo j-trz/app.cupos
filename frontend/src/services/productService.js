@@ -67,6 +67,14 @@ export class ProductService {
   static async unshareProduct(productId, agencia) {
     return await ApiClient.delete(`/products/${productId}/shared-agencies/${encodeURIComponent(agencia)}`);
   }
+
+  static async bulkDeleteProducts(ids) {
+    return await ApiClient.post('/products/bulk-delete', { ids });
+  }
+
+  static async bulkDuplicateProducts(ids) {
+    return await ApiClient.post('/products/bulk-duplicate', { ids });
+  }
 }
 
 export default ProductService;

@@ -17,7 +17,8 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Copy, CheckCircle2, Clock, Columns3 } from 'lucide-react';
+import BulkSelectionBar, { Trash2, Copy, CheckCircle2 } from '../components/ui/BulkSelectionBar.jsx';
+import { Search, Plus, Edit, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Clock, Columns3 } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -56,6 +57,11 @@ const GestionProductos = () => {
   const [routeModalProduct, setRouteModalProduct] = useState(null);
   const [notesModalProduct, setNotesModalProduct] = useState(null);
   const [movementsModalProduct, setMovementsModalProduct] = useState(null);
+
+  // Multi-selección
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkDuplicating, setIsBulkDuplicating] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -234,6 +240,53 @@ const GestionProductos = () => {
       Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Producto eliminado correctamente', timer: 1500, showConfirmButton: false });
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al eliminar el producto' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const result = await Swal.fire({
+      title: `¿Eliminar ${selectedIds.length} productos?`,
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkDeleting(true);
+    try {
+      await ProductService.bulkDeleteProducts(selectedIds);
+      toast({ title: 'Éxito', description: `${selectedIds.length} productos eliminados.` });
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (err) {
+      toast({ title: 'Error', description: err.message || 'Error al eliminar masivamente.', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleBulkDuplicate = async () => {
+    const result = await Swal.fire({
+      title: `¿Duplicar ${selectedIds.length} productos?`,
+      text: 'Se crearán copias exactas con el cupo y tarifas originales.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Duplicar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkDuplicating(true);
+    try {
+      await ProductService.bulkDuplicateProducts(selectedIds);
+      toast({ title: 'Éxito', description: `${selectedIds.length} productos duplicados.` });
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (err) {
+      toast({ title: 'Error', description: err.message || 'Error al duplicar masivamente.', variant: 'destructive' });
+    } finally {
+      setIsBulkDuplicating(false);
     }
   };
 
@@ -731,7 +784,18 @@ const GestionProductos = () => {
           <TableComponent containerClassName="max-h-[70vh]">
               <TableHeader className="sticky top-0 z-20 [&_th]:bg-slate-50">
                 <TableRow>
-                  <TableHead className="sticky left-0 z-30 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
+                  <TableHead className="w-10 sticky left-0 z-30 bg-slate-50 border-r border-b border-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(filteredProducts.map(p => p.id));
+                        else setSelectedIds([]);
+                      }}
+                      className="rounded border-gray-300 w-4 h-4"
+                    />
+                  </TableHead>
+                  <TableHead className="sticky left-10 z-30 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
                   {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
                     <TableHead key={c.key}>{c.label}</TableHead>
                   ))}
@@ -742,8 +806,19 @@ const GestionProductos = () => {
                   const tieneMovimientos = !!product.restricted_agency || !!product.source_agency
                     || (cedidosByProductId[String(product.id)] || []).length > 0;
                   return (
-                  <TableRow key={product.id} className="group">
-                    <TableCell className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                  <TableRow key={product.id} className={`group ${selectedIds.includes(product.id) ? 'bg-blue-50/50' : ''}`}>
+                    <TableCell className="w-10 sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(product.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(prev => [...prev, product.id]);
+                          else setSelectedIds(prev => prev.filter(id => id !== product.id));
+                        }}
+                        className="rounded border-gray-300 w-4 h-4"
+                      />
+                    </TableCell>
+                    <TableCell className="sticky left-10 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                       <div className="flex gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
                         <ActionIconButton icon={Copy} onClick={() => handleDuplicateProduct(product)} title="Duplicar producto" />
@@ -796,6 +871,16 @@ const GestionProductos = () => {
           }
         />
       )}
+
+      <BulkSelectionBar
+        selectedCount={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        entityLabel="producto"
+        actions={[
+          { label: 'Eliminar', icon: Trash2, variant: 'danger', onClick: handleBulkDelete, loading: isBulkDeleting },
+          { label: 'Duplicar', icon: Copy, variant: 'primary', onClick: handleBulkDuplicate, loading: isBulkDuplicating }
+        ]}
+      />
 
       {/* Modal de Cesión de Disponibilidad */}
       <TransferModal

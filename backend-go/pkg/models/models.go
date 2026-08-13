@@ -763,3 +763,36 @@ type Opportunity struct {
 	AutorizadorUser *Profile `gorm:"foreignKey:UsuarioAutorizador" json:"autorizador_user,omitempty"`
 }
 
+// Ticket representa un boleto emitido con lógica GDS inmutable (se emite, anula/void, o sincroniza con Netviax Atlas)
+type Ticket struct {
+	ID                uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	NumeroTicket      string     `gorm:"not null;uniqueIndex" json:"numero_ticket"`
+	ReservationID     uuid.UUID  `gorm:"type:uuid;not null;index" json:"reservation_id"`
+	PassengerID       *uuid.UUID `gorm:"type:uuid;index" json:"passenger_id,omitempty"`
+	ProductID         uint       `gorm:"not null;index" json:"product_id"`
+	Agencia           string     `gorm:"not null;index" json:"agencia"`
+	PasajeroNombre    string     `gorm:"not null" json:"pasajero_nombre"`
+	PasajeroDocumento string     `json:"pasajero_documento"`
+	PNR               string     `gorm:"not null;index" json:"pnr"`
+	Ruta              string     `json:"ruta"`
+	Compania          string     `json:"compania"`
+	Ficha             string     `json:"ficha"`
+	Tarifa            float64    `gorm:"not null;default:0" json:"tarifa"`
+	Impuestos         float64    `gorm:"not null;default:0" json:"impuestos"`
+	Total             float64    `gorm:"not null;default:0" json:"total"`
+	Estado            string     `gorm:"not null;default:'emitido';index" json:"estado"` // emitido, enviado_atlas, void
+	FechaEmision      time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_emision"`
+	UsuarioEmisorID   uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_emisor_id"`
+	FechaVoid         *time.Time `json:"fecha_void,omitempty"`
+	UsuarioVoidID     *uuid.UUID `gorm:"type:uuid" json:"usuario_void_id,omitempty"`
+	MotivoVoid        *string    `json:"motivo_void,omitempty"`
+	AtlasStatus       string     `gorm:"default:'pendiente'" json:"atlas_status"`
+	AtlasResponse     string     `gorm:"type:text" json:"atlas_response,omitempty"`
+	CreatedAt         time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt         time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+
+	// Relaciones
+	EmisorUser *Profile `gorm:"foreignKey:UsuarioEmisorID" json:"emisor_user,omitempty"`
+	VoidUser   *Profile `gorm:"foreignKey:UsuarioVoidID" json:"void_user,omitempty"`
+}
+

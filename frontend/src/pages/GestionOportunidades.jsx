@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import Swal from 'sweetalert2';
 import { Sparkles, Plus, Edit, Trash2, CheckCircle2, Search, Lock, PackagePlus, RefreshCw, RotateCcw, History } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useOpportunities, useDeleteOpportunity, useApproveOpportunity, useConvertOpportunityToProduct } from '../hooks/useOpportunities';
+import { useOpportunities, useDeleteOpportunity, useApproveOpportunity, useConvertOpportunityToProduct, useBulkDeleteOpportunities, useBulkApproveOpportunities } from '../hooks/useOpportunities';
 import { OportunityForm } from '../components/OportunityForm';
+import BulkSelectionBar, { Trash2, CheckCircle2 } from '../components/ui/BulkSelectionBar.jsx';
 import ProductForm from '../components/ProductForm';
 import Button from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
@@ -90,6 +91,13 @@ export default function GestionOportunidades() {
   const deleteMutation = useDeleteOpportunity();
   const approveMutation = useApproveOpportunity();
   const convertMutation = useConvertOpportunityToProduct();
+  const bulkDeleteMutation = useBulkDeleteOpportunities();
+  const bulkApproveMutation = useBulkApproveOpportunities();
+
+  // Multi-selección
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
 
   const isAdmin = can('USERS_VIEW');
   const canEdit = can('OPPORTUNITIES_UPDATE');
@@ -164,6 +172,50 @@ export default function GestionOportunidades() {
       toast({ title: 'Oportunidad aprobada', variant: 'success' });
     } catch (err) {
       toast({ title: 'Error al aprobar', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: `¿Eliminar ${selectedIds.length} oportunidades?`,
+      text: 'Esta acción no se puede deshacer.',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkDeleting(true);
+    try {
+      await bulkDeleteMutation.mutateAsync(selectedIds);
+      toast({ title: 'Éxito', description: `${selectedIds.length} oportunidades eliminadas.`, variant: 'success' });
+      setSelectedIds([]);
+    } catch (err) {
+      toast({ title: 'Error', description: err.message || 'Error al eliminar masivamente.', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: `¿Aprobar ${selectedIds.length} oportunidades?`,
+      showCancelButton: true,
+      confirmButtonText: 'Aprobar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkApproving(true);
+    try {
+      await bulkApproveMutation.mutateAsync(selectedIds);
+      toast({ title: 'Éxito', description: `${selectedIds.length} oportunidades aprobadas.`, variant: 'success' });
+      setSelectedIds([]);
+    } catch (err) {
+      toast({ title: 'Error', description: err.message || 'Error al aprobar masivamente.', variant: 'destructive' });
+    } finally {
+      setIsBulkApproving(false);
     }
   };
 
@@ -275,7 +327,18 @@ export default function GestionOportunidades() {
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-center">Acciones</TableHead>
+              <TableHead className="w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-b border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={filteredOportunidades.length > 0 && selectedIds.length === filteredOportunidades.length}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(filteredOportunidades.map(o => o.id));
+                    else setSelectedIds([]);
+                  }}
+                  className="rounded border-gray-300 w-4 h-4"
+                />
+              </TableHead>
+              <TableHead className="w-32 sticky left-10 z-20 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] text-center">Acciones</TableHead>
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="text-center">Estado Aerolínea</TableHead>
               <TableHead className="text-center">Servicio</TableHead>
@@ -299,10 +362,20 @@ export default function GestionOportunidades() {
               <TableRow><TableCell colSpan={15} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
             ) : (
               filteredOportunidades.map((opp) => (
-                <TableRow key={opp.id}>
-                  <TableCell>
+                <TableRow key={opp.id} className={`group ${selectedIds.includes(opp.id) ? 'bg-blue-50/50' : ''}`}>
+                  <TableCell className="w-10 text-center sticky left-0 z-10 bg-white border-r border-slate-200 group-hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(opp.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(prev => [...prev, opp.id]);
+                        else setSelectedIds(prev => prev.filter(id => id !== opp.id));
+                      }}
+                      className="rounded border-gray-300 w-4 h-4"
+                    />
+                  </TableCell>
+                  <TableCell className="sticky left-10 z-10 bg-white border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50">
                     <div className="flex items-center justify-center gap-1">
-                      {/* Historial: siempre visible */}
                       <ActionIconButton
                         icon={History}
                         onClick={() => setHistoryOpportunity(opp)}
@@ -391,6 +464,16 @@ export default function GestionOportunidades() {
           </TableBody>
         </TableComponent>
       </Card>
+
+      <BulkSelectionBar
+        selectedCount={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        entityLabel="oportunidad"
+        actions={[
+          { label: 'Aprobar', icon: CheckCircle2, variant: 'success', onClick: handleBulkApprove, loading: isBulkApproving },
+          { label: 'Eliminar', icon: Trash2, variant: 'danger', onClick: handleBulkDelete, loading: isBulkDeleting }
+        ]}
+      />
 
       <OportunityForm
         isOpen={isFormOpen}

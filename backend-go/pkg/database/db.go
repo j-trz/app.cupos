@@ -61,6 +61,7 @@ func InitDB() {
 		&models.APIKey{},
 		&models.Temporada{},
 		&models.Opportunity{},
+		&models.Ticket{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -178,7 +179,11 @@ func seedRBAC(db *gorm.DB) {
 		{"OPPORTUNITIES_UPDATE", "Editar Oportunidades", "opportunities", "update", "Modificar oportunidades"},
 		{"OPPORTUNITIES_DELETE", "Eliminar Oportunidades", "opportunities", "delete", "Eliminar oportunidades"},
 		{"OPPORTUNITIES_APPROVE", "Aprobar Oportunidades", "opportunities", "approve", "Aprobar oportunidades"},
-		{"OPPORTUNITIES_CONVERT", "Convertir a Producto", "opportunities", "convert", "Convertir una oportunidad aprobada en un producto (queda pendiente de aprobación)"},
+		{"OPPORTUNITIES_CONVERT", "Convertir Oportunidad a Producto", "opportunities", "convert", "Convertir una oportunidad aprobada en un producto del catálogo"},
+
+		{"TICKETS_VIEW", "Ver Bandeja de Tickets", "tickets", "view", "Acceso a la bandeja de tickets emitidos y detalle de boletos"},
+		{"TICKETS_VOID", "Anular / Voidear Ticket", "tickets", "void", "Anular boletos emitidos (registrar void)"},
+		{"TICKETS_SYNC", "Sincronizar Ticket con Atlas", "tickets", "sync", "Reintentar notificación de emisión de ticket a Netviax Atlas"},
 	}
 	for _, p := range permissions {
 		var count int64

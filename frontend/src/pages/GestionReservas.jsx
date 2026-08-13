@@ -11,6 +11,7 @@ import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import BulkSelectionBar, { XCircle } from '../components/ui/BulkSelectionBar.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
@@ -149,6 +150,12 @@ export default function GestionReservas() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Multi-selección
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [isBulkCanceling, setIsBulkCanceling] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editReservation, setEditReservation] = useState(null);
   const [editPassengerId, setEditPassengerId] = useState(null);
@@ -501,6 +508,61 @@ export default function GestionReservas() {
     }
   };
 
+  const handleBulkUpdate = async (estado) => {
+    const result = await Swal.fire({
+      title: `¿Cambiar estado a ${getEstadoLabel(estado)}?`,
+      text: `Se actualizarán ${selectedIds.length} reservas.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cambiar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkUpdating(true);
+    try {
+      await ReservationService.bulkUpdateReservations(selectedIds, estado);
+      Swal.fire({ icon: 'success', title: 'Actualizadas', timer: 1500, showConfirmButton: false });
+      setSelectedIds([]);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al actualizar masivamente.' });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkCancel = async () => {
+    const result = await Swal.fire({
+      title: `¿Cancelar ${selectedIds.length} reservas?`,
+      html: '<textarea id="motivo-cancel" class="swal2-textarea" placeholder="Motivo de cancelación (requerido)"></textarea>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cancelar',
+      cancelButtonText: 'Volver',
+      confirmButtonColor: '#d33',
+      preConfirm: () => {
+        const motivo = document.getElementById('motivo-cancel').value;
+        if (!motivo) {
+          Swal.showValidationMessage('Debe ingresar un motivo');
+          return false;
+        }
+        return motivo;
+      }
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkCanceling(true);
+    try {
+      await ReservationService.bulkCancelReservations(selectedIds, result.value);
+      Swal.fire({ icon: 'success', title: 'Canceladas', timer: 1500, showConfirmButton: false });
+      setSelectedIds([]);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al cancelar masivamente.' });
+    } finally {
+      setIsBulkCanceling(false);
+    }
+  };
+
   // ─── Ticket individual por pasajero ───────────
   const openTicketModal = (row) => {
     if (!row.passengerId) return;
@@ -608,7 +670,18 @@ export default function GestionReservas() {
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-center">Acciones</TableHead>
+              <TableHead className="w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-b border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(filtered.map(r => r.id));
+                    else setSelectedIds([]);
+                  }}
+                  className="rounded border-gray-300 w-4 h-4"
+                />
+              </TableHead>
+              <TableHead className="text-center sticky left-10 z-20 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Destino</TableHead>
               <TableHead>Cía</TableHead>
@@ -643,8 +716,19 @@ export default function GestionReservas() {
             ) : filtered.flatMap(r => {
               const expiry = r.estado === 'bloqueo_temporal' ? formatExpiry(r.bloqueo_expira_at) : null;
               return buildPassengerRows(r).map(row => (
-                <TableRow key={row.key}>
-                  <TableCell>
+                <TableRow key={row.key} className={selectedIds.includes(r.id) ? 'bg-blue-50/50' : ''}>
+                  <TableCell className="w-10 text-center sticky left-0 z-10 bg-white border-r border-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(r.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(prev => [...prev, r.id]);
+                        else setSelectedIds(prev => prev.filter(id => id !== r.id));
+                      }}
+                      className="rounded border-gray-300 w-4 h-4"
+                    />
+                  </TableCell>
+                  <TableCell className="sticky left-10 z-10 bg-white border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                     <div className="flex items-center justify-center gap-1">
                       {r.estado === 'solicitud_cancelacion' && (
                         <>
@@ -810,6 +894,17 @@ export default function GestionReservas() {
           </TableBody>
         </TableComponent>
       </Card>
+
+      <BulkSelectionBar
+        selectedCount={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        entityLabel="reserva"
+        actions={[
+          { label: 'Confirmar', icon: CheckCircle2, variant: 'success', onClick: () => handleBulkUpdate('confirmado'), loading: isBulkUpdating },
+          { label: 'Emitir', icon: Ticket, variant: 'primary', onClick: () => handleBulkUpdate('emitido'), loading: isBulkUpdating },
+          { label: 'Cancelar', icon: XCircle, variant: 'danger', onClick: handleBulkCancel, loading: isBulkCanceling }
+        ]}
+      />
 
       {/* ─── Modal Crear / Editar ─── */}
       <Modal title={editReservation ? 'Editar Reserva' : 'Nueva Reserva'} open={dialogOpen} onClose={closeDialog} size="xl">

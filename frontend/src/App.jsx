@@ -38,6 +38,7 @@ import Reportes from './pages/Reportes';
 import LogsDelSitio from './pages/LogsDelSitio';
 import GestionNominas from './pages/GestionNominas';
 import Documentacion from './pages/Documentacion';
+import BandejaTickets from './pages/BandejaTickets';
 import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -355,6 +356,16 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <TestPage />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/tickets"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <BandejaTickets />
                           </Layout>
                         </ProtectedRoute>
                       }

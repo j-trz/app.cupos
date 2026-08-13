@@ -1643,3 +1643,140 @@ func AddPassenger(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, newPassenger)
 }
+
+// BulkUpdateReservations permite cambiar masivamente el estado de reservas seleccionadas (ej. pasar a "Emitido")
+func BulkUpdateReservations(c *gin.Context) {
+	var req struct {
+		IDs           []uuid.UUID `json:"ids"`
+		Estado        string      `json:"estado"`
+		EstadoInterno string      `json:"estado_interno"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de reserva."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+
+	var reservations []models.Reservation
+	if err := query.Find(&reservations).Error; err != nil || len(reservations) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No se encontraron reservas para actualizar."})
+		return
+	}
+
+	userIDVal, _ := c.Get("userID")
+	userIDStr := fmt.Sprintf("%v", userIDVal)
+	userUUID, _ := uuid.Parse(userIDStr)
+
+	var updatedCount int
+	now := time.Now()
+
+	for _, res := range reservations {
+		updates := map[string]interface{}{}
+		if req.Estado != "" {
+			updates["estado"] = req.Estado
+		}
+		if req.EstadoInterno != "" {
+			if !models.IsValidEstadoInterno(req.EstadoInterno) {
+				continue
+			}
+			updates["estado_interno"] = req.EstadoInterno
+			if req.EstadoInterno == "Emitido" && res.EstadoInterno != "Emitido" {
+				updates["emitido_at"] = now
+			}
+		}
+
+		if len(updates) > 0 {
+			if err := database.DB.Model(&models.Reservation{}).Where("id = ?", res.ID).Updates(updates).Error; err == nil {
+				updatedCount++
+				// Si pasó a Emitido, auto-genera los boletos en la Bandeja de Tickets
+				if req.EstadoInterno == "Emitido" {
+					resCopy := res
+					resCopy.EstadoInterno = "Emitido"
+					_, _ = GenerateTicketsForReservationInternal(&resCopy, userUUID)
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d reserva(s) actualizada(s) correctamente.", updatedCount),
+		"count":   updatedCount,
+	})
+}
+
+// BulkCancelReservations cancela masivamente un grupo de reservas restituyendo el stock
+func BulkCancelReservations(c *gin.Context) {
+	var req struct {
+		IDs   []uuid.UUID `json:"ids"`
+		Notas string      `json:"notas"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de reserva."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+
+	var reservations []models.Reservation
+	if err := query.Find(&reservations).Error; err != nil || len(reservations) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No se encontraron reservas para cancelar."})
+		return
+	}
+
+	var canceledCount int
+	for _, res := range reservations {
+		if res.Estado == "cancelada" {
+			continue
+		}
+		tx := database.DB.Begin()
+		var product models.Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, res.ProductID).Error; err == nil {
+			var passengerCount int64
+			tx.Model(&models.Passenger{}).Where("reservation_id = ?", res.ID).Count(&passengerCount)
+			toRelease := int(passengerCount)
+			if toRelease == 0 {
+				toRelease = res.HoldPassengerCount
+			}
+			if toRelease == 0 {
+				toRelease = 1
+			}
+			product.Vendidos -= toRelease
+			if product.Vendidos < 0 {
+				product.Vendidos = 0
+			}
+			product.Disponibilidad = product.Cupo - product.Vendidos
+			tx.Save(&product)
+		}
+
+		res.Estado = "cancelada"
+		res.CancelacionNotas = req.Notas
+		if err := tx.Save(&res).Error; err == nil {
+			tx.Commit()
+			canceledCount++
+		} else {
+			tx.Rollback()
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d reserva(s) cancelada(s) correctamente.", canceledCount),
+		"count":   canceledCount,
+	})
+}

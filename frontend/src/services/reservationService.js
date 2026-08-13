@@ -401,6 +401,14 @@ class ReservationService {
 
     return true;
   }
+
+  static async bulkUpdateReservations(ids, estado) {
+    return await ApiClient.put('/reservations/bulk-update', { ids, estado });
+  }
+
+  static async bulkCancelReservations(ids, notas) {
+    return await ApiClient.post('/reservations/bulk-cancel', { ids, notas });
+  }
 }
 
 export default ReservationService;

@@ -474,3 +474,69 @@ func ConvertOpportunityToProduct(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, product)
 }
+
+// BulkApproveOpportunities aprueba masivamente oportunidades seleccionadas (solo admin)
+func BulkApproveOpportunities(c *gin.Context) {
+	var req struct {
+		IDs []uuid.UUID `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de oportunidad."})
+		return
+	}
+
+	userIDVal, _ := c.Get("userID")
+	userIDStr := fmt.Sprintf("%v", userIDVal)
+	userUUID, _ := uuid.Parse(userIDStr)
+	now := time.Now()
+
+	result := database.DB.Model(&models.Opportunity{}).
+		Where("id IN ? AND estado = 'pendiente'", req.IDs).
+		Updates(map[string]interface{}{
+			"estado":              "aprobada",
+			"usuario_autorizador": userUUID,
+			"fecha_aprobado":      now,
+		})
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al aprobar oportunidades: " + result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d oportunidad(es) aprobada(s) correctamente.", result.RowsAffected),
+		"count":   result.RowsAffected,
+	})
+}
+
+// BulkDeleteOpportunities elimina masivamente oportunidades seleccionadas
+func BulkDeleteOpportunities(c *gin.Context) {
+	var req struct {
+		IDs []uuid.UUID `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de oportunidad."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ? AND estado != 'producto'", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ? AND estado = 'pendiente'", strings.ToLower(agenciaCaller))
+	}
+
+	result := query.Delete(&models.Opportunity{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar oportunidades: " + result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d oportunidad(es) eliminada(s) correctamente.", result.RowsAffected),
+		"count":   result.RowsAffected,
+	})
+}

@@ -604,3 +604,81 @@ func recomputeDisponibilidad(cupo, vendidos int) int {
 	}
 	return d
 }
+
+// BulkDeleteProducts elimina un listado de productos seleccionados
+func BulkDeleteProducts(c *gin.Context) {
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de producto."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+
+	result := query.Delete(&models.Product{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar productos masivamente: " + result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d producto(s) eliminado(s) correctamente.", result.RowsAffected),
+		"count":   result.RowsAffected,
+	})
+}
+
+// BulkDuplicateProducts duplica un listado de productos seleccionados
+func BulkDuplicateProducts(c *gin.Context) {
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de producto."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	var products []models.Product
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+	if err := query.Find(&products).Error; err != nil || len(products) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No se encontraron productos válidos para duplicar."})
+		return
+	}
+
+	var duplicatedCount int
+	for i, orig := range products {
+		dup := orig
+		dup.ID = 0
+		dup.Vendidos = 0
+		dup.Disponibilidad = orig.Cupo
+		dup.CodigoCupo = generateCodigoCupo(&dup, i+1)
+		dup.CreatedAt = time.Now()
+		dup.UpdatedAt = time.Now()
+
+		if err := database.DB.Create(&dup).Error; err == nil {
+			duplicatedCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d producto(s) duplicado(s) correctamente.", duplicatedCount),
+		"count":   duplicatedCount,
+	})
+}

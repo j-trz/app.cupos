@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag, Briefcase } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag, Briefcase, Ticket } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import Swal from 'sweetalert2';
@@ -38,8 +38,9 @@ const catalogoItems = [
 ];
 const sistemaItems = [
   { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
-  { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
   { label: 'Administración', path: '/administracion', icon: Briefcase, permission: 'ADMINISTRACION_VIEW' },
+  { label: 'Bandeja de Tickets', path: '/tickets', icon: Ticket, permission: 'TICKETS_VIEW' },
+  { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
 ];
 
 // Settings items (grouped under Ajustes)
@@ -66,7 +67,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
   const mobileOpen = ctx ? ctx.mobileOpen : false;
-  const setMobileOpen = ctx ? ctx.setMobileOpen : () => {};
+  const setMobileOpen = ctx ? ctx.setMobileOpen : () => { };
   const [openSubmenus, setOpenSubmenus] = useState({});
   const [unreadCount, setUnreadCount] = useState(0);
   // Item de menú bajo el mouse (por path/clave) — reemplaza a las mutaciones

@@ -105,6 +105,8 @@ func init() {
 				products.DELETE("/:id", middleware.RequirePermission("PRODUCTS_DELETE"), handlers.DeleteProduct)
 				products.PUT("/:id/approve", middleware.RequirePermission("PRODUCTS_APPROVE"), handlers.ApproveProduct)
 				products.POST("/bulk", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.BulkCreateProducts)
+				products.POST("/bulk-delete", middleware.RequirePermission("PRODUCTS_DELETE"), handlers.BulkDeleteProducts)
+				products.POST("/bulk-duplicate", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.BulkDuplicateProducts)
 				products.GET("/:id/shared-agencies", handlers.ListSharedAgencies)
 				products.POST("/:id/shared-agencies", handlers.ShareProduct)
 				products.DELETE("/:id/shared-agencies/:agencia", handlers.UnshareProduct)
@@ -131,6 +133,8 @@ func init() {
 				orders.POST("/:id/passengers/:passengerId/duplicate", handlers.DuplicatePassenger)
 				orders.DELETE("/:id/passengers/:passengerId", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.DeletePassenger)
 				orders.DELETE("/:id", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.DeleteReservation)
+				orders.POST("/bulk-update", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.BulkUpdateReservations)
+				orders.POST("/bulk-cancel", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.BulkCancelReservations)
 			}
 
 			// Grupos (vuelos a medida): igual que /orders, el listado no está
@@ -162,6 +166,17 @@ func init() {
 				opportunities.DELETE("/:id", middleware.RequirePermission("OPPORTUNITIES_DELETE"), handlers.DeleteOpportunity)
 				opportunities.PUT("/:id/approve", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.ApproveOpportunity)
 				opportunities.POST("/:id/convert-to-product", middleware.RequirePermission("OPPORTUNITIES_CONVERT"), handlers.ConvertOpportunityToProduct)
+				opportunities.POST("/bulk-approve", middleware.RequirePermission("OPPORTUNITIES_APPROVE"), handlers.BulkApproveOpportunities)
+				opportunities.POST("/bulk-delete", middleware.RequirePermission("OPPORTUNITIES_DELETE"), handlers.BulkDeleteOpportunities)
+			}
+
+			// Bandeja de Tickets emitidos (inmutables, lógica GDS + Netviax Atlas)
+			tickets := protected.Group("/tickets")
+			{
+				tickets.GET("", middleware.RequirePermission("TICKETS_VIEW"), handlers.GetTickets)
+				tickets.GET("/:id", middleware.RequirePermission("TICKETS_VIEW"), handlers.GetTicketByID)
+				tickets.POST("/:id/void", middleware.RequirePermission("TICKETS_VOID"), handlers.VoidTicket)
+				tickets.POST("/:id/sync-atlas", middleware.RequirePermission("TICKETS_SYNC"), handlers.SyncTicketAtlas)
 			}
 
 			// Mis permisos resueltos (cualquier usuario autenticado, no solo admin —

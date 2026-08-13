@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ApiClient from '../services/apiClient';
 
-export const useOpportunities = (params = {}) => {
+export const useOpportunities = (params: any = {}) => {
   const queryParams = new URLSearchParams(params).toString();
   const url = `/opportunities${queryParams ? '?' + queryParams : ''}`;
 
@@ -14,7 +14,7 @@ export const useOpportunities = (params = {}) => {
 export const useCreateOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => ApiClient.post('/opportunities', data),
+    mutationFn: (data: any) => ApiClient.post('/opportunities', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -24,7 +24,7 @@ export const useCreateOpportunity = () => {
 export const useUpdateOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }) => ApiClient.put(`/opportunities/${id}`, data),
+    mutationFn: (variables: any) => ApiClient.put(`/opportunities/${variables.id}`, variables.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -34,7 +34,7 @@ export const useUpdateOpportunity = () => {
 export const useDeleteOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id) => ApiClient.delete(`/opportunities/${id}`),
+    mutationFn: (id: any) => ApiClient.delete(`/opportunities/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -44,7 +44,7 @@ export const useDeleteOpportunity = () => {
 export const useApproveOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id) => ApiClient.put(`/opportunities/${id}/approve`, {}),
+    mutationFn: (id: any) => ApiClient.put(`/opportunities/${id}/approve`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -58,10 +58,30 @@ export const useApproveOpportunity = () => {
 export const useConvertOpportunityToProduct = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }) => ApiClient.post(`/opportunities/${id}/convert-to-product`, data),
+    mutationFn: (variables: any) => ApiClient.post(`/opportunities/${variables.id}/convert-to-product`, variables.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+};
+
+export const useBulkDeleteOpportunities = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: number[]) => ApiClient.post('/opportunities/bulk-delete', { ids }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+    },
+  });
+};
+
+export const useBulkApproveOpportunities = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: number[]) => ApiClient.post('/opportunities/bulk-approve', { ids }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
   });
 };
