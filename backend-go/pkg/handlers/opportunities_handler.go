@@ -241,10 +241,15 @@ func UpdateOpportunity(c *gin.Context) {
 	fixOpportunityDates(rawData)
 	fixOpportunityNumbers(rawData)
 
-	// No permitir editar campos críticos
+	// No permitir editar campos críticos ni relaciones GORM (causan HTTP 500)
 	delete(rawData, "usuario_cargador")
 	delete(rawData, "fecha_cargado")
 	delete(rawData, "agencia")
+	delete(rawData, "cargador_user")
+	delete(rawData, "autorizador_user")
+	delete(rawData, "fecha_aprobado")
+	delete(rawData, "created_at")
+	delete(rawData, "updated_at")
 
 	// No-admin no puede cambiar estado ni usuario_autorizador
 	if !isAdmin {

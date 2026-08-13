@@ -217,29 +217,29 @@ export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess 
           </div>
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="estado_interno">Estado Aerolínea</Label>
-          <select
-            id="estado_interno"
-            value={form.estado_interno}
-            onChange={(e) => handleEstadoInternoChange(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-          >
-            <option value="">Sin especificar</option>
-            {ESTADO_AEROLINEA_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-          {form.estado_interno === RECHAZADO && (
-            <div className="flex items-center gap-2 pt-1 text-xs text-slate-500">
-              <span>Motivo: {form.motivo_rechazo || 'sin especificar'}</span>
-              <button type="button" className="text-slate-700 underline hover:text-slate-900" onClick={() => promptMotivoRechazo(form.motivo_rechazo)}>
-                Cambiar motivo
-              </button>
-            </div>
-          )}
-        </div>
+        <div className={`grid gap-4 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className="space-y-1">
+            <Label htmlFor="estado_interno">Estado Aerolínea</Label>
+            <select
+              id="estado_interno"
+              value={form.estado_interno}
+              onChange={(e) => handleEstadoInternoChange(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            >
+              <option value="">Sin especificar</option>
+              {ESTADO_AEROLINEA_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            {form.estado_interno === RECHAZADO && (
+              <div className="flex items-center gap-2 pt-1 text-xs text-slate-500">
+                <span>Motivo: {form.motivo_rechazo || 'sin especificar'}</span>
+                <button type="button" className="text-slate-700 underline hover:text-slate-900" onClick={() => promptMotivoRechazo(form.motivo_rechazo)}>
+                  Cambiar motivo
+                </button>
+              </div>
+            )}
+          </div>
 
-        {isAdmin && (
-          <div className="grid grid-cols-2 gap-4">
+          {isAdmin && (
             <div className="space-y-1">
               <Label htmlFor="estado">Estado</Label>
               <select
@@ -253,8 +253,8 @@ export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess 
                 <option value="rechazada">Rechazada</option>
               </select>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
           <Button variant="secondary" type="button" onClick={handleClose}>Cancelar</Button>
