@@ -680,7 +680,7 @@ func runSQLMigrations(db *gorm.DB) {
 		// Motivo de rechazo cuando estado_interno (Estado Aerolínea) de una
 		// oportunidad pasa a "rechazado" — capturado vía popup en el frontend.
 		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(50) DEFAULT '';`,
-		// Conversión opcional de Oportunidad -> Producto: el producto nace
+		// Conversión opcional de Oportunidad -\u003e Producto: el producto nace
 		// pendiente de aprobación (no aparece en Disponibilidad hasta que un
 		// admin lo apruebe) y la oportunidad guarda el ID a modo informativo.
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS pendiente_aprobacion BOOLEAN DEFAULT false;`,
@@ -691,7 +691,29 @@ func runSQLMigrations(db *gorm.DB) {
 			log.Println("WARNING: Column alteration error:", err)
 		}
 	}
-	fmt.Println("Migration applied: all columns ensured")
+
+	// Renombrado de columnas opportunities: GORM generó neto1/neto2 sin
+	// underscore porque los campos del struct no tenían gorm:"column:..." tag.
+	// Al agregar el tag ahora, la tabla ya existe con el nombre viejo — hay que
+	// renombrar con DO $$ ... END para no fallar si la columna ya tiene el
+	// nombre correcto.
+	renameSQLs := []string{
+		`DO $$ BEGIN
+			IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='opportunities' AND column_name='neto1') THEN
+				ALTER TABLE opportunities RENAME COLUMN neto1 TO neto_1;
+			END IF;
+		END $$;`,
+		`DO $$ BEGIN
+			IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='opportunities' AND column_name='neto2') THEN
+				ALTER TABLE opportunities RENAME COLUMN neto2 TO neto_2;
+			END IF;
+		END $$;`,
+	}
+	for _, sql := range renameSQLs {
+		if err := db.Exec(sql).Error; err != nil {
+			log.Println("WARNING: Rename column error:", err)
+		}
+	}
 
 	migrateSystemSettingsToAgencyAware(db)
 	dropAgencyForeignKeys(db)

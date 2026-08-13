@@ -734,8 +734,8 @@ type Opportunity struct {
 	FechaLlegada       *time.Time `json:"fecha_llegada"`
 	TotalLugares       int        `gorm:"not null;default:0" json:"total_lugares"`
 	TotalLiberados     int        `gorm:"not null;default:0" json:"total_liberados"`
-	Neto1              *float64   `json:"neto_1"`
-	Neto2              *float64   `json:"neto_2"`
+	Neto1              *float64   `gorm:"column:neto_1" json:"neto_1"`
+	Neto2              *float64   `gorm:"column:neto_2" json:"neto_2"`
 	EstadoInterno      *string    `json:"estado_interno"` // Estado Aerolínea: cotizado, rechazado, confirmado, vencido
 	MotivoRechazo      *string    `json:"motivo_rechazo"`
 	// ProductoID: se completa al convertir la oportunidad en producto (ver

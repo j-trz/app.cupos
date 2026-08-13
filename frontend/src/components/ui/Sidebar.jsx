@@ -19,17 +19,24 @@ const navItems = [
   { label: 'Asistente IA', path: '/asistente', icon: Bot, key: 'ia' },
 ];
 
-// Admin-only items — cada uno declara el permiso MODULO_ACCION que lo
+// Ítems de gestión — cada uno declara el permiso MODULO_ACCION que lo
 // habilita (ver GET /users/me/permissions), para que un rol personalizado
 // pueda ver, por ejemplo, "Reportes" sin heredar automáticamente el resto.
-const adminNavItems = [
+// Agrupados en 3 submenús colapsables (mismo patrón que Ajustes/Usuarios,
+// ver más abajo) en vez de una lista plana de 10 — antes eran siempre
+// visibles de una, dominando el sidebar para cualquier admin.
+const cuposReservasItems = [
   { label: 'Productos', path: '/productos', icon: Package, permission: 'PRODUCTS_VIEW' },
   { label: 'Grupos', path: '/grupos', icon: Luggage, permission: 'GROUPS_VIEW' },
   { label: 'Oportunidades', path: '/oportunidades', icon: Sparkles, permission: 'OPPORTUNITIES_VIEW' },
-  { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
-  { label: 'Temporadas', path: '/temporadas', icon: Tag, permission: 'TEMPORADAS_VIEW' },
   { label: 'Reservas', path: '/reservas', icon: CreditCard, permission: 'RESERVATIONS_VIEW' },
   { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
+];
+const catalogoItems = [
+  { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
+  { label: 'Temporadas', path: '/temporadas', icon: Tag, permission: 'TEMPORADAS_VIEW' },
+];
+const sistemaItems = [
   { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
   { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
   { label: 'Administración', path: '/administracion', icon: Briefcase, permission: 'ADMINISTRACION_VIEW' },
@@ -83,7 +90,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
     if (isAdmin) return true;
     return Array.isArray(user?.permissions) && user.permissions.includes(code);
   };
-  const visibleAdminNavItems = adminNavItems.filter((item) => can(item.permission));
+  const visibleCuposReservasItems = cuposReservasItems.filter((item) => can(item.permission));
+  const visibleCatalogoItems = catalogoItems.filter((item) => can(item.permission));
+  const visibleSistemaItems = sistemaItems.filter((item) => can(item.permission));
   const visibleSettingsItems = settingsItems.filter((item) => can(item.permission));
   const visibleUserManagementItems = userManagementItems.filter((item) => can(item.permission));
   // "Asistente IA" se oculta si la propia agencia lo desactivó desde Ajustes
@@ -399,52 +408,145 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                 )}
               </div>
 
-              {/* Admin-only menu items */}
-              {visibleAdminNavItems.length > 0 && (
-                <>
-                  {!collapsed && (
-                    <div className="my-2 px-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Gestión</p>
+              {/* Cupos y Reservas submenu */}
+              {visibleCuposReservasItems.length > 0 && (
+                <div className="mt-0.5">
+                  <button
+                    onClick={() => toggleSubmenu('cuposReservas')}
+                    className={clsx(
+                      'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                      collapsed ? 'justify-center px-2 py-2' : ''
+                    )}
+                    style={navItemColors('cuposReservas-toggle', isSubmenuActive(visibleCuposReservasItems))}
+                    {...navHoverHandlers('cuposReservas-toggle')}
+                  >
+                    <Plane className="h-4 w-4" style={{ color: isSubmenuActive(visibleCuposReservasItems) ? '#fff' : sbText }} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">Cupos y Reservas</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.cuposReservas ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleCuposReservasItems) ? '#fff' : sbText }} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && openSubmenus.cuposReservas && (
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                      {visibleCuposReservasItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
+                        >
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
+                        </NavLink>
+                      ))}
                     </div>
                   )}
-                  {visibleAdminNavItems.map(({ label, path, icon: Icon }) => (
-                    <NavLink
-                      key={path}
-                      to={path}
-                      className={({ isActive }) => {
-                        const active = isActive || location.pathname.startsWith(path + '/');
-                        return clsx(
-                          'group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                          collapsed ? 'justify-center px-2 py-2' : ''
-                        );
-                      }}
-                      style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
-                      {...navHoverHandlers(path)}
-                    >
-                      {({ isActive }) => {
-                        const active = isActive || location.pathname.startsWith(path + '/');
-                        return (
-                          <>
-                            <Icon className={clsx(collapsed ? 'h-4 w-4' : 'h-4 w-4')} style={{ color: active ? '#fff' : sbText }} />
-                            {!collapsed && <span className="truncate">{label}</span>}
-                            {!collapsed && active && (
-                              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />
-                            )}
-                          </>
-                        );
-                      }}
-                    </NavLink>
-                  ))}
-                </>
+                </div>
               )}
 
-              {/* Separadores para submenús */}
-              {(visibleSettingsItems.length > 0 || visibleUserManagementItems.length > 0) && !collapsed && (
-                <>
-                  <div className="my-2 px-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Gestión</p>
-                  </div>
-                </>
+              {/* Catálogo submenu */}
+              {visibleCatalogoItems.length > 0 && (
+                <div className="mt-0.5">
+                  <button
+                    onClick={() => toggleSubmenu('catalogo')}
+                    className={clsx(
+                      'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                      collapsed ? 'justify-center px-2 py-2' : ''
+                    )}
+                    style={navItemColors('catalogo-toggle', isSubmenuActive(visibleCatalogoItems))}
+                    {...navHoverHandlers('catalogo-toggle')}
+                  >
+                    <Building2 className="h-4 w-4" style={{ color: isSubmenuActive(visibleCatalogoItems) ? '#fff' : sbText }} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">Catálogo</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.catalogo ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleCatalogoItems) ? '#fff' : sbText }} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && openSubmenus.catalogo && (
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                      {visibleCatalogoItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
+                        >
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sistema submenu */}
+              {visibleSistemaItems.length > 0 && (
+                <div className="mt-0.5">
+                  <button
+                    onClick={() => toggleSubmenu('sistema')}
+                    className={clsx(
+                      'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                      collapsed ? 'justify-center px-2 py-2' : ''
+                    )}
+                    style={navItemColors('sistema-toggle', isSubmenuActive(visibleSistemaItems))}
+                    {...navHoverHandlers('sistema-toggle')}
+                  >
+                    <ScrollText className="h-4 w-4" style={{ color: isSubmenuActive(visibleSistemaItems) ? '#fff' : sbText }} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">Sistema</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.sistema ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleSistemaItems) ? '#fff' : sbText }} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && openSubmenus.sistema && (
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                      {visibleSistemaItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
+                        >
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Settings submenu */}
