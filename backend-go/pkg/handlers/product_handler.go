@@ -165,8 +165,9 @@ func GetProducts(c *gin.Context) {
 	} else {
 		// Vista de reserva (Disponibilidad): nunca mostrar cupos agotados, ni
 		// bloqueados para venta, ni de una agencia que no es la mía, no me
-		// cedió, ni me comparte.
-		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false")
+		// cedió, ni me comparte. Tampoco un producto convertido desde una
+		// Oportunidad que un admin todavía no aprobó (ver ApproveProduct).
+		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false AND pendiente_aprobacion = false")
 		if role != "admin" {
 			query = query.Where(
 				"LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?) OR "+sharedSubquery,
@@ -450,6 +451,37 @@ func DeleteProduct(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Producto eliminado correctamente"})
+}
+
+// ApproveProduct aprueba un producto creado vía "Convertir a producto" desde
+// una Oportunidad (ver ConvertOpportunityToProduct en opportunities_handler.go).
+// Solo admin (gateado por PRODUCTS_APPROVE en la ruta). Productos cargados
+// directo desde Gestión de Productos nunca pasan por acá (nacen con
+// PendienteAprobacion=false).
+func ApproveProduct(c *gin.Context) {
+	id := c.Param("id")
+	var product models.Product
+	if err := database.DB.First(&product, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+
+	if !product.PendienteAprobacion {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este producto no está pendiente de aprobación"})
+		return
+	}
+
+	if err := database.DB.Model(&product).Update("pendiente_aprobacion", false).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al aprobar el producto"})
+		return
+	}
+
+	services.NotifyAgencyByCode(product.Agencia, createdByFromContext(c), "product_approved", "Producto aprobado",
+		fmt.Sprintf("Tu producto %s hacia %s (%s) fue aprobado y ya está disponible para reservar", product.CodigoCupo, product.Destino, product.Compania),
+		map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania})
+
+	database.DB.First(&product, id)
+	c.JSON(http.StatusOK, product)
 }
 
 func BulkCreateProducts(c *gin.Context) {

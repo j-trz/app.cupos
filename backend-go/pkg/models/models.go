@@ -81,6 +81,15 @@ type Product struct {
 	TarifaChd              float64 `json:"tarifa_chd"`
 	ImpuestosChd           float64 `json:"impuestos_chd"`
 	IsBlockedForSale       bool    `gorm:"default:false" json:"is_blocked_for_sale"`
+	// PendienteAprobacion: true solo para productos creados vía "Convertir a
+	// producto" desde una Oportunidad (ver ConvertOpportunityToProduct en
+	// opportunities_handler.go) — mientras un admin no lo apruebe
+	// (PUT /products/:id/approve), no aparece en la vista de reserva
+	// (Disponibilidad, GetProducts sin scope=management) aunque tenga
+	// disponibilidad > 0. Los productos cargados directo desde Gestión de
+	// Productos nacen en false (default) y no pasan por ningún gate nuevo —
+	// ese flujo sigue exactamente igual que antes.
+	PendienteAprobacion bool `gorm:"column:pendiente_aprobacion;default:false" json:"pendiente_aprobacion"`
 	// Servicio es un texto libre que describe el servicio puntual del
 	// producto (ej. "Traslado", "Seguro de viaje", "Excursión"), distinto de
 	// TipoProducto (que categoriza Aéreo/Hotel/Crucero).
@@ -729,6 +738,12 @@ type Opportunity struct {
 	Neto2              *float64   `json:"neto_2"`
 	EstadoInterno      *string    `json:"estado_interno"` // Estado Aerolínea: cotizado, rechazado, confirmado, vencido
 	MotivoRechazo      *string    `json:"motivo_rechazo"`
+	// ProductoID: se completa al convertir la oportunidad en producto (ver
+	// ConvertOpportunityToProduct) — puramente informativo, no hay lectura
+	// automática de vuelta desde Product. Cuando está seteado, Estado pasa a
+	// "producto" (terminal: ni admin puede editar/eliminar/aprobar-rechazar
+	// la oportunidad después de esto, ya cumplió su ciclo).
+	ProductoID         *uint      `gorm:"column:producto_id" json:"producto_id"`
 	FechaCargado       time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_cargado"`
 	UsuarioCargador    uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_cargador"`
 	UsuarioAutorizador *uuid.UUID `gorm:"type:uuid" json:"usuario_autorizador"`

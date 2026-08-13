@@ -2,7 +2,7 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 > Fuente de verdad: el propio `models.go`. Este documento resume la forma y el *por qué* de cada tabla; ante cualquier duda puntual de tipo/columna, el código gana.
 >
-> Última lectura completa de `models.go` contra este documento: 2026-08-12 (nuevo `Reservation.NotasVendedor`, duplicar producto desde Gestión de Productos, itinerario de Grupos unificado con `ItineraryTable`).
+> Última lectura completa de `models.go` contra este documento: 2026-08-13 (`Opportunity.ProductoID`/`Estado="producto"` y `Product.PendienteAprobacion` — conversión de Oportunidad a Producto, ver *Flujos de Funcionalidades* sección 19).
 
 ## Índice
 
@@ -24,7 +24,8 @@ Catálogo de las tablas principales del **Sistema de Gestión de Cupos**, defini
 
 Una oportunidad de negocio con aerolínea: es la **pre-carga de un pedido** antes de que se convierta en un `Product` real del catálogo/stock. Sirve para registrar una propuesta comercial, analizarla, evaluarla y aprobarla por la agencia o el admin antes de materializarla como cupo disponible. Campos clave:
 
-- **Identidad**: `Agencia`, `Temporada` (opcional), `Destino`, `Compania`, `Validez` (fecha de vigencia), `FechaSalida`, `FechaLlegada` (opcional), `Estado` (`pendiente` / `aprobada` / `rechazada`).
+- **Identidad**: `Agencia`, `Temporada` (opcional), `Destino`, `Compania`, `Validez` (fecha de vigencia), `FechaSalida`, `FechaLlegada` (opcional), `Estado` (`pendiente` / `aprobada` / `rechazada` / `producto`, este último terminal desde 2026-08-13, ver abajo).
+- **Conversión a Producto** (agregada 2026-08-13, ver *Flujos de Funcionalidades* sección 19): `ProductoID` (`*uint`, nullable) — se completa al convertir la oportunidad en un `Product` real vía `ConvertOpportunityToProduct`, puramente informativo (no hay lectura automática de vuelta desde `Product`). Al convertirse, `Estado` pasa a `"producto"` (terminal: `UpdateOpportunity`/`DeleteOpportunity`/`ApproveOpportunity` rechazan cualquier cambio de ahí en más, ni siquiera admin). El producto resultante nace con `Product.PendienteAprobacion = true` (ver más abajo) — este flujo es enteramente opcional, no reemplaza la carga directa de productos desde Gestión de Productos.
 - **Stock y economía**: `TotalLugares`, `TotalLiberados`, `Neto1`, `Neto2`. `Neto1`/`Neto2` son valores de negocio del cupo potencial (no el neto de un pasajero real), útiles para comparar propuestas y luego convertirlas en un producto normal.
 - **Control operativo**: `EstadoInterno` — "Estado Aerolínea" en el frontend, desde 2026-08-12 un `<select>` con 4 opciones fijas (`Cotizado`/`Rechazado por la aerolínea`/`Confirmado`/`Vencido`), antes texto libre; sigue siendo un `*string` sin constraint en DB (el enum solo vive en el frontend, `OportunityForm.jsx`). `MotivoRechazo` (agregado 2026-08-12): solo tiene sentido cuando `EstadoInterno = "Rechazado por la aerolínea"` — se captura vía un popup (`Swal.fire` con `input: 'select'`) que se dispara al elegir esa opción, opciones `Tarifa alta`/`Fechas incorrectas`/`Exceso de oferta`/`Vencido`. `FechaCargado`, `UsuarioCargador`, `UsuarioAutorizador`. `FechaCargado` y `UsuarioCargador` se completan automáticamente en el backend desde el JWT y la hora actual; no se aceptan desde el request para evitar spoofing.
 - **Auditoría**: `CreatedAt`, `UpdatedAt`.
@@ -42,6 +43,7 @@ Un **cupo** — bloqueo aéreo, paquete o servicio publicado por una agencia. Ca
 - **Paquetes**: `PackageLinks` (`datatypes.JSON`, array de `{url, label}`) — links a los paquetes armados a partir de este cupo, mostrados en la columna "Paquetes" de Disponibilidad (agregado 2026-08-10).
 - **Visibilidad multi-agencia**: `Agencia` (dueña), `RestrictedAgency` (si está seteado, solo esa agencia + admin ven el producto — usado en los productos-espejo de una cesión), `SourceAgency` (quién cedió este espejo puntual, distinto de quién lo tiene *hoy*), `TransferID` (vincula el espejo con su `AvailabilityTransfer`). Sin cesión de por medio, **un producto solo lo ve su agencia dueña** — no existe un catálogo general visible para todos.
 - **Bloqueo de venta**: `IsBlockedForSale` (oculta de Disponibilidad sin tocar reservas existentes).
+- **Pendiente de aprobación** (agregada 2026-08-13): `PendienteAprobacion` (bool, default `false`) — `true` solo para productos creados vía "Convertir a producto" desde una Oportunidad (ver arriba); mientras esté en `true`, `GetProducts` sin `scope=management` lo excluye (además de `disponibilidad > 0`/`is_blocked_for_sale = false`), o sea que no aparece en Disponibilidad ni es reservable. Un admin lo aprueba con `PUT /products/:id/approve` (`ApproveProduct`, `PRODUCTS_APPROVE`). En `GestionProductos.jsx` se muestran apartados en su propia sección hasta que se aprueban. Los productos cargados directo desde Gestión de Productos nacen en `false` (default) y nunca pasan por este gate.
 - **Notas**: `NotasExternas` (cualquier agencia) vs `NotasInternas` (solo admin — se limpia antes de serializar a no-admins).
 - **Deadlines operativos**: `VencimientoPago`, `NominationDate`, `FechaEmision`, `FechaGastos` + su correspondiente `Aviso*Enviado` (evita reavisar en cada corrida del cron) — mismos nombres de columna que `Group`, para que el cron de avisos trate ambos modelos de forma uniforme.
 

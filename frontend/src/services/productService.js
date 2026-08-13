@@ -31,6 +31,12 @@ export class ProductService {
     return await ApiClient.delete(`/products/${id}`);
   }
 
+  // Aprueba un producto creado vía "Convertir a producto" desde una
+  // Oportunidad (nace con pendiente_aprobacion=true, no reservable hasta esto).
+  static async approveProduct(id) {
+    return await ApiClient.put(`/products/${id}/approve`, {});
+  }
+
   static async updateProductAvailability(productId, availabilityData) {
     return await ApiClient.put(`/products/${productId}/availability`, availabilityData);
   }

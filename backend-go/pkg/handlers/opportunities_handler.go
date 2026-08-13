@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // fixOpportunityDates convierte fechas "YYYY-MM-DD" a RFC3339
@@ -218,6 +219,13 @@ func UpdateOpportunity(c *gin.Context) {
 		return
 	}
 
+	// Terminal: ya se convirtió a producto, no se edita más (ni admin) — ver
+	// ConvertOpportunityToProduct.
+	if opp.Estado == "producto" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Esta oportunidad ya fue convertida a producto y no puede editarse"})
+		return
+	}
+
 	// Non-admin solo puede editar si estado es pendiente
 	if !isAdmin && opp.Estado != "pendiente" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Solo se pueden editar oportunidades en estado pendiente"})
@@ -283,6 +291,12 @@ func DeleteOpportunity(c *gin.Context) {
 		return
 	}
 
+	// Terminal: ya se convirtió a producto, no se elimina más (ni admin).
+	if opp.Estado == "producto" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Esta oportunidad ya fue convertida a producto y no puede eliminarse"})
+		return
+	}
+
 	if err := database.DB.Delete(&opp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar"})
 		return
@@ -309,6 +323,12 @@ func ApproveOpportunity(c *gin.Context) {
 		return
 	}
 
+	// Terminal: ya se convirtió a producto, no puede volver a cambiar de estado.
+	if opp.Estado == "producto" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Esta oportunidad ya fue convertida a producto y no puede cambiar de estado"})
+		return
+	}
+
 	var rawData map[string]interface{}
 	if err := c.ShouldBindJSON(&rawData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -330,4 +350,98 @@ func ApproveOpportunity(c *gin.Context) {
 	// Re-fetch
 	database.DB.First(&opp, "id = ?", id)
 	c.JSON(http.StatusOK, opp)
+}
+
+// ConvertOpportunityToProduct crea un Product nuevo a partir de una
+// Opportunity ya aprobada, reutilizando sus datos si el frontend los manda
+// precargados (mismo shape de body que CreateProduct — el frontend reusa
+// ProductForm con defaultValues salidos de la oportunidad). El producto nace
+// con PendienteAprobacion=true: no aparece en Disponibilidad (GetProducts sin
+// scope=management sigue exigiendo pendiente_aprobacion=false) hasta que un
+// admin lo aprueba (ver ApproveProduct en product_handler.go). La oportunidad
+// pasa a Estado "producto" (terminal, ver guards en Update/Delete/Approve de
+// arriba) y guarda ProductoID a modo informativo.
+//
+// Todo esto es opcional: una agencia que nunca haga click acá sigue cargando
+// productos directo desde Gestión de Productos exactamente como siempre —
+// CreateProduct no se toca y no gana ningún campo obligatorio nuevo.
+func ConvertOpportunityToProduct(c *gin.Context) {
+	id := c.Param("id")
+	var opp models.Opportunity
+	if err := database.DB.First(&opp, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Oportunidad no encontrada"})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
+	userID, _ := c.Get("userID")
+	uid, _ := uuid.Parse(fmt.Sprintf("%v", userID))
+
+	isAdmin := role == "admin"
+	isCreator := opp.UsuarioCargador == uid
+	isSameAgency := strings.ToLower(opp.Agencia) == strings.ToLower(agencia)
+	if !isAdmin && (!isCreator || !isSameAgency) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tienes permiso para convertir esta oportunidad"})
+		return
+	}
+
+	if opp.ProductoID != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Esta oportunidad ya fue convertida a producto"})
+		return
+	}
+	if opp.Estado != "aprobada" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Solo se pueden convertir oportunidades aprobadas"})
+		return
+	}
+
+	var rawData map[string]interface{}
+	if err := c.ShouldBindJSON(&rawData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	fixDates(rawData)
+	fixNumbers(rawData)
+
+	jsonBytes, err := json.Marshal(rawData)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Error procesando datos"})
+		return
+	}
+	var product models.Product
+	if err := json.Unmarshal(jsonBytes, &product); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	product.PendienteAprobacion = true
+	if product.CodigoCupo == "" {
+		product.CodigoCupo = generateCodigoCupo(&product, 0)
+	}
+	if product.TipoProducto == "" {
+		product.TipoProducto = "Aereo"
+	}
+	product.Disponibilidad = recomputeDisponibilidad(product.Cupo, product.Vendidos)
+	applyCalculatedPrices(&product)
+
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&product).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.Opportunity{}).Where("id = ?", opp.ID).Updates(map[string]interface{}{
+			"estado":      "producto",
+			"producto_id": product.ID,
+		}).Error
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al convertir la oportunidad a producto: " + err.Error()})
+		return
+	}
+
+	services.NotifyRoleByCode("admin", createdByFromContext(c), "product_pending_approval", "Producto pendiente de aprobación",
+		fmt.Sprintf("%s convirtió una oportunidad (%s - %s) en el producto %s, pendiente de aprobación", agencia, opp.Destino, opp.Compania, product.CodigoCupo),
+		map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania})
+
+	c.JSON(http.StatusCreated, product)
 }

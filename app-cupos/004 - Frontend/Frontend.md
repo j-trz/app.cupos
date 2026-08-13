@@ -118,6 +118,7 @@ Rutas definidas en `frontend/src/App.jsx`:
 | `/confirmations` | `Confirmations.jsx` | Confirmaciones. |
 | `/productos` | `GestionProductos.jsx` | Gestión de productos. |
 | `/grupos` | `GestionGrupos.jsx` | Grupos y vuelos a medida. |
+| `/oportunidades` | `GestionOportunidades.jsx` | Gestión de oportunidades de vuelos con lugares liberados (alta, edición, aprobación y conversión a productos). |
 | `/reservas` | `GestionReservas.jsx` | Gestión de reservas. |
 | `/nominas` | `GestionNominas.jsx` | Nóminas de pasajeros. |
 | `/agencias` | `GestionAgencias.jsx` | Gestión de agencias. |
@@ -156,6 +157,7 @@ Las vistas viven en `frontend/src/pages/`. Cada una corresponde a una o más rut
 - **Confirmations** (`Confirmations.jsx`): confirmaciones de reservas.
 - **GestionProductos** (`GestionProductos.jsx`): alta, edición, borrado y carga masiva de productos.
 - **GestionGrupos** (`GestionGrupos.jsx`): grupos y flujo de vuelos a medida.
+- **GestionOportunidades** (`GestionOportunidades.jsx`): gestión de oportunidades (vuelos con lugares liberados o excedentes). Normalizada con la estética global: iconografía estandarizada (`Edit` para edición, `Trash2` para eliminación, `CheckCircle2` para aprobación y `PackagePlus` para conversión a producto, sin botón redundante de detalles/ojo), barra de búsqueda con la lupa integrada (`pl-9`), controles desplegables dinámicos para `Estado`, `Temporada` y `Destino`, botón para limpiar filtros (`RotateCcw`) y botón de refresco en la cabecera (`RefreshCw`).
 - **GestionReservas** (`GestionReservas.jsx`): administración de reservas y sus estados.
 - **GestionNominas** (`GestionNominas.jsx`): nóminas de pasajeros.
 - **GestionUsuarios** (`GestionUsuarios.jsx`): gestión de usuarios.

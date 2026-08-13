@@ -104,6 +104,7 @@ func main() {
 				products.POST("/", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.CreateProduct)
 				products.PUT("/:id", middleware.RequirePermission("PRODUCTS_UPDATE"), handlers.UpdateProduct)
 				products.DELETE("/:id", middleware.RequirePermission("PRODUCTS_DELETE"), handlers.DeleteProduct)
+				products.PUT("/:id/approve", middleware.RequirePermission("PRODUCTS_APPROVE"), handlers.ApproveProduct)
 				products.POST("/bulk", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.BulkCreateProducts)
 				products.GET("/:id/shared-agencies", handlers.ListSharedAgencies)
 				products.POST("/:id/shared-agencies", handlers.ShareProduct)
@@ -161,6 +162,7 @@ func main() {
 				opportunities.PUT("/:id", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.UpdateOpportunity)
 				opportunities.DELETE("/:id", middleware.RequirePermission("OPPORTUNITIES_DELETE"), handlers.DeleteOpportunity)
 				opportunities.PUT("/:id/approve", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.ApproveOpportunity)
+				opportunities.POST("/:id/convert-to-product", middleware.RequirePermission("OPPORTUNITIES_CONVERT"), handlers.ConvertOpportunityToProduct)
 			}
 
 			// Mis permisos resueltos (cualquier usuario autenticado, no solo admin —

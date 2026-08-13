@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useApproveProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
 import ActionIconButton from '../components/ui/ActionIconButton.jsx';
@@ -17,7 +17,7 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Copy } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Copy, CheckCircle2, Clock } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -135,8 +135,14 @@ const GestionProductos = () => {
   const hasActiveFilters = !!(filters.agencia || filters.destino || filters.compania || filters.temporada || filters.tipo_producto || filters.estado);
   const clearFilters = () => setFilters({ agencia: '', destino: '', compania: '', temporada: '', tipo_producto: '', estado: '' });
 
+  // Productos convertidos desde una Oportunidad que todavía no aprobó un
+  // admin — se muestran aparte (ver sección "Pendientes de aprobación") y no
+  // entran a la tabla principal ni a sus filtros.
+  const pendingProducts = useMemo(() => products.filter((p) => p.pendiente_aprobacion), [products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      if (p.pendiente_aprobacion) return false;
       if (filters.agencia && p.agencia !== filters.agencia) return false;
       if (filters.destino && p.destino !== filters.destino) return false;
       if (filters.compania && p.compania !== filters.compania) return false;
@@ -151,6 +157,8 @@ const GestionProductos = () => {
   const createProductMutation = useCreateProductMutation();
   const updateProductMutation = useUpdateProduct();
   const deleteProductMutation = useDeleteProduct();
+  const approveProductMutation = useApproveProduct();
+  const canApprove = can('PRODUCTS_APPROVE');
 
   const handleCreateProduct = async (productData) => {
     try {
@@ -205,6 +213,24 @@ const GestionProductos = () => {
       Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Producto eliminado correctamente', timer: 1500, showConfirmButton: false });
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al eliminar el producto' });
+    }
+  };
+
+  const handleApproveProduct = async (product) => {
+    const result = await Swal.fire({
+      title: '¿Aprobar producto?',
+      html: `<b>${product.codigo_cupo}</b> hacia ${product.destino} (${product.compania}) va a quedar disponible para reservar.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Aprobar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await approveProductMutation.mutateAsync(product.id);
+      Swal.fire({ icon: 'success', title: 'Producto aprobado', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al aprobar el producto' });
     }
   };
 
@@ -418,6 +444,61 @@ const GestionProductos = () => {
           isEditing={!!editingProduct}
         />
       </Modal>
+
+      {/* Productos convertidos desde una Oportunidad (ver GestionOportunidades.jsx)
+          que todavía no aprobó un admin — apartados de la tabla principal, no
+          reservables en Disponibilidad hasta que se aprueben acá. */}
+      {pendingProducts.length > 0 && (
+        <Card className="border-l-4 border-amber-400 bg-amber-50/40">
+          <div className="p-4">
+            <div className="mb-1 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-600" />
+              <h3 className="text-sm font-semibold text-amber-900">
+                Pendientes de aprobación ({pendingProducts.length})
+              </h3>
+            </div>
+            <p className="mb-3 text-xs text-amber-700">
+              Creados desde una oportunidad convertida a producto — no aparecen en Disponibilidad hasta que un admin los apruebe.
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-amber-200 bg-white">
+              <TableComponent>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Acciones</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Destino</TableHead>
+                    <TableHead>Compañía</TableHead>
+                    <TableHead>Agencia</TableHead>
+                    <TableHead>Cupo</TableHead>
+                    <TableHead>Salida</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {canApprove && (
+                            <ActionIconButton icon={CheckCircle2} onClick={() => handleApproveProduct(product)} title="Aprobar" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
+                          )}
+                          <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
+                          <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
+                      <TableCell>{product.compania}</TableCell>
+                      <TableCell>{product.agencia ? agencyName(product.agencia) : '—'}</TableCell>
+                      <TableCell>{product.cupo || '—'}</TableCell>
+                      <TableCell>{formatDate(product.fecha_salida)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </TableComponent>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Barra de búsqueda y filtros */}
       <div className="flex flex-col gap-3 mb-6">

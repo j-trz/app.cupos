@@ -115,6 +115,7 @@ func seedRBAC(db *gorm.DB) {
 		{"PRODUCTS_CREATE", "Crear Productos", "products", "create", "Crear nuevos productos"},
 		{"PRODUCTS_UPDATE", "Editar Productos", "products", "update", "Modificar datos de productos"},
 		{"PRODUCTS_DELETE", "Eliminar Productos", "products", "delete", "Eliminar productos"},
+		{"PRODUCTS_APPROVE", "Aprobar Productos", "products", "approve", "Aprobar productos pendientes creados desde una oportunidad"},
 
 		{"GROUPS_VIEW", "Ver Grupos", "groups", "view", "Listar y gestionar solicitudes de grupo"},
 		{"GROUPS_CREATE", "Crear Grupos", "groups", "create", "Cargar un grupo nuevo desde cero"},
@@ -177,6 +178,7 @@ func seedRBAC(db *gorm.DB) {
 		{"OPPORTUNITIES_UPDATE", "Editar Oportunidades", "opportunities", "update", "Modificar oportunidades"},
 		{"OPPORTUNITIES_DELETE", "Eliminar Oportunidades", "opportunities", "delete", "Eliminar oportunidades"},
 		{"OPPORTUNITIES_APPROVE", "Aprobar Oportunidades", "opportunities", "approve", "Aprobar oportunidades"},
+		{"OPPORTUNITIES_CONVERT", "Convertir a Producto", "opportunities", "convert", "Convertir una oportunidad aprobada en un producto (queda pendiente de aprobación)"},
 	}
 	for _, p := range permissions {
 		var count int64
@@ -677,6 +679,11 @@ func runSQLMigrations(db *gorm.DB) {
 		// Motivo de rechazo cuando estado_interno (Estado Aerolínea) de una
 		// oportunidad pasa a "rechazado" — capturado vía popup en el frontend.
 		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(50) DEFAULT '';`,
+		// Conversión opcional de Oportunidad -> Producto: el producto nace
+		// pendiente de aprobación (no aparece en Disponibilidad hasta que un
+		// admin lo apruebe) y la oportunidad guarda el ID a modo informativo.
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS pendiente_aprobacion BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS producto_id INTEGER REFERENCES products(id) ON DELETE SET NULL;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

@@ -1,7 +1,7 @@
 
 Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** junto con su diagrama de flujo. Cada sección incluye una breve descripción textual y un diagrama que refleja la lógica real implementada en el repositorio (validaciones, estados y endpoints).
 
-> Secciones 1-16 sin re-verificar en la pasada del 2026-08-10 (se asume su contenido previo vigente); sección 17 agregada y verificada ese día; sección 18 agregada y verificada el 2026-08-12.
+> Secciones 1-16 sin re-verificar en la pasada del 2026-08-10 (se asume su contenido previo vigente); sección 17 agregada y verificada ese día; sección 18 agregada y verificada el 2026-08-12; sección 19 agregada y verificada el 2026-08-13.
 
 
 ## Índice
@@ -24,6 +24,7 @@ Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** 
 16. [Estado del Sistema y Backups](#16-estado-del-sistema-y-backups)
 17. [Integración con Netviax Atlas (Backoffice)](#17-integración-con-netviax-atlas-backoffice)
 18. [Administración (módulo en construcción)](#18-administración-módulo-en-construcción)
+19. [Oportunidades y Conversión a Producto](#19-oportunidades-y-conversión-a-producto)
 
 ---
 
@@ -517,4 +518,37 @@ Lo que existe hoy (2026-08-12):
 - Permiso `ADMINISTRACION_VIEW` sembrado en `seedRBAC()` (`db.go`, módulo `administracion`) y registrado en `frontend/src/lib/permissionModules.js` para que aparezca en la matriz de Roles.
 
 **No hay endpoint de backend, tabla, ni acciones (CREATE/UPDATE/DELETE) todavía** — no se agregó nada a `main.go`/`index.go` porque no hay ningún dato que servir aún. Cuando se defina el contenido real del módulo, seguir el mismo patrón dual-entrypoint (regla 1 de [[Gotchas y Reglas de Oro]]) y sumar los permisos de acción que correspondan (`ADMINISTRACION_CREATE`/`_UPDATE`/`_DELETE`) junto a `ADMINISTRACION_VIEW`.
+
+---
+
+## 19. Oportunidades y Conversión a Producto
+
+Una Oportunidad (`opportunities`, ver sección 7 para el modelo de Producto real) es la **pre-carga de un pedido comercial con una aerolínea**, antes de convertirse en inventario reservable. Tiene 2 estados independientes:
+
+- **`Estado`** (negocio/agencia): `pendiente` → `aprobada` | `rechazada`. Solo admin aprueba/rechaza (`PUT /api/opportunities/:id/approve`, `OPPORTUNITIES_APPROVE`... aunque la ruta real hoy gatea con `OPPORTUNITIES_UPDATE`, ver nota de la sección 5 de [[Gotchas y Reglas de Oro]] sobre este permiso sembrado-pero-no-usado). No-admin solo edita/elimina mientras está en `pendiente`.
+- **`EstadoInterno`** ("Estado Aerolínea", agregado 2026-08-12): `Cotizado` / `Rechazado por la aerolínea` / `Confirmado` / `Vencido` — seleccionable independiente del anterior; al elegir "Rechazado por la aerolínea" el frontend pide un `MotivoRechazo` (`Tarifa alta` / `Fechas incorrectas` / `Exceso de oferta` / `Vencido`) vía popup.
+
+**Conversión a Producto (agregada 2026-08-13, flujo opcional)**: una oportunidad ya `aprobada` puede convertirse en un Producto real de una sola vez, vía `POST /api/opportunities/:id/convert-to-product` (`OPPORTUNITIES_CONVERT`, mismo criterio de permiso que editar: admin o creador+misma agencia). El frontend reusa `ProductForm.jsx` tal cual (el mismo formulario de alta de Gestión de Productos), precargado con lo que ya existe en la oportunidad (destino, compañía, agencia, temporada, fechas, cupo inicial = lugares liberados, tarifa ADT sugerida = Neto1) — quien convierte completa el resto (tarifas por tipo, ruta, ficha, etc.) igual que si estuviera cargando el producto a mano.
+
+El producto resultante nace con **`PendienteAprobacion = true`**: no aparece en Disponibilidad (`GetProducts` sin `scope=management` exige `pendiente_aprobacion = false` además de `disponibilidad > 0` y `is_blocked_for_sale = false`) hasta que un admin lo aprueba (`PUT /api/products/:id/approve`, `PRODUCTS_APPROVE`). En Gestión de Productos, estos productos se muestran **apartados** en una sección propia (borde ámbar, arriba de la tabla principal) con su propio botón "Aprobar" — no entran a la tabla ni a sus filtros hasta que se aprueban. Este gate es enteramente independiente del flujo normal: un producto cargado directo desde Gestión de Productos nace en `false` y nunca lo atraviesa.
+
+La oportunidad, al convertirse, pasa a **`Estado = "producto"`** (terminal, guardando `ProductoID` a modo informativo — no hay lectura automática de vuelta desde el Producto) — de ahí en más no se puede editar, eliminar, ni volver a aprobar/rechazar, ni siquiera como admin (`ya cumplió su ciclo`).
+
+- Backend: `opportunities_handler.go` (`ConvertOpportunityToProduct`, guards de estado terminal en `UpdateOpportunity`/`DeleteOpportunity`/`ApproveOpportunity`), `product_handler.go` (`ApproveProduct`, filtro `pendiente_aprobacion` en `GetProducts`).
+- Frontend: `GestionOportunidades.jsx` (botón "Convertir a producto", badge de estado, texto informativo "Producto #ID"), `GestionProductos.jsx` (sección "Pendientes de aprobación"), `hooks/useOpportunities.ts` (`useConvertOpportunityToProduct`), `hooks/useProducts.js` (`useApproveProduct`).
+
+```mermaid
+flowchart TD
+    A["Oportunidad: pendiente"] -->|"Admin aprueba/rechaza"| B{"Estado"}
+    B -->|"rechazada"| Z["Fin — se puede editar/eliminar"]
+    B -->|"aprobada"| C{"¿La agencia quiere convertirla a Producto?"}
+    C -->|"No — usa Gestión de Productos directo, o no hace nada"| Z2["Fin — flujo sin cambios, opcional"]
+    C -->|"Sí"| D["Botón Convertir a producto: ProductForm precargado con datos de la oportunidad"]
+    D --> E["POST /api/opportunities/:id/convert-to-product"]
+    E --> F["Product creado con pendiente_aprobacion = true"]
+    F --> G["Opportunity.Estado = producto (terminal) + ProductoID guardado"]
+    G --> H["Producto aparece apartado en Gestión de Productos, NO en Disponibilidad"]
+    H -->|"Admin aprueba"| I["PUT /api/products/:id/approve — pendiente_aprobacion = false"]
+    I --> J["Aparece en tabla principal y en Disponibilidad"]
+```
 

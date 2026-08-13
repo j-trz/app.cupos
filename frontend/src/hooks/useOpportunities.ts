@@ -50,3 +50,18 @@ export const useApproveOpportunity = () => {
     },
   });
 };
+
+// Convierte una oportunidad aprobada en un producto nuevo (pendiente de
+// aprobación de un admin, ver ApproveProduct en useProducts.js) — flujo
+// opcional, no reemplaza la carga directa de productos desde Gestión de
+// Productos.
+export const useConvertOpportunityToProduct = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => ApiClient.post(`/opportunities/${id}/convert-to-product`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+};

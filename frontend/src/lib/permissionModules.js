@@ -37,6 +37,8 @@ export const ACTIONS = [
   { value: 'export', label: 'Exportar' },
   { value: 'unlock', label: 'Desbloquear' },
   { value: 'assign', label: 'Asignar' },
+  { value: 'approve', label: 'Aprobar' },
+  { value: 'convert', label: 'Convertir' },
 ];
 
 export const getModuleLabel = (moduleValue) => MODULES.find((m) => m.value === moduleValue)?.label || moduleValue;
