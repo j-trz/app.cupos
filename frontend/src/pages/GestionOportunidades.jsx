@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOpportunities, useDeleteOpportunity, useApproveOpportunity } from '@/hooks/useOpportunities';
-import { OportunityForm } from '@/components/OportunityForm';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import Swal from 'sweetalert2';
+import { useAuth } from '../contexts/AuthContext';
+import { useOpportunities, useDeleteOpportunity, useApproveOpportunity } from '../hooks/useOpportunities';
+import { OportunityForm } from '../components/OportunityForm';
+import { ShadcnButton as Button } from '../components/ui/shadcn-button';
+import { ShadcnInput as Input } from '../components/ui/shadcn-input';
 import {
   Table,
   TableBody,
@@ -11,16 +12,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { useToast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '../components/ui/shadcn-table';
+import { useToast } from '../hooks/use-toast';
 import { Edit2, Trash2, CheckCircle, Eye, Search } from 'lucide-react';
 
 export const GestionOportunidades = () => {
@@ -29,7 +22,6 @@ export const GestionOportunidades = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOportunity, setSelectedOportunity] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [filterEstado, setFilterEstado] = useState('');
   const [filterTemporada, setFilterTemporada] = useState('');
   const [filterDestino, setFilterDestino] = useState('');
@@ -54,12 +46,20 @@ export const GestionOportunidades = () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async () => {
-    if (!deleteConfirm) return;
+  const handleDelete = async (opp) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: '¿Eliminar oportunidad?',
+      text: `Se eliminará la oportunidad de ${opp.destino} (${opp.compania}). Esta acción no se puede deshacer.`,
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    });
+    if (!result.isConfirmed) return;
     try {
-      await deleteMutation.mutateAsync(deleteConfirm.id);
+      await deleteMutation.mutateAsync(opp.id);
       toast({ title: 'Oportunidad eliminada', variant: 'success' });
-      setDeleteConfirm(null);
     } catch (err) {
       toast({ title: 'Error al eliminar', description: err.message, variant: 'destructive' });
     }
@@ -188,7 +188,7 @@ export const GestionOportunidades = () => {
                     )}
                     {canDeleteRow(opp) && canDelete && (
                       <button
-                        onClick={() => setDeleteConfirm(opp)}
+                        onClick={() => handleDelete(opp)}
                         className="text-red-600 hover:text-red-800"
                         title="Eliminar"
                       >
@@ -246,22 +246,6 @@ export const GestionOportunidades = () => {
           setSelectedOportunity(null);
         }}
       />
-
-      {/* Confirmación de eliminación */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogTitle>¿Eliminar oportunidad?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Esta acción no se puede deshacer. Se eliminará la oportunidad de {deleteConfirm?.destino} ({deleteConfirm?.compania}).
-          </AlertDialogDescription>
-          <div className="flex gap-2 justify-end">
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Eliminar
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

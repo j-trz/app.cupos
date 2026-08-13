@@ -2,6 +2,22 @@ Postmortems de bugs ya corregidos, para no re-investigar desde cero si un sínto
 
 > Entradas verificadas contra código al momento de escribirse; fecha propia en cada una.
 
+## Deploy roto: módulo "Oportunidades" armado con la estructura de OTRO proyecto (alias `@/`, componentes shadcn con otro nombre)
+
+**Síntoma**: build de Vercel fallaba con `Rollup failed to resolve import "@/contexts/AuthContext" from ".../GestionOportunidades.jsx"`.
+
+**Causa raíz**: el módulo completo de "Oportunidades" (`GestionOportunidades.jsx`, `OportunityForm.jsx`, `useOpportunities.ts`, `opportunitySchema.ts` — frontend; handler/rutas/modelo/migración ya existían del lado backend) se había commiteado usando convenciones de un scaffold shadcn/ui genérico que **no coinciden con este repo**:
+- Alias `@/` para imports — este proyecto **no tiene ningún alias configurado** en `vite.config.js`, todo se importa con rutas relativas (`../contexts/AuthContext`).
+- Nombres de componentes UI genéricos (`components/ui/button`, `dialog`, `select`, `alert-dialog`) — acá los mismos componentes existen con prefijo `shadcn-` (`shadcn-button.jsx`, `shadcn-dialog.jsx`, `shadcn-select.jsx`) y exports nombrados distintos (`ShadcnButton as Button`, `ShadcnInput as Input`) — ver el patrón ya establecido en `Notificaciones.jsx`/`Settings.jsx`.
+- `apiCall()` genérico desde `@/lib/apiClient` — no existe; el cliente HTTP real del proyecto es la clase `ApiClient` (`services/apiClient.js`, métodos estáticos `.get/.post/.put/.delete`).
+- `AlertDialog` (confirmación modal tipo shadcn) — **no existe en este proyecto**, solo hay un `Alert` simple (banner estático, `shadcn-alert.jsx`: `Alert`/`AlertTitle`/`AlertDescription`). El patrón real de confirmación en toda la app es `Swal.fire({...})` (SweetAlert2).
+
+Lo demás (paquetes npm `react-hook-form`/`@hookform/resolvers`/`zod`, permisos RBAC `OPPORTUNITIES_*` en `seedRBAC()`, rutas `/opportunities` en ambos entrypoints, entrada en el Sidebar) sí estaba bien armado — el problema era puramente la capa de imports/componentes del frontend.
+
+**Fix** (2026-08-12): reescritos los imports de los 3 archivos frontend a rutas relativas + componentes `shadcn-*` reales; `useOpportunities.ts` reescrito para usar `ApiClient`; el `AlertDialog` de confirmación de borrado reemplazado por `Swal.fire` (mismo patrón que `GestionProductos.jsx`/`GestionTemporadas.jsx`).
+
+**Cómo evitar que se repita**: si aparece código nuevo (propio o pegado de otra fuente/herramienta) que importe con alias `@/` o que use nombres de componente `components/ui/algo` sin el prefijo `shadcn-`, es una señal de que se generó para otra estructura de proyecto — revisar contra los imports reales de `Notificaciones.jsx`/`Settings.jsx` antes de asumir que va a compilar.
+
 ## Notificación "nuevo producto" llegaba a usuarios de TODAS las agencias, no solo a la dueña
 
 **Síntoma** (reportado por Julian, auditoría a pedido): pidió revisar las notificaciones porque sospechaba que llegaban avisos que no le correspondían a un usuario común.

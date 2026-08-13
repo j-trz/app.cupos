@@ -1,13 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext';
-import { opportunitySchema } from '@/schemas/opportunitySchema';
-import { useUpdateOpportunity, useCreateOpportunity } from '@/hooks/useOpportunities';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/shadcn-dialog';
+import { ShadcnButton as Button } from './ui/shadcn-button';
+import { ShadcnInput as Input } from './ui/shadcn-input';
+import { Label } from './ui/shadcn-label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/shadcn-select';
+import { useAuth } from '../contexts/AuthContext';
+import { opportunitySchema } from '../schemas/opportunitySchema';
+import { useUpdateOpportunity, useCreateOpportunity } from '../hooks/useOpportunities';
 
 export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess = () => {} }) => {
   const { can } = useAuth();

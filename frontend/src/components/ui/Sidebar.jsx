@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag, Briefcase } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import Swal from 'sweetalert2';
@@ -32,7 +32,7 @@ const adminNavItems = [
   { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
   { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
   { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
-  { label: 'Administración', path: '/administracion', icon: Settings, permission: 'ADMINISTRACION_VIEW' },
+  { label: 'Administración', path: '/administracion', icon: Briefcase, permission: 'ADMINISTRACION_VIEW' },
 ];
 
 // Settings items (grouped under Ajustes)

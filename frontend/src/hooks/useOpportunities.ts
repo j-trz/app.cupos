@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiCall } from '@/lib/apiClient';
+import ApiClient from '../services/apiClient';
 
 export const useOpportunities = (params = {}) => {
   const queryParams = new URLSearchParams(params).toString();
@@ -7,19 +7,14 @@ export const useOpportunities = (params = {}) => {
 
   return useQuery({
     queryKey: ['opportunities', params],
-    queryFn: async () => {
-      const res = await apiCall('GET', url);
-      return res;
-    },
+    queryFn: () => ApiClient.get(url),
   });
 };
 
 export const useCreateOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data) => {
-      return await apiCall('POST', '/opportunities', data);
-    },
+    mutationFn: (data) => ApiClient.post('/opportunities', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -29,9 +24,7 @@ export const useCreateOpportunity = () => {
 export const useUpdateOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }) => {
-      return await apiCall('PUT', `/opportunities/${id}`, data);
-    },
+    mutationFn: ({ id, data }) => ApiClient.put(`/opportunities/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -41,9 +34,7 @@ export const useUpdateOpportunity = () => {
 export const useDeleteOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id) => {
-      return await apiCall('DELETE', `/opportunities/${id}`);
-    },
+    mutationFn: (id) => ApiClient.delete(`/opportunities/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
@@ -53,9 +44,7 @@ export const useDeleteOpportunity = () => {
 export const useApproveOpportunity = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id) => {
-      return await apiCall('PUT', `/opportunities/${id}/approve`, {});
-    },
+    mutationFn: (id) => ApiClient.put(`/opportunities/${id}/approve`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     },
