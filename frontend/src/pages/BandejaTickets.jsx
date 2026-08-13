@@ -323,7 +323,7 @@ export default function BandejaTickets() {
           <SkeletonTable rows={6} cols={7} />
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={Ticket}
+            icon={<Ticket size={48} className="text-slate-300" />}
             title="No hay tickets"
             description={estadoFilter ? `No hay tickets con estado "${estadoBadge[estadoFilter]?.label || estadoFilter}"` : 'La bandeja de tickets está vacía.'}
           />
