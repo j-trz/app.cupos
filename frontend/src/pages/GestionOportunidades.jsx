@@ -4,7 +4,7 @@ import { Sparkles, Plus, Edit, Trash2, CheckCircle2, Search, Lock, PackagePlus, 
 import { useAuth } from '../contexts/AuthContext';
 import { useOpportunities, useDeleteOpportunity, useApproveOpportunity, useConvertOpportunityToProduct, useBulkDeleteOpportunities, useBulkApproveOpportunities } from '../hooks/useOpportunities';
 import { OportunityForm } from '../components/OportunityForm';
-import BulkSelectionBar, { Trash2, CheckCircle2 } from '../components/ui/BulkSelectionBar.jsx';
+import BulkSelectionBar from '../components/ui/BulkSelectionBar.jsx';
 import ProductForm from '../components/ProductForm';
 import Button from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';

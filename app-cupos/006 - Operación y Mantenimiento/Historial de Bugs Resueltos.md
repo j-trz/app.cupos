@@ -2,6 +2,18 @@ Postmortems de bugs ya corregidos, para no re-investigar desde cero si un sínto
 
 > Entradas verificadas contra código al momento de escribirse; fecha propia en cada una.
 
+## Deploy roto: import duplicado/roto de `BulkSelectionBar.jsx` (`Trash2`/`CheckCircle2`)
+
+**Síntoma**: build de Vercel fallaba con `The symbol "Trash2" has already been declared` (`GestionOportunidades.jsx:7`), y tras corregir eso, con `"CheckCircle2" is not exported by "BulkSelectionBar.jsx"` (`GestionProductos.jsx:20`).
+
+**Causa raíz**: `BulkSelectionBar.jsx` (`components/ui/`) re-exporta un puñado de íconos de lucide-react "por conveniencia" (`export { Trash2, Copy, CheckCircle, XCircle };` — nótese `CheckCircle`, no `CheckCircle2`, son íconos distintos). Al agregar la barra de selección múltiple a `GestionOportunidades.jsx`/`GestionProductos.jsx`, esas páginas importaron `{ Trash2, CheckCircle2 }` desde `BulkSelectionBar.jsx` en vez de (u además de) `lucide-react`:
+- `GestionOportunidades.jsx` ya importaba `Trash2`/`CheckCircle2` de `lucide-react` en otra línea → **declaración duplicada del mismo nombre**, error real de sintaxis de módulos ES (esbuild lo detecta en dev/build, no en runtime).
+- `GestionProductos.jsx` importaba `CheckCircle2` únicamente de `BulkSelectionBar.jsx`, que **no exporta ese nombre** (solo `CheckCircle`) → import inexistente, error de Rollup en build de producción.
+
+**Fix**: en ambos archivos, los íconos se importan solo de `lucide-react` (de donde realmente vienen) y el import de `BulkSelectionBar.jsx` quedó como debía ser desde el principio — solo el default export (el componente de la barra), sin re-exports de íconos.
+
+**Cómo evitar que se repita**: `BulkSelectionBar.jsx` re-exportar íconos de lucide-react "por conveniencia" es un patrón frágil — cualquier página que también importe esos mismos íconos directo de `lucide-react` (lo normal) corre riesgo de duplicado o de pedir un nombre que ahí no existe. Si se necesita el ícono en la página, importarlo siempre de `lucide-react` directo; no depender de que un componente de UI los re-exporte.
+
 ## 5 vulnerabilidades críticas de seguridad backend (auditoría 2026-08-13) — corregidas
 
 Detalle completo del hallazgo original en [[Auditoría de Seguridad y QA - 2026-08-13]] — acá solo el resumen de los fixes, ya aplicados.
