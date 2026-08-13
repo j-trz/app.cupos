@@ -99,7 +99,7 @@ func GetOpportunities(c *gin.Context) {
 		query = query.Where("compania = ?", compania)
 	}
 
-	query.Find(&opportunities)
+	query.Preload("CargadorUser").Preload("AutorizadorUser").Find(&opportunities)
 	c.JSON(http.StatusOK, opportunities)
 }
 
@@ -108,7 +108,7 @@ func GetOpportunity(c *gin.Context) {
 	id := c.Param("id")
 	var opp models.Opportunity
 
-	if err := database.DB.First(&opp, "id = ?", id).Error; err != nil {
+	if err := database.DB.Preload("CargadorUser").Preload("AutorizadorUser").First(&opp, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Oportunidad no encontrada"})
 		return
 	}
@@ -338,17 +338,19 @@ func ApproveOpportunity(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid, _ := uuid.Parse(fmt.Sprintf("%v", userID))
 
-	// Setear estado y usuario_autorizador
+	// Setear estado, usuario_autorizador y fecha_aprobado
+	now := time.Now()
 	if err := database.DB.Where("id = ?", id).Model(&opp).Updates(map[string]interface{}{
 		"estado":              "aprobada",
 		"usuario_autorizador": uid,
+		"fecha_aprobado":      now,
 	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al aprobar"})
 		return
 	}
 
 	// Re-fetch
-	database.DB.First(&opp, "id = ?", id)
+	database.DB.Preload("CargadorUser").Preload("AutorizadorUser").First(&opp, "id = ?", id)
 	c.JSON(http.StatusOK, opp)
 }
 

@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUpdateOpportunity, useCreateOpportunity } from '../hooks/useOpportunities';
 import { useTemporadas } from '../hooks/useTemporadas';
 import { airlineNames } from '../lib/data/airlineNames.js';
+import { toDateOnlyString } from '../lib/dateOnly.js';
 
 // Nombres únicos del diccionario de aerolíneas (mismo que usa ItineraryTable)
 // para autocompletar Compañía sin forzar un valor exacto — sigue siendo texto
@@ -49,11 +50,29 @@ export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess 
 
   useEffect(() => {
     if (isOpen) {
-      setForm(initialData ? { ...emptyForm, ...initialData } : emptyForm);
+      if (initialData) {
+        setForm({
+          ...emptyForm,
+          ...initialData,
+          validez: toDateOnlyString(initialData.validez),
+          fecha_salida: toDateOnlyString(initialData.fecha_salida),
+          fecha_llegada: toDateOnlyString(initialData.fecha_llegada),
+        });
+      } else {
+        setForm(emptyForm);
+      }
     }
   }, [isOpen, initialData]);
 
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleFechaSalidaChange = (val) => {
+    setForm((prev) => ({
+      ...prev,
+      fecha_salida: val,
+      fecha_llegada: !prev.fecha_llegada || prev.fecha_llegada < val ? val : prev.fecha_llegada,
+    }));
+  };
 
   const promptMotivoRechazo = async (currentValue) => {
     const { value } = await Swal.fire({
@@ -92,6 +111,9 @@ export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess 
     }
     const payload = {
       ...form,
+      validez: form.validez ? form.validez : undefined,
+      fecha_salida: form.fecha_salida,
+      fecha_llegada: form.fecha_llegada ? form.fecha_llegada : undefined,
       total_lugares: Number(form.total_lugares) || 0,
       total_liberados: Number(form.total_liberados) || 0,
       neto_1: form.neto_1 === '' ? undefined : Number(form.neto_1),
@@ -165,7 +187,7 @@ export const OportunityForm = ({ isOpen, onClose, initialData = null, onSuccess 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label htmlFor="fecha_salida">Fecha de Salida *</Label>
-            <Input id="fecha_salida" type="date" value={form.fecha_salida} onChange={(e) => setField('fecha_salida', e.target.value)} required />
+            <Input id="fecha_salida" type="date" value={form.fecha_salida} onChange={(e) => handleFechaSalidaChange(e.target.value)} required />
           </div>
           <div className="space-y-1">
             <Label htmlFor="fecha_llegada">Fecha de Llegada</Label>

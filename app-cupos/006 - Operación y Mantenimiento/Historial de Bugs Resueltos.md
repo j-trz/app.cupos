@@ -33,6 +33,10 @@ Aprovechando el cambio, auditoría de "componentes sin uso" en `frontend/src/`: 
 
 Verificado con `npm run build` (limpio) y `npm run lint` (0 errores en cualquier archivo tocado o borrado; el lint completo del repo tiene ~800 errores preexistentes que vienen de lintear `dist/` por un gap de config, no relacionado a este cambio).
 
+**Cuarta pasada**: "Estado Aerolínea" (`estado_interno`) pasó de texto libre a `<select>` con 4 opciones fijas del lado frontend (`Cotizado`/`Rechazado por la aerolínea`/`Confirmado`/`Vencido` — el campo en sí sigue siendo `*string` sin constraint en DB, el enum vive solo en `OportunityForm.jsx`). Al elegir "Rechazado por la aerolínea" se dispara un popup (`Swal.fire` con `input: 'select'`, sin librería nueva) pidiendo el motivo: `Tarifa alta`/`Fechas incorrectas`/`Exceso de oferta`/`Vencido`, guardado en el nuevo campo `Opportunity.MotivoRechazo` (`*string`, migración `ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS motivo_rechazo`) — el motivo queda visible bajo el select con un link "Cambiar motivo" para reabrirlo. `Vencido` en ambos combos es manual por ahora: no se armó lógica automática que lo setee solo al pasar la fecha de validez (no fue pedido explícitamente; requeriría un cron o un chequeo al leer la oportunidad).
+
+Después, mismo hilo de conversación, se construyó el flujo "Convertir Oportunidad a Producto" — ver *Flujos de Funcionalidades* sección 19 y *Modelo de Datos* (`Opportunity.ProductoID`/`Estado="producto"`, `Product.PendienteAprobacion`) para el detalle completo, no se repite acá.
+
 ## Notificación "nuevo producto" llegaba a usuarios de TODAS las agencias, no solo a la dueña
 
 **Síntoma** (reportado por Julian, auditoría a pedido): pidió revisar las notificaciones porque sospechaba que llegaban avisos que no le correspondían a un usuario común.

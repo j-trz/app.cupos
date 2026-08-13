@@ -1,11 +1,11 @@
 Catálogo de este vault — un LLM (o una persona) que arranca una sesión nueva debería poder orientarse leyendo solo esta página. Estructura y protocolo de mantenimiento en [[Gotchas y Reglas de Oro]] (sección final); historial cronológico de altas/consultas/lints en [[log]].
 
-> **Última revisión de este mapa contra el código**: 2026-08-12.
+> **Última revisión de este mapa contra el código**: 2026-08-13.
 
 - **[000 - README](../000%20-%20README/Sistema%20de%20Gestión%20de%20Cupos.md)** — qué es el proyecto, cómo levantarlo local, cómo se despliega.
 - **[001 - API](../001%20-%20API/Referencia%20de%20API.md)** — catálogo completo de endpoints REST, convenciones de auth/errores/permisos.
 - **[002 - Quickstart](../002%20-%20Quickstart/Quickstart.md)** — primera llamada autenticada, flujo mínimo de reserva por API.
-- **[003 - Funcionalidades](../003%20-%20Funcionalidades/Flujos%20de%20Funcionalidades.md)** — cómo funciona cada módulo por dentro, con diagramas (17 secciones: auth, disponibilidad, ciclo de vida de reserva, cesión, grupos, RBAC, IA, cron de expiración, reportes, notificaciones, configuración, API keys, backups, Netviax Atlas).
+- **[003 - Funcionalidades](../003%20-%20Funcionalidades/Flujos%20de%20Funcionalidades.md)** — cómo funciona cada módulo por dentro, con diagramas (19 secciones: auth, disponibilidad, ciclo de vida de reserva, cesión, grupos, RBAC, IA, cron de expiración, reportes, notificaciones, configuración, API keys, backups, Netviax Atlas, Administración, Oportunidades y conversión a Producto).
 - **[004 - Frontend](../004%20-%20Frontend/Frontend.md)** — arquitectura de la SPA: stack, rutas, contextos, servicios, hooks, componentes, mobile, i18n, build.
 - **[005 - Arquitectura y Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md)** — catálogo de tablas/modelos (GORM), relaciones y por qué están diseñadas así.
 - **[006 - Operación y Mantenimiento](../006%20-%20Operación%20y%20Mantenimiento/Gotchas%20y%20Reglas%20de%20Oro.md)** — invariantes no obvias del repo (dos entrypoints de backend, sin DB de test, RBAC, scoping de agencia) + [historial de bugs ya resueltos](../006%20-%20Operación%20y%20Mantenimiento/Historial%20de%20Bugs%20Resueltos.md), para no re-investigar un síntoma ya conocido.

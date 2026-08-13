@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import Swal from 'sweetalert2';
-import { Sparkles, Plus, Edit, Trash2, CheckCircle2, Search, Lock, PackagePlus, RefreshCw, RotateCcw } from 'lucide-react';
+import { Sparkles, Plus, Edit, Trash2, CheckCircle2, Search, Lock, PackagePlus, RefreshCw, RotateCcw, History } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOpportunities, useDeleteOpportunity, useApproveOpportunity, useConvertOpportunityToProduct } from '../hooks/useOpportunities';
 import { OportunityForm } from '../components/OportunityForm';
@@ -28,6 +28,24 @@ const formatEstadoLabel = (estado) => {
   return estado.charAt(0).toUpperCase() + estado.slice(1);
 };
 
+const formatDate = (val) => {
+  if (!val) return '—';
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-AR');
+};
+
+const formatDateTime = (val) => {
+  if (!val) return '—';
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleString('es-AR');
+};
+
+const profileName = (profile) => {
+  if (!profile) return 'N/A';
+  const name = [profile.nombre, profile.apellido].filter(Boolean).join(' ');
+  return name || profile.email || 'N/A';
+};
+
 // Precarga del mini-form de conversión (ProductForm reusado tal cual) con lo
 // que ya existe en la oportunidad — el resto (tarifas por tipo, ruta, ficha,
 // etc.) lo completa quien convierte. Cupo Total arranca en los lugares
@@ -50,6 +68,7 @@ export default function GestionOportunidades() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOportunity, setSelectedOportunity] = useState(null);
   const [convertingOpportunity, setConvertingOpportunity] = useState(null);
+  const [historyOpportunity, setHistoryOpportunity] = useState(null);
   const [filterEstado, setFilterEstado] = useState('');
   const [filterTemporada, setFilterTemporada] = useState('');
   const [filterDestino, setFilterDestino] = useState('');
@@ -222,9 +241,7 @@ export default function GestionOportunidades() {
         >
           <option value="">Todas las temporadas</option>
           {temporadaOptions.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
+            <option key={t} value={t}>{t}</option>
           ))}
         </select>
 
@@ -235,9 +252,7 @@ export default function GestionOportunidades() {
         >
           <option value="">Todos los destinos</option>
           {destinoOptions.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
+            <option key={d} value={d}>{d}</option>
           ))}
         </select>
 
@@ -254,26 +269,32 @@ export default function GestionOportunidades() {
           <TableHeader>
             <TableRow>
               <TableHead className="text-center">Acciones</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Destino</TableHead>
-              <TableHead>Compañía</TableHead>
-              <TableHead>Temporada</TableHead>
-              <TableHead>Salida</TableHead>
-              <TableHead>Lugares</TableHead>
-              <TableHead>Neto 1</TableHead>
-              <TableHead>Cargador</TableHead>
+              <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Destino</TableHead>
+              <TableHead className="text-center">Compañía</TableHead>
+              <TableHead className="text-center">Temporada</TableHead>
+              <TableHead className="text-center">Salida</TableHead>
+              <TableHead className="text-center">Lugares</TableHead>
+              <TableHead className="text-center">Neto 1</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
             ) : filteredOportunidades.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
             ) : (
               filteredOportunidades.map((opp) => (
                 <TableRow key={opp.id}>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
+                      {/* Historial: siempre visible */}
+                      <ActionIconButton
+                        icon={History}
+                        onClick={() => setHistoryOpportunity(opp)}
+                        title="Historial de carga y aprobación"
+                        className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                      />
                       {canEditRow(opp) && canEdit && (
                         <ActionIconButton icon={Edit} onClick={() => handleEdit(opp)} title="Editar" />
                       )}
@@ -298,19 +319,20 @@ export default function GestionOportunidades() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     <Badge variant={getBadgeVariant(opp.estado)}>{formatEstadoLabel(opp.estado)}</Badge>
                     {opp.producto_id && (
                       <div className="mt-1 text-[11px] text-slate-400">Producto #{opp.producto_id}</div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium text-slate-900">{opp.destino}</TableCell>
-                  <TableCell>{opp.compania}</TableCell>
-                  <TableCell>{opp.temporada || '—'}</TableCell>
-                  <TableCell>{opp.fecha_salida ? new Date(opp.fecha_salida).toLocaleDateString() : '—'}</TableCell>
-                  <TableCell>{opp.total_lugares}</TableCell>
-                  <TableCell>{opp.neto_1 ? `$${opp.neto_1}` : '—'}</TableCell>
-                  <TableCell className="text-xs text-slate-500">{opp.usuario_cargador?.name || 'N/A'}</TableCell>
+                  <TableCell className="text-center font-medium text-slate-900">{opp.destino}</TableCell>
+                  <TableCell className="text-center">{opp.compania}</TableCell>
+                  <TableCell className="text-center">{opp.temporada || '—'}</TableCell>
+                  <TableCell className="text-center">{formatDate(opp.fecha_salida)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="info">{opp.total_lugares ?? 0}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">{opp.neto_1 ? `$${opp.neto_1}` : '—'}</TableCell>
                 </TableRow>
               ))
             )}
@@ -324,6 +346,64 @@ export default function GestionOportunidades() {
         initialData={selectedOportunity}
         onSuccess={() => setSelectedOportunity(null)}
       />
+
+      {/* Modal de Historial */}
+      <Modal
+        title="Historial de la Oportunidad"
+        open={!!historyOpportunity}
+        onClose={() => setHistoryOpportunity(null)}
+        size="lg"
+      >
+        {historyOpportunity && (
+          <div className="space-y-4 text-sm">
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <td className="px-4 py-3 font-semibold text-slate-500 w-40">Cargado por</td>
+                    <td className="px-4 py-3 text-slate-800">{profileName(historyOpportunity.cargador_user)}</td>
+                  </tr>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-4 py-3 font-semibold text-slate-500">Fecha de carga</td>
+                    <td className="px-4 py-3 text-slate-800">{formatDateTime(historyOpportunity.fecha_cargado)}</td>
+                  </tr>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <td className="px-4 py-3 font-semibold text-slate-500">Estado actual</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={getBadgeVariant(historyOpportunity.estado)}>{formatEstadoLabel(historyOpportunity.estado)}</Badge>
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-4 py-3 font-semibold text-slate-500">Aprobado por</td>
+                    <td className="px-4 py-3 text-slate-800">
+                      {historyOpportunity.autorizador_user
+                        ? profileName(historyOpportunity.autorizador_user)
+                        : <span className="text-slate-400 italic">Sin aprobación aún</span>}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <td className="px-4 py-3 font-semibold text-slate-500">Fecha aprobación</td>
+                    <td className="px-4 py-3 text-slate-800">
+                      {historyOpportunity.fecha_aprobado
+                        ? formatDateTime(historyOpportunity.fecha_aprobado)
+                        : <span className="text-slate-400 italic">—</span>}
+                    </td>
+                  </tr>
+                  {historyOpportunity.producto_id && (
+                    <tr>
+                      <td className="px-4 py-3 font-semibold text-slate-500">Producto generado</td>
+                      <td className="px-4 py-3 text-slate-800">#{historyOpportunity.producto_id}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setHistoryOpportunity(null)}>Cerrar</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         title="Convertir Oportunidad a Producto"

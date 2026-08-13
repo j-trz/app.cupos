@@ -747,6 +747,12 @@ type Opportunity struct {
 	FechaCargado       time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_cargado"`
 	UsuarioCargador    uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_cargador"`
 	UsuarioAutorizador *uuid.UUID `gorm:"type:uuid" json:"usuario_autorizador"`
+	FechaAprobado      *time.Time `gorm:"column:fecha_aprobado" json:"fecha_aprobado,omitempty"`
 	CreatedAt          time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt          time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+
+	// Relaciones
+	CargadorUser    *Profile `gorm:"foreignKey:UsuarioCargador" json:"cargador_user,omitempty"`
+	AutorizadorUser *Profile `gorm:"foreignKey:UsuarioAutorizador" json:"autorizador_user,omitempty"`
 }
+

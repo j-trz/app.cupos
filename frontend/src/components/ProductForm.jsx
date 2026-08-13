@@ -190,6 +190,15 @@ const ProductForm = ({
     if (errors[key]) setErrors((prev) => { const e = { ...prev }; delete e[key]; return e; });
   };
 
+  const handleFechaSalidaChange = (val) => {
+    setForm((prev) => ({
+      ...prev,
+      fecha_salida: val,
+      fecha_regreso: !prev.fecha_regreso || prev.fecha_regreso < val ? val : prev.fecha_regreso,
+    }));
+    if (errors.fecha_salida) setErrors((prev) => { const e = { ...prev }; delete e.fecha_salida; return e; });
+  };
+
   const validate = () => {
     const e = {};
     if (!form.agencia) e.agencia = 'Requerido';
@@ -319,7 +328,15 @@ const ProductForm = ({
         <div>
           {sectionLabel('Fechas y cupo')}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-            {field('fecha_salida', 'Fecha de Salida', 'date')}
+            <div className="space-y-1">
+              <Label htmlFor="fecha_salida">Fecha de Salida</Label>
+              <Input
+                id="fecha_salida"
+                type="date"
+                value={form.fecha_salida}
+                onChange={(e) => handleFechaSalidaChange(e.target.value)}
+              />
+            </div>
             {field('fecha_regreso', 'Fecha de Regreso', 'date')}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
             <div className="space-y-1">
