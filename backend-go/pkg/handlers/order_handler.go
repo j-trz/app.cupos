@@ -1066,6 +1066,7 @@ func UpdateReservation(c *gin.Context) {
 	// emitido_at nunca se acepta directo del cliente — se calcula acá abajo,
 	// la primera vez que estado_interno pasa a "Emitido".
 	delete(input, "emitido_at")
+	justEmitted := false
 	if v, ok := input["estado_interno"].(string); ok {
 		if !models.IsValidEstadoInterno(v) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "estado_interno inválido"})
@@ -1073,6 +1074,7 @@ func UpdateReservation(c *gin.Context) {
 		}
 		if v == "Emitido" && reservation.EstadoInterno != "Emitido" {
 			input["emitido_at"] = time.Now()
+			justEmitted = true
 		}
 	}
 
@@ -1082,6 +1084,19 @@ func UpdateReservation(c *gin.Context) {
 	}
 
 	database.DB.First(&reservation, id)
+
+	// Al emitirse (individual, no solo en bulk) se generan los boletos de la
+	// Bandeja de Tickets — antes solo BulkUpdateReservations lo hacía, así que
+	// la enorme mayoría de emisiones (flujo de a una reserva) nunca caían ahí.
+	// GenerateTicketsForReservationInternal no depende de Atlas para nada — el
+	// ticket queda con AtlasStatus="pendiente" y es visible en la bandeja
+	// igual, se sincroniza con Atlas después (o nunca) desde ahí.
+	if justEmitted {
+		userIDVal, _ := c.Get("userID")
+		userUUID, _ := uuid.Parse(fmt.Sprintf("%v", userIDVal))
+		_, _ = GenerateTicketsForReservationInternal(&reservation, userUUID)
+	}
+
 	c.JSON(http.StatusOK, reservation)
 }
 

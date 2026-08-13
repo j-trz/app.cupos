@@ -72,6 +72,13 @@ La unidad real de "cupo aéreo": **cada pasajero ocupa 1 lugar y se crea siempre
 
 > Nota de negocio pendiente de reflejar en el modelo: el **infante no ocupa lugar/cupo pero sí es pasajero** — hoy `Passenger` no distingue esto a nivel de stock (cada fila resta 1 de `Disponibilidad` por igual). Ver [[Feedback equipo de testing (UTG) — Sistema de Cupos|Feedback UTG]], sección Reserva.
 
+### `Ticket` (tabla `tickets`) — Bandeja de Tickets
+
+Registro **inmutable** (nunca se borra, solo se marca `void`) del boleto GDS emitido cuando una `Reservation` pasa a `EstadoInterno = "Emitido"` — se genera vía `GenerateTicketsForReservationInternal()` (`ticket_handler.go`), llamada tanto desde `UpdateReservation` (emisión individual) como `BulkUpdateReservations` (selección múltiple); es idempotente (si ya hay tickets para esa reserva, los devuelve sin duplicar). Un ticket por pasajero de la reserva (o uno solo si no hay pasajeros individuales cargados). `Estado`: `emitido` → `enviado_atlas` (vía `SyncTicketAtlas`, sin dependencia real de que Atlas esté conectado — es un estado manual) → `void` (terminal, vía `VoidTicket`).
+
+- **`RestoreStock` al voidear** (agregado 2026-08-13): `VoidTicket` acepta `restore_stock` (bool) en el body — si es `true`, devuelve 1 lugar al `Product` asociado (mismo patrón GORM de `DeleteReservation`, dentro de una transacción junto con el `Save` del ticket). La decisión la toma el usuario en el modal de confirmación (`BandejaTickets.jsx`), no se infiere automáticamente.
+- **Limitación de diseño conocida**: `ReservationID`/`PassengerID` son `uuid.UUID` generados con `uuid.NewSHA1(...)` a partir del ID entero real de `Reservation`/`Passenger` (ambos `uint`, no `uuid.UUID`) — son identificadores derivados **no reversibles**, no una FK real utilizable para `JOIN`/lookup hacia esas tablas. Por eso, por ejemplo, no es viable determinar desde `Ticket` si el pasajero original era un infante (que no ocupa stock) sin agregar una columna nueva con el ID entero real o una relación GORM propiamente tipada.
+
 ---
 
 ## 2. Identidad y acceso: Profile, Agency, UserAgency

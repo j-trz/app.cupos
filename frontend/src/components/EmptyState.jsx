@@ -2,15 +2,15 @@ import React from 'react';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 
-const EmptyState = ({ 
-  title = 'No hay datos', 
-  description = 'No se encontraron resultados', 
-  icon = '🔍', 
+const EmptyState = ({
+  title = 'No hay datos',
+  description = 'No se encontraron resultados',
+  icon = '🔍',
   action = null,
   showAction = true
 }) => {
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto border-none shadow-none">
       <CardHeader className="text-center">
         <div className="mx-auto text-4xl mb-4">{icon}</div>
         <CardTitle>{title}</CardTitle>

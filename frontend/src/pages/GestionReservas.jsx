@@ -508,9 +508,14 @@ export default function GestionReservas() {
     }
   };
 
-  const handleBulkUpdate = async (estado) => {
+  // kind: 'confirmar' → Reservation.Estado='confirmada'; 'emitir' →
+  // Reservation.EstadoInterno='Emitido' (dispara la generación de tickets en
+  // la Bandeja de Tickets, ver GenerateTicketsForReservationInternal). Son
+  // dos campos independientes del backend, no el mismo valor.
+  const handleBulkUpdate = async (kind) => {
+    const isEmitir = kind === 'emitir';
     const result = await Swal.fire({
-      title: `¿Cambiar estado a ${getEstadoLabel(estado)}?`,
+      title: isEmitir ? '¿Marcar como Emitido?' : '¿Confirmar reservas?',
       text: `Se actualizarán ${selectedIds.length} reservas.`,
       icon: 'question',
       showCancelButton: true,
@@ -520,7 +525,11 @@ export default function GestionReservas() {
     if (!result.isConfirmed) return;
     setIsBulkUpdating(true);
     try {
-      await ReservationService.bulkUpdateReservations(selectedIds, estado);
+      if (isEmitir) {
+        await ReservationService.bulkEmitReservations(selectedIds);
+      } else {
+        await ReservationService.bulkConfirmReservations(selectedIds);
+      }
       Swal.fire({ icon: 'success', title: 'Actualizadas', timer: 1500, showConfirmButton: false });
       setSelectedIds([]);
       fetchReservations();
@@ -900,8 +909,8 @@ export default function GestionReservas() {
         onClear={() => setSelectedIds([])}
         entityLabel="reserva"
         actions={[
-          { label: 'Confirmar', icon: CheckCircle2, variant: 'success', onClick: () => handleBulkUpdate('confirmado'), loading: isBulkUpdating },
-          { label: 'Emitir', icon: Ticket, variant: 'primary', onClick: () => handleBulkUpdate('emitido'), loading: isBulkUpdating },
+          { label: 'Confirmar', icon: CheckCircle2, variant: 'success', onClick: () => handleBulkUpdate('confirmar'), loading: isBulkUpdating },
+          { label: 'Emitir', icon: Ticket, variant: 'primary', onClick: () => handleBulkUpdate('emitir'), loading: isBulkUpdating },
           { label: 'Cancelar', icon: XCircle, variant: 'danger', onClick: handleBulkCancel, loading: isBulkCanceling }
         ]}
       />

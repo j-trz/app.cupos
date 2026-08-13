@@ -2,6 +2,33 @@ Postmortems de bugs ya corregidos, para no re-investigar desde cero si un sínto
 
 > Entradas verificadas contra código al momento de escribirse; fecha propia en cada una.
 
+## Bandeja de Tickets: reservas emitidas no "caían" ahí + selección múltiple de Reservas rota
+
+**Síntoma** (reportado por Julian): la Bandeja de Tickets no mostraba las reservas emitidas, y los botones "Confirmar"/"Emitir" de la selección múltiple en Gestión de Reservas tiraban error.
+
+**Causa raíz 1 — emisión individual nunca generaba tickets**: `GenerateTicketsForReservationInternal()` (`ticket_handler.go`) es la función que crea las filas de `Ticket` cuando una reserva pasa a `EstadoInterno = "Emitido"` — pero solo la llamaba `BulkUpdateReservations` (`order_handler.go`), agregada junto con la selección múltiple. `UpdateReservation` (el flujo normal, de a una reserva por vez, usado desde Gestión de Nóminas/Reservas) calculaba `emitido_at` pero **nunca** llamaba a esa función — la enorme mayoría de emisiones (todo lo que no pasa por seleccionar varias reservas y usar el botón masivo) nunca generaba ticket, así que nunca aparecía en la Bandeja. Esto también explica la duda de Julian sobre Atlas: no hay ninguna dependencia de Atlas en la generación de tickets (`AtlasStatus` arranca en `"pendiente"` y el ticket ya es visible), el problema era puramente que no se generaba el ticket en absoluto en el flujo individual.
+
+**Fix**: `UpdateReservation` ahora también llama a `GenerateTicketsForReservationInternal()` cuando detecta la transición a "Emitido" (mismo criterio que ya usaba para calcular `emitido_at`). La función ya es idempotente (si ya existen tickets para esa reserva, los devuelve sin duplicar), así que no hay riesgo de tickets repetidos si en algún momento se emite tanto individual como en bulk.
+
+**Causa raíz 2 — selección múltiple de Reservas (Confirmar/Emitir) rota**: `reservationService.js` tenía dos bugs simultáneos en `bulkUpdateReservations`:
+1. Llamaba `PUT /reservations/bulk-update` — pero la ruta real está registrada como `POST /orders/bulk-update` (no existe ningún grupo de rutas `/reservations` en el backend; toda esta lógica vive bajo `/orders`, ver `order_handler.go`). Método Y path equivocados → 404/405 seguro.
+2. Mandaba `{ ids, estado: 'confirmado' }` o `{ ids, estado: 'emitido' }` — pero el backend tiene DOS campos independientes: `Reservation.Estado` (ciclo de vida, valor real `"confirmada"`, no `"confirmado"`) y `Reservation.EstadoInterno` (seguimiento de backoffice, valores válidos `Pendiente`/`Seña`/`Pagado`/`Emitido`, con mayúscula). El frontend nunca mandaba `estado_interno`, así que aunque el path/método se arreglaran solos, "Emitir" jamás iba a disparar la generación de tickets (el backend solo la dispara cuando `EstadoInterno == "Emitido"`).
+
+**Fix**: `reservationService.js` ahora expone `bulkConfirmReservations(ids)` (→ `POST /orders/bulk-update` con `estado: 'confirmada'`) y `bulkEmitReservations(ids)` (→ mismo endpoint con `estado_interno: 'Emitido'`) como métodos separados en vez de uno genérico que mezclaba los dos campos. `GestionReservas.jsx` actualizado para llamar al método correcto según la acción.
+
+**Feature nueva — void de ticket pregunta por el stock**: `VoidTicket` (`ticket_handler.go`) ahora acepta `restore_stock` (bool) en el body; si es `true`, devuelve 1 lugar al `Product` asociado (mismo patrón GORM que usa `DeleteReservation` para restituir stock: `LEAST(cupo, GREATEST(0, disponibilidad + 1))` / `GREATEST(0, vendidos - 1)`, ambos dentro de una transacción junto con el `Save` del ticket). La decisión de si el lugar ocupaba stock o no queda en manos del usuario (no se intenta inferir automáticamente) — ver limitación de diseño abajo, sobre por qué no es trivial inferirlo del lado del backend. `BandejaTickets.jsx`'s `handleVoid` ahora pregunta explícitamente "¿Devolver al stock del cupo?" vs. "Void informativo" antes de pedir el motivo.
+
+**Limitación de diseño detectada (no corregida, solo documentada)**: `Ticket.ReservationID` y `Ticket.PassengerID` (`models.go`) se generan con `uuid.NewSHA1(...)` a partir del ID entero real de `Reservation`/`Passenger` — son identificadores **derivados, no reversibles**, no una FK real utilizable para hacer `JOIN`/lookup hacia esas tablas (`Reservation.ID`/`Passenger.ID` son `uint`, no `uuid.UUID`). Por eso el fix de "devolver stock" no intenta determinar automáticamente si el pasajero del ticket era un infante (que no ocupa lugar) — no hay forma confiable de recuperar el `Passenger` real desde `Ticket.PassengerID` con una query directa. Si en el futuro hace falta ese dato desde `Ticket` de forma confiable, la solución real es agregar una columna con el ID entero real (no el hash) o una relación GORM propiamente tipada — no intentar revertir el hash SHA1.
+
+
+## `BandejaTickets.jsx` (`/tickets`) no seguía el diseño del resto de la app
+
+**Síntoma** (reportado por Julian): "el diseño no corresponde al resto del sistema" en la página de tickets.
+
+**Causa raíz**: toda la página estaba escrita con `style={{}}` inline y colores hex arbitrarios (`#2563eb`, `#0f172a`, `#e4e4e7`, etc.) en vez de Tailwind + el kit de componentes propio (`Button`/`Card`/`Badge`/`ActionIconButton`) que usa el resto de `Gestion*.jsx`. Además: el wrapper raíz tenía `style={{ padding: '1.5rem' }}` duplicando el padding que `Layout.jsx`'s `<main>` ya aplica; los botones de acción de la tabla eran `<button style={{}}>` a mano en vez de `ActionIconButton`; el badge de estado `void` usaba `variant: 'error'`, que no existe en `Badge.jsx` (quedaba sin ningún color aplicado); y el modal de detalle pasaba `title=""` a `Modal.jsx` intentando un header "de borde a borde" custom, pero `Modal.jsx` igual renderiza su propia barra de título (vacía) + botón de cerrar, dejando un header duplicado feo.
+
+**Fix** (2026-08-13): reescrita la página completa usando el kit de componentes y clases Tailwind (paleta `slate` + variants reales de `Badge.jsx`), `ActionIconButton` en la columna Acciones, wrapper raíz sin padding propio, y el modal de detalle con un `title` real (el look de "boarding pass" quedó como un panel con gradiente DENTRO del contenido, no reemplazando el chrome del modal). Se armó [[Guía de Diseño (para agregar elementos nuevos)]] (004) para que esto no se repita en páginas futuras.
+
 ## Deploy roto: import duplicado/roto de `BulkSelectionBar.jsx` (`Trash2`/`CheckCircle2`)
 
 **Síntoma**: build de Vercel fallaba con `The symbol "Trash2" has already been declared` (`GestionOportunidades.jsx:7`), y tras corregir eso, con `"CheckCircle2" is not exported by "BulkSelectionBar.jsx"` (`GestionProductos.jsx:20`).

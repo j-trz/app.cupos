@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // GetTickets devuelve el listado de tickets emitidos con filtros y scoping por agencia
@@ -107,7 +108,8 @@ func VoidTicket(c *gin.Context) {
 	}
 
 	var req struct {
-		MotivoVoid string `json:"motivo_void"`
+		MotivoVoid   string `json:"motivo_void"`
+		RestoreStock bool   `json:"restore_stock"`
 	}
 	_ = c.ShouldBindJSON(&req)
 
@@ -126,7 +128,25 @@ func VoidTicket(c *gin.Context) {
 	ticket.UsuarioVoidID = &userUUID
 	ticket.MotivoVoid = &motivo
 
-	if err := database.DB.Save(&ticket).Error; err != nil {
+	// Devolver el lugar al stock es una decisión del usuario, no algo que el
+	// sistema infiera solo: un ticket puede ser de un pasajero que no ocupaba
+	// lugar (infante) o el void puede ser una corrección administrativa sin
+	// impacto real en el cupo — quien voidea es quien sabe cuál de los dos
+	// casos es este. "Void informativo" (restore_stock=false) no toca stock.
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&ticket).Error; err != nil {
+			return err
+		}
+		if req.RestoreStock {
+			return tx.Model(&models.Product{}).Where("id = ?", ticket.ProductID).
+				Updates(map[string]interface{}{
+					"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + 1)) ELSE GREATEST(0, disponibilidad + 1) END"),
+					"vendidos":       gorm.Expr("GREATEST(0, vendidos - 1)"),
+				}).Error
+		}
+		return nil
+	})
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al registrar la anulación del ticket: " + err.Error()})
 		return
 	}

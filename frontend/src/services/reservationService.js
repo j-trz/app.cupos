@@ -402,12 +402,22 @@ class ReservationService {
     return true;
   }
 
-  static async bulkUpdateReservations(ids, estado) {
-    return await ApiClient.put('/reservations/bulk-update', { ids, estado });
+  // El backend distingue dos campos independientes (ver Modelo de Datos):
+  // Estado (ciclo de vida de la reserva, ej. "confirmada") y EstadoInterno
+  // (seguimiento de backoffice, ej. "Emitido") — no son intercambiables ni
+  // el mismo valor sirve para los dos. La ruta real es /orders/bulk-update
+  // (POST) — antes esto llamaba a /reservations/bulk-update con PUT, que no
+  // existe (la app no tiene ningún grupo de rutas "/reservations").
+  static async bulkConfirmReservations(ids) {
+    return await ApiClient.post('/orders/bulk-update', { ids, estado: 'confirmada' });
+  }
+
+  static async bulkEmitReservations(ids) {
+    return await ApiClient.post('/orders/bulk-update', { ids, estado_interno: 'Emitido' });
   }
 
   static async bulkCancelReservations(ids, notas) {
-    return await ApiClient.post('/reservations/bulk-cancel', { ids, notas });
+    return await ApiClient.post('/orders/bulk-cancel', { ids, notas });
   }
 }
 
