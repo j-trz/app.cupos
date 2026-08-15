@@ -17,6 +17,7 @@ import Modal from '../components/Modal.jsx';
 import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import { useAgencies } from '../hooks/useAgencies';
+import { getEstadoVariant as getBadgeVariant, getEstadoLabel } from '../lib/estadoReserva.js';
 import { formatDateOnly } from '../lib/dateOnly.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ const buildPassengerRows = (r) => {
     // qué agencia vino — para que en la nómina se note que ese pasajero no es
     // "propio" del catálogo, sino de un cupo cedido.
     originalAgency: r.original_agency || null,
+    estadoInterno: r.estado_interno || '',
   };
 
   if (Array.isArray(r.passengers) && r.passengers.length > 0) {
@@ -96,23 +98,6 @@ const buildPassengerRows = (r) => {
   }];
 };
 
-const getBadgeVariant = (estado) => {
-  if (estado === 'confirmada' || estado === 'confirmado') return 'success';
-  if (estado === 'bloqueo_temporal') return 'warning';
-  if (estado === 'cancelada' || estado === 'solicitud_cancelacion') return 'danger';
-  return 'default';
-};
-
-const getEstadoLabel = (estado) => ({
-  bloqueo_temporal: 'Bloqueo Temporal',
-  confirmado: 'Confirmado',
-  confirmada: 'Confirmada',
-  cancelado: 'Cancelado',
-  cancelada: 'Cancelada',
-  solicitud_cancelacion: 'Sol. Cancelación',
-  procesando: 'Procesando',
-}[estado] || estado || '—');
-
 // Comparación de códigos de agencia case/espacio-insensible — igual que el
 // backend (strings.EqualFold) en product_handler.go. Sin esto, una diferencia
 // de mayúsculas entre Product.Agencia y Reservation.Agencia (mismo código,
@@ -154,7 +139,7 @@ const buildRow = (r, products) => {
     'Fecha Nacimiento': formatDate(row.nacimiento),
     'Nacionalidad': row.nacionalidad,
     'Tipo Pasajero': row.tipoPasajero,
-    'Estado': getEstadoLabel(row.estado),
+    'Estado': getEstadoLabel(row.estado, row.estadoInterno),
     'Contacto': row.contactoNombre,
     'Email Contacto': row.contactoEmail,
     'Teléfono Contacto': row.contactoTelefono,
@@ -527,8 +512,8 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                   <TableCell className="text-zinc-700">{row.nacionalidad}</TableCell>
                   <TableCell className="text-zinc-700">{row.tipoPasajero}</TableCell>
                   <TableCell>
-                    <Badge variant={getBadgeVariant(row.estado)}>
-                      {getEstadoLabel(row.estado)}
+                    <Badge variant={getBadgeVariant(row.estado, row.estadoInterno)}>
+                      {getEstadoLabel(row.estado, row.estadoInterno)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-zinc-700">

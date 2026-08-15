@@ -17,27 +17,13 @@ import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import { formatDateOnly } from '../lib/dateOnly.js';
+import { getEstadoVariant, getEstadoLabel } from '../lib/estadoReserva.js';
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 const formatDate = formatDateOnly;
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'USD' }).format(value || 0);
-
-const getEstadoVariant = (estado) => {
-  if (estado === 'confirmada' || estado === 'confirmado') return 'success';
-  if (estado === 'bloqueo_temporal') return 'warning';
-  if (estado === 'cancelada') return 'danger';
-  return 'default';
-};
-
-const getEstadoLabel = (estado) => ({
-  bloqueo_temporal: 'Bloqueo temporal',
-  confirmada: 'Confirmada',
-  confirmado: 'Confirmado',
-  pendiente: 'Pendiente',
-  cancelada: 'Cancelada',
-}[estado] || estado);
 
 const greetingFor = (name) => {
   const h = new Date().getHours();
@@ -226,8 +212,8 @@ function RecentReservationsWidget({ reservations, loading, onOpen }) {
                   {r.pedido_id} · {formatDate(r.vuelo_salida)}
                 </p>
               </div>
-              <Badge variant={getEstadoVariant(r.estado)} className="shrink-0 text-xs">
-                {getEstadoLabel(r.estado)}
+              <Badge variant={getEstadoVariant(r.estado, r.estado_interno)} className="shrink-0 text-xs">
+                {getEstadoLabel(r.estado, r.estado_interno)}
               </Badge>
             </button>
           ))

@@ -18,6 +18,7 @@ import BulkSelectionBar, { XCircle } from '../components/ui/BulkSelectionBar.jsx
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
+import { getEstadoVariant, getEstadoLabel } from '../lib/estadoReserva.js';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryPDF from '../components/ItineraryPDF.jsx';
@@ -62,28 +63,6 @@ const formatMoney = (value) => {
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const getEstadoVariant = (estado) => {
-  if (estado === 'confirmado' || estado === 'confirmada') return 'success';
-  if (estado === 'procesando') return 'warning';
-  if (estado === 'cancelado' || estado === 'cancelada' || estado === 'solicitud_cancelacion') return 'danger';
-  if (estado === 'expirada') return 'danger';
-  if (estado === 'cedido') return 'outline';
-  return 'default';
-};
-
-const getEstadoLabel = (estado) => ({
-  bloqueo_temporal: 'Bloqueo Temporal',
-  confirmado: 'Confirmado',
-  confirmada: 'Confirmado',
-  procesando: 'Procesando',
-  completado: 'Completado',
-  cancelado: 'Cancelado',
-  cancelada: 'Cancelado',
-  solicitud_cancelacion: 'Sol. Cancelación',
-  expirada: 'Expirada',
-  cedido: 'Cedido a otra agencia',
-}[estado] || estado || '—');
-
 // Comparación de códigos de agencia case/espacio-insensible — igual que el
 // backend (strings.EqualFold en product_handler.go). Sin esto, una diferencia
 // de mayúsculas entre el código de agencia del producto y el de la reserva
@@ -107,6 +86,7 @@ const buildPassengerRows = (r) => {
       documento: p.documento || '—',
       tipoPasajero: p.tipo_pasajero || '—',
       estado: p.estado || r.estado || '',
+      estadoInterno: r.estado_interno || '',
       docContable: p.doc_contable || r.doc_contable || '',
       numeroTicket: p.numero_ticket || '',
       precioVenta: p.precio_venta || r.precio_venta,
@@ -122,6 +102,7 @@ const buildPassengerRows = (r) => {
     documento: r.documento_pasajero || '—',
     tipoPasajero: r.tipo_pasajero || '—',
     estado: r.estado || '',
+    estadoInterno: r.estado_interno || '',
     docContable: r.doc_contable || '',
     numeroTicket: '',
     precioVenta: r.precio_venta,
@@ -776,7 +757,7 @@ export default function GestionReservas() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getEstadoVariant(row.estado)}>{getEstadoLabel(row.estado)}</Badge>
+                    <Badge variant={getEstadoVariant(row.estado, row.estadoInterno)}>{getEstadoLabel(row.estado, row.estadoInterno)}</Badge>
                   </TableCell>
                   <TableCell>{r.vuelo_destino || '—'}</TableCell>
                   <TableCell>{r.vuelo_compania || '—'}</TableCell>
