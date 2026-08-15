@@ -795,8 +795,29 @@ type Ticket struct {
 	MotivoVoid        *string    `json:"motivo_void,omitempty"`
 	AtlasStatus       string     `gorm:"default:'pendiente'" json:"atlas_status"`
 	AtlasResponse     string     `gorm:"type:text" json:"atlas_response,omitempty"`
-	CreatedAt         time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt         time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	// Datos adicionales pedidos para que la Bandeja de Tickets sea un E-ticket
+	// completo con cada dato de backoffice separado en su propio campo (no
+	// texto libre a re-parsear) — todos son snapshot al momento de emitir,
+	// igual que Agencia/Ficha/Compania de arriba: Reservation/Passenger no son
+	// joineables desde Ticket (ReservationID/PassengerID son hashes SHA1 no
+	// reversibles, ver upsertTicketForPassenger), así que lo que no se copia
+	// acá en el momento de la emisión se pierde.
+	TipoPasajero  string     `json:"tipo_pasajero"`
+	TipoDocumento string     `json:"tipo_documento"` // "CI" o "Pasaporte" — cuál de los dos snapshoteó PasajeroDocumento
+	PedidoID      string     `json:"pedido_id"`
+	Vendedor      string     `json:"vendedor"` // email de Reservation.CreatedBy al momento de emitir
+	FechaReserva  *time.Time `json:"fecha_reserva,omitempty"`
+	// Franquicia de equipaje del producto al momento de emitir — mismo shape
+	// (carryon/handbag/checkedbag + *_kg) que Product, para poder reusar
+	// directo el componente BaggageFranchise.jsx sin mapeo.
+	CarryOn      bool    `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag      bool    `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag   bool    `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	CarryOnKg    float64 `gorm:"column:carryon_kg;default:0" json:"carryon_kg"`
+	HandBagKg    float64 `gorm:"column:handbag_kg;default:0" json:"handbag_kg"`
+	CheckedBagKg float64 `gorm:"column:checkedbag_kg;default:0" json:"checkedbag_kg"`
+	CreatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 
 	// Relaciones
 	EmisorUser *Profile `gorm:"foreignKey:UsuarioEmisorID" json:"emisor_user,omitempty"`

@@ -215,6 +215,18 @@ func SyncTicketAtlas(c *gin.Context) {
 	})
 }
 
+// resolveVendedorEmail busca el email de quien creó la reserva (Reservation.
+// CreatedBy) para snapshotearlo en el ticket como "Vendedor" — mismo dato que
+// ya resuelve GetReservations (ver reservationWithVendor en order_handler.go)
+// pero acá alcanza con un solo lookup por reserva, no un mapa masivo.
+func resolveVendedorEmail(createdBy uuid.UUID) string {
+	var profile models.Profile
+	if err := database.DB.Select("email").First(&profile, "id = ?", createdBy).Error; err != nil {
+		return ""
+	}
+	return profile.Email
+}
+
 // upsertTicketForPassenger crea (o completa) el Ticket de UN pasajero puntual
 // — nunca a nivel reserva completa. El "¿ya existe?" viejo chequeaba si la
 // RESERVA ya tenía algún ticket y, de ser así, se salteaba TODOS los
@@ -227,13 +239,24 @@ func SyncTicketAtlas(c *gin.Context) {
 // todavía no se cargó ninguno (ej. se marcó "Emitido" en bloque antes de
 // tipear los números reales de la aerolínea). Si el ticket ya existía con el
 // placeholder y ahora llega el número real, lo actualiza en vez de duplicar.
-func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pnr string, userID uuid.UUID) (*models.Ticket, error) {
+func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, product models.Product, vendedorEmail string, userID uuid.UUID) (*models.Ticket, error) {
 	paxIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("pax-%d", pax.ID)))
 	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
 
 	ticketNum := pax.NumeroTicket
 	if ticketNum == "" {
 		ticketNum = fmt.Sprintf("045-%s-%07d", time.Now().Format("20060102"), pax.ID)
+	}
+
+	doc := pax.Documento
+	tipoDocumento := "CI"
+	if doc == "" {
+		doc = pax.Pasaporte
+		tipoDocumento = "Pasaporte"
+	}
+	tipoPasajero := pax.TipoPasajero
+	if tipoPasajero == "" {
+		tipoPasajero = res.TipoPasajero
 	}
 
 	var existing models.Ticket
@@ -244,13 +267,28 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 			existing.NumeroTicket = ticketNum
 			needsSave = true
 		}
-		// Autocura tickets emitidos antes de que existiera Segmentos (o si
-		// Ruta cambió) — no cuesta nada más recalcularlo acá también.
+		// Autocura tickets emitidos antes de que existieran estas columnas —
+		// no cuesta nada más recalcularlas acá también, la próxima vez que se
+		// toque el número de ticket de este pasajero.
 		if len(existing.Segmentos) == 0 || string(existing.Segmentos) == "[]" {
 			if seg := buildSegmentosJSON(res.VueloRuta); len(seg) > 2 {
 				existing.Segmentos = seg
 				needsSave = true
 			}
+		}
+		if existing.PedidoID == "" {
+			existing.TipoPasajero = tipoPasajero
+			existing.TipoDocumento = tipoDocumento
+			existing.PedidoID = res.PedidoID
+			existing.Vendedor = vendedorEmail
+			existing.FechaReserva = &res.CreatedAt
+			existing.CarryOn = product.CarryOn
+			existing.HandBag = product.HandBag
+			existing.CheckedBag = product.CheckedBag
+			existing.CarryOnKg = product.CarryOnKg
+			existing.HandBagKg = product.HandBagKg
+			existing.CheckedBagKg = product.CheckedBagKg
+			needsSave = true
 		}
 		if needsSave {
 			if err := database.DB.Save(&existing).Error; err != nil {
@@ -267,10 +305,6 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 	if nombreCompleto == "" {
 		nombreCompleto = res.ContactoNombre
 	}
-	doc := pax.Documento
-	if doc == "" {
-		doc = pax.Pasaporte
-	}
 
 	t := models.Ticket{
 		NumeroTicket:      ticketNum,
@@ -280,7 +314,7 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 		Agencia:           res.Agencia,
 		PasajeroNombre:    nombreCompleto,
 		PasajeroDocumento: doc,
-		PNR:               pnr,
+		PNR:               product.PNR,
 		Ruta:              res.VueloRuta,
 		Segmentos:         buildSegmentosJSON(res.VueloRuta),
 		Destino:           res.VueloDestino,
@@ -293,6 +327,17 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 		FechaEmision:      time.Now(),
 		UsuarioEmisorID:   userID,
 		AtlasStatus:       "pendiente",
+		TipoPasajero:      tipoPasajero,
+		TipoDocumento:     tipoDocumento,
+		PedidoID:          res.PedidoID,
+		Vendedor:          vendedorEmail,
+		FechaReserva:      &res.CreatedAt,
+		CarryOn:           product.CarryOn,
+		HandBag:           product.HandBag,
+		CheckedBag:        product.CheckedBag,
+		CarryOnKg:         product.CarryOnKg,
+		HandBagKg:         product.HandBagKg,
+		CheckedBagKg:      product.CheckedBagKg,
 	}
 	if err := database.DB.Create(&t).Error; err != nil {
 		return nil, fmt.Errorf("error creando ticket para pasajero #%d: %w", pax.ID, err)
@@ -302,8 +347,10 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 
 // generateReservationLevelTicket es el caso legado: reservas históricas sin
 // pasajeros desglosados en la tabla Passenger, donde el único dato de
-// pasajero vive en la propia Reservation.
-func generateReservationLevelTicket(res *models.Reservation, pnr string, userID uuid.UUID) ([]models.Ticket, error) {
+// pasajero vive en la propia Reservation. No hay forma de distinguir
+// CI/Pasaporte acá (Reservation solo tiene un campo DocumentoPasajero), así
+// que TipoDocumento queda vacío en vez de asumir uno de los dos.
+func generateReservationLevelTicket(res *models.Reservation, product models.Product, vendedorEmail string, userID uuid.UUID) ([]models.Ticket, error) {
 	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
 
 	var existing models.Ticket
@@ -318,7 +365,7 @@ func generateReservationLevelTicket(res *models.Reservation, pnr string, userID 
 		Agencia:           res.Agencia,
 		PasajeroNombre:    res.ContactoNombre,
 		PasajeroDocumento: res.DocumentoPasajero,
-		PNR:               pnr,
+		PNR:               product.PNR,
 		Ruta:              res.VueloRuta,
 		Segmentos:         buildSegmentosJSON(res.VueloRuta),
 		Destino:           res.VueloDestino,
@@ -331,6 +378,16 @@ func generateReservationLevelTicket(res *models.Reservation, pnr string, userID 
 		FechaEmision:      time.Now(),
 		UsuarioEmisorID:   userID,
 		AtlasStatus:       "pendiente",
+		TipoPasajero:      res.TipoPasajero,
+		PedidoID:          res.PedidoID,
+		Vendedor:          vendedorEmail,
+		FechaReserva:      &res.CreatedAt,
+		CarryOn:           product.CarryOn,
+		HandBag:           product.HandBag,
+		CheckedBag:        product.CheckedBag,
+		CarryOnKg:         product.CarryOnKg,
+		HandBagKg:         product.HandBagKg,
+		CheckedBagKg:      product.CheckedBagKg,
 	}
 	if err := database.DB.Create(&t).Error; err != nil {
 		return nil, fmt.Errorf("no se pudo crear el ticket de la reserva #%d: %w", res.ID, err)
@@ -353,22 +410,23 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 	// El PNR real (código de reserva de la aerolínea, ej. "V9L8SZ") vive en
 	// Product.PNR — antes el ticket usaba Reservation.PedidoID (nuestro ID
 	// interno de pedido, ej. "PED-2026-...") como si fuera el PNR, que nunca
-	// lo fue.
+	// lo fue. Se trae el producto entero (no solo PNR) porque el ticket
+	// también snapshotea la franquicia de equipaje al emitir.
 	var product models.Product
-	database.DB.Select("pnr").First(&product, res.ProductID)
-	pnr := product.PNR
+	database.DB.First(&product, res.ProductID)
+	vendedorEmail := resolveVendedorEmail(res.CreatedBy)
 
 	var passengers []models.Passenger
 	database.DB.Where("reservation_id = ?", res.ID).Find(&passengers)
 
 	if len(passengers) == 0 {
-		return generateReservationLevelTicket(res, pnr, userID)
+		return generateReservationLevelTicket(res, product, vendedorEmail, userID)
 	}
 
 	var tickets []models.Ticket
 	var errs []string
 	for _, pax := range passengers {
-		t, err := upsertTicketForPassenger(&pax, res, pnr, userID)
+		t, err := upsertTicketForPassenger(&pax, res, product, vendedorEmail, userID)
 		if err != nil {
 			log.Printf("GenerateTicketsForReservationInternal: %v", err)
 			errs = append(errs, err.Error())

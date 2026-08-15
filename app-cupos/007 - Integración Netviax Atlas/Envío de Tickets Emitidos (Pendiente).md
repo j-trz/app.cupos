@@ -1,6 +1,6 @@
 **Nada de esto está construido todavía.** Esta nota es el punto de partida para la próxima fase de desarrollo con Netviax: reportar hacia Atlas el detalle de los tickets ya emitidos (nosotros → Atlas, al revés de todo lo documentado en [[Búsqueda de Contactos (Lectura)]] y [[Búsqueda de Fichas (Lectura)]], que es Atlas → nosotros). Objetivo de esta nota: que la estructura, lo que sabemos y lo que falta confirmar con Netviax quede 100% claro antes de la próxima conversación con ellos.
 
-> Última verificación contra código: 2026-08-10. Estado: **sin cambios desde entonces** — nada nuevo implementado.
+> Última verificación contra código: 2026-08-15. Estado: la integración de escritura en sí **sigue sin construirse** — lo que cambió es que `Ticket` ahora snapshotea muchos más de los datos que esta nota identifica como necesarios (ver tabla de la sección 2), achicando el trabajo de mapeo del día que se construya.
 
 ## 1. Qué necesitamos comunicarle a Atlas
 
@@ -24,6 +24,9 @@ Datos que en principio Atlas necesitaría recibir por pasajero emitido:
 | Localizador / PNR | **Resuelto 2026-08-15**: `Ticket.PNR` ahora es el PNR real de la aerolínea (`Product.PNR`), no el ID de pedido interno |
 | Compañía / Ruta / Fecha de salida | `Reservation.VueloCompania` / `Reservation.VueloRuta` / `Reservation.VueloSalida` |
 | Itinerario normalizado por tramo (nro. vuelo, fecha, origen, destino, salida, llegada) | **Nuevo 2026-08-15**: `Ticket.Segmentos` (JSONB, array — un ticket puede tener más de 1 tramo), calculado con `services.ParseRuta()` (`backend-go/pkg/services/itinerary_parser.go`). Esto es exactamente el shape que un endpoint de boletaje de Atlas probablemente va a pedir por tramo — ver [Modelo de Datos §Ticket](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md#ticket-tabla-tickets--bandeja-de-tickets) para el detalle completo de campos. |
+| Tipo de pasajero / tipo de documento (CI vs. Pasaporte) | **Nuevo 2026-08-15**: `Ticket.TipoPasajero` / `Ticket.TipoDocumento` |
+| ID de pedido interno / vendedor / fecha de reserva | **Nuevo 2026-08-15**: `Ticket.PedidoID` / `Ticket.Vendedor` (email) / `Ticket.FechaReserva` |
+| Franquicia de equipaje (carry-on/mano/bodega + kg) | **Nuevo 2026-08-15**: `Ticket.CarryOn`/`HandBag`/`CheckedBag` + `*Kg`, snapshot del `Product` al emitir |
 | Marca de "ya reportado a Atlas" | `Reservation.StatusBack` — **ya existe**, hoy es una anotación manual libre (ej. "BO OK"), pensado desde el vamos para pasar a automático el día que exista esta integración |
 | Momento en que se decide "está emitido" | `Reservation.EstadoInterno` pasando a `"Emitido"` → dispara `Reservation.EmitidoAt` (se calcula solo, una vez) |
 

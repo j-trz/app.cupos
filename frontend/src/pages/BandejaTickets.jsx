@@ -19,6 +19,7 @@ import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../compo
 import TableComponent from '../components/ui/Table.jsx';
 import Modal from '../components/Modal.jsx';
 import { parseRuta } from '../components/ItineraryTable.jsx';
+import BaggageFranchise from '../components/BaggageFranchise.jsx';
 import { ticketService } from '../services/ticketService';
 import { useToast } from '../hooks/use-toast';
 
@@ -33,6 +34,31 @@ function fmtDateTime(str) {
 function fmtCurrency(n) {
   if (n == null) return '—';
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
+}
+
+// Ticket.Segmentos ya viene normalizado desde el backend (snake_case:
+// fecha_salida/next_day) — parseRuta(ticket.ruta) es el fallback en camelCase
+// (fechaSalida/nextDay) para tickets emitidos antes de que existiera esa
+// columna. Se acepta cualquiera de las dos formas acá.
+const segField = (seg, camel, snake) => seg?.[camel] ?? seg?.[snake] ?? '';
+
+// Explota cada ticket en una fila por tramo — "nro de segmento" pedido como
+// columna propia solo tiene sentido si cada tramo es su propia fila (un
+// ticket con ida y vuelta son 2 tramos con vuelo/fecha/origen/destino
+// distintos, no se puede meter en una sola celda sin perder datos). Tickets
+// sin ningún tramo parseable (dato viejo/roto) igual muestran 1 fila con las
+// columnas de ruta vacías, para no perder el resto del ticket.
+function buildTicketRows(tickets) {
+  return tickets.flatMap((ticket) => {
+    const segmentos = ticket.segmentos?.length ? ticket.segmentos : (parseRuta(ticket.ruta) || []);
+    const segs = segmentos.length > 0 ? segmentos : [null];
+    return segs.map((seg, i) => ({
+      key: `${ticket.id}-${i}`,
+      ticket,
+      seg,
+      segIndex: seg?.segmento || i + 1,
+    }));
+  });
 }
 
 // Badge de estado — variantes existentes en components/ui/Badge.jsx (no
@@ -107,9 +133,18 @@ function TicketDetailModal({ ticket, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <InfoField icon={User} label="Pasajero" value={ticket.pasajero_nombre} />
-            <InfoField icon={FileText} label="Documento" value={ticket.pasajero_documento} />
+            <InfoField icon={FileText} label={`Documento${ticket.tipo_documento ? ` (${ticket.tipo_documento})` : ''}`} value={ticket.pasajero_documento} />
             <InfoField icon={Building2} label="Agencia" value={ticket.agencia} />
             <InfoField icon={Calendar} label="Fecha de emisión" value={fmtDateTime(ticket.fecha_emision)} />
+            <InfoField label="Tipo de pasajero" value={ticket.tipo_pasajero} />
+            <InfoField label="Ficha" value={ticket.ficha} />
+            <InfoField label="ID de pedido" value={ticket.pedido_id} />
+            <InfoField label="Vendedor" value={ticket.vendedor} />
+            <InfoField label="Fecha de reserva" value={fmtDate(ticket.fecha_reserva)} />
+            <div className="space-y-0.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Equipaje</div>
+              <BaggageFranchise item={ticket} />
+            </div>
           </div>
 
           {tramos.length > 0 && (
@@ -325,9 +360,13 @@ export default function BandejaTickets() {
       t.pnr?.toLowerCase().includes(q) ||
       t.pasajero_nombre?.toLowerCase().includes(q) ||
       t.pasajero_documento?.toLowerCase().includes(q) ||
-      t.agencia?.toLowerCase().includes(q)
+      t.agencia?.toLowerCase().includes(q) ||
+      t.pedido_id?.toLowerCase().includes(q) ||
+      t.ficha?.toLowerCase().includes(q)
     );
   }, [tickets, search]);
+
+  const rows = useMemo(() => buildTicketRows(filtered), [filtered]);
 
   const stats = useMemo(() => ({
     total: tickets.length,
@@ -379,7 +418,7 @@ export default function BandejaTickets() {
       </div>
 
       {isLoading ? (
-        <SkeletonTable rows={6} cols={7} />
+        <SkeletonTable rows={6} cols={9} />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="🎫"
@@ -392,22 +431,40 @@ export default function BandejaTickets() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-center">Acciones</TableHead>
-                <TableHead>N° Ticket</TableHead>
-                <TableHead>PNR</TableHead>
-                <TableHead>Pasajero</TableHead>
-                <TableHead>Ruta</TableHead>
-                <TableHead>Agencia</TableHead>
-                <TableHead>Total</TableHead>
+                <TableHead className="text-center">N° Segmento</TableHead>
+                <TableHead>Compañía</TableHead>
+                <TableHead>N° Vuelo</TableHead>
+                <TableHead>Fecha Salida</TableHead>
+                <TableHead>Origen</TableHead>
+                <TableHead>Destino</TableHead>
+                <TableHead>Hora Salida</TableHead>
+                <TableHead>Hora Llegada</TableHead>
+                <TableHead className="text-right">Tarifa</TableHead>
+                <TableHead className="text-right">Impuestos</TableHead>
+                <TableHead className="text-right">Total</TableHead>
                 <TableHead>Fecha Emisión</TableHead>
+                <TableHead>Agencia</TableHead>
+                <TableHead>Pasajero</TableHead>
+                <TableHead>PNR</TableHead>
+                <TableHead>N° Ticket</TableHead>
+                <TableHead>Tipo Pasajero</TableHead>
+                <TableHead>Documento</TableHead>
+                <TableHead>Tipo Documento</TableHead>
+                <TableHead>Ficha</TableHead>
+                <TableHead>Vendedor</TableHead>
+                <TableHead>Emisor</TableHead>
+                <TableHead>ID Pedido</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead className="text-center">Equipaje</TableHead>
+                <TableHead>Fecha Reserva</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((ticket) => {
+              {rows.map(({ key, ticket, seg, segIndex }) => {
                 const badge = estadoBadge[ticket.estado] || { label: ticket.estado, variant: 'default' };
                 const isVoid = ticket.estado === 'void';
                 return (
-                  <TableRow key={ticket.id} className={isVoid ? 'opacity-60' : ''}>
+                  <TableRow key={key} className={isVoid ? 'opacity-60' : ''}>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
                         <ActionIconButton icon={Eye} onClick={() => setSelectedTicket(ticket)} title="Ver boleto GDS" />
@@ -424,21 +481,36 @@ export default function BandejaTickets() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-medium text-slate-900">{ticket.numero_ticket}</TableCell>
-                    <TableCell className="font-mono text-xs font-medium text-blue-600">{ticket.pnr || '—'}</TableCell>
-                    <TableCell>
-                      <div className="font-medium text-slate-900">{ticket.pasajero_nombre}</div>
-                      {ticket.pasajero_documento && (
-                        <div className="text-xs text-slate-500">{ticket.pasajero_documento}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>{ticket.ruta || '—'}</TableCell>
-                    <TableCell>{ticket.agencia}</TableCell>
-                    <TableCell className="font-medium">{fmtCurrency(ticket.total)}</TableCell>
+                    <TableCell className="text-center font-mono text-xs">{segIndex}</TableCell>
+                    <TableCell>{seg?.compania || ticket.compania || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs">{seg?.vuelo || '—'}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{segField(seg, 'fechaSalida', 'fecha_salida') || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs font-semibold">{seg?.origen || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs font-semibold">{seg?.destino || ticket.destino || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs">{seg?.salida || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs">{seg?.llegada || '—'}</TableCell>
+                    <TableCell className="text-right">{fmtCurrency(ticket.tarifa)}</TableCell>
+                    <TableCell className="text-right">{fmtCurrency(ticket.impuestos)}</TableCell>
+                    <TableCell className="text-right font-medium">{fmtCurrency(ticket.total)}</TableCell>
                     <TableCell className="text-xs text-slate-500">{fmtDate(ticket.fecha_emision)}</TableCell>
+                    <TableCell>{ticket.agencia}</TableCell>
+                    <TableCell className="font-medium text-slate-900">{ticket.pasajero_nombre}</TableCell>
+                    <TableCell className="font-mono text-xs font-medium text-blue-600">{ticket.pnr || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs font-medium text-slate-900">{ticket.numero_ticket}</TableCell>
+                    <TableCell>{ticket.tipo_pasajero || '—'}</TableCell>
+                    <TableCell>{ticket.pasajero_documento || '—'}</TableCell>
+                    <TableCell>{ticket.tipo_documento || '—'}</TableCell>
+                    <TableCell className="text-xs">{ticket.ficha || '—'}</TableCell>
+                    <TableCell className="text-xs">{ticket.vendedor || '—'}</TableCell>
+                    <TableCell className="text-xs">{ticket.emisor_user?.nombre || ticket.emisor_user?.email || '—'}</TableCell>
+                    <TableCell className="font-mono text-xs">{ticket.pedido_id || '—'}</TableCell>
                     <TableCell>
                       <Badge variant={badge.variant}>{badge.label}</Badge>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <BaggageFranchise item={ticket} />
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500">{fmtDate(ticket.fecha_reserva)}</TableCell>
                   </TableRow>
                 );
               })}

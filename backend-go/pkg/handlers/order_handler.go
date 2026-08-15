@@ -1427,8 +1427,9 @@ func UpdatePassengerTicket(c *gin.Context) {
 			log.Printf("UpdatePassengerTicket: userID de contexto no es un UUID válido (%v): %v — no se genera ticket", userIDVal, uerr)
 		} else {
 			var product models.Product
-			database.DB.Select("pnr").First(&product, parentReservation.ProductID)
-			if _, err := upsertTicketForPassenger(&passenger, &parentReservation, product.PNR, userUUID); err != nil {
+			database.DB.First(&product, parentReservation.ProductID)
+			vendedorEmail := resolveVendedorEmail(parentReservation.CreatedBy)
+			if _, err := upsertTicketForPassenger(&passenger, &parentReservation, product, vendedorEmail, userUUID); err != nil {
 				log.Printf("UpdatePassengerTicket: %v", err)
 			}
 			if parentReservation.EstadoInterno != "Emitido" {

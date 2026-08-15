@@ -708,6 +708,20 @@ func runSQLMigrations(db *gorm.DB) {
 		// Itinerario normalizado tramo por tramo (nro. vuelo/fecha/origen/
 		// destino/salida/llegada) — ver services.ParseRuta().
 		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS segmentos JSONB DEFAULT '[]';`,
+		// E-ticket completo: cada dato de backoffice como campo propio en vez
+		// de tener que re-derivarlo de Reservation/Passenger (no joineables
+		// desde Ticket, ver comentario en models.Ticket).
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tipo_pasajero VARCHAR(50) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tipo_documento VARCHAR(50) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS pedido_id VARCHAR(255) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS vendedor VARCHAR(255) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS fecha_reserva TIMESTAMP NULL;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS carryon BOOLEAN DEFAULT false;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS handbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checkedbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {
