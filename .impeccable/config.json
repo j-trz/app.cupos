@@ -5,9 +5,12 @@
     "ignoreValues": [
       {
         "rule": "gray-on-color",
-        "value": "text-slate-700 on bg-amber-50",
+        "value": "*",
+        "files": [
+          "frontend/src/pages/GestionProductos.jsx"
+        ],
         "createdAt": "2026-08-15T03:49:29.676Z",
-        "reason": "false positive: slate-700 (#334155) is dark, not gray-light; contrast against amber-50 (#fffbeb) is well over 4.5:1, confirmed by hex luminance"
+        "reason": "false positive at L958 (text-slate-700 on bg-amber-50): slate-700 (#334155) is dark, not gray-light; contrast against amber-50 (#fffbeb) is well over 4.5:1, confirmed by hex luminance. gray-on-color doesn't support per-value ignores (only a fixed rule whitelist does, per extractFindingIgnoreValue in impeccable-config.mjs), so this is file-scoped instead of value-scoped."
       },
       {
         "rule": "border-accent-on-rounded",
@@ -26,6 +29,15 @@
         ],
         "createdAt": "2026-08-15T03:50:00.979Z",
         "reason": "false positive: same CSS spinner pattern (border-b-2 + animate-spin rounded-full), not a decorative card accent"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "frontend/src/pages/EmailConfig.jsx"
+        ],
+        "createdAt": "2026-08-15T04:20:00.000Z",
+        "reason": "false positive at L300 (text-slate-400 on bg-green-100): the two classes are mutually exclusive branches of one ternary (config?.smtp_host ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400') and never render together; the static detector cross-pairs classes from different branches of the same template literal"
       }
     ]
   }

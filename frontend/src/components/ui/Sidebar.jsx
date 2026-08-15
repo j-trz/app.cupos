@@ -69,7 +69,17 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
   const mobileOpen = ctx ? ctx.mobileOpen : false;
   const setMobileOpen = ctx ? ctx.setMobileOpen : () => { };
-  const [openSubmenus, setOpenSubmenus] = useState({});
+  // Persistido en localStorage: qué acordeones dejó abiertos el usuario la
+  // última vez, para no tener que reabrirlos a mano cada sesión — combinado
+  // con el auto-expand de la ruta activa (más abajo), que corre una sola vez
+  // al montar y no pisa lo que ya venía de acá.
+  const [openSubmenus, setOpenSubmenus] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sidebar_open_submenus')) || {};
+    } catch {
+      return {};
+    }
+  });
   const [unreadCount, setUnreadCount] = useState(0);
   // Item de menú bajo el mouse (por path/clave) — reemplaza a las mutaciones
   // directas de el.style.* que había antes en onMouseEnter/onMouseLeave. Esas
@@ -195,6 +205,15 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
       [submenu]: !prev[submenu]
     }));
   };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_open_submenus', JSON.stringify(openSubmenus));
+    } catch {
+      // localStorage puede fallar en modo privado — no es crítico, se pierde
+      // la persistencia entre sesiones pero el sidebar sigue funcionando.
+    }
+  }, [openSubmenus]);
 
   // Check if current path belongs to a submenu
   const isSubmenuActive = (items) => {

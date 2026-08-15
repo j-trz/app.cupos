@@ -497,22 +497,22 @@ const GestionProductos = () => {
       ) : <span className="text-slate-400">—</span>),
     },
     { key: 'temporada', label: 'Temporada', render: (p) => p.temporada || '—' },
-    { key: 'disponibilidad', label: 'Disp.', render: (p) => p.disponibilidad },
-    { key: 'cupo', label: 'Cupo', render: (p) => p.cupo || '—' },
+    { key: 'disponibilidad', label: 'Disp.', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => p.disponibilidad },
+    { key: 'cupo', label: 'Cupo', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => p.cupo || '—' },
     { key: 'salida', label: 'Salida', render: (p) => formatDate(p.fecha_salida) },
     { key: 'regreso', label: 'Regreso', render: (p) => formatDate(p.fecha_regreso) },
     { key: 'vencimiento_pago', label: 'Venc. Pago', render: (p) => formatDate(p.vencimiento_pago) },
     { key: 'nomination', label: 'Nómina', render: (p) => formatDate(p.nomination_date) },
     { key: 'emision', label: 'Emisión', render: (p) => formatDate(p.fecha_emision) },
     { key: 'gastos', label: 'Gastos', render: (p) => formatDate(p.fecha_gastos) },
-    { key: 'bloqueo', label: 'Bloqueo (min)', render: (p) => p.bloqueo_temporal_minutos || '—' },
-    { key: 'adt', label: 'ADT', render: (p) => formatMoney(p.precio) },
-    { key: 'inf', label: 'INF', render: (p) => formatMoney(p.inf_fare) },
-    { key: 'chd', label: 'CHD', render: (p) => formatMoney(p.chd_fare) },
-    { key: 'neto1', label: 'Neto 1', render: (p) => formatMoney(p.neto_1) },
-    { key: 'op_adt', label: 'OP ADT', render: (p) => formatMoney(p.op_adt) },
-    { key: 'op_inf', label: 'OP INF', render: (p) => formatMoney(p.op_inf) },
-    { key: 'op_chd', label: 'OP CHD', render: (p) => formatMoney(p.op_chd) },
+    { key: 'bloqueo', label: 'Bloqueo (min)', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => p.bloqueo_temporal_minutos || '—' },
+    { key: 'adt', label: 'ADT', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.precio) },
+    { key: 'inf', label: 'INF', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.inf_fare) },
+    { key: 'chd', label: 'CHD', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.chd_fare) },
+    { key: 'neto1', label: 'Neto 1', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.neto_1) },
+    { key: 'op_adt', label: 'OP ADT', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.op_adt) },
+    { key: 'op_inf', label: 'OP INF', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.op_inf) },
+    { key: 'op_chd', label: 'OP CHD', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.op_chd) },
     { key: 'equipaje', label: 'Equipaje', render: (p) => <BaggageFranchise item={p} /> },
     {
       key: 'estado', label: 'Estado',
@@ -798,7 +798,7 @@ const GestionProductos = () => {
                   </TableHead>
                   <TableHead className="sticky left-10 z-30 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
                   {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
-                    <TableHead key={c.key}>{c.label}</TableHead>
+                    <TableHead key={c.key} className={c.headClassName}>{c.label}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>

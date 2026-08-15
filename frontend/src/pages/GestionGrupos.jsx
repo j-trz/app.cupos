@@ -10,6 +10,7 @@ import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge.jsx';
 import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import ActionsOverflow from '../components/ui/ActionsOverflow.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import SkeletonTable from '../components/SkeletonTable';
@@ -325,19 +326,19 @@ const GestionGrupos = () => {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditGroup(group)} title="Editar / Cotizar" />
-                        {(group.estado_cotizacion === 'pendiente' || group.estado_cotizacion === 'cotizada') && (
-                          <ActionIconButton icon={Send} onClick={() => handleSendQuote(group)} title="Enviar cotización al usuario" className="text-blue-600 hover:bg-blue-50 hover:text-blue-700" />
-                        )}
-                        {group.estado_cotizacion === 'aceptada' && !group.estado_reservar && (
-                          <ActionIconButton icon={CheckCircle2} onClick={() => handleConfirmGroup(group)} title="Confirmar grupo" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
-                        )}
-                        {group.estado_reservar === 'cancelacion_solicitada' && (
-                          <>
-                            <ActionIconButton icon={ThumbsUp} onClick={() => handleResolveCancellation(group, 'approve')} title="Aprobar cancelación" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
-                            <ActionIconButton icon={ThumbsDown} onClick={() => handleResolveCancellation(group, 'decline')} title="Rechazar cancelación" className="text-amber-600 hover:bg-amber-50 hover:text-amber-700" />
-                          </>
-                        )}
                         <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteGroup(group.id)} title="Eliminar" />
+                        <ActionsOverflow
+                          items={[
+                            (group.estado_cotizacion === 'pendiente' || group.estado_cotizacion === 'cotizada') &&
+                              { icon: Send, label: 'Enviar cotización al usuario', onClick: () => handleSendQuote(group) },
+                            group.estado_cotizacion === 'aceptada' && !group.estado_reservar &&
+                              { icon: CheckCircle2, label: 'Confirmar grupo', onClick: () => handleConfirmGroup(group) },
+                            group.estado_reservar === 'cancelacion_solicitada' &&
+                              { icon: ThumbsUp, label: 'Aprobar cancelación', onClick: () => handleResolveCancellation(group, 'approve') },
+                            group.estado_reservar === 'cancelacion_solicitada' &&
+                              { icon: ThumbsDown, label: 'Rechazar cancelación', onClick: () => handleResolveCancellation(group, 'decline') },
+                          ]}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

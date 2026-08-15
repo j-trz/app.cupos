@@ -6,6 +6,7 @@ import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
 import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import ActionsOverflow from '../components/ui/ActionsOverflow.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -739,40 +740,39 @@ export default function GestionReservas() {
                   </TableCell>
                   <TableCell className="sticky left-10 z-10 bg-white border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                     <div className="flex items-center justify-center gap-1">
-                      {r.estado === 'solicitud_cancelacion' && (
-                        <>
-                          <ActionIconButton icon={ThumbsUp} onClick={() => handleResolveCancellation(r, 'approve')} title="Aprobar cancelación" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
-                          <ActionIconButton icon={ThumbsDown} variant="danger" onClick={() => handleResolveCancellation(r, 'decline')} title="Rechazar cancelación" />
-                        </>
-                      )}
-                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && r.estado !== 'expirada' && r.estado !== 'cancelada' && (
-                        <ActionIconButton icon={CheckCircle2} onClick={() => handleConfirm(r)} title="Confirmar pedido completo" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
-                      )}
-                      <ActionIconButton icon={Send} onClick={() => handleResendEmail(r)} title="Reenviar email" />
                       <ActionIconButton icon={Edit} onClick={() => openEdit(r)} title="Editar reserva" />
                       <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeletePassenger(row)} title="Eliminar este pasajero" />
-                      {row.numeroTicket && (
-                        <ActionIconButton
-                          icon={FileText}
-                          className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                          onClick={() => {
-                            const reservation = r;
-                            const passengers = [row]; // Pasamos el pasajero de esta fila
-                            const liveProduct = products.find(p => p.id === r.product_id);
-                            const product = {
-                              ruta: r.vuelo_ruta,
-                              destino: r.vuelo_destino,
-                              fecha_salida: r.vuelo_salida,
-                              pnr: liveProduct?.pnr,
-                              carryon: liveProduct?.carryon,
-                              handbag: liveProduct?.handbag,
-                              checkedbag: liveProduct?.checkedbag,
-                            };
-                            setPdfModalData({ reservation, passengers, product });
-                          }}
-                          title="Generar Itinerario"
-                        />
-                      )}
+                      <ActionsOverflow
+                        items={[
+                          r.estado === 'solicitud_cancelacion' &&
+                            { icon: ThumbsUp, label: 'Aprobar cancelación', onClick: () => handleResolveCancellation(r, 'approve') },
+                          r.estado === 'solicitud_cancelacion' &&
+                            { icon: ThumbsDown, label: 'Rechazar cancelación', onClick: () => handleResolveCancellation(r, 'decline'), danger: true },
+                          r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && r.estado !== 'expirada' && r.estado !== 'cancelada' &&
+                            { icon: CheckCircle2, label: 'Confirmar pedido completo', onClick: () => handleConfirm(r) },
+                          { icon: Send, label: 'Reenviar email', onClick: () => handleResendEmail(r) },
+                          row.numeroTicket &&
+                            {
+                              icon: FileText,
+                              label: 'Generar itinerario',
+                              onClick: () => {
+                                const reservation = r;
+                                const passengers = [row]; // Pasamos el pasajero de esta fila
+                                const liveProduct = products.find(p => p.id === r.product_id);
+                                const product = {
+                                  ruta: r.vuelo_ruta,
+                                  destino: r.vuelo_destino,
+                                  fecha_salida: r.vuelo_salida,
+                                  pnr: liveProduct?.pnr,
+                                  carryon: liveProduct?.carryon,
+                                  handbag: liveProduct?.handbag,
+                                  checkedbag: liveProduct?.checkedbag,
+                                };
+                                setPdfModalData({ reservation, passengers, product });
+                              },
+                            },
+                        ]}
+                      />
                     </div>
                   </TableCell>
                   <TableCell>
