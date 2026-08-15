@@ -1662,9 +1662,9 @@ func AddPassenger(c *gin.Context) {
 // BulkUpdateReservations permite cambiar masivamente el estado de reservas seleccionadas (ej. pasar a "Emitido")
 func BulkUpdateReservations(c *gin.Context) {
 	var req struct {
-		IDs           []uuid.UUID `json:"ids"`
-		Estado        string      `json:"estado"`
-		EstadoInterno string      `json:"estado_interno"`
+		IDs           []uint `json:"ids"`
+		Estado        string `json:"estado"`
+		EstadoInterno string `json:"estado_interno"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de reserva."})
@@ -1731,8 +1731,8 @@ func BulkUpdateReservations(c *gin.Context) {
 // BulkCancelReservations cancela masivamente un grupo de reservas restituyendo el stock
 func BulkCancelReservations(c *gin.Context) {
 	var req struct {
-		IDs   []uuid.UUID `json:"ids"`
-		Notas string      `json:"notas"`
+		IDs   []uint `json:"ids"`
+		Notas string `json:"notas"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de reserva."})
