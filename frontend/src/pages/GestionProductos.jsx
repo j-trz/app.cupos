@@ -7,6 +7,7 @@ import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useA
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
 import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import ActionsOverflow from '../components/ui/ActionsOverflow.jsx';
 import { Input } from '../components/ui/Input';
 import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
@@ -613,7 +614,7 @@ const GestionProductos = () => {
           que todavía no aprobó un admin — apartados de la tabla principal, no
           reservables en Disponibilidad hasta que se aprueben acá. */}
       {pendingProducts.length > 0 && (
-        <Card className="border-l-4 border-amber-400 bg-amber-50/40">
+        <Card className="border-amber-200 bg-amber-50/40">
           <div className="p-4">
             <div className="mb-1 flex items-center gap-2">
               <Clock className="h-5 w-5 text-amber-600" />
@@ -819,23 +820,24 @@ const GestionProductos = () => {
                       />
                     </TableCell>
                     <TableCell className="sticky left-10 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
-                        <ActionIconButton icon={Copy} onClick={() => handleDuplicateProduct(product)} title="Duplicar producto" />
-                        <ActionIconButton icon={ArrowRightLeft} onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad" />
-                        {/* Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra */}
-                        {(user.role === 'admin' || product.agencia === user.agencia) && (
-                          <ActionIconButton icon={Share2} onClick={() => handleOpenShare(product)} title="Compartir con otras agencias" />
-                        )}
-                        {/* Botón para recuperar cupo cedido (si soy el cedente) */}
-                        {product.restricted_agency && product.source_agency === user.agencia && (
-                          <ActionIconButton icon={RotateCcw} onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800" />
-                        )}
-                        {/* Movimientos: historial de cesiones/préstamos — solo si hay algo que mostrar */}
-                        {tieneMovimientos && (
-                          <ActionIconButton icon={History} onClick={() => setMovementsModalProduct(product)} title="Ver movimientos (cesiones/préstamos)" className="text-blue-600 hover:text-blue-800" />
-                        )}
                         <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
+                        <ActionsOverflow
+                          items={[
+                            { icon: Copy, label: 'Duplicar producto', onClick: () => handleDuplicateProduct(product) },
+                            { icon: ArrowRightLeft, label: 'Ceder disponibilidad', onClick: () => handleOpenTransfer(product) },
+                            // Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra
+                            (user.role === 'admin' || product.agencia === user.agencia) &&
+                              { icon: Share2, label: 'Compartir con otras agencias', onClick: () => handleOpenShare(product) },
+                            // Recuperar cupo cedido, solo si soy el cedente
+                            product.restricted_agency && product.source_agency === user.agencia &&
+                              { icon: RotateCcw, label: 'Recuperar cupo cedido', onClick: () => handleReclaimTransfer(product) },
+                            // Movimientos: historial de cesiones/préstamos, solo si hay algo que mostrar
+                            tieneMovimientos &&
+                              { icon: History, label: 'Ver movimientos', onClick: () => setMovementsModalProduct(product) },
+                          ]}
+                        />
                       </div>
                     </TableCell>
                     {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (

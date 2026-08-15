@@ -142,6 +142,15 @@ pre {
   font-family: var(--font-mono);
 }
 
+/* Refina el trazo de lucide-react en toda la app (default de la librería es
+   2px) — a 16-20px ese grosor lee "chunky"/genérico; 1.75 mantiene el mismo
+   ícono, mismo trazo consistente en todos lados, solo más afinado. Una regla
+   de CSS de autor sí pisa el atributo stroke-width del SVG (no hace falta
+   !important), así que no requiere tocar cada uso de <Icon />. */
+svg.lucide {
+  stroke-width: 1.75;
+}
+
 /* Estilos para el header - Estilo Vercel */
 header {
   border-bottom: 1px solid var(--color-border);
