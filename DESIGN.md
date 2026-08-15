@@ -9,6 +9,8 @@ colors:
   border-strong: "#cbd5e1"
   text-muted: "#64748b"
   text-faint: "#94a3b8"
+  text-default: "#475569"
+  text-strong: "#334155"
   accent: "#2563eb"
   success: "#059669"
   warning: "#d97706"
@@ -29,6 +31,10 @@ typography:
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.625rem"
     fontWeight: 500
+  caption:
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 400
 rounded:
   sm: "0.375rem"
   md: "0.5rem"

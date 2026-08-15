@@ -92,8 +92,18 @@ class ApiClient {
     return data;
   }
 
-  static get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+  // El segundo argumento acepta { params } (querystring) — algunos callers ya
+  // lo pasaban (ej. ticketService.getTickets) pero se ignoraba en silencio,
+  // así que ese filtro nunca llegaba al backend.
+  static get(endpoint, { params } = {}) {
+    let path = endpoint;
+    if (params && typeof params === 'object') {
+      const query = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      ).toString();
+      if (query) path = `${endpoint}?${query}`;
+    }
+    return this.request(path, { method: 'GET' });
   }
 
   static post(endpoint, body) {

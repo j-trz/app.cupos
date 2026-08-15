@@ -192,7 +192,14 @@ export default function BandejaTickets() {
 
   const { data: tickets = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['tickets', estadoFilter],
-    queryFn: () => ticketService.getTickets({ estado: estadoFilter || undefined }).then((r) => r.data),
+    // ApiClient (a diferencia de axios) ya devuelve el body parseado
+    // directo — no es un response wrapper con `.data`. `.then(r => r.data)`
+    // leía `.data` de un array (undefined) y la Bandeja quedaba SIEMPRE
+    // vacía sin importar lo que hubiera en la base — bug puro de frontend,
+    // nada que ver con la generación de tickets del backend. El `|| []`
+    // cubre además el caso de una agencia con 0 tickets: un slice de Go sin
+    // inicializar serializa como `null`, no `[]`.
+    queryFn: () => ticketService.getTickets({ estado: estadoFilter || undefined }).then((data) => data || []),
     staleTime: 30_000,
   });
 
