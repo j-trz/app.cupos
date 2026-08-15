@@ -38,6 +38,15 @@
         ],
         "createdAt": "2026-08-15T04:20:00.000Z",
         "reason": "false positive at L300 (text-slate-400 on bg-green-100): the two classes are mutually exclusive branches of one ternary (config?.smtp_host ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400') and never render together; the static detector cross-pairs classes from different branches of the same template literal"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "frontend/src/pages/Availability.jsx"
+        ],
+        "createdAt": "2026-08-15T12:00:00.000Z",
+        "reason": "false positive at L1504 (text-slate-700 on bg-amber-50): same case as GestionProductos.jsx L958 — slate-700 is dark, contrast against amber-50 is well over 4.5:1"
       }
     ]
   }

@@ -682,7 +682,7 @@ export default function GestionReservas() {
           description={searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
         />
       ) : (
-      <Card>
+      <Card className="overflow-hidden">
         <TableComponent>
           <TableHeader>
             <TableRow>

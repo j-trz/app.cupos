@@ -1413,6 +1413,32 @@ func UpdatePassengerTicket(c *gin.Context) {
 	}
 
 	database.DB.First(&passenger, passenger.ID)
+
+	// Cargar el número de ticket real de un pasajero (desde Reservas o
+	// Nóminas) ES el momento real de emisión — antes esto no generaba nada en
+	// la Bandeja de Tickets, que solo se disparaba desde el dropdown de
+	// estado_interno="Emitido" (un control aparte que en la práctica casi
+	// nadie usaba). Ahora genera/completa el ticket de este pasajero y marca
+	// la reserva como Emitido si no lo estaba, para que quede consistente.
+	if input.NumeroTicket != "" && parentReservation.ID != 0 {
+		userIDVal, _ := c.Get("userID")
+		userUUID, uerr := uuid.Parse(fmt.Sprintf("%v", userIDVal))
+		if uerr != nil {
+			log.Printf("UpdatePassengerTicket: userID de contexto no es un UUID válido (%v): %v — no se genera ticket", userIDVal, uerr)
+		} else {
+			if _, err := upsertTicketForPassenger(&passenger, &parentReservation, userUUID); err != nil {
+				log.Printf("UpdatePassengerTicket: %v", err)
+			}
+			if parentReservation.EstadoInterno != "Emitido" {
+				now := time.Now()
+				database.DB.Model(&parentReservation).Updates(map[string]interface{}{
+					"estado_interno": "Emitido",
+					"emitido_at":     now,
+				})
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, passenger)
 }
 

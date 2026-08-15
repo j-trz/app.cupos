@@ -783,7 +783,7 @@ export default function Availability() {
         </div>
       )}
 
-      <Card>
+      <Card className="overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
           <div className="flex items-center justify-between">
             <div>

@@ -330,7 +330,7 @@ export default function GestionOportunidades() {
       ) : filteredOportunidades.length === 0 ? (
         <EmptyState icon="✨" title="No hay oportunidades" description="No hay oportunidades cargadas todavía." />
       ) : (
-      <Card>
+      <Card className="overflow-hidden">
         <TableComponent>
           <TableHeader>
             <TableRow>

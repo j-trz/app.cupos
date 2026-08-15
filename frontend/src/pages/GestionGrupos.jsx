@@ -281,50 +281,26 @@ const GestionGrupos = () => {
             <TableComponent>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="text-center">Acciones</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Agencia</TableHead>
                   <TableHead>Destino</TableHead>
                   <TableHead>Compañía</TableHead>
-                  <TableHead>Lugares</TableHead>
+                  <TableHead className="text-right">Lugares</TableHead>
                   <TableHead>Salida</TableHead>
                   <TableHead>Regreso</TableHead>
                   <TableHead>PNR Aerolínea</TableHead>
                   <TableHead>PNR Agencia</TableHead>
-                  <TableHead>Neto 01</TableHead>
+                  <TableHead className="text-right">Neto 01</TableHead>
                   <TableHead>Estado Cotización</TableHead>
                   <TableHead>Estado Reserva</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredGroups.map((group) => (
                   <TableRow key={group.id}>
-                    <TableCell className="font-medium text-slate-900">{userName(group.vendedor)}</TableCell>
-                    <TableCell>{agencyName(group.agency)}</TableCell>
-                    <TableCell>{group.destino || '—'}</TableCell>
-                    <TableCell>{group.compania || '—'}</TableCell>
-                    <TableCell>{group.cantidad_lugares || '—'}</TableCell>
-                    <TableCell>{formatDate(group.salida)}</TableCell>
-                    <TableCell>{formatDate(group.regreso)}</TableCell>
-                    <TableCell>{group.pnr_airline || '—'}</TableCell>
-                    <TableCell>{group.pnr_agency || '—'}</TableCell>
-                    <TableCell>{formatMoney(group.neto_01)}</TableCell>
-                    <TableCell>
-                      <Badge variant={COTIZACION_VARIANT[group.estado_cotizacion] || 'default'}>
-                        {COTIZACION_LABEL[group.estado_cotizacion] || group.estado_cotizacion || '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {group.estado_reservar ? (
-                        <Badge variant={RESERVAR_VARIANT[group.estado_reservar] || 'default'}>
-                          {RESERVAR_LABEL[group.estado_reservar] || group.estado_reservar}
-                        </Badge>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
                         <ActionIconButton icon={Edit} onClick={() => handleEditGroup(group)} title="Editar / Cotizar" />
                         <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteGroup(group.id)} title="Eliminar" />
                         <ActionsOverflow
@@ -340,6 +316,30 @@ const GestionGrupos = () => {
                           ]}
                         />
                       </div>
+                    </TableCell>
+                    <TableCell className="text-center font-medium text-slate-900">{userName(group.vendedor)}</TableCell>
+                    <TableCell className="text-center">{agencyName(group.agency)}</TableCell>
+                    <TableCell className="text-center">{group.destino || '—'}</TableCell>
+                    <TableCell className="text-center">{group.compania || '—'}</TableCell>
+                    <TableCell className="text-right font-mono">{group.cantidad_lugares || '—'}</TableCell>
+                    <TableCell className="text-center">{formatDate(group.salida)}</TableCell>
+                    <TableCell className="text-center">{formatDate(group.regreso)}</TableCell>
+                    <TableCell className="text-center">{group.pnr_airline || '—'}</TableCell>
+                    <TableCell className="text-center">{group.pnr_agency || '—'}</TableCell>
+                    <TableCell className="text-right font-mono">{formatMoney(group.neto_01)}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={COTIZACION_VARIANT[group.estado_cotizacion] || 'default'}>
+                        {COTIZACION_LABEL[group.estado_cotizacion] || group.estado_cotizacion || '—'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {group.estado_reservar ? (
+                        <Badge variant={RESERVAR_VARIANT[group.estado_reservar] || 'default'}>
+                          {RESERVAR_LABEL[group.estado_reservar] || group.estado_reservar}
+                        </Badge>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -196,112 +196,145 @@ func SyncTicketAtlas(c *gin.Context) {
 	})
 }
 
-// GenerateTicketsForReservationInternal es un helper interno que crea los boletos
-// cuando una reserva pasa a "Emitido"
+// upsertTicketForPassenger crea (o completa) el Ticket de UN pasajero puntual
+// — nunca a nivel reserva completa. El "¿ya existe?" viejo chequeaba si la
+// RESERVA ya tenía algún ticket y, de ser así, se salteaba TODOS los
+// pasajeros restantes — un bug real para reservas con emisión escalonada
+// (cada pasajero se ticketea en un momento distinto, no todos juntos).
+//
+// El número real de ticket cargado por el usuario (Reservas/Nóminas →
+// "Asignar ticket", ver UpdatePassengerTicket en order_handler.go) es la
+// fuente de verdad; el placeholder sintético "045-..." solo se usa si
+// todavía no se cargó ninguno (ej. se marcó "Emitido" en bloque antes de
+// tipear los números reales de la aerolínea). Si el ticket ya existía con el
+// placeholder y ahora llega el número real, lo actualiza en vez de duplicar.
+func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, userID uuid.UUID) (*models.Ticket, error) {
+	paxIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("pax-%d", pax.ID)))
+	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
+
+	ticketNum := pax.NumeroTicket
+	if ticketNum == "" {
+		ticketNum = fmt.Sprintf("045-%s-%07d", time.Now().Format("20060102"), pax.ID)
+	}
+
+	var existing models.Ticket
+	err := database.DB.Where("passenger_id = ?", paxIDUUID).First(&existing).Error
+	if err == nil {
+		if existing.NumeroTicket != ticketNum && existing.Estado != "void" {
+			existing.NumeroTicket = ticketNum
+			if err := database.DB.Save(&existing).Error; err != nil {
+				return nil, fmt.Errorf("error actualizando número de ticket del pasajero #%d: %w", pax.ID, err)
+			}
+		}
+		return &existing, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		log.Printf("upsertTicketForPassenger: error chequeando ticket existente del pasajero #%d: %v", pax.ID, err)
+	}
+
+	nombreCompleto := strings.TrimSpace(pax.Nombre + " " + pax.Apellido)
+	if nombreCompleto == "" {
+		nombreCompleto = res.ContactoNombre
+	}
+	doc := pax.Documento
+	if doc == "" {
+		doc = pax.Pasaporte
+	}
+
+	t := models.Ticket{
+		NumeroTicket:      ticketNum,
+		ReservationID:     resIDUUID,
+		PassengerID:       &paxIDUUID,
+		ProductID:         res.ProductID,
+		Agencia:           res.Agencia,
+		PasajeroNombre:    nombreCompleto,
+		PasajeroDocumento: doc,
+		PNR:               res.PedidoID,
+		Ruta:              res.VueloRuta,
+		Compania:          res.VueloCompania,
+		Ficha:             res.FichaVenta,
+		Tarifa:            pax.PrecioVenta,
+		Impuestos:         0,
+		Total:             pax.PrecioVenta,
+		Estado:            "emitido",
+		FechaEmision:      time.Now(),
+		UsuarioEmisorID:   userID,
+		AtlasStatus:       "pendiente",
+	}
+	if err := database.DB.Create(&t).Error; err != nil {
+		return nil, fmt.Errorf("error creando ticket para pasajero #%d: %w", pax.ID, err)
+	}
+	return &t, nil
+}
+
+// generateReservationLevelTicket es el caso legado: reservas históricas sin
+// pasajeros desglosados en la tabla Passenger, donde el único dato de
+// pasajero vive en la propia Reservation.
+func generateReservationLevelTicket(res *models.Reservation, userID uuid.UUID) ([]models.Ticket, error) {
+	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
+
+	var existing models.Ticket
+	if err := database.DB.Where("reservation_id = ?", resIDUUID).First(&existing).Error; err == nil {
+		return []models.Ticket{existing}, nil
+	}
+
+	t := models.Ticket{
+		NumeroTicket:      fmt.Sprintf("045-%s-%07d-01", time.Now().Format("20060102"), res.ID),
+		ReservationID:     resIDUUID,
+		ProductID:         res.ProductID,
+		Agencia:           res.Agencia,
+		PasajeroNombre:    res.ContactoNombre,
+		PasajeroDocumento: res.DocumentoPasajero,
+		PNR:               res.PedidoID,
+		Ruta:              res.VueloRuta,
+		Compania:          res.VueloCompania,
+		Ficha:             res.FichaVenta,
+		Tarifa:            res.PrecioVenta,
+		Impuestos:         0,
+		Total:             res.PrecioVenta,
+		Estado:            "emitido",
+		FechaEmision:      time.Now(),
+		UsuarioEmisorID:   userID,
+		AtlasStatus:       "pendiente",
+	}
+	if err := database.DB.Create(&t).Error; err != nil {
+		return nil, fmt.Errorf("no se pudo crear el ticket de la reserva #%d: %w", res.ID, err)
+	}
+	return []models.Ticket{t}, nil
+}
+
+// GenerateTicketsForReservationInternal genera (o completa) los tickets de
+// TODOS los pasajeros de una reserva — se llama cuando la reserva completa
+// pasa a EstadoInterno="Emitido" (individual o en bloque, ver
+// UpdateReservation/BulkUpdateReservations en order_handler.go). Es
+// por-pasajero (vía upsertTicketForPassenger), no por-reserva: si algunos
+// pasajeros ya tenían ticket (cargado a mano vía "Asignar") y otros no,
+// completa solo los que faltan.
 func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.UUID) ([]models.Ticket, error) {
 	if res == nil {
 		return nil, fmt.Errorf("reserva nula")
 	}
 
-	// ReservationID de Ticket es un UUID derivado (hash) del ID entero real de
-	// la reserva — nunca comparar contra res.ID directo (uint), Postgres
-	// rechaza el tipo (uuid = integer) y la query de abajo fallaba en
-	// silencio, siempre devolviendo "no existe" incluso cuando sí había
-	// tickets ya creados.
-	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
-
-	// Si ya existen boletos creados para esta reserva, los devuelve
-	var existing []models.Ticket
-	if err := database.DB.Where("reservation_id = ?", resIDUUID).Find(&existing).Error; err != nil {
-		log.Printf("GenerateTicketsForReservationInternal: error chequeando tickets existentes de la reserva #%d: %v", res.ID, err)
-	}
-	if len(existing) > 0 {
-		return existing, nil
-	}
-
 	var passengers []models.Passenger
 	database.DB.Where("reservation_id = ?", res.ID).Find(&passengers)
 
-	var createdTickets []models.Ticket
-	var createErrs []string
-	now := time.Now()
-	datePrefix := now.Format("20060102")
-
-	// Si hay pasajeros cargados en la reserva, genera un boleto por cada pasajero
-	if len(passengers) > 0 {
-		for i, pax := range passengers {
-			ticketNum := fmt.Sprintf("045-%s-%07d-%02d", datePrefix, res.ID, i+1)
-			nombreCompleto := strings.TrimSpace(pax.Nombre + " " + pax.Apellido)
-			if nombreCompleto == "" {
-				nombreCompleto = res.ContactoNombre
-			}
-			doc := pax.Documento
-			if doc == "" {
-				doc = pax.Pasaporte
-			}
-
-			paxIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("pax-%d", pax.ID)))
-
-			t := models.Ticket{
-				NumeroTicket:      ticketNum,
-				ReservationID:     resIDUUID,
-				PassengerID:       &paxIDUUID,
-				ProductID:         res.ProductID,
-				Agencia:           res.Agencia,
-				PasajeroNombre:    nombreCompleto,
-				PasajeroDocumento: doc,
-				PNR:               res.PedidoID,
-				Ruta:              res.VueloRuta,
-				Compania:          res.VueloCompania,
-				Ficha:             res.FichaVenta,
-				Tarifa:            pax.PrecioVenta,
-				Impuestos:         0,
-				Total:             pax.PrecioVenta,
-				Estado:            "emitido",
-				FechaEmision:      now,
-				UsuarioEmisorID:   userID,
-				AtlasStatus:       "pendiente",
-			}
-			if err := database.DB.Create(&t).Error; err != nil {
-				log.Printf("GenerateTicketsForReservationInternal: error creando ticket para pasajero #%d de la reserva #%d: %v", pax.ID, res.ID, err)
-				createErrs = append(createErrs, err.Error())
-				continue
-			}
-			createdTickets = append(createdTickets, t)
-		}
-	} else {
-		// Si no hay pasajeros individuales detallados, genera un ticket principal
-		ticketNum := fmt.Sprintf("045-%s-%07d-01", datePrefix, res.ID)
-
-		t := models.Ticket{
-			NumeroTicket:      ticketNum,
-			ReservationID:     resIDUUID,
-			ProductID:         res.ProductID,
-			Agencia:           res.Agencia,
-			PasajeroNombre:    res.ContactoNombre,
-			PasajeroDocumento: res.DocumentoPasajero,
-			PNR:               res.PedidoID,
-			Ruta:              res.VueloRuta,
-			Compania:          res.VueloCompania,
-			Ficha:             res.FichaVenta,
-			Tarifa:            res.PrecioVenta,
-			Impuestos:         0,
-			Total:             res.PrecioVenta,
-			Estado:            "emitido",
-			FechaEmision:      now,
-			UsuarioEmisorID:   userID,
-			AtlasStatus:       "pendiente",
-		}
-		if err := database.DB.Create(&t).Error; err != nil {
-			log.Printf("GenerateTicketsForReservationInternal: error creando ticket principal de la reserva #%d: %v", res.ID, err)
-			createErrs = append(createErrs, err.Error())
-		} else {
-			createdTickets = append(createdTickets, t)
-		}
+	if len(passengers) == 0 {
+		return generateReservationLevelTicket(res, userID)
 	}
 
-	if len(createdTickets) == 0 && len(createErrs) > 0 {
-		return nil, fmt.Errorf("no se pudo crear ningún ticket para la reserva #%d: %s", res.ID, strings.Join(createErrs, "; "))
+	var tickets []models.Ticket
+	var errs []string
+	for _, pax := range passengers {
+		t, err := upsertTicketForPassenger(&pax, res, userID)
+		if err != nil {
+			log.Printf("GenerateTicketsForReservationInternal: %v", err)
+			errs = append(errs, err.Error())
+			continue
+		}
+		tickets = append(tickets, *t)
 	}
-	return createdTickets, nil
+	if len(tickets) == 0 && len(errs) > 0 {
+		return nil, fmt.Errorf("no se pudo crear ningún ticket para la reserva #%d: %s", res.ID, strings.Join(errs, "; "))
+	}
+	return tickets, nil
 }
