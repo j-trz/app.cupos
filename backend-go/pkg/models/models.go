@@ -775,6 +775,7 @@ type Ticket struct {
 	PasajeroDocumento string     `json:"pasajero_documento"`
 	PNR               string     `gorm:"not null;index" json:"pnr"`
 	Ruta              string     `json:"ruta"`
+	Destino           string     `json:"destino"`
 	Compania          string     `json:"compania"`
 	Ficha             string     `json:"ficha"`
 	Tarifa            float64    `gorm:"not null;default:0" json:"tarifa"`

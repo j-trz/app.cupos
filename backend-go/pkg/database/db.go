@@ -700,6 +700,11 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
 		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
 		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
+		// Destino propio del ticket (antes el frontend intentaba derivarlo
+		// parseando Ticket.Ruta con un split('-') ingenuo, que no funciona con
+		// el formato real de itinerario multi-tramo — ver ItineraryTable.jsx
+		// parseRuta() para el parser real).
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS destino VARCHAR(255) DEFAULT '';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

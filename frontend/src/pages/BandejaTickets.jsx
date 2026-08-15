@@ -18,6 +18,7 @@ import EmptyState from '../components/EmptyState';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import Modal from '../components/Modal.jsx';
+import { parseRuta } from '../components/ItineraryTable.jsx';
 import { ticketService } from '../services/ticketService';
 import { useToast } from '../hooks/use-toast';
 
@@ -47,6 +48,14 @@ const estadoBadge = {
 // destacado DENTRO del contenido, no reemplazando el chrome del modal.
 function TicketDetailModal({ ticket, onClose }) {
   const badge = ticket ? (estadoBadge[ticket.estado] || { label: ticket.estado, variant: 'default' }) : null;
+  // Ticket.Ruta es el itinerario completo (multi-tramo, texto libre) — no un
+  // simple "ORIGEN-DESTINO" separado por guión. El origen real del viaje es
+  // el origen del primer tramo (parseRuta ya sabe leer este formato, ver
+  // ItineraryTable.jsx); el destino usa Ticket.Destino (copiado de la
+  // reserva al emitir), no algo derivado de Ruta.
+  const primerTramo = ticket ? parseRuta(ticket.ruta)[0] : null;
+  const origen = primerTramo?.origen || '???';
+  const destino = ticket?.destino || '???';
 
   return (
     <Modal open={!!ticket} onClose={onClose} title={ticket ? `Boleto ${ticket.numero_ticket}` : ''} size="lg">
@@ -68,7 +77,7 @@ function TicketDetailModal({ ticket, onClose }) {
 
             <div className="mt-5 flex items-center gap-4">
               <div className="text-center">
-                <div className="text-2xl font-extrabold tracking-wide">{ticket.ruta?.split('-')[0]?.trim() || '???'}</div>
+                <div className="text-2xl font-extrabold tracking-wide">{origen}</div>
                 <div className="text-[11px] tracking-wide text-blue-200">ORIGEN</div>
               </div>
               <div className="flex flex-1 items-center gap-2">
@@ -77,7 +86,7 @@ function TicketDetailModal({ ticket, onClose }) {
                 <div className="h-px flex-1 bg-white/25" />
               </div>
               <div className="text-center">
-                <div className="text-2xl font-extrabold tracking-wide">{ticket.ruta?.split('-')[1]?.trim() || '???'}</div>
+                <div className="text-2xl font-extrabold tracking-wide">{destino}</div>
                 <div className="text-[11px] tracking-wide text-blue-200">DESTINO</div>
               </div>
             </div>

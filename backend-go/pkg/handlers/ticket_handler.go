@@ -208,7 +208,7 @@ func SyncTicketAtlas(c *gin.Context) {
 // todavía no se cargó ninguno (ej. se marcó "Emitido" en bloque antes de
 // tipear los números reales de la aerolínea). Si el ticket ya existía con el
 // placeholder y ahora llega el número real, lo actualiza en vez de duplicar.
-func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, userID uuid.UUID) (*models.Ticket, error) {
+func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pnr string, userID uuid.UUID) (*models.Ticket, error) {
 	paxIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("pax-%d", pax.ID)))
 	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
 
@@ -249,8 +249,9 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, us
 		Agencia:           res.Agencia,
 		PasajeroNombre:    nombreCompleto,
 		PasajeroDocumento: doc,
-		PNR:               res.PedidoID,
+		PNR:               pnr,
 		Ruta:              res.VueloRuta,
+		Destino:           res.VueloDestino,
 		Compania:          res.VueloCompania,
 		Ficha:             res.FichaVenta,
 		Tarifa:            pax.PrecioVenta,
@@ -270,7 +271,7 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, us
 // generateReservationLevelTicket es el caso legado: reservas históricas sin
 // pasajeros desglosados en la tabla Passenger, donde el único dato de
 // pasajero vive en la propia Reservation.
-func generateReservationLevelTicket(res *models.Reservation, userID uuid.UUID) ([]models.Ticket, error) {
+func generateReservationLevelTicket(res *models.Reservation, pnr string, userID uuid.UUID) ([]models.Ticket, error) {
 	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
 
 	var existing models.Ticket
@@ -285,8 +286,9 @@ func generateReservationLevelTicket(res *models.Reservation, userID uuid.UUID) (
 		Agencia:           res.Agencia,
 		PasajeroNombre:    res.ContactoNombre,
 		PasajeroDocumento: res.DocumentoPasajero,
-		PNR:               res.PedidoID,
+		PNR:               pnr,
 		Ruta:              res.VueloRuta,
+		Destino:           res.VueloDestino,
 		Compania:          res.VueloCompania,
 		Ficha:             res.FichaVenta,
 		Tarifa:            res.PrecioVenta,
@@ -315,17 +317,25 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 		return nil, fmt.Errorf("reserva nula")
 	}
 
+	// El PNR real (código de reserva de la aerolínea, ej. "V9L8SZ") vive en
+	// Product.PNR — antes el ticket usaba Reservation.PedidoID (nuestro ID
+	// interno de pedido, ej. "PED-2026-...") como si fuera el PNR, que nunca
+	// lo fue.
+	var product models.Product
+	database.DB.Select("pnr").First(&product, res.ProductID)
+	pnr := product.PNR
+
 	var passengers []models.Passenger
 	database.DB.Where("reservation_id = ?", res.ID).Find(&passengers)
 
 	if len(passengers) == 0 {
-		return generateReservationLevelTicket(res, userID)
+		return generateReservationLevelTicket(res, pnr, userID)
 	}
 
 	var tickets []models.Ticket
 	var errs []string
 	for _, pax := range passengers {
-		t, err := upsertTicketForPassenger(&pax, res, userID)
+		t, err := upsertTicketForPassenger(&pax, res, pnr, userID)
 		if err != nil {
 			log.Printf("GenerateTicketsForReservationInternal: %v", err)
 			errs = append(errs, err.Error())
