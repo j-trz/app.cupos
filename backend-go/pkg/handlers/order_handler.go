@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -1093,8 +1094,12 @@ func UpdateReservation(c *gin.Context) {
 	// igual, se sincroniza con Atlas después (o nunca) desde ahí.
 	if justEmitted {
 		userIDVal, _ := c.Get("userID")
-		userUUID, _ := uuid.Parse(fmt.Sprintf("%v", userIDVal))
-		_, _ = GenerateTicketsForReservationInternal(&reservation, userUUID)
+		userUUID, err := uuid.Parse(fmt.Sprintf("%v", userIDVal))
+		if err != nil {
+			log.Printf("UpdateReservation: userID de contexto no es un UUID válido (%v), no se puede generar ticket para la reserva #%d: %v", userIDVal, reservation.ID, err)
+		} else if _, err := GenerateTicketsForReservationInternal(&reservation, userUUID); err != nil {
+			log.Printf("UpdateReservation: no se pudo generar el ticket de la reserva #%d al emitirla: %v", reservation.ID, err)
+		}
 	}
 
 	c.JSON(http.StatusOK, reservation)
@@ -1689,7 +1694,10 @@ func BulkUpdateReservations(c *gin.Context) {
 
 	userIDVal, _ := c.Get("userID")
 	userIDStr := fmt.Sprintf("%v", userIDVal)
-	userUUID, _ := uuid.Parse(userIDStr)
+	userUUID, userIDErr := uuid.Parse(userIDStr)
+	if userIDErr != nil {
+		log.Printf("BulkUpdateReservations: userID de contexto no es un UUID válido (%v): %v — los tickets de esta emisión no se van a poder generar", userIDVal, userIDErr)
+	}
 
 	var updatedCount int
 	now := time.Now()
@@ -1713,10 +1721,12 @@ func BulkUpdateReservations(c *gin.Context) {
 			if err := database.DB.Model(&models.Reservation{}).Where("id = ?", res.ID).Updates(updates).Error; err == nil {
 				updatedCount++
 				// Si pasó a Emitido, auto-genera los boletos en la Bandeja de Tickets
-				if req.EstadoInterno == "Emitido" {
+				if req.EstadoInterno == "Emitido" && userIDErr == nil {
 					resCopy := res
 					resCopy.EstadoInterno = "Emitido"
-					_, _ = GenerateTicketsForReservationInternal(&resCopy, userUUID)
+					if _, err := GenerateTicketsForReservationInternal(&resCopy, userUUID); err != nil {
+						log.Printf("BulkUpdateReservations: no se pudo generar el ticket de la reserva #%d al emitirla: %v", res.ID, err)
+					}
 				}
 			}
 		}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -202,9 +203,18 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 		return nil, fmt.Errorf("reserva nula")
 	}
 
+	// ReservationID de Ticket es un UUID derivado (hash) del ID entero real de
+	// la reserva — nunca comparar contra res.ID directo (uint), Postgres
+	// rechaza el tipo (uuid = integer) y la query de abajo fallaba en
+	// silencio, siempre devolviendo "no existe" incluso cuando sí había
+	// tickets ya creados.
+	resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
+
 	// Si ya existen boletos creados para esta reserva, los devuelve
 	var existing []models.Ticket
-	database.DB.Where("reservation_id = ?", res.ID).Find(&existing)
+	if err := database.DB.Where("reservation_id = ?", resIDUUID).Find(&existing).Error; err != nil {
+		log.Printf("GenerateTicketsForReservationInternal: error chequeando tickets existentes de la reserva #%d: %v", res.ID, err)
+	}
 	if len(existing) > 0 {
 		return existing, nil
 	}
@@ -213,6 +223,7 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 	database.DB.Where("reservation_id = ?", res.ID).Find(&passengers)
 
 	var createdTickets []models.Ticket
+	var createErrs []string
 	now := time.Now()
 	datePrefix := now.Format("20060102")
 
@@ -230,7 +241,6 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 			}
 
 			paxIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("pax-%d", pax.ID)))
-			resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
 
 			t := models.Ticket{
 				NumeroTicket:      ticketNum,
@@ -252,14 +262,16 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 				UsuarioEmisorID:   userID,
 				AtlasStatus:       "pendiente",
 			}
-			if err := database.DB.Create(&t).Error; err == nil {
-				createdTickets = append(createdTickets, t)
+			if err := database.DB.Create(&t).Error; err != nil {
+				log.Printf("GenerateTicketsForReservationInternal: error creando ticket para pasajero #%d de la reserva #%d: %v", pax.ID, res.ID, err)
+				createErrs = append(createErrs, err.Error())
+				continue
 			}
+			createdTickets = append(createdTickets, t)
 		}
 	} else {
 		// Si no hay pasajeros individuales detallados, genera un ticket principal
 		ticketNum := fmt.Sprintf("045-%s-%07d-01", datePrefix, res.ID)
-		resIDUUID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(fmt.Sprintf("res-%d", res.ID)))
 
 		t := models.Ticket{
 			NumeroTicket:      ticketNum,
@@ -280,10 +292,16 @@ func GenerateTicketsForReservationInternal(res *models.Reservation, userID uuid.
 			UsuarioEmisorID:   userID,
 			AtlasStatus:       "pendiente",
 		}
-		if err := database.DB.Create(&t).Error; err == nil {
+		if err := database.DB.Create(&t).Error; err != nil {
+			log.Printf("GenerateTicketsForReservationInternal: error creando ticket principal de la reserva #%d: %v", res.ID, err)
+			createErrs = append(createErrs, err.Error())
+		} else {
 			createdTickets = append(createdTickets, t)
 		}
 	}
 
+	if len(createdTickets) == 0 && len(createErrs) > 0 {
+		return nil, fmt.Errorf("no se pudo crear ningún ticket para la reserva #%d: %s", res.ID, strings.Join(createErrs, "; "))
+	}
 	return createdTickets, nil
 }
