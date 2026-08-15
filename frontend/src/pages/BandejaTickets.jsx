@@ -42,23 +42,30 @@ function fmtCurrency(n) {
 // columna. Se acepta cualquiera de las dos formas acá.
 const segField = (seg, camel, snake) => seg?.[camel] ?? seg?.[snake] ?? '';
 
-// Explota cada ticket en una fila por tramo — "nro de segmento" pedido como
-// columna propia solo tiene sentido si cada tramo es su propia fila (un
-// ticket con ida y vuelta son 2 tramos con vuelo/fecha/origen/destino
-// distintos, no se puede meter en una sola celda sin perder datos). Tickets
-// sin ningún tramo parseable (dato viejo/roto) igual muestran 1 fila con las
-// columnas de ruta vacías, para no perder el resto del ticket.
-function buildTicketRows(tickets) {
-  return tickets.flatMap((ticket) => {
-    const segmentos = ticket.segmentos?.length ? ticket.segmentos : (parseRuta(ticket.ruta) || []);
-    const segs = segmentos.length > 0 ? segmentos : [null];
-    return segs.map((seg, i) => ({
-      key: `${ticket.id}-${i}`,
-      ticket,
-      seg,
-      segIndex: seg?.segmento || i + 1,
-    }));
-  });
+// Un ticket = 1 PNR + 1 número de ticket, aunque cubra varios tramos (ida y
+// vuelta, escalas) — NUNCA una fila (ni un ticket) por tramo, eso implicaría
+// boletos separados donde en realidad es el mismo. Los tramos se apilan
+// DENTRO de la misma fila (una línea por tramo, en la misma celda), para
+// mostrar cada dato de ruta por separado sin sugerir que son tickets
+// distintos. Tickets sin ningún tramo parseable (dato viejo/roto) muestran 1
+// línea vacía, para no perder el resto de la fila.
+function ticketSegments(ticket) {
+  const segmentos = ticket.segmentos?.length ? ticket.segmentos : (parseRuta(ticket.ruta) || []);
+  return segmentos.length > 0 ? segmentos : [null];
+}
+
+// Apila un valor por tramo dentro de la misma celda — la fila sigue siendo 1
+// sola por ticket, pero cada línea de la celda es un tramo distinto,
+// alineada verticalmente contra las mismas líneas del resto de columnas de
+// ruta (mismo `segs`, mismo orden).
+function SegmentStack({ segs, render, className }) {
+  return (
+    <div className={clsx('space-y-1.5', className)}>
+      {segs.map((seg, i) => (
+        <div key={i}>{render(seg, i)}</div>
+      ))}
+    </div>
+  );
 }
 
 // Badge de estado — variantes existentes en components/ui/Badge.jsx (no
@@ -366,8 +373,6 @@ export default function BandejaTickets() {
     );
   }, [tickets, search]);
 
-  const rows = useMemo(() => buildTicketRows(filtered), [filtered]);
-
   const stats = useMemo(() => ({
     total: tickets.length,
     emitidos: tickets.filter((t) => t.estado === 'emitido').length,
@@ -460,11 +465,12 @@ export default function BandejaTickets() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ key, ticket, seg, segIndex }) => {
+              {filtered.map((ticket) => {
                 const badge = estadoBadge[ticket.estado] || { label: ticket.estado, variant: 'default' };
                 const isVoid = ticket.estado === 'void';
+                const segs = ticketSegments(ticket);
                 return (
-                  <TableRow key={key} className={isVoid ? 'opacity-60' : ''}>
+                  <TableRow key={ticket.id} className={isVoid ? 'opacity-60' : ''}>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
                         <ActionIconButton icon={Eye} onClick={() => setSelectedTicket(ticket)} title="Ver boleto GDS" />
@@ -481,14 +487,30 @@ export default function BandejaTickets() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center font-mono text-xs">{segIndex}</TableCell>
-                    <TableCell>{seg?.compania || ticket.compania || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs">{seg?.vuelo || '—'}</TableCell>
-                    <TableCell className="text-xs text-slate-500">{segField(seg, 'fechaSalida', 'fecha_salida') || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs font-semibold">{seg?.origen || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs font-semibold">{seg?.destino || ticket.destino || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs">{seg?.salida || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs">{seg?.llegada || '—'}</TableCell>
+                    <TableCell className="align-top text-center">
+                      <SegmentStack segs={segs} className="font-mono text-xs" render={(seg, i) => seg?.segmento || i + 1} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} render={(seg) => seg?.compania || ticket.compania || '—'} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} className="font-mono text-xs" render={(seg) => seg?.vuelo || '—'} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} className="text-xs text-slate-500" render={(seg) => segField(seg, 'fechaSalida', 'fecha_salida') || '—'} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} className="font-mono text-xs font-semibold" render={(seg) => seg?.origen || '—'} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} className="font-mono text-xs font-semibold" render={(seg) => seg?.destino || ticket.destino || '—'} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} className="font-mono text-xs" render={(seg) => seg?.salida || '—'} />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <SegmentStack segs={segs} className="font-mono text-xs" render={(seg) => seg?.llegada || '—'} />
+                    </TableCell>
                     <TableCell className="text-right">{fmtCurrency(ticket.tarifa)}</TableCell>
                     <TableCell className="text-right">{fmtCurrency(ticket.impuestos)}</TableCell>
                     <TableCell className="text-right font-medium">{fmtCurrency(ticket.total)}</TableCell>
