@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tag, Plus, Edit3, Trash2, Lock } from 'lucide-react';
+import { Tag, Plus, Edit, Trash2, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useAuth } from '../contexts/AuthContext';
 import { useTemporadas, useCreateTemporada, useUpdateTemporada, useDeleteTemporada } from '../hooks/useTemporadas';
@@ -8,7 +8,10 @@ import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import TableComponent from '../components/ui/Table.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 
 const emptyForm = { nombre: '', activa: true };
@@ -106,22 +109,22 @@ export default function GestionTemporadas() {
         }
       />
 
-      <Card>
-        <TableComponent>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead className="text-center">Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={3} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
-            ) : temporadas.length === 0 ? (
-              <TableRow><TableCell colSpan={3} className="text-center py-10 text-slate-400">No hay temporadas cargadas todavía.</TableCell></TableRow>
-            ) : (
-              temporadas.map((t) => (
+      {isLoading ? (
+        <SkeletonTable columns={3} rows={5} />
+      ) : temporadas.length === 0 ? (
+        <EmptyState icon="🏷️" title="No hay temporadas" description="No hay temporadas cargadas todavía." />
+      ) : (
+        <Card>
+          <TableComponent>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {temporadas.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-medium text-slate-900">{t.nombre}</TableCell>
                   <TableCell className="text-center">
@@ -129,20 +132,16 @@ export default function GestionTemporadas() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="outline" size="sm" onClick={() => openEdit(t)} title="Editar" disabled={!can('TEMPORADAS_UPDATE')}>
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(t)} title="Eliminar" disabled={!can('TEMPORADAS_DELETE')}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <ActionIconButton icon={Edit} onClick={() => openEdit(t)} title="Editar" disabled={!can('TEMPORADAS_UPDATE')} />
+                      <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDelete(t)} title="Eliminar" disabled={!can('TEMPORADAS_DELETE')} />
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </TableComponent>
-      </Card>
+              ))}
+            </TableBody>
+          </TableComponent>
+        </Card>
+      )}
 
       <Modal title={editing ? 'Editar Temporada' : 'Nueva Temporada'} open={dialogOpen} onClose={closeDialog} size="sm">
         <form onSubmit={handleSubmit} className="space-y-4">

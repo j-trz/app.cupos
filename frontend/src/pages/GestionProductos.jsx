@@ -232,7 +232,7 @@ const GestionProductos = () => {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     try {
@@ -251,7 +251,7 @@ const GestionProductos = () => {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     setIsBulkDeleting(true);

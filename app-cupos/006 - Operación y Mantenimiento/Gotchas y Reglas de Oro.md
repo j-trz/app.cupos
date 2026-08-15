@@ -1,6 +1,6 @@
 Reglas operativas e invariantes que **no** son obvias leyendo un único archivo — se descubrieron a fuerza de incidentes repetidos en este repo. Léelo antes de tocar rutas, migraciones, RBAC o el entorno local. Complementa [[Historial de Bugs Resueltos]] (postmortems puntuales ya cerrados) y [Modelo de Datos](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md) (detalle de esquema).
 
-> Última verificación de las reglas 1-13 contra código: 2026-08-12. Reglas 14-24 agregadas 2026-08-13 tras la [[Auditoría de Seguridad y QA - 2026-08-13|auditoría integral de seguridad/QA]] (5 agentes en paralelo) — documentan prácticas nuevas, no necesariamente bugs ya corregidos (ver el link para el detalle completo y el estado pendiente/resuelto de cada hallazgo).
+> Última verificación de las reglas 1-13 contra código: 2026-08-12. Reglas 14-24 agregadas 2026-08-13 tras la [[Auditoría de Seguridad y QA - 2026-08-13|auditoría integral de seguridad/QA]] (5 agentes en paralelo) — documentan prácticas nuevas, no necesariamente bugs ya corregidos (ver el link para el detalle completo y el estado pendiente/resuelto de cada hallazgo). Regla 25 agregada 2026-08-14 (ecosistema de herramientas de IA instaladas a nivel global).
 
 ## 1. Dos entrypoints de backend duplican TODA la tabla de rutas
 
@@ -116,6 +116,15 @@ Existía `/api/data` (`data_handler.go`): un endpoint gateado solo por autentica
 - Todo token de auth se lee/escribe únicamente vía `ApiClient.getToken()`/`setToken()` (frontend) — ningún service llama `localStorage` directo para esto (pasó en `exportService.js`, quedó leyendo una clave que nadie escribe).
 - Código muerto de fallback de auth (cookies no usadas, `?token=` en query, claves de storage no escritas) se borra al notarlo — no se deja "por si acaso", porque es exactamente lo que una feature futura activa sin querer.
 - Páginas nuevas se registran con `React.lazy()` + `Suspense` en `App.jsx`, no `import` estático — evita que cada página nueva siga engordando el bundle único.
+
+## 25. Ecosistema de herramientas de IA (global, no solo de este repo) — cuándo usar cada una acá
+
+Julian corrió una evaluación de tooling de IA a nivel global (2026-08-14, no específica de app-cupos) — el detalle completo y el por qué de cada decisión vive en `~/.claude/rules/ai-tooling-strategy.md` (fuera del repo, no versionado acá). Lo que sí es específico de este proyecto es **cuándo usar cada una**:
+
+- **`codebase-memory-mcp`** (MCP server instalado global, indexa código real en un grafo): antes de explorar `backend-go`/`frontend` a mano con grep+lectura de archivos completos para preguntas estructurales ("¿dónde está X?", "¿qué llama a `CreateReservation`?", "mapa de la arquitectura"), correr `index_repository` una vez sobre el repo y usar `search_graph`/`trace_path`/`get_architecture` — ahorra un orden de magnitud de tokens frente a grep+lectura completa. Si el índice quedó viejo tras un cambio grande de código, reindexar antes de confiar en una query — no asumir que el grafo se actualiza solo.
+- **`impeccable`** (skill de diseño instalada global, 23 comandos + detectores deterministas): **acotada a superficies con cara de marca/agencia** (ej. una futura pantalla pública de white-label, login, algo que una agencia vea como "la cara" del producto) — **nunca** en las pantallas `Gestion*.jsx` internas (tablas, formularios, modales de gestión), donde manda `004 - Frontend/Guía de Diseño (para agregar elementos nuevos).md`, nacida de un incidente real. No dejar que un comando `/impeccable` (`craft`, `polish`, `bolder`, etc.) reescriba una pantalla admin con un criterio de diseño distinto al ya establecido.
+- **`superpowers`**: desactivado globalmente (choca con el objetivo de ahorrar tokens) — no aplica a este repo tampoco, no hace falta reactivarlo acá.
+- Convención general (no solo de este repo): usar el skill `defuddle` en vez de `WebFetch` para leer páginas web normales (artículos, docs) durante cualquier tarea de investigación en este proyecto.
 
 ---
 

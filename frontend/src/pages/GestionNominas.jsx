@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy, Plus, Lock } from 'lucide-react';
+import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Edit, Trash2, Copy, Plus, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
@@ -14,6 +14,8 @@ import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import Modal from '../components/Modal.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import { useAgencies } from '../hooks/useAgencies';
 import { formatDateOnly } from '../lib/dateOnly.js';
 
@@ -468,7 +470,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
           <TableComponent>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center">Acciones</TableHead>
+                <TableHead className="text-center sticky left-0 z-20 bg-slate-50 border-r border-b border-slate-200">Acciones</TableHead>
                 <TableHead>Ficha</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Pedido ID</TableHead>
@@ -488,19 +490,19 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                 <TableHead>Tel. Contacto</TableHead>
                 <TableHead>Doc. Contable</TableHead>
                 <TableHead>Ticket</TableHead>
-                <TableHead>Precio Venta</TableHead>
-                <TableHead>Neto 1</TableHead>
-                <TableHead>OP</TableHead>
+                <TableHead className="text-right">Precio Venta</TableHead>
+                <TableHead className="text-right">Neto 1</TableHead>
+                <TableHead className="text-right">OP</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {passengerRows.map((row) => (
                 <TableRow key={row.key} className={rowTintByKey[row.key]}>
-                  <TableCell>
+                  <TableCell className="sticky left-0 z-10 bg-white border-r border-slate-200">
                     <div className="flex items-center justify-center gap-1">
                       {row.passengerId && (
                         <>
-                          <ActionIconButton icon={Pencil} onClick={() => onEdit(row)} title="Editar pasajero" />
+                          <ActionIconButton icon={Edit} onClick={() => onEdit(row)} title="Editar pasajero" />
                           <ActionIconButton icon={Copy} onClick={() => onDuplicate(row)} title="Duplicar pasajero" />
                           <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(row)} title="Eliminar pasajero" />
                         </>
@@ -565,9 +567,9 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                   <TableCell className="text-zinc-700">{row.contactoTelefono}</TableCell>
                   <TableCell className="text-zinc-700">{row.docContable}</TableCell>
                   <TableCell className="text-zinc-700 font-mono text-xs">{row.numeroTicket}</TableCell>
-                  <TableCell className="text-zinc-700">{formatMoney(row.precioVenta)}</TableCell>
-                  <TableCell className="text-zinc-700">{formatMoney(row.neto1)}</TableCell>
-                  <TableCell className="text-zinc-700">
+                  <TableCell className="text-zinc-700 text-right font-mono">{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell className="text-zinc-700 text-right font-mono">{formatMoney(row.neto1)}</TableCell>
+                  <TableCell className="text-zinc-700 text-right font-mono">
                     {product?.[`op_${passengerPriceSuffix(row.tipoPasajero)}`] ?? product?.op ?? '—'}
                   </TableCell>
                 </TableRow>
@@ -746,7 +748,7 @@ export default function GestionNominas() {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     try {
@@ -1032,21 +1034,15 @@ export default function GestionNominas() {
       )}
 
       {/* Loading state */}
-      {loading && (
-        <div className="flex justify-center items-center py-16">
-          <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
-          <span className="ml-2 text-sm text-zinc-500">Cargando nóminas...</span>
-        </div>
-      )}
+      {loading && <SkeletonTable columns={5} rows={5} />}
 
       {/* Empty state */}
       {!loading && !error && filteredProductIds.length === 0 && (
-        <Card className="px-5 py-12 text-center">
-          <Users className="h-10 w-10 mx-auto mb-3 text-zinc-300" />
-          <p className="text-sm font-medium text-zinc-500">
-            {search ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay reservas registradas.'}
-          </p>
-        </Card>
+        <EmptyState
+          icon="👥"
+          title="No hay nóminas"
+          description={search ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay reservas registradas.'}
+        />
       )}
 
       {/* Product sections */}
@@ -1080,7 +1076,7 @@ export default function GestionNominas() {
         <div className="space-y-4">
           <PassengerFieldsForm values={editForm} onChange={setEditForm} showTicket />
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="outline" onClick={closeEditPassenger} disabled={savingPassenger}>
+            <Button variant="secondary" onClick={closeEditPassenger} disabled={savingPassenger}>
               Cancelar
             </Button>
             <Button onClick={handleSavePassenger} disabled={savingPassenger}>
@@ -1105,7 +1101,7 @@ export default function GestionNominas() {
           )}
           <PassengerFieldsForm values={addForm} onChange={setAddForm} showTicket={false} />
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="outline" onClick={closeAddPassenger} disabled={savingAddPassenger}>
+            <Button variant="secondary" onClick={closeAddPassenger} disabled={savingAddPassenger}>
               Cancelar
             </Button>
             <Button onClick={handleSaveAddPassenger} disabled={savingAddPassenger}>

@@ -567,7 +567,7 @@ export default function AIConfig() {
                                         </div>
 
                                         <div className="flex justify-end gap-2 pt-4 border-t">
-                                            <Button type="button" variant="outline" onClick={() => setShowProviderForm(false)}>
+                                            <Button type="button" variant="secondary" onClick={() => setShowProviderForm(false)}>
                                                 Cancelar
                                             </Button>
                                             <Button type="submit">

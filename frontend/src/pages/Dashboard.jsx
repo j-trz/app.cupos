@@ -59,43 +59,60 @@ const NOTIF_COLOR = {
 
 /* ─── Sub-componentes ────────────────────────────────────── */
 
-function WelcomeBanner({ user, totalReservas, bloqueadas }) {
+// Bienvenida + métricas en un solo hero (antes eran dos bloques oscuros
+// apilados, uno detrás del otro, con el mismo degradado — pesaban el doble
+// de lo que aportaban antes de llegar a contenido real). El detalle de
+// "bloqueos pendientes" queda solo en la tarjeta "Bloqueos temporales" +
+// BlockedReservationsWidget, ya no repetido acá como texto/pill aparte.
+function WelcomeBanner({ user, stats, statsLoading }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-8 py-7 text-white shadow-lg">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-6 py-6 sm:px-8 sm:py-7 text-white shadow-lg">
       {/* decoración */}
       <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" />
       <div className="pointer-events-none absolute -bottom-8 right-24 h-32 w-32 rounded-full bg-white/5" />
 
-      <div className="flex items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-          {/* avatar */}
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg font-bold ring-2 ring-white/20">
-            {initials(user?.nombre || user?.email)}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-white/60">{todayLabel()}</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight">
-              {greetingFor(user?.nombre)}
-            </h1>
-            <p className="mt-1 text-sm text-white/70">
-              Tenés <span className="font-semibold text-white">{totalReservas}</span> reservas
-              {bloqueadas > 0 && (
-                <> · <span className="font-semibold text-amber-300">{bloqueadas} con doc. pendiente</span></>
-              )}
-            </p>
-          </div>
+      <div className="relative z-10 mb-5 flex items-center gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 text-base font-bold ring-2 ring-white/20">
+          {initials(user?.nombre || user?.email)}
         </div>
-
-        {/* indicador rápido */}
-        {bloqueadas > 0 && (
-          <div className="hidden sm:flex items-center gap-2 rounded-2xl bg-amber-400/20 px-4 py-2.5 ring-1 ring-amber-400/30">
-            <AlertCircle className="h-4 w-4 text-amber-300" />
-            <span className="text-sm font-medium text-amber-200">
-              {bloqueadas} reserva{bloqueadas > 1 ? 's' : ''} requieren acción
-            </span>
-          </div>
-        )}
+        <div>
+          <p className="text-xs font-medium text-white/60">{todayLabel()}</p>
+          <h1 className="mt-0.5 text-xl font-bold tracking-tight">
+            {greetingFor(user?.nombre)}
+          </h1>
+        </div>
       </div>
+
+      {statsLoading ? (
+        <div className="relative z-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-[4.5rem] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+          ))}
+        </div>
+      ) : (
+        <div className="relative z-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stats.map((stat, i) => {
+            const Icon = stat.icon;
+            const Wrapper = stat.onClick ? 'button' : 'div';
+            return (
+              <Wrapper
+                key={i}
+                type={stat.onClick ? 'button' : undefined}
+                onClick={stat.onClick}
+                className={`flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 ${stat.onClick ? 'cursor-pointer' : ''}`}
+              >
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${stat.color}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-medium text-slate-300">{stat.label}</p>
+                  <p className="mt-0.5 text-base font-bold text-white">{stat.value}</p>
+                </div>
+              </Wrapper>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -172,7 +189,7 @@ function BlockedReservationsWidget({ reservations, onGoToRequests }) {
   );
 }
 
-function RecentReservationsWidget({ reservations, loading }) {
+function RecentReservationsWidget({ reservations, loading, onOpen }) {
   const recent = reservations.slice(0, 6);
   return (
     <Card className="flex flex-col h-full">
@@ -192,7 +209,12 @@ function RecentReservationsWidget({ reservations, loading }) {
           </div>
         ) : (
           recent.map((r) => (
-            <div key={r.id} className="flex items-center gap-3 px-5 py-3">
+            <button
+              type="button"
+              key={r.id}
+              onClick={() => onOpen(r)}
+              className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-slate-50"
+            >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
                 <MapPin className="h-3.5 w-3.5 text-slate-500" />
               </div>
@@ -207,7 +229,7 @@ function RecentReservationsWidget({ reservations, loading }) {
               <Badge variant={getEstadoVariant(r.estado)} className="shrink-0 text-xs">
                 {getEstadoLabel(r.estado)}
               </Badge>
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -428,23 +450,25 @@ const Dashboard = () => {
           description="Vista general del sistema y métricas clave."
           icon={BarChart3}
           action={
-            <Button size="sm" onClick={handleRefresh} disabled={refreshing}>
+            <Button size="sm" variant="secondary" onClick={handleRefresh} disabled={refreshing} title="Actualizar">
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
           }
         />
         {isLoadingReports ? (
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-24" />
-            ))}
+          <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-4 shadow-lg sm:p-8">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-24 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+              ))}
+            </div>
           </div>
         ) : (
           <StatsHero
             stats={[
-              { icon: Calendar, label: 'Total Pasajeros', value: reports?.totalPassengers || 0, description: 'Pasajeros confirmados', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
-              { icon: CreditCard, label: 'Ventas Totales', value: formatCurrency(reports?.totalSales || 0), description: 'Ventas confirmadas', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' },
-              { icon: Plane, label: 'Disponibilidad Promedio', value: `${reports?.avgAvailability || 0}%`, description: 'Cupos disponibles', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20' },
+              { icon: Calendar, label: 'Total Pasajeros', value: reports?.totalPassengers || 0, description: 'Pasajeros confirmados', color: 'text-blue-300 bg-blue-500/10 border-blue-500/20', onClick: () => navigate('/nominas') },
+              { icon: CreditCard, label: 'Ventas Totales', value: formatCurrency(reports?.totalSales || 0), description: 'Ventas confirmadas', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', onClick: () => navigate('/reportes') },
+              { icon: Plane, label: 'Disponibilidad Promedio', value: `${reports?.avgAvailability || 0}%`, description: 'Cupos disponibles', color: 'text-amber-300 bg-amber-500/10 border-amber-500/20', onClick: () => navigate('/availability') },
             ]}
           />
         )}
@@ -472,54 +496,41 @@ const Dashboard = () => {
         }
       />
 
-      {/* Banner de bienvenida */}
+      {/* Bienvenida + métricas en un solo hero */}
       <WelcomeBanner
         user={user}
-        totalReservas={reservations.length}
-        bloqueadas={blocked}
+        statsLoading={isLoadingUserMetrics}
+        stats={[
+          {
+            icon: Calendar,
+            label: 'Mis reservas',
+            value: reservations.length || userMetrics?.totalReservations || 0,
+            color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+            onClick: () => navigate('/reservas'),
+          },
+          {
+            icon: CheckCircle,
+            label: 'Confirmadas',
+            value: confirmed || userMetrics?.confirmedReservations || 0,
+            color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+            onClick: () => navigate('/reservas'),
+          },
+          {
+            icon: Clock,
+            label: 'Bloqueos temporales',
+            value: blocked || userMetrics?.pendingReservations || 0,
+            color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+            onClick: () => navigate('/solicitudes'),
+          },
+          {
+            icon: TrendingUp,
+            label: 'Mis ventas',
+            value: formatCurrency(userMetrics?.totalSales || 0),
+            color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+            onClick: () => navigate('/reportes'),
+          },
+        ]}
       />
-
-      {/* Stat cards */}
-      {isLoadingUserMetrics ? (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse h-20" />
-          ))}
-        </div>
-      ) : (
-        <StatsHero
-          stats={[
-            {
-              icon: Calendar,
-              label: 'Mis reservas',
-              value: reservations.length || userMetrics?.totalReservations || 0,
-              description: 'Total creadas',
-              color: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
-            },
-            {
-              icon: CheckCircle,
-              label: 'Confirmadas',
-              value: confirmed || userMetrics?.confirmedReservations || 0,
-              description: 'Reservas confirmadas',
-              color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
-            },
-            {
-              icon: Clock,
-              label: 'Bloqueos temporales',
-              value: blocked || userMetrics?.pendingReservations || 0,
-              description: 'Pendientes de doc. contable',
-              color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
-            },
-            {
-              icon: TrendingUp,
-              label: 'Mis ventas',
-              value: formatCurrency(userMetrics?.totalSales || 0),
-              description: 'Ventas confirmadas',
-              color: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
-            },
-          ]}
-        />
-      )}
 
       {/* Widget de bloqueos urgentes */}
       <BlockedReservationsWidget
@@ -529,7 +540,7 @@ const Dashboard = () => {
 
       {/* Columnas: últimas reservas + notificaciones */}
       <div className="grid gap-5 lg:grid-cols-2">
-        <RecentReservationsWidget reservations={reservations} loading={loading} />
+        <RecentReservationsWidget reservations={reservations} loading={loading} onOpen={() => navigate('/reservas')} />
         <NotificationsWidget
           notifications={notifications}
           loading={loadingNotifs}

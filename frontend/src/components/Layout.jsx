@@ -90,7 +90,7 @@ export default function Layout({ children }) {
             </button>
             {headerData.icon && (
               <div className="flex items-center justify-center rounded-lg bg-zinc-100 p-2 text-zinc-900 shrink-0">
-                <headerData.icon className="h-4.5 w-4.5" />
+                <headerData.icon className="h-4 w-4" />
               </div>
             )}
             <div className="min-w-0">

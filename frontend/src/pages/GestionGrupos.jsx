@@ -9,6 +9,7 @@ import { Input } from '../components/ui/Input';
 import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import SkeletonTable from '../components/SkeletonTable';
@@ -128,7 +129,7 @@ const GestionGrupos = () => {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     try {
@@ -323,32 +324,20 @@ const GestionGrupos = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" onClick={() => handleEditGroup(group)} title="Editar / Cotizar">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <ActionIconButton icon={Edit} onClick={() => handleEditGroup(group)} title="Editar / Cotizar" />
                         {(group.estado_cotizacion === 'pendiente' || group.estado_cotizacion === 'cotizada') && (
-                          <Button variant="outline" size="sm" onClick={() => handleSendQuote(group)} title="Enviar cotización al usuario" className="text-blue-600 hover:text-blue-800">
-                            <Send className="h-4 w-4" />
-                          </Button>
+                          <ActionIconButton icon={Send} onClick={() => handleSendQuote(group)} title="Enviar cotización al usuario" className="text-blue-600 hover:bg-blue-50 hover:text-blue-700" />
                         )}
                         {group.estado_cotizacion === 'aceptada' && !group.estado_reservar && (
-                          <Button variant="outline" size="sm" onClick={() => handleConfirmGroup(group)} title="Confirmar grupo" className="text-emerald-600 hover:text-emerald-800">
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
+                          <ActionIconButton icon={CheckCircle2} onClick={() => handleConfirmGroup(group)} title="Confirmar grupo" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
                         )}
                         {group.estado_reservar === 'cancelacion_solicitada' && (
                           <>
-                            <Button variant="outline" size="sm" onClick={() => handleResolveCancellation(group, 'approve')} title="Aprobar cancelación" className="text-emerald-600 hover:text-emerald-800">
-                              <ThumbsUp className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleResolveCancellation(group, 'decline')} title="Rechazar cancelación" className="text-amber-600 hover:text-amber-800">
-                              <ThumbsDown className="h-4 w-4" />
-                            </Button>
+                            <ActionIconButton icon={ThumbsUp} onClick={() => handleResolveCancellation(group, 'approve')} title="Aprobar cancelación" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
+                            <ActionIconButton icon={ThumbsDown} onClick={() => handleResolveCancellation(group, 'decline')} title="Rechazar cancelación" className="text-amber-600 hover:bg-amber-50 hover:text-amber-700" />
                           </>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => handleDeleteGroup(group.id)} title="Eliminar">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteGroup(group.id)} title="Eliminar" />
                       </div>
                     </TableCell>
                   </TableRow>

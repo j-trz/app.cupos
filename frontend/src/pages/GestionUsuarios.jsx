@@ -8,8 +8,11 @@ import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import UserForm from '../components/UserForm';
 import UserAgenciesModal from '../components/UserAgenciesModal';
 import { Search, Plus, Edit, Trash2, RefreshCw, Users, UserCheck, XCircle, CheckCircle, Lock, Building2 } from 'lucide-react';
@@ -80,7 +83,7 @@ const GestionUsuarios = () => {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
       cancelButtonColor: '#3085d6',
     });
     if (!result.isConfirmed) return;
@@ -214,6 +217,15 @@ const GestionUsuarios = () => {
           </div>
         </div>
 
+        {isLoading ? (
+          <div className="px-6 py-5"><SkeletonTable columns={6} rows={5} /></div>
+        ) : users.length === 0 ? (
+          <EmptyState
+            icon="👤"
+            title="No hay usuarios"
+            description={searchTerm ? 'No se encontraron usuarios con la búsqueda.' : 'No hay usuarios registrados.'}
+          />
+        ) : (
         <TableComponent>
           <TableHeader>
             <TableRow>
@@ -226,20 +238,7 @@ const GestionUsuarios = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell className="text-center py-10" colSpan={6}>
-                  Cargando usuarios...
-                </TableCell>
-              </TableRow>
-            ) : users.length === 0 ? (
-              <TableRow>
-                <TableCell className="text-center py-10" colSpan={6}>
-                  {searchTerm ? 'No se encontraron usuarios con la búsqueda.' : 'No hay usuarios registrados.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map((user) => (
+              {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="text-center font-medium">
                     {user.nombre} {user.apellido}
@@ -259,24 +258,18 @@ const GestionUsuarios = () => {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="Editar usuario">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <ActionIconButton icon={Edit} onClick={() => handleEditUser(user)} title="Editar usuario" />
                       {isAdmin && (
-                        <Button variant="ghost" size="sm" onClick={() => setAgenciesUserTarget(user)} title="Agencias adicionales">
-                          <Building2 className="h-4 w-4" />
-                        </Button>
+                        <ActionIconButton icon={Building2} onClick={() => setAgenciesUserTarget(user)} title="Agencias adicionales" />
                       )}
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user.id)} title="Eliminar usuario" className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteUser(user.id)} title="Eliminar usuario" />
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
           </TableBody>
         </TableComponent>
+        )}
       </Card>
 
       {/* Modal de Crear/Editar Usuario */}

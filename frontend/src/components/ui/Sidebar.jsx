@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag, Briefcase, Ticket } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, UserCheck, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag, Briefcase, Ticket } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import Swal from 'sweetalert2';
@@ -9,6 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shad
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
 import NotificationService from '../../services/notificationService.js';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext.jsx';
+import Badge from './Badge.jsx';
 import { visibleDocsSections } from '../../lib/docsSections.js';
 
 const navItems = [
@@ -30,7 +31,7 @@ const cuposReservasItems = [
   { label: 'Grupos', path: '/grupos', icon: Luggage, permission: 'GROUPS_VIEW' },
   { label: 'Oportunidades', path: '/oportunidades', icon: Sparkles, permission: 'OPPORTUNITIES_VIEW' },
   { label: 'Reservas', path: '/reservas', icon: CreditCard, permission: 'RESERVATIONS_VIEW' },
-  { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
+  { label: 'Nóminas', path: '/nominas', icon: UserCheck, permission: 'RESERVATIONS_VIEW' },
 ];
 const catalogoItems = [
   { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
@@ -110,6 +111,26 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
       .map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon })),
     [user?.permissions, isAdmin, user?.ai_habilitado]
   );
+
+  // Auto-abre el submenú que contiene la ruta actual al montar — antes los 6
+  // acordeones arrancaban siempre cerrados y había que reabrir el correcto
+  // en cada sesión/reload, incluso estando parado en una de sus páginas.
+  useEffect(() => {
+    const path = location.pathname;
+    const groups = {
+      docs: docsItems,
+      cuposReservas: visibleCuposReservasItems,
+      catalogo: visibleCatalogoItems,
+      sistema: visibleSistemaItems,
+      settings: visibleSettingsItems,
+      userManagement: visibleUserManagementItems,
+    };
+    const activeGroup = Object.entries(groups).find(([, items]) => items.some((i) => path.startsWith(i.path)));
+    if (activeGroup) {
+      setOpenSubmenus((prev) => ({ ...prev, [activeGroup[0]]: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // El ancho puede venir del white-label como número/string sin unidad (ej.
   // guardado como "240" en vez de "240px") — CSS descarta silenciosamente un
@@ -197,28 +218,6 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
     onMouseLeave: () => setHoveredKey((k) => (k === key ? null : k)),
   });
 
-  // Helper para estilos de items del sidebar
-  const itemStyle = (active) => {
-    const base = {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.625rem',
-      borderRadius: '0.5rem',
-      padding: '0.5rem 0.75rem',
-      fontSize: '0.875rem',
-      fontWeight: '500',
-      transition: 'all 0.2s ease',
-      cursor: 'pointer',
-      textDecoration: 'none',
-      color: active ? '#fff' : sbText,
-      backgroundColor: active ? sbActiveBg : 'transparent',
-    };
-    if (!active) {
-      base._hover = { backgroundColor: sbHoverBg, color: '#fff' };
-    }
-    return base;
-  };
-
   return (
     <TooltipProvider>
       {/* Backdrop del drawer móvil — solo existe por debajo de md, donde el
@@ -292,7 +291,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCollapsed(true)}
-                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
+                      className="absolute -right-3 top-[30%] z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
                       aria-label="Colapsar sidebar"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -306,7 +305,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCollapsed(false)}
-                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
+                      className="absolute -right-3 top-[30%] z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
                       aria-label="Expandir sidebar"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -741,7 +740,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                         </div>
                         <span>Notificaciones</span>
                         {unreadCount > 0 && (
-                          <span className="ml-auto text-xs font-semibold text-red-500">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                          <Badge variant="danger" className="ml-auto px-1.5 py-0 text-[10px]">{unreadCount > 99 ? '99+' : unreadCount}</Badge>
                         )}
                       </a>
                     </DropdownMenuItem>

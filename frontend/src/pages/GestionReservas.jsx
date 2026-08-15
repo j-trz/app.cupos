@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock, BedDouble } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock, BedDouble } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import { useAuth } from '../contexts/AuthContext';
 import ApiClient from '../services/apiClient';
@@ -11,6 +11,8 @@ import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import BulkSelectionBar, { XCircle } from '../components/ui/BulkSelectionBar.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
@@ -468,7 +470,7 @@ export default function GestionReservas() {
         ? 'Es el único pasajero de este pedido: se eliminará también la reserva.'
         : 'Se libera su lugar. El resto de los pasajeros de este mismo pedido no se ven afectados.',
       showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!res.isConfirmed) return;
     try {
@@ -548,7 +550,7 @@ export default function GestionReservas() {
       showCancelButton: true,
       confirmButtonText: 'Sí, cancelar',
       cancelButtonText: 'Volver',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
       preConfirm: () => {
         const motivo = document.getElementById('motivo-cancel').value;
         if (!motivo) {
@@ -650,32 +652,36 @@ export default function GestionReservas() {
         ]}
       />
 
-      <Card>
-        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Lista de Reservas</h2>
-              <p className="text-sm text-slate-500">Cada fila es un pasajero individual; varios pasajeros pueden compartir el mismo pedido.</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero, ficha..."
-              value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
-          </div>
-          {estados.length > 1 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Estado:</span>
-              {estados.map(est => (
-                <button key={est} type="button" onClick={() => setEstadoFilter(est)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                  {est === 'Todas' ? 'Todas' : getEstadoLabel(est)}
-                </button>
-              ))}
-            </div>
-          )}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero, ficha..."
+            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
         </div>
+      </div>
+      {estados.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Estado:</span>
+          {estados.map(est => (
+            <button key={est} type="button" onClick={() => setEstadoFilter(est)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              {est === 'Todas' ? 'Todas' : getEstadoLabel(est)}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {loading ? (
+        <SkeletonTable columns={10} rows={6} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon="🧳"
+          title="No hay reservas"
+          description={searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
+        />
+      ) : (
+      <Card>
         <TableComponent>
           <TableHeader>
             <TableRow>
@@ -707,22 +713,16 @@ export default function GestionReservas() {
               <TableHead>Contacto</TableHead>
               <TableHead>Doc.Contable</TableHead>
               <TableHead>Ticket</TableHead>
-              <TableHead>Precio Venta</TableHead>
-              <TableHead>Neto 1</TableHead>
-              <TableHead>OP</TableHead>
+              <TableHead className="text-right">Precio Venta</TableHead>
+              <TableHead className="text-right">Neto 1</TableHead>
+              <TableHead className="text-right">OP</TableHead>
               <TableHead>Vendedor</TableHead>
               <TableHead>ID Pedido</TableHead>
               <TableHead>Agencia</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={23} className="text-center py-10">Cargando...</TableCell></TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={23} className="text-center py-10 text-slate-400">
-                {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
-              </TableCell></TableRow>
-            ) : filtered.flatMap(r => {
+            {filtered.flatMap(r => {
               const expiry = r.estado === 'bloqueo_temporal' ? formatExpiry(r.bloqueo_expira_at) : null;
               return buildPassengerRows(r).map(row => (
                 <TableRow key={row.key} className={selectedIds.includes(r.id) ? 'bg-blue-50/50' : ''}>
@@ -749,7 +749,7 @@ export default function GestionReservas() {
                         <ActionIconButton icon={CheckCircle2} onClick={() => handleConfirm(r)} title="Confirmar pedido completo" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
                       )}
                       <ActionIconButton icon={Send} onClick={() => handleResendEmail(r)} title="Reenviar email" />
-                      <ActionIconButton icon={Edit3} onClick={() => openEdit(r)} title="Editar reserva" />
+                      <ActionIconButton icon={Edit} onClick={() => openEdit(r)} title="Editar reserva" />
                       <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeletePassenger(row)} title="Eliminar este pasajero" />
                       {row.numeroTicket && (
                         <ActionIconButton
@@ -891,9 +891,9 @@ export default function GestionReservas() {
                       </button>
                     ) : <span className="text-xs text-slate-300">—</span>}
                   </TableCell>
-                  <TableCell>{formatMoney(row.precioVenta)}</TableCell>
-                  <TableCell>{formatMoney(row.neto1)}</TableCell>
-                  <TableCell>{productOp(r.product_id, row.tipoPasajero)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(row.neto1)}</TableCell>
+                  <TableCell className="text-right font-mono">{productOp(r.product_id, row.tipoPasajero)}</TableCell>
                   <TableCell className="text-xs text-slate-500">{r.vendedor_email || '—'}</TableCell>
                   <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
                   <TableCell>{agencyName(r.agencia)}</TableCell>
@@ -903,6 +903,7 @@ export default function GestionReservas() {
           </TableBody>
         </TableComponent>
       </Card>
+      )}
 
       <BulkSelectionBar
         selectedCount={selectedIds.length}

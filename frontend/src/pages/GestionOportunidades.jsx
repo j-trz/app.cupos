@@ -15,6 +15,8 @@ import Modal from '../components/Modal.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import { useToast } from '../hooks/use-toast';
 
 const getBadgeVariant = (estado) => {
@@ -323,6 +325,11 @@ export default function GestionOportunidades() {
         )}
       </div>
 
+      {isLoading ? (
+        <SkeletonTable columns={8} rows={5} />
+      ) : filteredOportunidades.length === 0 ? (
+        <EmptyState icon="✨" title="No hay oportunidades" description="No hay oportunidades cargadas todavía." />
+      ) : (
       <Card>
         <TableComponent>
           <TableHeader>
@@ -351,17 +358,12 @@ export default function GestionOportunidades() {
               <TableHead className="text-center">Equipaje</TableHead>
               <TableHead className="text-center">Lugares</TableHead>
               <TableHead className="text-center">Liberados</TableHead>
-              <TableHead className="text-center">Neto 1</TableHead>
-              <TableHead className="text-center">Neto 2</TableHead>
+              <TableHead className="text-right">Neto 1</TableHead>
+              <TableHead className="text-right">Neto 2</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={15} className="text-center py-10 text-slate-400">Cargando...</TableCell></TableRow>
-            ) : filteredOportunidades.length === 0 ? (
-              <TableRow><TableCell colSpan={15} className="text-center py-10 text-slate-400">No hay oportunidades cargadas todavía.</TableCell></TableRow>
-            ) : (
-              filteredOportunidades.map((opp) => (
+              {filteredOportunidades.map((opp) => (
                 <TableRow key={opp.id} className={`group ${selectedIds.includes(opp.id) ? 'bg-blue-50/50' : ''}`}>
                   <TableCell className="w-10 text-center sticky left-0 z-10 bg-white border-r border-slate-200 group-hover:bg-slate-50">
                     <input
@@ -456,14 +458,14 @@ export default function GestionOportunidades() {
                       {opp.total_liberados ?? 0}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center">{opp.neto_1 ? `$${opp.neto_1}` : '—'}</TableCell>
-                  <TableCell className="text-center">{opp.neto_2 ? `$${opp.neto_2}` : '—'}</TableCell>
+                  <TableCell className="text-right font-mono">{opp.neto_1 ? `$${opp.neto_1}` : '—'}</TableCell>
+                  <TableCell className="text-right font-mono">{opp.neto_2 ? `$${opp.neto_2}` : '—'}</TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
           </TableBody>
         </TableComponent>
       </Card>
+      )}
 
       <BulkSelectionBar
         selectedCount={selectedIds.length}

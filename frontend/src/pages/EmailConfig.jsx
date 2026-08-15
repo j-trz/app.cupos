@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import EmailConfigService from '../services/emailConfigService';
 import Swal from 'sweetalert2';
 import {
-    Mail, Save, TestTube, Send, RefreshCw, Eye, Pencil, Code, Settings,
+    Mail, Save, TestTube, Send, RefreshCw, Eye, Edit, Code, Settings,
     CheckCircle, XCircle, AlertCircle, Server, Lock, User
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
@@ -464,7 +464,7 @@ export default function EmailConfig() {
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <Button size="sm" variant="ghost" onClick={() => handleOpenEditTemplate(template)} title="Editar">
-                                                        <Pencil className="h-4 w-4" />
+                                                        <Edit className="h-4 w-4" />
                                                     </Button>
                                                     <Button size="sm" variant="ghost" onClick={() => handlePreviewTemplate(template)} title="Vista previa">
                                                         <Eye className="h-4 w-4" />
