@@ -705,6 +705,9 @@ func runSQLMigrations(db *gorm.DB) {
 		// el formato real de itinerario multi-tramo — ver ItineraryTable.jsx
 		// parseRuta() para el parser real).
 		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS destino VARCHAR(255) DEFAULT '';`,
+		// Itinerario normalizado tramo por tramo (nro. vuelo/fecha/origen/
+		// destino/salida/llegada) — ver services.ParseRuta().
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS segmentos JSONB DEFAULT '[]';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

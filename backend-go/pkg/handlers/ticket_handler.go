@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,8 +14,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+// buildSegmentosJSON parsea el texto libre de itinerario (Reservation.VueloRuta)
+// en tramos normalizados (services.ParseRuta) y lo serializa para la columna
+// Ticket.Segmentos. Si el parseo no encuentra ningún tramo válido, devuelve
+// un array vacío en vez de null (mismo default que la columna).
+func buildSegmentosJSON(ruta string) datatypes.JSON {
+	segmentos := services.ParseRuta(ruta)
+	if segmentos == nil {
+		segmentos = []services.ItinerarySegment{}
+	}
+	b, err := json.Marshal(segmentos)
+	if err != nil {
+		log.Printf("buildSegmentosJSON: error serializando itinerario: %v", err)
+		return datatypes.JSON([]byte("[]"))
+	}
+	return datatypes.JSON(b)
+}
 
 // GetTickets devuelve el listado de tickets emitidos con filtros y scoping por agencia
 func GetTickets(c *gin.Context) {
@@ -220,8 +239,20 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 	var existing models.Ticket
 	err := database.DB.Where("passenger_id = ?", paxIDUUID).First(&existing).Error
 	if err == nil {
+		needsSave := false
 		if existing.NumeroTicket != ticketNum && existing.Estado != "void" {
 			existing.NumeroTicket = ticketNum
+			needsSave = true
+		}
+		// Autocura tickets emitidos antes de que existiera Segmentos (o si
+		// Ruta cambió) — no cuesta nada más recalcularlo acá también.
+		if len(existing.Segmentos) == 0 || string(existing.Segmentos) == "[]" {
+			if seg := buildSegmentosJSON(res.VueloRuta); len(seg) > 2 {
+				existing.Segmentos = seg
+				needsSave = true
+			}
+		}
+		if needsSave {
 			if err := database.DB.Save(&existing).Error; err != nil {
 				return nil, fmt.Errorf("error actualizando número de ticket del pasajero #%d: %w", pax.ID, err)
 			}
@@ -251,6 +282,7 @@ func upsertTicketForPassenger(pax *models.Passenger, res *models.Reservation, pn
 		PasajeroDocumento: doc,
 		PNR:               pnr,
 		Ruta:              res.VueloRuta,
+		Segmentos:         buildSegmentosJSON(res.VueloRuta),
 		Destino:           res.VueloDestino,
 		Compania:          res.VueloCompania,
 		Ficha:             res.FichaVenta,
@@ -288,6 +320,7 @@ func generateReservationLevelTicket(res *models.Reservation, pnr string, userID 
 		PasajeroDocumento: res.DocumentoPasajero,
 		PNR:               pnr,
 		Ruta:              res.VueloRuta,
+		Segmentos:         buildSegmentosJSON(res.VueloRuta),
 		Destino:           res.VueloDestino,
 		Compania:          res.VueloCompania,
 		Ficha:             res.FichaVenta,

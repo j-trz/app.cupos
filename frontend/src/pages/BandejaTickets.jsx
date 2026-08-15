@@ -53,8 +53,11 @@ function TicketDetailModal({ ticket, onClose }) {
   // el origen del primer tramo (parseRuta ya sabe leer este formato, ver
   // ItineraryTable.jsx); el destino usa Ticket.Destino (copiado de la
   // reserva al emitir), no algo derivado de Ruta.
-  const primerTramo = ticket ? parseRuta(ticket.ruta)[0] : null;
-  const origen = primerTramo?.origen || '???';
+  // Segmentos ya viene normalizado desde el backend (services.ParseRuta, un
+  // ticket puede tener más de un tramo) — parseRuta(ticket.ruta) queda solo
+  // como fallback para tickets emitidos antes de que existiera esa columna.
+  const tramos = ticket?.segmentos?.length ? ticket.segmentos : (ticket ? parseRuta(ticket.ruta) : []);
+  const origen = tramos[0]?.origen || '???';
   const destino = ticket?.destino || '???';
 
   return (
@@ -108,6 +111,42 @@ function TicketDetailModal({ ticket, onClose }) {
             <InfoField icon={Building2} label="Agencia" value={ticket.agencia} />
             <InfoField icon={Calendar} label="Fecha de emisión" value={fmtDateTime(ticket.fecha_emision)} />
           </div>
+
+          {tramos.length > 0 && (
+            <Card className="p-4">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Itinerario {tramos.length > 1 && `— ${tramos.length} tramos`}
+              </div>
+              <div className="divide-y divide-slate-100">
+                {tramos.map((t, i) => {
+                  const fechaSalida = t.fechaSalida || t.fecha_salida || '';
+                  const nextDay = t.nextDay ?? t.next_day ?? false;
+                  return (
+                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+                          <Plane className="h-3.5 w-3.5 text-slate-500" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold text-slate-900">{t.compania}{t.vuelo}</div>
+                          <div className="text-[11px] text-slate-400">{fechaSalida || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-800">
+                        <span>{t.origen || '???'}</span>
+                        <span className="text-slate-300">→</span>
+                        <span>{t.destino || '???'}</span>
+                      </div>
+                      <div className="text-right text-xs text-slate-500">
+                        <div>{t.salida || '—'} - {t.llegada || '—'}</div>
+                        {nextDay && <div className="text-amber-600">+1 día</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
 
           <Card className="p-4">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Desglose tarifario</div>

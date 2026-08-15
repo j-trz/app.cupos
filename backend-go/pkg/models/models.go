@@ -775,6 +775,12 @@ type Ticket struct {
 	PasajeroDocumento string     `json:"pasajero_documento"`
 	PNR               string     `gorm:"not null;index" json:"pnr"`
 	Ruta              string     `json:"ruta"`
+	// Segmentos es Ruta ya normalizado tramo por tramo (nro. de vuelo, fecha,
+	// origen, destino, salida, llegada) — un ticket puede tener más de un
+	// tramo (ida y vuelta, escalas). Se calcula una sola vez al emitir (ver
+	// services.ParseRuta) para que el backoffice reciba estos datos como
+	// campos propios, no como texto libre a re-parsear.
+	Segmentos         datatypes.JSON `gorm:"column:segmentos;default:'[]'" json:"segmentos"`
 	Destino           string     `json:"destino"`
 	Compania          string     `json:"compania"`
 	Ficha             string     `json:"ficha"`

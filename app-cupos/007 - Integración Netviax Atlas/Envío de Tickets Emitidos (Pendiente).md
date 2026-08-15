@@ -21,8 +21,9 @@ Datos que en principio Atlas necesitaría recibir por pasajero emitido:
 | Precio de venta (por pasajero) | `Passenger.PrecioVenta` |
 | Documento / Pasaporte | `Passenger.Documento` / `Passenger.Pasaporte` |
 | Ficha de venta | `Reservation.FichaVenta` |
-| Localizador / PNR | — no hay un campo dedicado hoy; `Reservation.VueloCodigo` es lo más cercano, a confirmar si alcanza |
+| Localizador / PNR | **Resuelto 2026-08-15**: `Ticket.PNR` ahora es el PNR real de la aerolínea (`Product.PNR`), no el ID de pedido interno |
 | Compañía / Ruta / Fecha de salida | `Reservation.VueloCompania` / `Reservation.VueloRuta` / `Reservation.VueloSalida` |
+| Itinerario normalizado por tramo (nro. vuelo, fecha, origen, destino, salida, llegada) | **Nuevo 2026-08-15**: `Ticket.Segmentos` (JSONB, array — un ticket puede tener más de 1 tramo), calculado con `services.ParseRuta()` (`backend-go/pkg/services/itinerary_parser.go`). Esto es exactamente el shape que un endpoint de boletaje de Atlas probablemente va a pedir por tramo — ver [Modelo de Datos §Ticket](../005%20-%20Arquitectura%20y%20Datos/Modelo%20de%20Datos.md#ticket-tabla-tickets--bandeja-de-tickets) para el detalle completo de campos. |
 | Marca de "ya reportado a Atlas" | `Reservation.StatusBack` — **ya existe**, hoy es una anotación manual libre (ej. "BO OK"), pensado desde el vamos para pasar a automático el día que exista esta integración |
 | Momento en que se decide "está emitido" | `Reservation.EstadoInterno` pasando a `"Emitido"` → dispara `Reservation.EmitidoAt` (se calcula solo, una vez) |
 
