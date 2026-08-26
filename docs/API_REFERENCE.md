@@ -59,7 +59,12 @@ Los errores de permisos insuficientes agregan además un campo `message` con el 
 | `401` | Falta el header `Authorization`, token inválido/vencido, credenciales incorrectas, cuenta inactiva |
 | `403` | Token válido pero sin el permiso o rol necesario para esa acción, o sin acceso al recurso puntual (ej. un cupo de otra agencia) |
 | `404` | El recurso solicitado no existe |
+| `429` | Rate limit excedido (ver [Rate limiting](#rate-limiting) abajo) — el header `Retry-After` trae los segundos hasta que se puede reintentar |
 | `500` | Error interno (DB, etc.) |
+
+### Rate limiting
+
+Límite por IP, en memoria (no exacto en el borde de la ventana, ni compartido entre instancias serverless — ver detalle en el código, `middleware/rate_limit.go`): **300 requests/minuto** en toda la API, y **15 requests/5 minutos** específicamente en `POST /api/auth/login` (para frenar fuerza bruta de contraseñas). Al excederse, la respuesta es `429` con `{"error": "Demasiadas solicitudes..."}` y un header `Retry-After` en segundos.
 
 Las respuestas exitosas **no** siguen un único sobre estándar — cada endpoint devuelve la forma que tiene sentido para ese recurso (a veces `{"success": true, "data": [...]}`, a veces el objeto directo, a veces con claves específicas como `token`/`user`). Se indica la forma relevante en los endpoints donde no es obvia.
 

@@ -98,6 +98,7 @@ func CreateAtlasConfig(c *gin.Context) {
 	}
 	input.ID = uuid.New()
 	input.AgencyID = agencyID
+	input.Clave = services.EncryptSecret(input.Clave)
 
 	if err := database.DB.Create(&input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudo crear la configuración de Atlas"})
@@ -124,9 +125,14 @@ func UpdateAtlasConfig(c *gin.Context) {
 	delete(input, "agency_id")
 	// La clave solo se actualiza si vino con contenido — así el frontend
 	// puede reenviar el resto del formulario sin tener que resubmitear la
-	// clave real (que nunca se devuelve en GetAtlasConfig).
-	if clave, ok := input["clave"].(string); ok && clave == "" {
-		delete(input, "clave")
+	// clave real (que nunca se devuelve en GetAtlasConfig). Si vino, se cifra
+	// acá antes de guardar (ver services.EncryptSecret).
+	if clave, ok := input["clave"].(string); ok {
+		if clave == "" {
+			delete(input, "clave")
+		} else {
+			input["clave"] = services.EncryptSecret(clave)
+		}
 	}
 
 	if err := database.DB.Model(&cfg).Updates(input).Error; err != nil {

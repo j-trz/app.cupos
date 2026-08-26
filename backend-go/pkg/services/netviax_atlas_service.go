@@ -77,7 +77,12 @@ type AtlasCredentials struct {
 }
 
 func credentialsFromConfig(cfg *models.AtlasConfig) AtlasCredentials {
-	return AtlasCredentials{Usuario: cfg.Usuario, Clave: cfg.Clave, Empresa: cfg.Empresa, Sucursal: cfg.Sucursal}
+	// DecryptSecret tolera un valor en texto plano (config recién tipeada en
+	// el formulario de "test de conexión" antes de guardar, o un dato legacy
+	// guardado antes de que existiera el cifrado) — este es el único punto
+	// donde la clave real se usa para armar un request, no hace falta
+	// desencriptar en ningún otro lado.
+	return AtlasCredentials{Usuario: cfg.Usuario, Clave: DecryptSecret(cfg.Clave), Empresa: cfg.Empresa, Sucursal: cfg.Sucursal}
 }
 
 // AtlasFlexString existe porque Atlas no es consistente entre endpoints: la

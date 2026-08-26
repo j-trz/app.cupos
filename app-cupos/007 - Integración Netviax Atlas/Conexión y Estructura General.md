@@ -33,9 +33,13 @@ Netviax Atlas es el backoffice externo donde la agencia ya tiene cargados sus co
 
 ## Credenciales
 
-4 campos por agencia (`models.AtlasConfig`): `Usuario`, `Clave`, `Empresa`, `Sucursal`, más `Environment` (`"test"` o `"prod"`, elige la URL base). Mismo patrón de fallback que `EmailSMTPConfig`: se resuelve primero la config **de la agencia** (`agency_id = <la del usuario>`), y si no existe, la config **global** (`agency_id IS NULL`). Se administran desde **Configuración → Atlas** (`/atlas-config`), con permisos `ATLAS_VIEW`/`ATLAS_UPDATE`.
+4 campos por agencia (`models.AtlasConfig`): `Usuario`, `Clave`, `Empresa`, `Sucursal`, más `Environment` (`"test"` o `"prod"`, elige la URL base). Mismo patrón de fallback que `EmailSMTPConfig`: se resuelve primero la config **de la agencia** (`agency_id = <la del usuario>`), y si no existe, la config **global** (`agency_id IS NULL`). Se administran desde **Configuración → Atlas** (`/atlas-config`).
+
+**Corrección 2026-08-26**: la fila de arriba decía "con permisos `ATLAS_VIEW`/`ATLAS_UPDATE`" — eso es falso contra el código real. Esos códigos existen en el catálogo de permisos (`seedRBAC`) pero **nunca se cablearon** a las rutas `/atlas-config/*` (mismo hallazgo "Alto" que la auditoría 2026-08-13 marcó para `/email-config`, ver `009 - Seguridad y Calidad`) — hoy alcanza con cualquier sesión autenticada, sin permiso ni ownership por agencia. **No corregido todavía** (fuera del alcance del pedido puntual que sí se resolvió ese día — cifrado de `Clave`, ver abajo); dejado como tarea aparte.
 
 La `Clave` nunca se devuelve al frontend una vez guardada (`GetAtlasConfig`/`UpdateAtlasConfig` la vacían antes de responder) — al editar, si el campo clave llega vacío, el backend no la pisa (permite reenviar el resto del formulario sin resubmitear la contraseña real).
+
+**Cifrado en reposo (agregado 2026-08-26)**: `Clave` se guarda cifrada con AES-256-GCM (`services.EncryptSecret`/`DecryptSecret`, `secrets_crypto.go`), clave derivada de la env var `SECRETS_ENCRYPTION_KEY` — antes se guardaba en texto plano en la base (la API nunca la exponía, pero cualquiera con acceso directo a la DB o a un backup la veía). Los valores viejos en texto plano se re-encriptan solos la próxima vez que se guarda esa config (autocura, sin migración aparte) — `DecryptSecret` distingue un valor cifrado de uno plano por un prefijo, y el único punto real de desencriptado es `credentialsFromConfig()`, justo antes de armar el request hacia Atlas.
 
 ## Cómo se autentica cada llamada a Atlas
 

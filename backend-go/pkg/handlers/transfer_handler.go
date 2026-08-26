@@ -182,11 +182,21 @@ func CreateTransfer(c *gin.Context) {
 }
 
 // ListTransfers lista todas las cesiones (solo admin)
+// ListTransfers es la vista "todas las cesiones" (a diferencia de
+// GetUserTransfers, que ya escopa a la propia agencia) — pensada para admin.
+// Si `TRANSFERS_VIEW` llegara a otorgarse a un rol no-admin (ej.
+// agency_admin), igual queda forzado a ver solo lo suyo, mismo criterio que
+// GetUserTransfers — nunca "/all" real para alguien que no sea admin.
 func ListTransfers(c *gin.Context) {
-	transfers := []models.AvailabilityTransfer{}
+	role, _ := c.Get("role")
+	agencia, _ := c.Get("agencia")
 
-	// Preload producto
-	database.DB.Preload("Product").Order("created_at desc").Find(&transfers)
+	transfers := []models.AvailabilityTransfer{}
+	query := database.DB.Preload("Product").Order("created_at desc")
+	if role != "admin" {
+		query = query.Where("source_agency = ? OR target_agency = ?", agencia, agencia)
+	}
+	query.Find(&transfers)
 
 	c.JSON(http.StatusOK, transfers)
 }

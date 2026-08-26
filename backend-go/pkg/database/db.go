@@ -317,6 +317,27 @@ func seedRBAC(db *gorm.DB) {
 		}
 	}
 
+	// Corrección idempotente: AGENCY_ADMIN debe tener EMAIL_VIEW/EMAIL_UPDATE
+	// y NOTIFICATION_TEMPLATES_VIEW/NOTIFICATION_TEMPLATES_UPDATE — recién se
+	// cablearon a RequirePermission en las rutas de /email-config y
+	// /notification-config (antes cualquier sesión autenticada podía
+	// reescribir una plantilla global, incluida la de confirmación de
+	// reserva que se manda a clientes reales — hallazgo de la auditoría de
+	// seguridad). En una base ya existente el bloque assign() de arriba no
+	// vuelve a correr para roles que ya existían, así que hay que otorgarlos
+	// acá para no romper el acceso legítimo que agency_admin ya tenía de hecho.
+	if err := db.Where("code = ? AND is_system = true", "AGENCY_ADMIN").First(&agencyAdminRole).Error; err == nil {
+		var toGrant []models.Permission
+		db.Where("code IN ?", []string{"EMAIL_VIEW", "EMAIL_UPDATE", "NOTIFICATION_TEMPLATES_VIEW", "NOTIFICATION_TEMPLATES_UPDATE"}).Find(&toGrant)
+		for _, p := range toGrant {
+			var count int64
+			db.Model(&models.RolePermission{}).Where("role_id = ? AND permission_id = ?", agencyAdminRole.ID, p.ID).Count(&count)
+			if count == 0 {
+				db.Create(&models.RolePermission{RoleID: agencyAdminRole.ID, PermissionID: p.ID})
+			}
+		}
+	}
+
 	// Migración aditiva: todo Profile sin ninguna fila en UserRole recibe el
 	// rol de sistema equivalente a su Profile.Role actual.
 	var migrationRoles []models.Role

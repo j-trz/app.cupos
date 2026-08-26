@@ -37,6 +37,8 @@ La resolución de permisos **RBAC** ocurre una sola vez después del login: el f
 - Backend: `POST /api/auth/login` (`user_handler.go`), `GET /users/me/permissions` (`rbac_handler.go`), middleware `AuthMiddleware` / `RequirePermission` (`middleware/auth.go`).
 - Frontend: `frontend/src/components/ui/Sidebar.jsx`.
 
+**Decisión de producto ya tomada (2026-08-15), no implementada todavía**: en producción, el login va a hacerse vía **Office 365 / SSO corporativo** — no es una opción en evaluación, es el reemplazo decidido del login propio (usuario/contraseña) contra `Profile`. Sin diseño técnico ni código todavía (nada de OAuth/Azure AD/MSAL en el repo a la fecha de esta nota) — cuando se implemente, actualizar esta sección con el flujo real en vez de dar por sentado que sigue siendo bcrypt+JWT contra `Profile` para producción.
+
 ```mermaid
 flowchart TD
     A["Usuario ingresa email y password"] --> B["POST /api/auth/login"]

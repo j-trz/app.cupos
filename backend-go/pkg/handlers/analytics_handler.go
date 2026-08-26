@@ -220,14 +220,42 @@ func isPassengerSale(p models.Passenger, returnDate *time.Time) bool {
 	return false
 }
 
-func loadDataFromDB() ([]models.Product, []models.Passenger, error) {
+// loadDataFromDB es la fuente de datos de TODOS los reportes (legacy y
+// nuevos) — productos y pasajeros con su reserva. Reportes son datos
+// financieros/comerciales sensibles (ventas, rentabilidad, ocupación por
+// cupo), así que el scoping por agencia va ACÁ, no repetido en cada handler:
+// un caller no-admin (agency_admin u otro rol al que se le haya otorgado
+// REPORTS_VIEW) nunca recibe productos ni pasajeros de otra agencia, sin
+// importar qué filtro mande el frontend en el body — nunca confiar en un
+// filtro client-side para esto. admin ve todo, sin scoping.
+//
+// Los productos se scopean por `Product.Agencia` (quién es la dueña del
+// cupo); los pasajeros por `Reservation.Agencia` (quién hizo la venta) — son
+// campos distintos a propósito (ver [[Cesión de Cupos]]): una agencia puede
+// vender un cupo cedido por otra, y en ese caso `Reservation.Agencia` es la
+// que vendió, no la dueña original del cupo.
+func loadDataFromDB(c *gin.Context) ([]models.Product, []models.Passenger, error) {
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
+
+	productsQuery := database.DB.Model(&models.Product{})
+	passengersQuery := database.DB.Preload("Reservation").Preload("Reservation.Product")
+
+	if role != "admin" {
+		productsQuery = productsQuery.Where("LOWER(agencia) = LOWER(?)", callerAgencia)
+		passengersQuery = passengersQuery.
+			Joins("JOIN reservations ON reservations.id = passengers.reservation_id").
+			Where("LOWER(reservations.agencia) = LOWER(?)", callerAgencia)
+	}
+
 	var products []models.Product
-	if err := database.DB.Find(&products).Error; err != nil {
+	if err := productsQuery.Find(&products).Error; err != nil {
 		return nil, nil, err
 	}
 
 	var passengers []models.Passenger
-	if err := database.DB.Preload("Reservation").Preload("Reservation.Product").Find(&passengers).Error; err != nil {
+	if err := passengersQuery.Find(&passengers).Error; err != nil {
 		return nil, nil, err
 	}
 
@@ -544,7 +572,7 @@ func getOrderedKeys(granularity string, now time.Time, keysWithData []string) []
 // Handlers
 
 func GetFieldsHandler(c *gin.Context) {
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -613,7 +641,7 @@ func EvolucionAgenciasHandler(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -709,7 +737,7 @@ func AgenciasDataHandler(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -818,7 +846,7 @@ func DetalleDestinosHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -933,7 +961,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1160,7 +1188,7 @@ func EvolucionPasajerosHandler(c *gin.Context) {
 		return
 	}
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1233,7 +1261,7 @@ func EvolucionPorCupoHandler(c *gin.Context) {
 		return
 	}
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1296,7 +1324,7 @@ func SharePorCupoHandler(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1365,7 +1393,7 @@ func PorSalidaHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1491,7 +1519,7 @@ func DashboardDataHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1703,7 +1731,7 @@ func MetricsSummaryHandler(c *gin.Context) {
 		to, _ = time.Parse(time.RFC3339, toStr)
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1806,7 +1834,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		to, _ = time.Parse(time.RFC3339, toStr)
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1893,7 +1921,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 }
 
 func ForecastSalesHandler(c *gin.Context) {
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return

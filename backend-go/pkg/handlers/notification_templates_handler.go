@@ -36,6 +36,10 @@ func UpdateNotificationTemplate(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Plantilla no encontrada"})
 		return
 	}
+	if !callerOwnsTemplateAgency(c, tpl.AgencyID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso para editar esta plantilla."})
+		return
+	}
 
 	var input struct {
 		Title       string `json:"title"`

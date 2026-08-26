@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/handlers"
@@ -21,6 +22,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestLogger())
+	r.Use(middleware.RateLimit(300, time.Minute))
 
 	// Configuración CORS dinámica desde variable de entorno
 	frontendURL := os.Getenv("URL_FRONTEND")
@@ -77,7 +79,7 @@ func main() {
 	api := r.Group("/api")
 	{
 		// Rutas públicas
-		api.POST("/auth/login", handlers.Login)
+		api.POST("/auth/login", middleware.RateLimit(15, 5*time.Minute), handlers.Login)
 		// No hay auto-registro público: el alta de usuarios la hace un admin
 		// desde Gestión de Usuarios (CreateUser, autenticado). Existió un
 		// /auth/register público que dejaba a cualquier anónimo declararse
@@ -435,17 +437,17 @@ func main() {
 				emailConfig.DELETE("/config/:id", handlers.DeleteEmailConfig)
 				emailConfig.POST("/test", handlers.TestEmailConnection)
 				emailConfig.POST("/send-test", handlers.SendTestEmail)
-				emailConfig.GET("/templates", handlers.GetEmailTemplates)
-				emailConfig.PUT("/templates/:id", handlers.UpdateEmailTemplate)
-				emailConfig.GET("/templates/:id/preview", handlers.PreviewEmailTemplate)
+				emailConfig.GET("/templates", middleware.RequirePermission("EMAIL_VIEW"), handlers.GetEmailTemplates)
+				emailConfig.PUT("/templates/:id", middleware.RequirePermission("EMAIL_UPDATE"), handlers.UpdateEmailTemplate)
+				emailConfig.GET("/templates/:id/preview", middleware.RequirePermission("EMAIL_VIEW"), handlers.PreviewEmailTemplate)
 			}
 
 			// Plantillas de notificaciones in-app (campana), por agencia
 			notificationConfig := protected.Group("/notification-config")
 			{
-				notificationConfig.GET("/templates", handlers.GetNotificationTemplates)
-				notificationConfig.PUT("/templates/:id", handlers.UpdateNotificationTemplate)
-				notificationConfig.GET("/templates/:id/preview", handlers.PreviewNotificationTemplate)
+				notificationConfig.GET("/templates", middleware.RequirePermission("NOTIFICATION_TEMPLATES_VIEW"), handlers.GetNotificationTemplates)
+				notificationConfig.PUT("/templates/:id", middleware.RequirePermission("NOTIFICATION_TEMPLATES_UPDATE"), handlers.UpdateNotificationTemplate)
+				notificationConfig.GET("/templates/:id/preview", middleware.RequirePermission("NOTIFICATION_TEMPLATES_VIEW"), handlers.PreviewNotificationTemplate)
 			}
 		}
 	}
