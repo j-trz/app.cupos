@@ -122,9 +122,13 @@ Rutas definidas en `frontend/src/App.jsx`:
 | `/confirmations` | `Confirmations.jsx` | Confirmaciones. |
 | `/productos` | `GestionProductos.jsx` | Gestión de productos. |
 | `/grupos` | `GestionGrupos.jsx` | Grupos y vuelos a medida. |
+| `/oportunidades` | `GestionOportunidades.jsx` | Oportunidades — propuestas de vuelo pendientes de aprobación, previas a convertirse en producto. |
 | `/reservas` | `GestionReservas.jsx` | Gestión de reservas. |
 | `/nominas` | `GestionNominas.jsx` | Nóminas de pasajeros. |
+| `/tickets` | `BandejaTickets.jsx` | Bandeja de Tickets — registro inmutable de boletos GDS emitidos. |
 | `/agencias` | `GestionAgencias.jsx` | Gestión de agencias. |
+| `/temporadas` | `GestionTemporadas.jsx` | Temporadas (ej. "Verano 2027"), usadas como filtro en Productos/Oportunidades. |
+| `/atlas-config` | `AtlasConfig.jsx` | Configuración de credenciales de Netviax Atlas por agencia. |
 | `/temas` | `GestionTemas.jsx` | Gestión de temas. |
 | `/usuarios` | `GestionUsuarios.jsx` | Usuarios (RBAC). |
 | `/roles` | `GestionRoles.jsx` | Roles (RBAC). |
@@ -158,13 +162,17 @@ Las vistas viven en `frontend/src/pages/`. Cada una corresponde a una o más rut
 - **Confirmations** (`Confirmations.jsx`): confirmaciones de reservas.
 - **GestionProductos** (`GestionProductos.jsx`): alta, edición, borrado y carga masiva de productos.
 - **GestionGrupos** (`GestionGrupos.jsx`): grupos y flujo de vuelos a medida.
+- **GestionOportunidades** (`GestionOportunidades.jsx`): alta y revisión de oportunidades (propuestas de vuelo/paquete pendientes de aprobación), aprobación individual/masiva y conversión a producto una vez aprobadas.
 - **GestionReservas** (`GestionReservas.jsx`): administración de reservas y sus estados.
 - **GestionNominas** (`GestionNominas.jsx`): nóminas de pasajeros.
+- **BandejaTickets** (`BandejaTickets.jsx`): registro inmutable de boletos GDS emitidos, una fila por ticket con el itinerario normalizado por tramo apilado dentro de cada celda de ruta (nunca una fila por tramo — un ticket con varios tramos sigue siendo un solo PNR y un solo número de ticket). Acciones: ver detalle (boleto estilo e-ticket con desglose tarifario), anular (`void`, con opción de devolver el lugar al stock) y sincronizar con Netviax Atlas (hoy manual).
 - **GestionUsuarios** (`GestionUsuarios.jsx`): gestión de usuarios.
 - **GestionRoles** (`GestionRoles.jsx`): definición de roles (globales o por agencia).
 - **GestionPermisos** (`GestionPermisos.jsx`): catálogo de permisos del sistema.
 - **GestionAgencias** (`GestionAgencias.jsx`): administración de agencias.
 - **GestionTemas** (`GestionTemas.jsx`): gestión de temas visuales.
+- **GestionTemporadas** (`GestionTemporadas.jsx`): alta/edición/baja de temporadas (etiqueta simple con nombre y si está activa), usadas como filtro en Productos y Oportunidades.
+- **AtlasConfig** (`AtlasConfig.jsx`): carga de credenciales de Netviax Atlas (usuario, clave, empresa, sucursal, ambiente) por agencia, con botón de prueba de conexión — ver [Integración Netviax Atlas](FLUJOS_FUNCIONALIDADES.html#19-integración-netviax-atlas).
 - **Reportes** (`Reportes.jsx`): cockpit ejecutivo con gráficos y tablas analíticas (ver `components/reports/`).
 - **LogsDelSitio** (`LogsDelSitio.jsx`): **Estado del sistema** con dos pestañas:
   - **Estado del sistema** — salud de la base de datos (conexión + latencia ms), servicios (API Go, SMTP, IA), métricas de conteo de entidades, tabla de **holds activos** (bloqueos temporales sin confirmar) y **holds expirados/estancados** con botón de **liberación manual** (devuelve stock).
