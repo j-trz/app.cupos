@@ -1354,5 +1354,491 @@
     "seen": 1787837084.1020014,
     "ast_hash": "998c84606b38b640e2db1ffb9a92cf09",
     "semantic_hash": "998c84606b38b640e2db1ffb9a92cf09"
+  },
+  "backend-go/migrations/001_create_availability_transfers.sql": {
+    "mtime": 1783459652.2114322,
+    "seen": 1787838270.0627456,
+    "ast_hash": "873ecb65077e6e4f35eaf7562b61828d",
+    "semantic_hash": ""
+  },
+  "backend-go/migrations/002_create_opportunities.sql": {
+    "mtime": 1786585542.2612412,
+    "seen": 1787838270.0627496,
+    "ast_hash": "97189499fcc61b84841a1d5c7e11c5b5",
+    "semantic_hash": ""
+  },
+  "database/migrations/001_create_permissions_system.sql": {
+    "mtime": 1783296882.5991855,
+    "seen": 1787838270.0628836,
+    "ast_hash": "81b9edf4fb438ddba8c6abffeff2dedb",
+    "semantic_hash": ""
+  },
+  "database/schema.sql": {
+    "mtime": 1783368203.7588336,
+    "seen": 1787838270.062886,
+    "ast_hash": "003417f46f0a903fd0d2d16f264872a7",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1787834366.9730077,
+    "seen": 1787838270.063313,
+    "ast_hash": "c232166e6492ba1ed955030b16979b05",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/SKILL.md": {
+    "mtime": 1787834366.96016,
+    "seen": 1787838270.0633152,
+    "ast_hash": "2e223eed9c5bb9ec3999615806cf0681",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/add-watch.md": {
+    "mtime": 1787834341.3462682,
+    "seen": 1787838270.0633178,
+    "ast_hash": "d59d027fe449f06aa03905a01184e779",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/exports.md": {
+    "mtime": 1787834341.3563106,
+    "seen": 1787838270.0633192,
+    "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/extraction-spec.md": {
+    "mtime": 1787834341.387595,
+    "seen": 1787838270.0633209,
+    "ast_hash": "42fef56a01698118f7fd722acdadea34",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/github-and-merge.md": {
+    "mtime": 1787834341.3896053,
+    "seen": 1787838270.0633225,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/hooks.md": {
+    "mtime": 1787834341.4027195,
+    "seen": 1787838270.0633247,
+    "ast_hash": "3f545db6ce646650bb9de588f5512a27",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/query.md": {
+    "mtime": 1787834341.417096,
+    "seen": 1787838270.0633261,
+    "ast_hash": "3c46f8ad006874260614ed8657d02307",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/transcribe.md": {
+    "mtime": 1787834341.4276118,
+    "seen": 1787838270.063328,
+    "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
+    "semantic_hash": ""
+  },
+  ".claude/skills/graphify/references/update.md": {
+    "mtime": 1787834341.439658,
+    "seen": 1787838270.0633295,
+    "ast_hash": "9378bd03d56baaf78bd738ab3848f142",
+    "semantic_hash": ""
+  },
+  ".github/dependabot.yml": {
+    "mtime": 1787759584.077944,
+    "seen": 1787838270.0633316,
+    "ast_hash": "161d7318d85c9b4b9ef4893106cb4456",
+    "semantic_hash": ""
+  },
+  ".github/workflows/check-deadlines.yml": {
+    "mtime": 1784755490.917623,
+    "seen": 1787838270.0633333,
+    "ast_hash": "8250d7d39b9d757b96669544d4996660",
+    "semantic_hash": ""
+  },
+  ".github/workflows/expire-reservations.yml": {
+    "mtime": 1785255331.1014755,
+    "seen": 1787838270.0633352,
+    "ast_hash": "55a62615cf9ba3f3731139824176ca4a",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1786584159.9356995,
+    "seen": 1787838270.0633373,
+    "ast_hash": "3367e15802c59f3ca1a80d2fc217076e",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1787834366.9730077,
+    "seen": 1787838270.0633395,
+    "ast_hash": "889081d1fbc70647b25745cc8fa342ff",
+    "semantic_hash": ""
+  },
+  "DESIGN.md": {
+    "mtime": 1786815307.8615403,
+    "seen": 1787838270.0633416,
+    "ast_hash": "c3a26ca3cfe9157fa492f98320116c68",
+    "semantic_hash": ""
+  },
+  "GEMINI.md": {
+    "mtime": 1786584164.755792,
+    "seen": 1787838270.063343,
+    "ast_hash": "3367e15802c59f3ca1a80d2fc217076e",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1784755490.9254165,
+    "seen": 1787838270.0633454,
+    "ast_hash": "419d1b4eef2b61516650e1add3951bfd",
+    "semantic_hash": ""
+  },
+  "app-cupos/000 - README/Sistema de Gesti\u00f3n de Cupos.md": {
+    "mtime": 1786583990.9785964,
+    "seen": 1787838270.0633502,
+    "ast_hash": "608ea9e08fef9dffd2564459946c1923",
+    "semantic_hash": ""
+  },
+  "app-cupos/001 - API/Referencia de API.md": {
+    "mtime": 1786386494.830793,
+    "seen": 1787838270.0633523,
+    "ast_hash": "a14c7d4b91f4eec9a23dccc792436d41",
+    "semantic_hash": ""
+  },
+  "app-cupos/002 - Quickstart/Quickstart.md": {
+    "mtime": 1786386013.97173,
+    "seen": 1787838270.0633543,
+    "ast_hash": "0aa0ae43ad1525ec330a04d6263c7c90",
+    "semantic_hash": ""
+  },
+  "app-cupos/003 - Funcionalidades/Flujos de Funcionalidades.md": {
+    "mtime": 1787758450.9442265,
+    "seen": 1787838270.0633566,
+    "ast_hash": "69a563df6df7482b9825f2108436bf95",
+    "semantic_hash": ""
+  },
+  "app-cupos/004 - Frontend/Frontend.md": {
+    "mtime": 1786635772.0364797,
+    "seen": 1787838270.063359,
+    "ast_hash": "fe9e126da8f3f0bf93a04f2cfffaf316",
+    "semantic_hash": ""
+  },
+  "app-cupos/004 - Frontend/Gu\u00eda de Dise\u00f1o (para agregar elementos nuevos).md": {
+    "mtime": 1786656299.185522,
+    "seen": 1787838270.0633616,
+    "ast_hash": "9ba9813f2db55e03930a01b5729ce1e1",
+    "semantic_hash": ""
+  },
+  "app-cupos/005 - Arquitectura y Datos/Modelo de Datos.md": {
+    "mtime": 1786830802.8590841,
+    "seen": 1787838270.0633636,
+    "ast_hash": "2fc55ae85b45c7069747c05cd65e1e6b",
+    "semantic_hash": ""
+  },
+  "app-cupos/006 - Operaci\u00f3n y Mantenimiento/Gotchas y Reglas de Oro.md": {
+    "mtime": 1786765075.1810453,
+    "seen": 1787838270.063366,
+    "ast_hash": "273d9d804fb7929f7589088b4dadb470",
+    "semantic_hash": ""
+  },
+  "app-cupos/006 - Operaci\u00f3n y Mantenimiento/Historial de Bugs Resueltos.md": {
+    "mtime": 1787759763.7243624,
+    "seen": 1787838270.0633688,
+    "ast_hash": "eb6b0cc612fca6f31336986b7bbf55cc",
+    "semantic_hash": ""
+  },
+  "app-cupos/007 - Integraci\u00f3n Netviax Atlas/B\u00fasqueda de Contactos (Lectura).md": {
+    "mtime": 1786386382.3417478,
+    "seen": 1787838270.063371,
+    "ast_hash": "e61a328e0d0c3a9699e89455c6c14751",
+    "semantic_hash": ""
+  },
+  "app-cupos/007 - Integraci\u00f3n Netviax Atlas/B\u00fasqueda de Fichas (Lectura).md": {
+    "mtime": 1786583944.3500776,
+    "seen": 1787838270.0633733,
+    "ast_hash": "8e6afc30bba0b14304c789cc64385ac0",
+    "semantic_hash": ""
+  },
+  "app-cupos/007 - Integraci\u00f3n Netviax Atlas/Conexi\u00f3n y Estructura General.md": {
+    "mtime": 1787759844.358749,
+    "seen": 1787838270.0633762,
+    "ast_hash": "afb09d3392b8c02653c095b3f652e885",
+    "semantic_hash": ""
+  },
+  "app-cupos/007 - Integraci\u00f3n Netviax Atlas/Env\u00edo de Tickets Emitidos (Pendiente).md": {
+    "mtime": 1786830825.6893063,
+    "seen": 1787838270.0633795,
+    "ast_hash": "b863c25a219a685a5b2e4a1f09610b8f",
+    "semantic_hash": ""
+  },
+  "app-cupos/007 - Integraci\u00f3n Netviax Atlas/borrador-email-netviax-2026-08-12.md": {
+    "mtime": 1786475264.0595443,
+    "seen": 1787838270.0633824,
+    "ast_hash": "d35ddcf55b5d42c7ca3eb562a490b0ab",
+    "semantic_hash": ""
+  },
+  "app-cupos/008 - Backlog y Feedback/Feedback equipo de testing (UTG) \u2014 Sistema de Cupos.md": {
+    "mtime": 1786422277.1407907,
+    "seen": 1787838270.0633852,
+    "ast_hash": "68ee337f07be4b3b2af2f304609a304e",
+    "semantic_hash": ""
+  },
+  "app-cupos/009 - Seguridad y Calidad/Auditor\u00eda de Seguridad y QA - 2026-08-13.md": {
+    "mtime": 1787759703.9914365,
+    "seen": 1787838270.0633886,
+    "ast_hash": "c1946b59f86b2531a0a0f77b43c8c5b4",
+    "semantic_hash": ""
+  },
+  "app-cupos/009 - Seguridad y Calidad/Programa de Seguridad y QA.md": {
+    "mtime": 1787759726.3477316,
+    "seen": 1787838270.0633907,
+    "ast_hash": "326787df63eee0e65fa7ebbfed0e4e96",
+    "semantic_hash": ""
+  },
+  "app-cupos/010 - Despliegue en Azure/Gu\u00eda de Migraci\u00f3n a Azure.md": {
+    "mtime": 1786636728.7056744,
+    "seen": 1787838270.0633934,
+    "ast_hash": "6a5777aaf9bc42b992618aa5b46e3fd9",
+    "semantic_hash": ""
+  },
+  "app-cupos/index.md": {
+    "mtime": 1786656332.696279,
+    "seen": 1787838270.063396,
+    "ast_hash": "589995c0373cb1524dd2c8f63f412239",
+    "semantic_hash": ""
+  },
+  "app-cupos/log.md": {
+    "mtime": 1787759791.7408235,
+    "seen": 1787838270.0633981,
+    "ast_hash": "a283e1ddbc7063389c107b82427cda3a",
+    "semantic_hash": ""
+  },
+  "backend-go/README.md": {
+    "mtime": 1784755490.9340677,
+    "seen": 1787838270.0634003,
+    "ast_hash": "bf9e097fb731302762e9a934ca701701",
+    "semantic_hash": ""
+  },
+  "backend-go/docs/API.md": {
+    "mtime": 1785353169.0408564,
+    "seen": 1787838270.0634022,
+    "ast_hash": "52cc961049cdb57909e6725eb1de82e8",
+    "semantic_hash": ""
+  },
+  "backend-go/docs/openapi.yaml": {
+    "mtime": 1785353209.1108387,
+    "seen": 1787838270.0634043,
+    "ast_hash": "a0e93e4c8591f417adbe45f1feb6677b",
+    "semantic_hash": ""
+  },
+  "docs/API_REFERENCE.md": {
+    "mtime": 1787759804.6488495,
+    "seen": 1787838270.0634062,
+    "ast_hash": "d4cdadb9809ba55a0c7dda2d8a3bca45",
+    "semantic_hash": ""
+  },
+  "docs/FLUJOS_FUNCIONALIDADES.md": {
+    "mtime": 1787758470.971786,
+    "seen": 1787838270.0634084,
+    "ast_hash": "1e3b44b641dc0efe5cd3150c02ee808f",
+    "semantic_hash": ""
+  },
+  "docs/FRONTEND.md": {
+    "mtime": 1787752715.6566198,
+    "seen": 1787838270.0634103,
+    "ast_hash": "3b6a64f10fb74d636d98f987affad37a",
+    "semantic_hash": ""
+  },
+  "docs/QUICKSTART.md": {
+    "mtime": 1785255331.1506145,
+    "seen": 1787838270.0634127,
+    "ast_hash": "e5f58818a420a6438014551288a28848",
+    "semantic_hash": ""
+  },
+  "docs/_config.yml": {
+    "mtime": 1785255331.152611,
+    "seen": 1787838270.0634153,
+    "ast_hash": "ec5d380eab3d9099122cb723e80aebed",
+    "semantic_hash": ""
+  },
+  "docs/_layouts/default.html": {
+    "mtime": 1785265425.6513667,
+    "seen": 1787838270.0634172,
+    "ast_hash": "65fd9f774d0c0d3303421cebf20673f7",
+    "semantic_hash": ""
+  },
+  "docs/index.md": {
+    "mtime": 1785255331.1620998,
+    "seen": 1787838270.0634193,
+    "ast_hash": "fcc29dfc7df3410b00f8c38d7cecdbeb",
+    "semantic_hash": ""
+  },
+  "frontend/README.md": {
+    "mtime": 1784755491.8070636,
+    "seen": 1787838270.0634215,
+    "ast_hash": "e0d10f01c82b7bb16a59a46465e1333b",
+    "semantic_hash": ""
+  },
+  "frontend/index.html": {
+    "mtime": 1783651168.8780065,
+    "seen": 1787838270.0634234,
+    "ast_hash": "991a621a398f65e4191f017afe48ecf0",
+    "semantic_hash": ""
+  },
+  "frontend/sidebar.md": {
+    "mtime": 1783210779.0061944,
+    "seen": 1787838270.0634255,
+    "ast_hash": "c1cada295775324b2b8e3583bf9cbda4",
+    "semantic_hash": ""
+  },
+  "plans/ACCIONES_IA_FLUJO_VENTAS_COMPLETO.md": {
+    "mtime": 1783526090.061961,
+    "seen": 1787838270.0634282,
+    "ast_hash": "2a2505a532982e3cb0d18b45dcbcd40a",
+    "semantic_hash": ""
+  },
+  "plans/AI_ANALISIS.md": {
+    "mtime": 1783519971.5968983,
+    "seen": 1787838270.0634298,
+    "ast_hash": "94b48c08ab717f2c32d8df746185cf10",
+    "semantic_hash": ""
+  },
+  "plans/AI_INSTRUCTIONS_MIGRATION.md": {
+    "mtime": 1783315959.7696588,
+    "seen": 1787838270.0634322,
+    "ast_hash": "285c270f02daea3895ce444f135b8259",
+    "semantic_hash": ""
+  },
+  "plans/AUDITORIA_SISTEMA.md": {
+    "mtime": 1783427683.8234487,
+    "seen": 1787838270.0634346,
+    "ast_hash": "cb2ac09b1370c94c52cfb235c7f868e7",
+    "semantic_hash": ""
+  },
+  "plans/AUDITORIA_Y_PLAN_ACCION.md": {
+    "mtime": 1783629928.510841,
+    "seen": 1787838270.0634367,
+    "ast_hash": "b74b4b54843cc7f01bc60202b321c088",
+    "semantic_hash": ""
+  },
+  "plans/COMPARATIVA_BACKEND.md": {
+    "mtime": 1783427683.8304477,
+    "seen": 1787838270.0634387,
+    "ast_hash": "091cab6147a10061957ae1016149106d",
+    "semantic_hash": ""
+  },
+  "plans/CREAR_JSON_ACCION_AGENTE_RESERVAS.md": {
+    "mtime": 1783492060.4518168,
+    "seen": 1787838270.0634408,
+    "ast_hash": "a489eef5d1fbd060447a8b04b5a9220b",
+    "semantic_hash": ""
+  },
+  "plans/DEPLOY.md": {
+    "mtime": 1783488914.33542,
+    "seen": 1787838270.0634432,
+    "ast_hash": "1cd7cb209ec06ca3993323aa8e3946ee",
+    "semantic_hash": ""
+  },
+  "plans/DIAGRAMAS_OPORTUNIDADES.md": {
+    "mtime": 1786585275.4427273,
+    "seen": 1787838270.0634453,
+    "ast_hash": "5c556a6f23766bc588aeba8f7dd4676f",
+    "semantic_hash": ""
+  },
+  "plans/DOCUMENTACION_FUNCIONALIDADES.md": {
+    "mtime": 1783484562.9425025,
+    "seen": 1787838270.0634475,
+    "ast_hash": "9db661113d610c59389c60829c172fcf",
+    "semantic_hash": ""
+  },
+  "plans/FLEXIBILITY_ARCHITECTURE.md": {
+    "mtime": 1783086903.3531613,
+    "seen": 1787838270.06345,
+    "ast_hash": "654bb6c681cb1cf5ecf593aec93f4c9d",
+    "semantic_hash": ""
+  },
+  "plans/IMPLEMENTACION_REPORTES_GO.md": {
+    "mtime": 1783486725.6902387,
+    "seen": 1787838270.0634522,
+    "ast_hash": "03dd4620219712c1feaa545a6b4dfbf7",
+    "semantic_hash": ""
+  },
+  "plans/IMPLEMENTATION_CHECKLIST.md": {
+    "mtime": 1783292064.116751,
+    "seen": 1787838270.0634542,
+    "ast_hash": "27a4e9f5461770079dc122b0022b7e9a",
+    "semantic_hash": ""
+  },
+  "plans/OPORTUNIDADES_RESUMEN.md": {
+    "mtime": 1786585275.4427273,
+    "seen": 1787838270.063456,
+    "ast_hash": "a29f044bf69c56f3c224293fdb430c61",
+    "semantic_hash": ""
+  },
+  "plans/PLAN_IA_CHAT_EXPERTOS_ITINERARIOS.md": {
+    "mtime": 1784755492.0739028,
+    "seen": 1787838270.0634582,
+    "ast_hash": "7c22518c519b0387ee5bcf9fde7f5c32",
+    "semantic_hash": ""
+  },
+  "plans/PLAN_OPORTUNIDADES_CRUD.md": {
+    "mtime": 1786585275.3478565,
+    "seen": 1787838270.0634613,
+    "ast_hash": "58dd8ec573bf13f0f02239321a0e8a4a",
+    "semantic_hash": ""
+  },
+  "plans/REPORT_MODULE.md": {
+    "mtime": 1783427683.8369923,
+    "seen": 1787838270.0634637,
+    "ast_hash": "4b3fb0b3c7bad96d0e7a2a18c513657f",
+    "semantic_hash": ""
+  },
+  "plans/WHITE_LABEL_AI_CHAT_PLAN.md": {
+    "mtime": 1783291626.0623138,
+    "seen": 1787838270.0634663,
+    "ast_hash": "23674fa011126ccc2645b898089695d0",
+    "semantic_hash": ""
+  },
+  "plans/complete-integration-plan.md": {
+    "mtime": 1783222295.933778,
+    "seen": 1787838270.0634685,
+    "ast_hash": "69719f302c8c1aaff7967942e48c0853",
+    "semantic_hash": ""
+  },
+  "plans/contexto.txt": {
+    "mtime": 1783296246.7773094,
+    "seen": 1787838270.0634708,
+    "ast_hash": "fce14b53fc83ca23caf53afe2e63d8d7",
+    "semantic_hash": ""
+  },
+  "plans/database_tables.md": {
+    "mtime": 1783131551.640464,
+    "seen": 1787838270.063473,
+    "ast_hash": "62b06ba9a13be89a4a5b707d5e7b3da7",
+    "semantic_hash": ""
+  },
+  "plans/feedback_testing_2026-08-07.md": {
+    "mtime": 1786378484.878325,
+    "seen": 1787838270.0634751,
+    "ast_hash": "de197a9519cfa3b899bed25f76742746",
+    "semantic_hash": ""
+  },
+  "plans/prompt.md": {
+    "mtime": 1783133791.211392,
+    "seen": 1787838270.0634775,
+    "ast_hash": "d6d4b1c899facfabc119b5740b682fd8",
+    "semantic_hash": ""
+  },
+  "plans/reportes-dashboard-plan.md": {
+    "mtime": 1783474600.3447614,
+    "seen": 1787838270.0634797,
+    "ast_hash": "6c34c76331de726ef4eeecf1563a064e",
+    "semantic_hash": ""
+  },
+  "plans/shadcn-components-summary.md": {
+    "mtime": 1783222296.0176876,
+    "seen": 1787838270.0634816,
+    "ast_hash": "aef108cb650a1b4e3a545e5b3c56306f",
+    "semantic_hash": ""
+  },
+  "plans/untitled-plan-productsAndSettings.prompt.md": {
+    "mtime": 1783219014.0285091,
+    "seen": 1787838270.063484,
+    "ast_hash": "9dca748f95512e527a227edf822f7dc6",
+    "semantic_hash": ""
   }
 }
