@@ -59,6 +59,9 @@ func InitDB() {
 		&models.AIExpertDocument{},
 		&models.AIExpertChunk{},
 		&models.APIKey{},
+		&models.Temporada{},
+		&models.Opportunity{},
+		&models.Ticket{},
 	)
 
 	// Run SQL migrations for columns/tables that need ALTER statements
@@ -103,10 +106,17 @@ func seedRBAC(db *gorm.DB) {
 		{"AGENCIES_UPDATE", "Editar Agencias", "agencies", "update", "Modificar datos de agencias"},
 		{"AGENCIES_DELETE", "Eliminar Agencias", "agencies", "delete", "Eliminar agencias"},
 
+		{"TEMPORADAS_VIEW", "Ver Temporadas", "temporadas", "view", "Listar temporadas"},
+		{"TEMPORADAS_CREATE", "Crear Temporadas", "temporadas", "create", "Crear nuevas temporadas"},
+		{"TEMPORADAS_UPDATE", "Editar Temporadas", "temporadas", "update", "Modificar temporadas"},
+		{"TEMPORADAS_DELETE", "Eliminar Temporadas", "temporadas", "delete", "Eliminar temporadas"},
+		{"ADMINISTRACION_VIEW", "Ver Administración", "administracion", "view", "Ver el módulo de Administración"},
+
 		{"PRODUCTS_VIEW", "Ver Productos", "products", "view", "Listar y buscar productos"},
 		{"PRODUCTS_CREATE", "Crear Productos", "products", "create", "Crear nuevos productos"},
 		{"PRODUCTS_UPDATE", "Editar Productos", "products", "update", "Modificar datos de productos"},
 		{"PRODUCTS_DELETE", "Eliminar Productos", "products", "delete", "Eliminar productos"},
+		{"PRODUCTS_APPROVE", "Aprobar Productos", "products", "approve", "Aprobar productos pendientes creados desde una oportunidad"},
 
 		{"GROUPS_VIEW", "Ver Grupos", "groups", "view", "Listar y gestionar solicitudes de grupo"},
 		{"GROUPS_CREATE", "Crear Grupos", "groups", "create", "Cargar un grupo nuevo desde cero"},
@@ -163,6 +173,17 @@ func seedRBAC(db *gorm.DB) {
 
 		{"REPORTS_VIEW", "Ver Reportes", "reports", "view", "Acceder a reportes y estadísticas"},
 		{"REPORTS_EXPORT", "Exportar Datos", "reports", "export", "Exportar datos en CSV/Excel/PDF"},
+
+		{"OPPORTUNITIES_VIEW", "Ver Oportunidades", "opportunities", "view", "Listar y buscar oportunidades"},
+		{"OPPORTUNITIES_CREATE", "Crear Oportunidades", "opportunities", "create", "Crear nuevas oportunidades"},
+		{"OPPORTUNITIES_UPDATE", "Editar Oportunidades", "opportunities", "update", "Modificar oportunidades"},
+		{"OPPORTUNITIES_DELETE", "Eliminar Oportunidades", "opportunities", "delete", "Eliminar oportunidades"},
+		{"OPPORTUNITIES_APPROVE", "Aprobar Oportunidades", "opportunities", "approve", "Aprobar oportunidades"},
+		{"OPPORTUNITIES_CONVERT", "Convertir Oportunidad a Producto", "opportunities", "convert", "Convertir una oportunidad aprobada en un producto del catálogo"},
+
+		{"TICKETS_VIEW", "Ver Bandeja de Tickets", "tickets", "view", "Acceso a la bandeja de tickets emitidos y detalle de boletos"},
+		{"TICKETS_VOID", "Anular / Voidear Ticket", "tickets", "void", "Anular boletos emitidos (registrar void)"},
+		{"TICKETS_SYNC", "Sincronizar Ticket con Atlas", "tickets", "sync", "Reintentar notificación de emisión de ticket a Netviax Atlas"},
 	}
 	for _, p := range permissions {
 		var count int64
@@ -226,7 +247,11 @@ func seedRBAC(db *gorm.DB) {
 			// dejarle GestionAgencias.jsx/AGENCIES_VIEW mostraría una pantalla
 			// con botones que igual tirarían 403 al tocarlos.
 			switch p.Module {
-			case "backup", "logs", "agencies":
+			case "backup", "logs", "agencies", "temporadas":
+				// temporadas es una lista global (no por agencia, ver models.go) —
+				// mismo criterio que agencies: administrarla es exclusivo del
+				// superadmin para que ningún agency_admin le cambie/borre una
+				// temporada al resto de las agencias.
 				return false
 			case "permissions":
 				return p.Action == "view"
@@ -292,6 +317,27 @@ func seedRBAC(db *gorm.DB) {
 		}
 	}
 
+	// Corrección idempotente: AGENCY_ADMIN debe tener EMAIL_VIEW/EMAIL_UPDATE
+	// y NOTIFICATION_TEMPLATES_VIEW/NOTIFICATION_TEMPLATES_UPDATE — recién se
+	// cablearon a RequirePermission en las rutas de /email-config y
+	// /notification-config (antes cualquier sesión autenticada podía
+	// reescribir una plantilla global, incluida la de confirmación de
+	// reserva que se manda a clientes reales — hallazgo de la auditoría de
+	// seguridad). En una base ya existente el bloque assign() de arriba no
+	// vuelve a correr para roles que ya existían, así que hay que otorgarlos
+	// acá para no romper el acceso legítimo que agency_admin ya tenía de hecho.
+	if err := db.Where("code = ? AND is_system = true", "AGENCY_ADMIN").First(&agencyAdminRole).Error; err == nil {
+		var toGrant []models.Permission
+		db.Where("code IN ?", []string{"EMAIL_VIEW", "EMAIL_UPDATE", "NOTIFICATION_TEMPLATES_VIEW", "NOTIFICATION_TEMPLATES_UPDATE"}).Find(&toGrant)
+		for _, p := range toGrant {
+			var count int64
+			db.Model(&models.RolePermission{}).Where("role_id = ? AND permission_id = ?", agencyAdminRole.ID, p.ID).Count(&count)
+			if count == 0 {
+				db.Create(&models.RolePermission{RoleID: agencyAdminRole.ID, PermissionID: p.ID})
+			}
+		}
+	}
+
 	// Migración aditiva: todo Profile sin ninguna fila en UserRole recibe el
 	// rol de sistema equivalente a su Profile.Role actual.
 	var migrationRoles []models.Role
@@ -329,10 +375,12 @@ func seedRBAC(db *gorm.DB) {
 // arranque y GetIntSetting tenga algo que leer aunque nadie los haya tocado.
 func seedSystemSettings(db *gorm.DB) {
 	defaults := map[string]interface{}{
-		"bloqueo_minutos_default": 60,
-		"ai_historial_horas":      4,
-		"dias_aviso_vencimientos": 3,
-		"bloqueo_hold_minutos":    10,
+		"bloqueo_minutos_default":     60,
+		"ai_historial_horas":          4,
+		"dias_aviso_vencimientos":     3,
+		"bloqueo_hold_minutos":        10,
+		"porcentaje_tarifa_infant":    15,
+		"porcentaje_impuestos_infant": 10,
 	}
 	for key, value := range defaults {
 		var count int64
@@ -353,7 +401,7 @@ func seedEmailTemplates(db *gorm.DB) {
 			Code:     "reservation_blocked",
 			Name:     "Reserva en bloqueo temporal",
 			Subject:  "Tu reserva {{pedido_id}} está en bloqueo temporal",
-			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> quedó en bloqueo temporal y vence el {{vence}}. Confirmala antes de esa fecha o el cupo se liberará automáticamente.</p>",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> hacia {{destino}} ({{compania}}) quedó en bloqueo temporal y vence el {{vence}}. Confirmala antes de esa fecha o el cupo se liberará automáticamente.</p><p>Pasajero(s): {{pasajeros}}</p><p>Precio de venta: {{precio_venta}}</p>",
 		},
 		{
 			Code:     "reservation_expiring_soon",
@@ -371,13 +419,31 @@ func seedEmailTemplates(db *gorm.DB) {
 			Code:     "reservation_confirmed",
 			Name:     "Reserva confirmada",
 			Subject:  "Tu reserva {{pedido_id}} fue confirmada",
-			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> fue confirmada correctamente.</p>",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Tu reserva del pedido <b>{{pedido_id}}</b> hacia {{destino}} ({{compania}}) fue confirmada correctamente.</p><p>Pasajero(s): {{pasajeros}}</p><p>Precio de venta: {{precio_venta}}</p>",
+		},
+		{
+			Code:     "passenger_confirmation",
+			Name:     "Confirmación al pasajero",
+			Subject:  "Tu reserva {{pedido_id}} está confirmada",
+			BodyHTML: "<p>Hola {{contacto_nombre}},</p><p>Te confirmamos tu reserva hacia {{destino}} con {{compania}}.</p><p>Número de pedido: <b>{{pedido_id}}</b></p><p>Pasajero(s): {{pasajeros}}</p>",
 		},
 		{
 			Code:     "new_product",
 			Name:     "Nuevo producto disponible",
 			Subject:  "Nuevo producto disponible: {{codigo_cupo}}",
 			BodyHTML: "<p>Se agregó un nuevo producto a disponibilidad:</p><p><b>{{codigo_cupo}}</b> hacia {{destino}} ({{compania}})</p>",
+		},
+		{
+			Code:     "new_product_bulk",
+			Name:     "Nuevos productos disponibles (carga masiva)",
+			Subject:  "Nuevos productos disponibles ({{cantidad}})",
+			BodyHTML: "<p>Se agregaron <b>{{cantidad}}</b> productos nuevos a disponibilidad.</p>",
+		},
+		{
+			Code:     "product_changed",
+			Name:     "Producto: cambio de ruta o fecha",
+			Subject:  "Tu cupo reservado cambió: {{codigo_cupo}}",
+			BodyHTML: "<p>El producto <b>{{codigo_cupo}}</b> hacia {{destino}} de tu reserva <b>{{pedido_id}}</b> cambió:</p><p>{{cambios}}</p>",
 		},
 		{
 			Code:     "test_email",
@@ -412,6 +478,8 @@ func seedNotificationTemplates(db *gorm.DB) {
 			Message: "Tu reserva del pedido {{pedido_id}} fue confirmada"},
 		{Code: "reservation_deleted", Name: "Reserva eliminada", Title: "Reserva eliminada",
 			Message: "Se eliminó la reserva del pedido {{pedido_id}} y se liberó el cupo"},
+		{Code: "reservation_cancelled_direct", Name: "Reserva cancelada (bloqueo temporal, sin autorización)", Title: "Reserva cancelada",
+			Message: "Se canceló la reserva del pedido {{pedido_id}} (bloqueo temporal) y el cupo fue liberado"},
 		{Code: "passenger_deleted", Name: "Pasajero eliminado", Title: "Pasajero eliminado",
 			Message: "Se eliminó a {{nombre}} {{apellido}} del pedido {{pedido_id}} y se liberó su lugar"},
 		{Code: "cancellation_pending", Name: "Solicitud de cancelación pendiente", Title: "Solicitud de cancelación pendiente",
@@ -454,6 +522,8 @@ func seedNotificationTemplates(db *gorm.DB) {
 			Message: "El cupo {{codigo_cupo}} hacia {{destino}} tiene la fecha de emisión el {{fecha}} (en {{dias}} día(s))"},
 		{Code: "product_deadline_gastos", Name: "Producto: entrada en gastos próxima", Title: "Entrada en gastos próxima",
 			Message: "El cupo {{codigo_cupo}} hacia {{destino}} entra en gastos el {{fecha}} (en {{dias}} día(s))"},
+		{Code: "product_changed", Name: "Producto: cambio de ruta o fecha", Title: "Tu cupo reservado cambió",
+			Message: "El producto {{codigo_cupo}} hacia {{destino}} de tu reserva {{pedido_id}} cambió: {{cambios}}"},
 	}
 
 	for _, tpl := range defaults {
@@ -540,6 +610,7 @@ func runSQLMigrations(db *gorm.DB) {
 
 	// Add columns to tables (if they don't exist, ALTER ignores it)
 	colSQLs := []string{
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS fecha_aprobado TIMESTAMP WITH TIME ZONE;`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS transfer_id UUID REFERENCES availability_transfers(id) ON DELETE SET NULL;`,
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS original_agency VARCHAR(255);`,
 		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS color VARCHAR(7) DEFAULT '#3b82f6';`,
@@ -588,13 +659,119 @@ func runSQLMigrations(db *gorm.DB) {
 		// formulario de pasajeros) y apagado de IA por agencia.
 		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hold_passenger_count INT DEFAULT 0;`,
 		`ALTER TABLE agencies ADD COLUMN IF NOT EXISTS ai_habilitado BOOLEAN DEFAULT true;`,
+		// Precios: Tarifa+Impuestos por tipo de pasajero (precio/chd_fare/inf_fare
+		// pasan a ser la Venta calculada = Tarifa+Impuestos+OP, ver
+		// applyCalculatedPrices en product_handler.go). Backfill de productos
+		// cargados antes de este cambio: Tarifa = precio actual, Impuestos = 0 —
+		// a propósito NO se recalcula precio/chd_fare/inf_fare acá (quedan
+		// iguales hasta que alguien edite y guarde ese producto de nuevo).
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS tarifa_adt numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS impuestos_adt numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS tarifa_chd numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS impuestos_chd numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS tarifa_inf numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS impuestos_inf numeric DEFAULT 0;`,
+		`UPDATE products SET tarifa_adt = precio WHERE tarifa_adt = 0 AND impuestos_adt = 0 AND precio != 0;`,
+		`UPDATE products SET tarifa_chd = chd_fare WHERE tarifa_chd = 0 AND impuestos_chd = 0 AND chd_fare != 0;`,
+		`UPDATE products SET tarifa_inf = inf_fare WHERE tarifa_inf = 0 AND impuestos_inf = 0 AND inf_fare != 0;`,
+		// Seguimiento administrativo de pago/emisión (Exportar BO en Nóminas)
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS estado_interno VARCHAR(20) DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS emitido_at TIMESTAMP WITH TIME ZONE;`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS status_back VARCHAR(50) DEFAULT '';`,
+		// CI (Documento) y Pasaporte son documentos distintos — un pasajero puede
+		// tener uno, el otro, o los dos.
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS pasaporte VARCHAR(50) DEFAULT '';`,
+		// Kilaje por franquicia de equipaje (puede variar por producto) y links
+		// de paquetes armados a partir del cupo, mostrados en Disponibilidad.
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS package_links JSONB DEFAULT '[]';`,
+		// OP individualizado por tipo de pasajero (antes era un solo valor
+		// aplicado a los 3 tipos por igual). Backfill: los productos ya
+		// cargados heredan el OP viejo en los 3 tipos, para que su Venta
+		// calculada no cambie hasta que alguien edite y guarde de nuevo.
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS op_adt numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS op_chd numeric DEFAULT 0;`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS op_inf numeric DEFAULT 0;`,
+		`UPDATE products SET op_adt = op WHERE op_adt = 0 AND op != 0;`,
+		`UPDATE products SET op_chd = op WHERE op_chd = 0 AND op != 0;`,
+		`UPDATE products SET op_inf = op WHERE op_inf = 0 AND op != 0;`,
+		// Sección "Servicios" del formulario de reserva (Hotel/Traslados) y
+		// vencimiento de documento por pasajero (con opción "vitalicio").
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS hotel VARCHAR(255) DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS traslados_incluye BOOLEAN DEFAULT false;`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS traslados_notas TEXT DEFAULT '';`,
+		`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS notas_vendedor TEXT DEFAULT '';`,
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vencimiento TIMESTAMP WITH TIME ZONE;`,
+		`ALTER TABLE passengers ADD COLUMN IF NOT EXISTS documento_vitalicio BOOLEAN DEFAULT false;`,
+		// Motivo de rechazo cuando estado_interno (Estado Aerolínea) de una
+		// oportunidad pasa a "rechazado" — capturado vía popup en el frontend.
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(50) DEFAULT '';`,
+		// Conversión opcional de Oportunidad -\u003e Producto: el producto nace
+		// pendiente de aprobación (no aparece en Disponibilidad hasta que un
+		// admin lo apruebe) y la oportunidad guarda el ID a modo informativo.
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS pendiente_aprobacion BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS producto_id INTEGER REFERENCES products(id) ON DELETE SET NULL;`,
+		// Servicio y Franquicia de Equipaje en Oportunidades (se heredan al crear producto)
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS servicio VARCHAR(100) DEFAULT '';`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS carryon BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS handbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS checkedbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
+		// Destino propio del ticket (antes el frontend intentaba derivarlo
+		// parseando Ticket.Ruta con un split('-') ingenuo, que no funciona con
+		// el formato real de itinerario multi-tramo — ver ItineraryTable.jsx
+		// parseRuta() para el parser real).
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS destino VARCHAR(255) DEFAULT '';`,
+		// Itinerario normalizado tramo por tramo (nro. vuelo/fecha/origen/
+		// destino/salida/llegada) — ver services.ParseRuta().
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS segmentos JSONB DEFAULT '[]';`,
+		// E-ticket completo: cada dato de backoffice como campo propio en vez
+		// de tener que re-derivarlo de Reservation/Passenger (no joineables
+		// desde Ticket, ver comentario en models.Ticket).
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tipo_pasajero VARCHAR(50) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tipo_documento VARCHAR(50) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS pedido_id VARCHAR(255) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS vendedor VARCHAR(255) DEFAULT '';`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS fecha_reserva TIMESTAMP NULL;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS carryon BOOLEAN DEFAULT false;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS handbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checkedbag BOOLEAN DEFAULT false;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
+		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {
 			log.Println("WARNING: Column alteration error:", err)
 		}
 	}
-	fmt.Println("Migration applied: all columns ensured")
+
+	// Renombrado de columnas opportunities: GORM generó neto1/neto2 sin
+	// underscore porque los campos del struct no tenían gorm:"column:..." tag.
+	// Al agregar el tag ahora, la tabla ya existe con el nombre viejo — hay que
+	// renombrar con DO $$ ... END para no fallar si la columna ya tiene el
+	// nombre correcto.
+	renameSQLs := []string{
+		`DO $$ BEGIN
+			IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='opportunities' AND column_name='neto1') THEN
+				ALTER TABLE opportunities RENAME COLUMN neto1 TO neto_1;
+			END IF;
+		END $$;`,
+		`DO $$ BEGIN
+			IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='opportunities' AND column_name='neto2') THEN
+				ALTER TABLE opportunities RENAME COLUMN neto2 TO neto_2;
+			END IF;
+		END $$;`,
+	}
+	for _, sql := range renameSQLs {
+		if err := db.Exec(sql).Error; err != nil {
+			log.Println("WARNING: Rename column error:", err)
+		}
+	}
 
 	migrateSystemSettingsToAgencyAware(db)
 	dropAgencyForeignKeys(db)

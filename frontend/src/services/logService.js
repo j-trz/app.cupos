@@ -62,6 +62,21 @@ export class LogService {
   static async releaseHold(reservationId) {
     return await ApiClient.post(`/system/holds/${reservationId}/release`, {});
   }
+
+  /**
+   * Ejecuta la suite de diagnóstico QA quirúrgico del sistema en tiempo real.
+   */
+  static async runSystemQA() {
+    return await ApiClient.post('/system/qa/run', {});
+  }
+
+  /**
+   * Genera el dictamen de salud del sistema utilizando la IA integrada.
+   * @param {Object} qaResults - Resultado devuelto por runSystemQA.
+   */
+  static async generateAIDictamen(qaResults) {
+    return await ApiClient.post('/system/qa/ai-dictamen', { qa_results: qaResults });
+  }
 }
 
 export default LogService;

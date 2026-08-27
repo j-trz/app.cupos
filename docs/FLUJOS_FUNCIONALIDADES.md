@@ -27,6 +27,9 @@ Este documento describe cada funcionalidad del **Sistema de Gestión de Cupos** 
 14. [Configuraciones](#14-configuraciones)
 15. [Claves de API para Integraciones Externas (M2M)](#15-claves-de-api-para-integraciones-externas-m2m)
 16. [Estado del Sistema y Backups](#16-estado-del-sistema-y-backups)
+17. [Bandeja de Tickets](#17-bandeja-de-tickets)
+18. [Oportunidades](#18-oportunidades)
+19. [Integración Netviax Atlas](#19-integración-netviax-atlas)
 
 ---
 
@@ -38,6 +41,8 @@ La resolución de permisos **RBAC** ocurre una sola vez después del login: el f
 
 - Backend: `POST /api/auth/login` (`user_handler.go`), `GET /users/me/permissions` (`rbac_handler.go`), middleware `AuthMiddleware` / `RequirePermission` (`middleware/auth.go`).
 - Frontend: `frontend/src/components/ui/Sidebar.jsx`.
+
+> **En producción, el login va a pasar a hacerse vía Office 365 / SSO corporativo** — decisión ya tomada, reemplazando este login propio (usuario/contraseña contra `Profile`). Todavía no implementado: el diagrama de abajo describe el mecanismo actual.
 
 ```mermaid
 flowchart TD
@@ -494,4 +499,92 @@ flowchart TD
     J --> K["Descargar JSON con GET /api/backup/download/:filename"]
     K --> L["Rotación automática: mantener últimos 30 backups"]
 ```
+
+---
+
+## 17. Bandeja de Tickets
+
+La **Bandeja de Tickets** (`/tickets`) es el registro inmutable de boletos GDS emitidos — cada fila es un boleto real de un pasajero, nunca se borra (solo se marca `void` con auditoría). El disparador real es **por-pasajero, no por-reserva**: cargar el número de ticket real de la aerolínea (botón "Asignar" en Gestión de Reservas, o "Editar Pasajero" en Nóminas) genera o completa el `Ticket` de ese pasajero puntual y marca la reserva como `Emitido` si no lo estaba. El flujo alternativo — marcar `Emitido` directo desde el dropdown de estado interno (individual o en bloque) — dispara la misma generación para todos los pasajeros de la reserva que todavía no tengan ticket propio; ambos caminos son idempotentes.
+
+Al emitir, el sistema **snapshotea** en el ticket todos los datos que un backoffice necesitaría (agencia, ficha, vendedor, ID de pedido, tipo de pasajero, tipo de documento, franquicia de equipaje) más el **itinerario normalizado tramo por tramo** (compañía, número de vuelo, fecha, origen, destino, hora de salida y llegada) — un ticket puede cubrir más de un tramo (ida y vuelta, escalas) bajo el mismo PNR y el mismo número de ticket; el itinerario se calcula parseando el texto libre de ruta del producto con el mismo algoritmo que usa el frontend para "Generar Itinerario", para que ambos lados lean el formato GDS exactamente igual. Estos datos no pueden recuperarse después vía `JOIN` (el ticket enlaza a la reserva/pasajero con un identificador derivado, no reversible), así que quedan copiados en el momento de emitir.
+
+Anular un ticket (`void`) pide un motivo y deja elegir si el lugar vuelve al stock del cupo (útil si el void es una corrección administrativa que no libera disponibilidad real) o si es puramente informativo. La sincronización con Netviax Atlas hoy es un estado manual (`enviado_atlas`) — el ticket ya trae todo lo necesario para una futura integración de escritura real (PNR, itinerario por tramo, vendedor, ficha, franquicia), pero esa integración en sí todavía no está construida.
+
+- Backend: `GET/POST /api/tickets*` (`handlers/ticket_handler.go`), generación vía `GenerateTicketsForReservationInternal`/`upsertTicketForPassenger`, parser de itinerario `services.ParseRuta` (`services/itinerary_parser.go`).
+- Frontend: `frontend/src/pages/BandejaTickets.jsx`.
+
+```mermaid
+flowchart TD
+    A["Agencia carga el número de ticket real de un pasajero (Reservas o Nóminas)"] --> B["PUT /api/orders/:id/passengers/:passengerId"]
+    C["O: se marca EstadoInterno = Emitido (individual o en bloque)"] --> D["GenerateTicketsForReservationInternal itera cada pasajero sin ticket propio"]
+    B --> E["upsertTicketForPassenger para ESE pasajero"]
+    D --> E
+    E --> F{"¿Ya existe un Ticket para este pasajero?"}
+    F -->|"Sí"| G["Actualiza número de ticket / completa campos faltantes (autocura tickets viejos)"]
+    F -->|"No"| H["Snapshotea agencia, ficha, vendedor, pedido, tipo de pasajero/documento, franquicia y PNR real del producto"]
+    H --> I["Parsea la ruta libre del producto en tramos normalizados (services.ParseRuta)"]
+    G --> J["Marca Reservation.EstadoInterno = Emitido si no lo estaba"]
+    I --> J
+    J --> K["Ticket visible en la Bandeja de Tickets, Estado = emitido"]
+    K --> L{"Acción sobre el ticket"}
+    L -->|"Anular"| M["POST /api/tickets/:id/void con motivo y si devuelve stock"]
+    L -->|"Sincronizar"| N["POST /api/tickets/:id/sync-atlas (manual, sin integración de escritura real todavía)"]
+    M --> O["Estado = void, terminal"]
+    N --> P["Estado = enviado_atlas"]
+```
+
+---
+
+## 18. Oportunidades
+
+**Oportunidades** (`/oportunidades`) es un canal previo a Gestión de Productos: una agencia carga una propuesta de vuelo/paquete que todavía no está confirmada con la aerolínea (destino, compañía, fechas, cantidad de lugares, netos, servicio y franquicia de equipaje) para que un administrador la revise **antes** de que se convierta en un cupo real vendible. Nace en `pendiente`; un admin la mueve a `aprobada` o `rechazada` (con motivo). Una oportunidad **rechazada o pendiente se puede seguir editando**; una vez `aprobada` (o ya convertida) queda protegida contra ediciones para no invalidar una aprobación ya dada.
+
+Aprobar **no** crea el producto todavía — es un paso deliberadamente separado. Una vez `aprobada`, el propio admin o el usuario que la cargó (si sigue siendo de la misma agencia) puede **convertirla a producto** (`ConvertOpportunityToProduct`): reutiliza los datos de la oportunidad (mismo shape que crear un producto a mano) y crea un `Product` nuevo con `PendienteAprobacion = true` — no aparece todavía en Disponibilidad, necesita la aprobación de producto aparte (ver [Gestión de Productos](#7-gestión-de-productos)). La oportunidad pasa a `producto` (estado **terminal**: ni admin puede volver a editarla, aprobarla o rechazarla) y guarda el `producto_id` a modo puramente informativo — no hay sincronización de vuelta si el producto cambia después.
+
+- Backend: `GET/POST/PUT/DELETE /api/opportunities*` (`handlers/opportunities_handler.go`), conversión vía `ConvertOpportunityToProduct` → reutiliza `applyCalculatedPrices`/`recomputeDisponibilidad`/`generateCodigoCupo` de `product_handler.go`.
+- Frontend: `frontend/src/pages/GestionOportunidades.jsx`.
+
+```mermaid
+flowchart TD
+    A["Agencia carga destino, compañía, fechas, lugares, netos y equipaje"] --> B["POST /api/opportunities — Estado = pendiente"]
+    B --> C{"Admin revisa"}
+    C -->|"Rechaza"| D["Estado = rechazada + motivo_rechazo (editable de nuevo)"]
+    C -->|"Aprueba (individual o en bloque)"| E["PUT /api/opportunities/:id/approve — Estado = aprobada, guarda usuario_autorizador y fecha_aprobado"]
+    E --> F{"¿Admin o el creador original de la misma agencia?"}
+    F -->|"Sí"| G["POST /api/opportunities/:id/convert-to-product"]
+    F -->|"No"| H["403 — no puede convertir"]
+    G --> I["Crea Product con PendienteAprobacion = true, mismo shape que crear un producto a mano"]
+    I --> J["Oportunidad pasa a Estado = producto (terminal, guarda producto_id informativo)"]
+    J --> K["Notifica a admin: producto pendiente de aprobación"]
+    K --> L["Admin aprueba el Product por separado — recién ahí aparece en Disponibilidad"]
+```
+
+---
+
+## 19. Integración Netviax Atlas
+
+**Netviax Atlas** es el backoffice externo que ya usan las agencias para su operación diaria (fichas de venta, contactos de pasajeros). Hoy la integración es **de lectura únicamente** — el sistema consulta datos que ya existen en Atlas para no volver a tipearlos, todavía no escribe nada de vuelta.
+
+Cada agencia (o, si no cargó las propias, una configuración global/default) guarda sus credenciales de Atlas en **Configuración → Atlas** (usuario, clave, empresa, sucursal, ambiente test/producción), con un botón de **probar conexión** antes de guardar. La clave nunca se devuelve en las respuestas de la API una vez guardada (el formulario la muestra vacía al reabrir la pantalla).
+
+El uso real está en **Disponibilidad**, al cargar los datos de contacto o de cada pasajero de una reserva: en vez de tipear nombre, documento, nacionalidad, etc. a mano, se puede **buscar en Atlas por documento o por número de ficha** y aplicar el resultado directo al formulario — reduce tipeo repetido y errores de carga cuando el pasajero ya es un contacto conocido en el backoffice de la agencia.
+
+- Backend: `POST /api/backoffice/atlas/contactos/buscar`, `GET /api/backoffice/atlas/contactos/:codigo`, `POST /api/backoffice/atlas/fichas/buscar` (`handlers/backoffice_handler.go`), configuración en `GET/POST/PUT/DELETE /api/atlas-config/*` (`handlers/atlas_config_handler.go`), cliente HTTP hacia Atlas en `services/netviax_atlas_service.go`.
+- Frontend: modal de búsqueda en `frontend/src/pages/Availability.jsx` (`atlasService.js`), configuración de credenciales en `frontend/src/pages/AtlasConfig.jsx`.
+
+```mermaid
+flowchart TD
+    A["Admin/Agencia carga usuario, clave, empresa y sucursal de Atlas"] --> B["Configuración → Atlas: probar conexión"]
+    B --> C["POST /api/atlas-config/test"]
+    C --> D["POST /api/atlas-config/config — clave guardada, nunca se vuelve a devolver"]
+    D --> E["Agencia crea una reserva en Disponibilidad"]
+    E --> F{"¿Busca el contacto/pasajero en Atlas?"}
+    F -->|"Por documento"| G["POST /api/backoffice/atlas/contactos/buscar"]
+    F -->|"Por número de ficha"| H["POST /api/backoffice/atlas/fichas/buscar (trae también los pasajeros de esa ficha)"]
+    G --> I["Aplica el resultado al formulario: nombre, documento, nacionalidad, etc."]
+    H --> I
+    I --> J["Continúa la reserva sin re-tipear datos ya cargados en el backoffice"]
+```
+
+**Próxima fase (no implementada todavía):** reportar hacia Atlas el detalle de cada ticket ya emitido (número de ticket, PNR, itinerario por tramo, precio) para que el backoffice quede sincronizado sin carga manual doble — el `Ticket` de la Bandeja (sección 17) ya guarda todos los datos que esa fase futura necesitaría.
 

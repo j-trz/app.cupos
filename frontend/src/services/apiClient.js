@@ -9,14 +9,16 @@ class ApiClient {
   }
 
   static getToken() {
-    return localStorage.getItem('api_token');
+    const token = localStorage.getItem('api_token') || localStorage.getItem('token');
+    return token && token !== 'null' && token !== 'undefined' ? token : null;
   }
 
   static setToken(token) {
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       localStorage.setItem('api_token', token);
     } else {
       localStorage.removeItem('api_token');
+      localStorage.removeItem('token');
     }
   }
 
@@ -31,7 +33,7 @@ class ApiClient {
   static getSessionUser() {
     try {
       const stored = localStorage.getItem('api_user');
-      return stored ? JSON.parse(stored) : null;
+      return stored && stored !== 'null' && stored !== 'undefined' ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
@@ -39,6 +41,7 @@ class ApiClient {
 
   static clearSession() {
     localStorage.removeItem('api_token');
+    localStorage.removeItem('token');
     localStorage.removeItem('api_user');
   }
 
@@ -89,8 +92,18 @@ class ApiClient {
     return data;
   }
 
-  static get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+  // El segundo argumento acepta { params } (querystring) — algunos callers ya
+  // lo pasaban (ej. ticketService.getTickets) pero se ignoraba en silencio,
+  // así que ese filtro nunca llegaba al backend.
+  static get(endpoint, { params } = {}) {
+    let path = endpoint;
+    if (params && typeof params === 'object') {
+      const query = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      ).toString();
+      if (query) path = `${endpoint}?${query}`;
+    }
+    return this.request(path, { method: 'GET' });
   }
 
   static post(endpoint, body) {

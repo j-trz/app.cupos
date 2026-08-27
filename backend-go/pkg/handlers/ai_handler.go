@@ -1242,7 +1242,9 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, productID).Error; err != nil {
 				return fmt.Errorf("Producto no encontrado")
 			}
-			if product.Disponibilidad <= 0 {
+			// El infante no ocupa lugar/cupo (ver CreateReservation en order_handler.go).
+			esInfante := strings.EqualFold(fmt.Sprintf("%v", args["pasajero_tipo"]), "Infante")
+			if !esInfante && product.Disponibilidad <= 0 {
 				return fmt.Errorf("El producto no tiene disponibilidad")
 			}
 
@@ -1260,12 +1262,15 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				return ""
 			}
 
+			// Neto1 (y el OP usado más abajo para "rentabilidad") van según el
+			// tipo real del pasajero, no un valor único del producto.
+			tipoPasajero := strArg("pasajero_tipo")
 			reserva = models.Reservation{
 				ProductID:            uint(productID),
 				CreatedBy:            u.ID,
 				Estado:               models.EstadoBloqueoTemporal,
 				PrecioVenta:          precio,
-				Neto1:                product.Neto1,
+				Neto1:                product.NetoForTipo(tipoPasajero),
 				PedidoID:             pedidoID,
 				Agencia:              agencia,
 				ContactoNombre:       strArg("contacto_nombre"),
@@ -1276,7 +1281,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				DocumentoPasajero:    strArg("pasajero_documento"),
 				NacionalidadPasajero: strArg("pasajero_nacionalidad"),
 				NacimientoPasajero:   parseDateFlexible(strArg("pasajero_nacimiento")),
-				TipoPasajero:         strArg("pasajero_tipo"),
+				TipoPasajero:         tipoPasajero,
 				FichaVenta:           strArg("ficha_venta"),
 			}
 
@@ -1298,10 +1303,15 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				return err
 			}
 
-			// Descontar disponibilidad e incrementar vendidos de forma atómica y segura
+			// Descontar disponibilidad (salvo infante, que no ocupa lugar) e
+			// incrementar vendidos de forma atómica y segura.
+			disponibilidad := product.Disponibilidad
+			if !esInfante {
+				disponibilidad--
+			}
 			if err := tx.Model(&models.Product{}).Where("id = ?", productID).
 				Updates(map[string]interface{}{
-					"disponibilidad": product.Disponibilidad - 1,
+					"disponibilidad": disponibilidad,
 					"vendidos":       product.Vendidos + 1,
 				}).Error; err != nil {
 				return err
@@ -1368,15 +1378,11 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		var reserva models.Reservation
 		if database.DB.First(&reserva, id).Error == nil {
 			if reserva.Estado != models.EstadoExpirada && reserva.Estado != models.EstadoCancelada {
-				var passengersCount int64
-				database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reserva.ID).Count(&passengersCount)
-				if passengersCount == 0 {
-					passengersCount = 1
-				}
+				seats, total := countPassengerSeats(reserva.ID)
 				database.DB.Model(&models.Product{}).Where("id = ?", reserva.ProductID).
 					Updates(map[string]interface{}{
-						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 					})
 			}
 			database.DB.Where("reservation_id = ?", reserva.ID).Delete(&models.Passenger{})
@@ -1454,10 +1460,24 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 
 		var totalReservas int64
 		baseQ().Count(&totalReservas)
+
+		// Ventas/costo se suman por PASAJERO, no por reserva: cada pasajero
+		// tiene su propio precio_venta/neto_1 según su tipo (ADT/CHD/INF) —
+		// sumar a nivel Reservation usaría un solo valor por pedido, ciego a
+		// la mezcla real de tipos si el pedido tiene más de un pasajero.
+		passengerQ := func() *gorm.DB {
+			q := database.DB.Model(&models.Passenger{}).
+				Joins("JOIN reservations ON reservations.id = passengers.reservation_id").
+				Where("reservations.estado = ?", models.EstadoConfirmada)
+			if scopeAgencia != "" {
+				q = q.Where("LOWER(reservations.agencia) = LOWER(?)", scopeAgencia)
+			}
+			return q
+		}
 		var totalVentas float64
-		baseQ().Select("COALESCE(SUM(precio_venta), 0)").Scan(&totalVentas)
+		passengerQ().Select("COALESCE(SUM(passengers.precio_venta), 0)").Scan(&totalVentas)
 		var totalCosto float64
-		baseQ().Select("COALESCE(SUM(neto_1), 0)").Scan(&totalCosto)
+		passengerQ().Select("COALESCE(SUM(passengers.neto_1), 0)").Scan(&totalCosto)
 
 		rentabilidad := totalVentas - totalCosto
 		margenPct := 0.0

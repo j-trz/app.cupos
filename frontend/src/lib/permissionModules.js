@@ -9,6 +9,7 @@ export const MODULES = [
   { value: 'agencies', label: 'Agencias', icon: '🏢' },
   { value: 'products', label: 'Productos', icon: '📦' },
   { value: 'groups', label: 'Grupos', icon: '🧳' },
+  { value: 'opportunities', label: 'Oportunidades', icon: '✨' },
   { value: 'reservations', label: 'Reservas', icon: '📅' },
   { value: 'transfers', label: 'Cesiones', icon: '🔄' },
   { value: 'notifications', label: 'Notificaciones', icon: '🔔' },
@@ -22,6 +23,8 @@ export const MODULES = [
   { value: 'permissions', label: 'Permisos', icon: '🔐' },
   { value: 'roles', label: 'Roles', icon: '🛡️' },
   { value: 'reports', label: 'Reportes', icon: '📈' },
+  { value: 'administracion', label: 'Administración', icon: '⚙️' },
+  { value: 'tickets', label: 'Bandeja de Tickets', icon: '🎫' },
 ];
 
 // Orden canónico de acciones para la matriz de permisos de GestionRoles.jsx —
@@ -35,6 +38,10 @@ export const ACTIONS = [
   { value: 'export', label: 'Exportar' },
   { value: 'unlock', label: 'Desbloquear' },
   { value: 'assign', label: 'Asignar' },
+  { value: 'approve', label: 'Aprobar' },
+  { value: 'convert', label: 'Convertir' },
+  { value: 'void', label: 'Anular (Void)' },
+  { value: 'sync', label: 'Sincronizar Atlas' },
 ];
 
 export const getModuleLabel = (moduleValue) => MODULES.find((m) => m.value === moduleValue)?.label || moduleValue;

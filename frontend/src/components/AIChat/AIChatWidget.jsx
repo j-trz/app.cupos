@@ -72,7 +72,7 @@ export default function AIChatWidget() {
             >
                 {/* Indicador de no leídos */}
                 {unreadCount > 0 && !isOpen && (
-                    <span className="absolute -top-1 z-10 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ring-2 ring-white dark:ring-zinc-900">
+                    <span className="absolute -top-1 z-10 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ring-2 ring-white">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
@@ -83,20 +83,20 @@ export default function AIChatWidget() {
                     relative w-12 h-12 rounded-xl shadow-md
                     flex items-center justify-center
                     transition-all duration-200
-                    bg-zinc-900 dark:bg-zinc-100
+                    bg-zinc-900
                     hover:shadow-lg hover:scale-105
                     active:scale-95
                     ${unreadCount > 0 && !isOpen ? 'animate-pulse' : ''}
                   `}
                 >
-                    <Sparkles className="w-5 h-5 text-white dark:text-zinc-900" />
+                    <Sparkles className="w-5 h-5 text-white" />
                 </div>
 
                 {/* Tooltip al hacer hover */}
                 {!isOpen && (
-                    <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                    <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
                         Asistente IA
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-2 h-2 bg-zinc-900 dark:bg-zinc-100 rotate-45" />
+                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-2 h-2 bg-zinc-900 rotate-45" />
                     </div>
                 )}
             </button>

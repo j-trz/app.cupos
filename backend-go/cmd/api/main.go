@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"backend-go/pkg/database"
 	"backend-go/pkg/handlers"
@@ -21,6 +22,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestLogger())
+	r.Use(middleware.RateLimit(300, time.Minute))
 
 	// Configuración CORS dinámica desde variable de entorno
 	frontendURL := os.Getenv("URL_FRONTEND")
@@ -77,8 +79,18 @@ func main() {
 	api := r.Group("/api")
 	{
 		// Rutas públicas
-		api.POST("/auth/login", handlers.Login)
-		api.POST("/auth/register", handlers.Register)
+		api.POST("/auth/login", middleware.RateLimit(15, 5*time.Minute), handlers.Login)
+		// Login corporativo (Office 365 / Microsoft Entra ID) — preparación
+		// para el reemplazo del login propio en producción, ver
+		// services/office365_auth.go. Se apaga solo (503) si AZURE_TENANT_ID/
+		// AZURE_CLIENT_ID no están configuradas todavía.
+		api.POST("/auth/login-office365", middleware.RateLimit(15, 5*time.Minute), handlers.LoginOffice365)
+		// No hay auto-registro público: el alta de usuarios la hace un admin
+		// desde Gestión de Usuarios (CreateUser, autenticado). Existió un
+		// /auth/register público que dejaba a cualquier anónimo declararse
+		// miembro de cualquier agencia vía el body del request — eliminado
+		// 2026-08-13 (hallazgo de la auditoría de seguridad, sin ningún
+		// caller real en el frontend).
 
 		// Cron externo (protegido por header X-Cron-Secret, no por JWT)
 		api.GET("/cron/expire-reservations", handlers.ExpireReservations)
@@ -104,7 +116,10 @@ func main() {
 				products.POST("/", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.CreateProduct)
 				products.PUT("/:id", middleware.RequirePermission("PRODUCTS_UPDATE"), handlers.UpdateProduct)
 				products.DELETE("/:id", middleware.RequirePermission("PRODUCTS_DELETE"), handlers.DeleteProduct)
+				products.PUT("/:id/approve", middleware.RequirePermission("PRODUCTS_APPROVE"), handlers.ApproveProduct)
 				products.POST("/bulk", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.BulkCreateProducts)
+				products.POST("/bulk-delete", middleware.RequirePermission("PRODUCTS_DELETE"), handlers.BulkDeleteProducts)
+				products.POST("/bulk-duplicate", middleware.RequirePermission("PRODUCTS_CREATE"), handlers.BulkDuplicateProducts)
 				products.GET("/:id/shared-agencies", handlers.ListSharedAgencies)
 				products.POST("/:id/shared-agencies", handlers.ShareProduct)
 				products.DELETE("/:id/shared-agencies/:agencia", handlers.UnshareProduct)
@@ -117,19 +132,22 @@ func main() {
 				orders.GET("/blocked", handlers.GetBlockedReservations)
 				orders.POST("/", handlers.CreateReservation)
 				orders.POST("/hold", handlers.CreateHold)
+				orders.PUT("/hold/:id", handlers.AdjustHold)
 				orders.DELETE("/hold/:id", handlers.ReleaseHold)
 				orders.GET("/:id", handlers.GetReservationByID)
-				orders.PUT("/:id", handlers.UpdateReservation)
-				orders.PUT("/:id/doc-contable", handlers.AddDocContable)
+				orders.PUT("/:id", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.UpdateReservation)
+				orders.PUT("/:id/doc-contable", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.AddDocContable)
 				orders.PUT("/:id/cancel-request", handlers.RequestCancellation)
 				orders.PUT("/:id/cancel-request/resolve", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.ResolveCancellation)
-				orders.POST("/:id/confirm", handlers.ConfirmReservation)
+				orders.POST("/:id/confirm", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.ConfirmReservation)
 				orders.PUT("/:id/passengers/:passengerId", handlers.UpdatePassengerTicket)
 				orders.PUT("/:id/passengers/:passengerId/full", handlers.UpdatePassenger)
 				orders.POST("/:id/passengers", handlers.AddPassenger)
 				orders.POST("/:id/passengers/:passengerId/duplicate", handlers.DuplicatePassenger)
-				orders.DELETE("/:id/passengers/:passengerId", handlers.DeletePassenger)
+				orders.DELETE("/:id/passengers/:passengerId", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.DeletePassenger)
 				orders.DELETE("/:id", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.DeleteReservation)
+				orders.POST("/bulk-update", middleware.RequirePermission("RESERVATIONS_UPDATE"), handlers.BulkUpdateReservations)
+				orders.POST("/bulk-cancel", middleware.RequirePermission("RESERVATIONS_DELETE"), handlers.BulkCancelReservations)
 			}
 
 			// Grupos (vuelos a medida): igual que /orders, el listado no está
@@ -149,6 +167,29 @@ func main() {
 				groups.POST("/:id/send-quote", middleware.RequirePermission("GROUPS_UPDATE"), handlers.SendGroupQuote)
 				groups.POST("/:id/request-cancellation", handlers.RequestGroupCancellation)
 				groups.POST("/:id/resolve-cancellation", middleware.RequirePermission("GROUPS_UPDATE"), handlers.ResolveGroupCancellation)
+			}
+
+			// Oportunidades (análisis de pedidos antes de convertirse en Productos)
+			opportunities := protected.Group("/opportunities")
+			{
+				opportunities.GET("/", middleware.RequirePermission("OPPORTUNITIES_VIEW"), handlers.GetOpportunities)
+				opportunities.GET("/:id", middleware.RequirePermission("OPPORTUNITIES_VIEW"), handlers.GetOpportunity)
+				opportunities.POST("/", middleware.RequirePermission("OPPORTUNITIES_CREATE"), handlers.CreateOpportunity)
+				opportunities.PUT("/:id", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.UpdateOpportunity)
+				opportunities.DELETE("/:id", middleware.RequirePermission("OPPORTUNITIES_DELETE"), handlers.DeleteOpportunity)
+				opportunities.PUT("/:id/approve", middleware.RequirePermission("OPPORTUNITIES_UPDATE"), handlers.ApproveOpportunity)
+				opportunities.POST("/:id/convert-to-product", middleware.RequirePermission("OPPORTUNITIES_CONVERT"), handlers.ConvertOpportunityToProduct)
+				opportunities.POST("/bulk-approve", middleware.RequirePermission("OPPORTUNITIES_APPROVE"), handlers.BulkApproveOpportunities)
+				opportunities.POST("/bulk-delete", middleware.RequirePermission("OPPORTUNITIES_DELETE"), handlers.BulkDeleteOpportunities)
+			}
+
+			// Bandeja de Tickets emitidos (inmutables, lógica GDS + Netviax Atlas)
+			tickets := protected.Group("/tickets")
+			{
+				tickets.GET("/", middleware.RequirePermission("TICKETS_VIEW"), handlers.GetTickets)
+				tickets.GET("/:id", middleware.RequirePermission("TICKETS_VIEW"), handlers.GetTicketByID)
+				tickets.POST("/:id/void", middleware.RequirePermission("TICKETS_VOID"), handlers.VoidTicket)
+				tickets.POST("/:id/sync-atlas", middleware.RequirePermission("TICKETS_SYNC"), handlers.SyncTicketAtlas)
 			}
 
 			// Mis permisos resueltos (cualquier usuario autenticado, no solo admin —
@@ -204,6 +245,8 @@ func main() {
 				reports.GET("/forecast-sales", handlers.ForecastSalesHandler)
 				reports.GET("/grupos", handlers.GetGroupsReport)
 			}
+			// Métricas personales para usuarios regulares (solo sesión, sin REPORTS_VIEW)
+			protected.GET("/reports/user-metrics", handlers.GetUserMetrics)
 
 			// Ajustes
 			settings := protected.Group("/settings")
@@ -229,7 +272,6 @@ func main() {
 				apiKeysGroup.POST("", middleware.AgencyAdminOrAdmin(), handlers.CreateAPIKeyHandler)
 				apiKeysGroup.DELETE("/:id", middleware.AgencyAdminOrAdmin(), handlers.RevokeAPIKeyHandler)
 			}
-
 
 			// Exportación
 			protected.GET("/export/csv/:entityType", handlers.ExportCSV)
@@ -264,14 +306,14 @@ func main() {
 				ai.PUT("/experts/:id/documents/:docId", middleware.AgencyAdminOrAdmin(), handlers.UpdateAIExpertDocument)
 			}
 
-			// CRUD Dinámico (Data)
-			data := protected.Group("/data")
-			{
-				data.GET("/", handlers.GetData)
-				data.POST("/", handlers.ExecuteCRUD)
-				data.PUT("/", handlers.ExecuteCRUD)
-				data.DELETE("/", handlers.ExecuteCRUD)
-			}
+			// Eliminado 2026-08-13 (hallazgo crítico de la auditoría de
+			// seguridad): existía un "CRUD Dinámico" (/data) que aceptaba
+			// nombre de tabla Y de columna arbitrarios del request sin
+			// ninguna allowlist ni permiso más allá de estar logueado —
+			// cualquier usuario autenticado podía volcar cualquier tabla
+			// (incluyendo password hashes) o auto-promoverse a admin
+			// escribiendo directo su propia fila de profiles. Sin ningún
+			// caller real en el frontend (`grep` no encontró ningún uso).
 
 			// Agencias
 			agencies := protected.Group("/agencies")
@@ -285,6 +327,17 @@ func main() {
 				agencies.POST("/", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_CREATE"), handlers.CreateAgency)
 				agencies.PUT("/:id", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_UPDATE"), handlers.UpdateAgency)
 				agencies.DELETE("/:id", middleware.AdminOnly(), middleware.RequirePermission("AGENCIES_DELETE"), handlers.DeleteAgency)
+			}
+
+			// Temporadas: lista global para el desplegable de Producto — el GET
+			// queda abierto a cualquier autenticado (lo necesita el formulario),
+			// administrarla es exclusivo del superadmin (ver seedRBAC en db.go).
+			temporadas := protected.Group("/temporadas")
+			{
+				temporadas.GET("/", handlers.ListTemporadas)
+				temporadas.POST("/", middleware.AdminOnly(), middleware.RequirePermission("TEMPORADAS_CREATE"), handlers.CreateTemporada)
+				temporadas.PUT("/:id", middleware.AdminOnly(), middleware.RequirePermission("TEMPORADAS_UPDATE"), handlers.UpdateTemporada)
+				temporadas.DELETE("/:id", middleware.AdminOnly(), middleware.RequirePermission("TEMPORADAS_DELETE"), handlers.DeleteTemporada)
 			}
 			// Self-service: prender/apagar la IA de la PROPIA agencia — la agencia
 			// objetivo la resuelve el handler de c.Get("agencia"), nunca de acá.
@@ -354,6 +407,9 @@ func main() {
 			{
 				backoffice.POST("/contactos/buscar", handlers.BuscarContactoAtlas)
 				backoffice.GET("/contactos/:codigo", handlers.DetalleContactoAtlas)
+				// wsfichabuscar ya trae el detalle + pasajeros en la misma
+				// respuesta, no hace falta un detalle aparte.
+				backoffice.POST("/fichas/buscar", handlers.BuscarFichaAtlas)
 			}
 
 			// Configuración de credenciales de Netviax Atlas, por agencia
@@ -373,6 +429,8 @@ func main() {
 			{
 				systemGroup.GET("/status", middleware.RequirePermission("LOGS_VIEW"), handlers.GetSystemStatus)
 				systemGroup.POST("/holds/:id/release", middleware.AdminOnly(), handlers.AdminReleaseHold)
+				systemGroup.POST("/qa/run", middleware.RequirePermission("LOGS_VIEW"), handlers.RunSystemQA)
+				systemGroup.POST("/qa/ai-dictamen", middleware.RequirePermission("LOGS_VIEW"), handlers.GenerateAIDictamen)
 			}
 
 			// Configuración de email (SMTP + plantillas) por agencia
@@ -384,17 +442,17 @@ func main() {
 				emailConfig.DELETE("/config/:id", handlers.DeleteEmailConfig)
 				emailConfig.POST("/test", handlers.TestEmailConnection)
 				emailConfig.POST("/send-test", handlers.SendTestEmail)
-				emailConfig.GET("/templates", handlers.GetEmailTemplates)
-				emailConfig.PUT("/templates/:id", handlers.UpdateEmailTemplate)
-				emailConfig.GET("/templates/:id/preview", handlers.PreviewEmailTemplate)
+				emailConfig.GET("/templates", middleware.RequirePermission("EMAIL_VIEW"), handlers.GetEmailTemplates)
+				emailConfig.PUT("/templates/:id", middleware.RequirePermission("EMAIL_UPDATE"), handlers.UpdateEmailTemplate)
+				emailConfig.GET("/templates/:id/preview", middleware.RequirePermission("EMAIL_VIEW"), handlers.PreviewEmailTemplate)
 			}
 
 			// Plantillas de notificaciones in-app (campana), por agencia
 			notificationConfig := protected.Group("/notification-config")
 			{
-				notificationConfig.GET("/templates", handlers.GetNotificationTemplates)
-				notificationConfig.PUT("/templates/:id", handlers.UpdateNotificationTemplate)
-				notificationConfig.GET("/templates/:id/preview", handlers.PreviewNotificationTemplate)
+				notificationConfig.GET("/templates", middleware.RequirePermission("NOTIFICATION_TEMPLATES_VIEW"), handlers.GetNotificationTemplates)
+				notificationConfig.PUT("/templates/:id", middleware.RequirePermission("NOTIFICATION_TEMPLATES_UPDATE"), handlers.UpdateNotificationTemplate)
+				notificationConfig.GET("/templates/:id/preview", middleware.RequirePermission("NOTIFICATION_TEMPLATES_VIEW"), handlers.PreviewNotificationTemplate)
 			}
 		}
 	}

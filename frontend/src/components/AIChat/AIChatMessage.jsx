@@ -18,12 +18,12 @@ const MARKDOWN_COMPONENTS = {
     li: ({ children }) => <li className="pl-0.5">{children}</li>,
     strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
     a: ({ children, href }) => (
-        <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2 text-blue-600 dark:text-blue-400 hover:text-blue-500">
+        <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2 text-blue-600 hover:text-blue-500">
             {children}
         </a>
     ),
     blockquote: ({ children }) => (
-        <blockquote className="border-l-2 border-zinc-300 dark:border-zinc-600 pl-2 my-1.5 text-zinc-600 dark:text-zinc-400">
+        <blockquote className="border-l-2 border-zinc-300 pl-2 my-1.5 text-zinc-600">
             {children}
         </blockquote>
     ),
@@ -36,22 +36,22 @@ const MARKDOWN_COMPONENTS = {
         return isBlock ? (
             <code className="font-mono text-[13px]">{children}</code>
         ) : (
-            <code className="bg-zinc-200 dark:bg-zinc-700 rounded px-1 py-0.5 font-mono text-[13px]">{children}</code>
+            <code className="bg-zinc-200 rounded px-1 py-0.5 font-mono text-[13px]">{children}</code>
         );
     },
     pre: ({ children }) => (
-        <pre className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 my-1.5 overflow-x-auto">
+        <pre className="bg-zinc-100 border border-zinc-200 rounded-lg p-2 my-1.5 overflow-x-auto">
             {children}
         </pre>
     ),
-    hr: () => <hr className="my-2 border-zinc-200 dark:border-zinc-700" />,
+    hr: () => <hr className="my-2 border-zinc-200" />,
     table: ({ children }) => (
         <div className="overflow-x-auto my-1.5">
             <table className="text-[13px] border-collapse">{children}</table>
         </div>
     ),
-    th: ({ children }) => <th className="border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-left font-semibold">{children}</th>,
-    td: ({ children }) => <td className="border border-zinc-300 dark:border-zinc-600 px-2 py-1">{children}</td>,
+    th: ({ children }) => <th className="border border-zinc-300 px-2 py-1 text-left font-semibold">{children}</th>,
+    td: ({ children }) => <td className="border border-zinc-300 px-2 py-1">{children}</td>,
 };
 
 const TOOL_LABELS = {
@@ -91,10 +91,10 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
             {/* Avatar */}
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs
                 ${isUser
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                    ? 'bg-zinc-900 text-white'
                     : isError
-                        ? 'bg-red-100 text-red-600 dark:bg-red-900/30'
-                        : 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                        ? 'bg-red-100 text-red-600'
+                        : 'bg-zinc-900 text-white'
                 }`}>
                 {isUser ? <User className="w-3.5 h-3.5" /> : isError ? <AlertCircle className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
             </div>
@@ -110,7 +110,7 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
                                 key={idx}
                                 src={img}
                                 alt={`documento-${idx}`}
-                                className="rounded-lg w-16 h-16 object-cover border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                                className="rounded-lg w-16 h-16 object-cover border border-zinc-200 shadow-sm"
                             />
                         ))}
                     </div>
@@ -118,16 +118,16 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
                     <img
                         src={imagePreview}
                         alt="documento"
-                        className="rounded-lg max-w-[180px] max-h-[120px] object-cover border border-zinc-200 dark:border-zinc-700 mb-1"
+                        className="rounded-lg max-w-[180px] max-h-[120px] object-cover border border-zinc-200 mb-1"
                     />
                 ) : null}
 
                 <div className={`rounded-xl px-3 py-2 text-sm border
                     ${isUser
-                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-transparent rounded-tr-none'
+                        ? 'bg-zinc-900 text-white border-transparent rounded-tr-none'
                         : isError
-                            ? 'bg-red-50 text-red-700 border-red-200 rounded-tl-none dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
-                            : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-200 dark:border-zinc-700 rounded-tl-none'
+                            ? 'bg-red-50 text-red-700 border-red-200 rounded-tl-none'
+                            : 'bg-zinc-50 text-zinc-900 border-zinc-200 rounded-tl-none'
                     }`}>
 
                     {/* Tool calls ejecutados */}
@@ -136,7 +136,7 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
                             <button
                                 type="button"
                                 onClick={() => setShowTools(p => !p)}
-                                className="flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors"
                             >
                                 <Wrench className="w-3 h-3" />
                                 <span>{toolCalls.length} acción{toolCalls.length > 1 ? 'es' : ''} ejecutada{toolCalls.length > 1 ? 's' : ''}</span>
@@ -145,7 +145,7 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
                             {showTools && (
                                 <div className="mt-1.5 space-y-1">
                                     {toolCalls.map((tc, i) => (
-                                        <div key={i} className="text-[11px] bg-zinc-100 dark:bg-zinc-700/50 rounded-lg px-2 py-1 text-zinc-600 dark:text-zinc-400 font-mono">
+                                        <div key={i} className="text-[11px] bg-zinc-100 rounded-lg px-2 py-1 text-zinc-600 font-mono">
                                             {TOOL_LABELS[tc.tool] || tc.tool}
                                         </div>
                                     ))}
@@ -171,10 +171,10 @@ export default function AIChatMessage({ message, isUser, timestamp, toolCalls, i
                     {/* Footer */}
                     {!isUser && (
                         <div className="mt-1.5 flex items-center justify-between">
-                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{formatTime(timestamp)}</span>
+                            <span className="text-[10px] text-zinc-400">{formatTime(timestamp)}</span>
                             <button
                                 onClick={handleCopy}
-                                className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                                className="p-0.5 rounded hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600 transition-colors"
                                 title="Copiar"
                             >
                                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}

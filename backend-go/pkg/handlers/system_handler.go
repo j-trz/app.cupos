@@ -280,15 +280,13 @@ func AdminReleaseHold(c *gin.Context) {
 		return
 	}
 
-	// Cuántos asientos devolver
+	// Cuántos asientos devolver. HoldPassengerCount (pre-hold sin datos de
+	// pasajero todavía) siempre ocupó ese lugar completo; una reserva real ya
+	// tiene tipo por pasajero, así que se excluye al infante (no ocupó lugar).
 	passengersToReturn := reservation.HoldPassengerCount
 	if passengersToReturn == 0 {
-		var paxCount int64
-		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&paxCount)
-		passengersToReturn = int(paxCount)
-		if passengersToReturn == 0 {
-			passengersToReturn = 1
-		}
+		seats, _ := countPassengerSeats(reservation.ID)
+		passengersToReturn = int(seats)
 	}
 
 	// Transacción: expirar reserva + devolver stock

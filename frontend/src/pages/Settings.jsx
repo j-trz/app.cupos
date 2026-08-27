@@ -178,6 +178,53 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Infant Fare Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Cálculo de Tarifas de Infant (Bebés)
+            </CardTitle>
+            <CardDescription>
+              Porcentajes por defecto utilizados para auto-generar la tarifa e impuestos del infant en la creación de productos
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="porcentaje_tarifa_infant">% sobre el Total Adulto para Infant</Label>
+              <Input
+                id="porcentaje_tarifa_infant"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={settings.porcentaje_tarifa_infant || '15'}
+                onChange={(e) => handleChange('porcentaje_tarifa_infant', e.target.value)}
+                placeholder="15"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Porcentaje por defecto sobre el total del adulto (Tarifa + Impuestos) para calcular el total del infant (ej: 15%).
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="porcentaje_impuestos_infant">% de Impuestos sobre el Total del Infant</Label>
+              <Input
+                id="porcentaje_impuestos_infant"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={settings.porcentaje_impuestos_infant || '10'}
+                onChange={(e) => handleChange('porcentaje_impuestos_infant', e.target.value)}
+                placeholder="10"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Porcentaje del total calculado del infant asignado a impuestos (ej: 10%, el 90% restante queda en tarifa).
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* AI Settings */}
         <Card>
           <CardHeader>

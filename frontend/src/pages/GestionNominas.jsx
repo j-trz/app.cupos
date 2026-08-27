@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Pencil, Trash2, Copy, Plus, Lock } from 'lucide-react';
+import { Users, Package, ClipboardList, CheckCircle2, Download, RefreshCw, ChevronDown, ChevronRight, Search, Edit, Trash2, Copy, Plus, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import ApiClient from '../services/apiClient';
@@ -8,12 +8,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import Modal from '../components/Modal.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import { useAgencies } from '../hooks/useAgencies';
+import { getEstadoVariant as getBadgeVariant, getEstadoLabel } from '../lib/estadoReserva.js';
 import { formatDateOnly } from '../lib/dateOnly.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -46,6 +50,7 @@ const buildPassengerRows = (r) => {
     // qué agencia vino — para que en la nómina se note que ese pasajero no es
     // "propio" del catálogo, sino de un cupo cedido.
     originalAgency: r.original_agency || null,
+    estadoInterno: r.estado_interno || '',
   };
 
   if (Array.isArray(r.passengers) && r.passengers.length > 0) {
@@ -58,6 +63,7 @@ const buildPassengerRows = (r) => {
       nombre: p.nombre || '—',
       apellido: p.apellido || '—',
       documento: p.documento || '—',
+      pasaporte: p.pasaporte || '—',
       nacimiento: p.nacimiento,
       nacionalidad: p.nacionalidad || '—',
       tipoPasajero: p.tipo_pasajero || '—',
@@ -79,6 +85,7 @@ const buildPassengerRows = (r) => {
     nombre: r.nombre_pasajero || '—',
     apellido: r.apellido_pasajero || '—',
     documento: r.documento_pasajero || '—',
+    pasaporte: '—',
     nacimiento: r.nacimiento_pasajero,
     nacionalidad: r.nacionalidad_pasajero || '—',
     tipoPasajero: r.tipo_pasajero || '—',
@@ -91,23 +98,6 @@ const buildPassengerRows = (r) => {
   }];
 };
 
-const getBadgeVariant = (estado) => {
-  if (estado === 'confirmada' || estado === 'confirmado') return 'success';
-  if (estado === 'bloqueo_temporal') return 'warning';
-  if (estado === 'cancelada' || estado === 'solicitud_cancelacion') return 'danger';
-  return 'default';
-};
-
-const getEstadoLabel = (estado) => ({
-  bloqueo_temporal: 'Bloqueo Temporal',
-  confirmado: 'Confirmado',
-  confirmada: 'Confirmada',
-  cancelado: 'Cancelado',
-  cancelada: 'Cancelada',
-  solicitud_cancelacion: 'Sol. Cancelación',
-  procesando: 'Procesando',
-}[estado] || estado || '—');
-
 // Comparación de códigos de agencia case/espacio-insensible — igual que el
 // backend (strings.EqualFold) en product_handler.go. Sin esto, una diferencia
 // de mayúsculas entre Product.Agencia y Reservation.Agencia (mismo código,
@@ -118,9 +108,14 @@ const sameAgency = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim()
 // Adulto/Menor/Infante -> ADT/CHD/INF, la nomenclatura estándar de la industria.
 const TIPO_PASAJERO_CODES = { Adulto: 'ADT', Menor: 'CHD', Infante: 'INF' };
 
+// Cuenta solo pasajeros activos (excluye cancelados) — así el desglose
+// ADT/CHD/INF se mueve junto con los badges Confirmadas/Pendientes vecinos
+// en vez de ser un total histórico ciego al estado. 'expirada'/'cedido' ya
+// se filtran antes, al armar `reservations` (ver el filter de setReservations).
 const countPassengerTypes = (passengerRows) => {
   const counts = { ADT: 0, CHD: 0, INF: 0 };
   passengerRows.forEach((row) => {
+    if (row.estado === 'cancelada' || row.estado === 'cancelado') return;
     const code = TIPO_PASAJERO_CODES[row.tipoPasajero];
     if (code) counts[code]++;
   });
@@ -140,10 +135,11 @@ const buildRow = (r, products) => {
     'Nombre': row.nombre,
     'Apellido': row.apellido,
     'Documento': row.documento,
+    'Pasaporte': row.pasaporte === '—' ? '' : row.pasaporte,
     'Fecha Nacimiento': formatDate(row.nacimiento),
     'Nacionalidad': row.nacionalidad,
     'Tipo Pasajero': row.tipoPasajero,
-    'Estado': getEstadoLabel(row.estado),
+    'Estado': getEstadoLabel(row.estado, row.estadoInterno),
     'Contacto': row.contactoNombre,
     'Email Contacto': row.contactoEmail,
     'Teléfono Contacto': row.contactoTelefono,
@@ -153,7 +149,7 @@ const buildRow = (r, products) => {
     'Vendedor': row.vendedorEmail,
     'Precio Venta': row.precioVenta ?? '',
     'Neto 1': row.neto1 ?? '',
-    'OP': product?.op ?? '',
+    'OP': product?.[`op_${passengerPriceSuffix(row.tipoPasajero)}`] ?? product?.op ?? '',
     'Salida': formatDate(r.vuelo_salida || product?.fecha_salida || product?.salida),
   }));
 };
@@ -180,6 +176,109 @@ const exportToExcel = (reservations, products) => {
   XLSX.writeFile(wb, `nominas-${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
+// ─── Excel export para Backoffice (BO) ──────────────────────────────────────
+// Formato fijo pedido para importar a Netviax Atlas: una fila por pasajero,
+// con las columnas exactas (incluye varias en blanco a propósito — "K1" a
+// "P1", "W1", "AA1" a "AD1" — que el template de BO espera aunque este
+// sistema no tenga ese dato).
+
+// Adulto/Menor(Niño)/Infante -> el sufijo de campo de Producto correspondiente
+// (tarifa_adt/impuestos_adt, etc). Acepta "Niño" además de "Menor" porque
+// conviven los dos valores en el sistema (ver GestionReservas.jsx vs.
+// Availability.jsx) — cualquiera de los dos cuenta como CHD acá.
+const passengerPriceSuffix = (tipoPasajero) => {
+  const t = (tipoPasajero || '').toLowerCase();
+  if (t === 'infante') return 'inf';
+  if (t === 'menor' || t === 'niño' || t === 'nino') return 'chd';
+  return 'adt';
+};
+
+const buildBORow = (r, products, agencies) => {
+  const product = products.find((p) => String(p.id) === String(r.product_id));
+  const agencyDisplayName = agencies.find((a) => a.code === r.agencia)?.name || r.agencia || '';
+
+  return buildPassengerRows(r).map((row) => {
+    const suffix = passengerPriceSuffix(row.tipoPasajero);
+    const tarifa = Number(product?.[`tarifa_${suffix}`]) || 0;
+    const impuestos = Number(product?.[`impuestos_${suffix}`]) || 0;
+    const neto1 = tarifa + impuestos;
+    // OP según el tipo real de ESTE pasajero — antes era un solo valor
+    // (product.op) aplicado a todos los tipos por igual.
+    const op = Number(product?.[`op_${suffix}`] ?? product?.op) || 0;
+    const netoVendedor = neto1 + op;
+
+    return {
+      'NRO': row.esVentaPrincipal === null ? '' : (row.esVentaPrincipal ? 1 : 0),
+      'Cupo': product?.codigo_cupo || r.vuelo_codigo || '',
+      'Pasajero': `${row.apellido === '—' ? '' : row.apellido.toUpperCase()}/${row.nombre === '—' ? '' : row.nombre.toUpperCase()}`,
+      'Ficha': row.fichaVenta === '—' ? '' : row.fichaVenta,
+      'CI': row.documento === '—' ? '' : row.documento,
+      'Pasaporte': row.pasaporte === '—' ? '' : row.pasaporte,
+      'Fecha Nac': formatDate(row.nacimiento) || '',
+      'Celular': r.contacto_telefono || '',
+      'Vendedor': row.vendedorEmail === '—' ? '' : row.vendedorEmail,
+      'Agencia': agencyDisplayName,
+      'K1': '', 'L1': '', 'M1': '', 'N1': '', 'O1': '', 'P1': '',
+      'Creado': r.created_at ? new Date(r.created_at).toLocaleString('es-AR') : '',
+      'TARIFA': tarifa,
+      'TASAS': impuestos,
+      'NETO 1': neto1,
+      'OP': op,
+      'Neto Vendedor': netoVendedor,
+      'W1': '',
+      'Regreso': formatDate(product?.fecha_regreso) || '',
+      'Fecha emisión de grupo': r.emitido_at ? formatDate(r.emitido_at) : '',
+      'Código de Reserva': product?.pnr || '',
+      'AA1': '', 'AB1': '', 'AC1': '', 'AD1': '',
+      'Status BACK': r.status_back || '',
+    };
+  });
+};
+
+const exportToExcelBO = (reservations, products, agencies) => {
+  const rows = reservations.flatMap((r) => buildBORow(r, products, agencies));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+  XLSX.utils.book_append_sheet(wb, ws, 'BO');
+  XLSX.writeFile(wb, `nominas-bo-${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
+// ─── Excel export "Nómina" (por producto) ───────────────────────────────────
+// Reporte reducido para operativa/embarque — solo las columnas que se usan en
+// el papel, no todos los datos administrativos (a diferencia de Exportar
+// Excel/BO, que son "todo el dato"). Numeración corrida por asiento; el
+// infante no ocupa lugar así que no lleva número, va marcado "INF" (mismo
+// criterio que el resto de la app — ver countPassengerTypes/Disponibilidad).
+const exportFichaOperativa = (product, passengerRows) => {
+  const header = ['N°', 'CUPO', 'APELLIDO/NOMBRE', 'FICHA', 'CI', 'PP', 'F NACIM', 'VEND'];
+  let seatNumber = 0;
+  const dataRows = passengerRows
+    .filter((row) => row.estado !== 'cancelada' && row.estado !== 'cancelado')
+    .map((row) => {
+      const esInfante = row.tipoPasajero === 'Infante';
+      if (!esInfante) seatNumber++;
+      const apellido = row.apellido === '—' ? '' : row.apellido.toUpperCase();
+      const nombre = row.nombre === '—' ? '' : row.nombre.toUpperCase();
+      return [
+        esInfante ? 'INF' : seatNumber,
+        product?.codigo_cupo || '',
+        `${apellido}/${nombre}`,
+        row.fichaVenta === '—' ? '' : row.fichaVenta,
+        row.documento === '—' ? '' : row.documento,
+        row.pasaporte === '—' ? '' : row.pasaporte,
+        formatDate(row.nacimiento) || '',
+        row.vendedorEmail === '—' ? '' : row.vendedorEmail,
+      ];
+    });
+
+  const aoa = [[`F OPERATIVA ${product?.ficha || '—'}`], [], header, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Nomina');
+  const fileTag = product?.codigo_cupo || product?.ficha || 'ficha';
+  XLSX.writeFile(wb, `nomina-${fileTag}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
 // ─── Formulario compartido de datos de pasajero (editar / agregar) ──────────
 
 const passengerInputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
@@ -200,19 +299,25 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700">Documento</label>
+          <label className="text-sm font-medium text-slate-700">CI</label>
           <input type="text" value={values.documento} onChange={set('documento')} className={passengerInputCls} />
         </div>
         <div className="space-y-1">
-          <label className="text-sm font-medium text-slate-700">Nacimiento</label>
-          <input type="date" value={values.nacimiento} onChange={set('nacimiento')} className={passengerInputCls} />
+          <label className="text-sm font-medium text-slate-700">Pasaporte</label>
+          <input type="text" value={values.pasaporte} onChange={set('pasaporte')} className={passengerInputCls} />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
+          <label className="text-sm font-medium text-slate-700">Nacimiento</label>
+          <input type="date" value={values.nacimiento} onChange={set('nacimiento')} className={passengerInputCls} />
+        </div>
+        <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Nacionalidad</label>
           <input type="text" value={values.nacionalidad} onChange={set('nacionalidad')} className={passengerInputCls} />
         </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-sm font-medium text-slate-700">Tipo</label>
           <select value={values.tipo_pasajero} onChange={set('tipo_pasajero')} className={`${passengerInputCls} bg-white`}>
@@ -245,6 +350,8 @@ function PassengerFieldsForm({ values, onChange, showTicket }) {
 // ─── Product section (collapsible) ───────────────────────────────────────────
 
 function ProductSection({ product, reservations, agencyName, onEdit, onDelete, onDuplicate, onAdd }) {
+  const { user } = useAuth();
+  const myAgencia = user?.agencia;
   const [expanded, setExpanded] = useState(false);
 
   const estado = (r) => r.estado || '';
@@ -254,44 +361,68 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
     [reservations]
   );
 
+  // Colores por familia/ficha: un tono distinto por grupo de pedidoId
+  // consecutivo, para distinguir visualmente dónde termina una ficha y
+  // empieza la siguiente (los pasajeros de un mismo pedido ya vienen
+  // contiguos en passengerRows).
+  const PEDIDO_ROW_TINTS = [
+    'bg-white',
+    'bg-sky-50/60',
+  ];
+  const rowTintByKey = useMemo(() => {
+    const map = {};
+    let groupIndex = -1;
+    let lastPedidoId = null;
+    passengerRows.forEach((row) => {
+      if (row.pedidoId !== lastPedidoId) {
+        groupIndex++;
+        lastPedidoId = row.pedidoId;
+      }
+      map[row.key] = PEDIDO_ROW_TINTS[groupIndex % PEDIDO_ROW_TINTS.length];
+    });
+    return map;
+  }, [passengerRows]);
+
   const tipoCounts = useMemo(() => countPassengerTypes(passengerRows), [passengerRows]);
 
   return (
     <Card className="overflow-hidden">
-      {/* Header row — always visible */}
+      {/* Header row — always visible. El botón de export va afuera del botón de
+          expandir/colapsar (no puede ir anidado dentro de otro <button>). */}
+      <div className="flex items-center">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+        className="flex-1 min-w-0 flex items-center gap-3 px-5 py-4 text-left hover:bg-zinc-50 transition-colors"
       >
-        <span className="text-zinc-500 dark:text-zinc-400 shrink-0">
+        <span className="text-zinc-500 shrink-0">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </span>
 
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-4 items-center">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+            <p className="text-sm font-semibold text-zinc-900 truncate">
               {product?.destino || 'Destino desconocido'}
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+            <p className="text-xs text-zinc-500 truncate">
               {product?.codigo_cupo || '—'}
               {product?.tipo_producto && ` · ${product.tipo_producto}`}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Salida</p>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            <p className="text-xs text-zinc-500">Salida</p>
+            <p className="text-sm text-zinc-700">
               {formatDate(product?.fecha_salida || product?.salida) || '—'}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Temporada</p>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            <p className="text-xs text-zinc-500">Temporada</p>
+            <p className="text-sm text-zinc-700">
               {product?.temporada || '—'}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">ADT · CHD · INF</p>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <p className="text-xs text-zinc-500">ADT · CHD · INF</p>
+            <p className="text-sm font-medium text-zinc-700">
               {tipoCounts.ADT} · {tipoCounts.CHD} · {tipoCounts.INF}
             </p>
           </div>
@@ -310,13 +441,23 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
           {reservations.length}
         </Badge>
       </button>
+      <ActionIconButton
+        icon={Download}
+        onClick={() => exportFichaOperativa(product, passengerRows)}
+        title="Exportar Nómina (reporte reducido para operativa/embarque)"
+        className="mr-3 shrink-0"
+      />
+      </div>
 
       {/* Expandable table — una fila por pasajero, con todos los datos */}
       {expanded && (
-        <div className="border-t border-zinc-100 dark:border-zinc-800 overflow-x-auto">
+        <div className="border-t border-zinc-100 overflow-x-auto">
           <TableComponent>
             <TableHeader>
               <TableRow>
+                <TableHead className="text-center sticky left-0 z-20 bg-slate-50 border-r border-b border-slate-200">Acciones</TableHead>
+                <TableHead>Ficha</TableHead>
+                <TableHead>Vendedor</TableHead>
                 <TableHead>Pedido ID</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Apellido</TableHead>
@@ -334,49 +475,67 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                 <TableHead>Tel. Contacto</TableHead>
                 <TableHead>Doc. Contable</TableHead>
                 <TableHead>Ticket</TableHead>
-                <TableHead>Ficha</TableHead>
-                <TableHead>Vendedor</TableHead>
-                <TableHead>Precio Venta</TableHead>
-                <TableHead>Neto 1</TableHead>
-                <TableHead>OP</TableHead>
-                <TableHead className="text-center">Acciones</TableHead>
+                <TableHead className="text-right">Precio Venta</TableHead>
+                <TableHead className="text-right">Neto 1</TableHead>
+                <TableHead className="text-right">OP</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {passengerRows.map((row) => (
-                <TableRow key={row.key}>
-                  <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                <TableRow key={row.key} className={rowTintByKey[row.key]}>
+                  <TableCell className="sticky left-0 z-10 bg-white border-r border-slate-200">
+                    <div className="flex items-center justify-center gap-1">
+                      {row.passengerId && (
+                        <>
+                          <ActionIconButton icon={Edit} onClick={() => onEdit(row)} title="Editar pasajero" />
+                          <ActionIconButton icon={Copy} onClick={() => onDuplicate(row)} title="Duplicar pasajero" />
+                          <ActionIconButton icon={Trash2} variant="danger" onClick={() => onDelete(row)} title="Eliminar pasajero" />
+                        </>
+                      )}
+                      <ActionIconButton icon={Plus} onClick={() => onAdd(row)} title="Agregar pasajero a este pedido" />
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-zinc-700">{row.fichaVenta}</TableCell>
+                  <TableCell className="text-zinc-700">{row.vendedorEmail}</TableCell>
+                  <TableCell className="font-mono text-xs text-zinc-600">
                     {row.pedidoId}
                   </TableCell>
-                  <TableCell className="text-zinc-900 dark:text-zinc-100 font-medium">
+                  <TableCell className="text-zinc-900 font-medium">
                     {row.nombre}
                     {row.esVentaPrincipal === false && (
                       <Badge variant="secondary" className="ml-2 text-xs">Acompañante</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.apellido}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.documento}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatDate(row.nacimiento)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.nacionalidad}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.tipoPasajero}</TableCell>
+                  <TableCell className="text-zinc-700">{row.apellido}</TableCell>
+                  <TableCell className="text-zinc-700">{row.documento}</TableCell>
+                  <TableCell className="text-zinc-700">{formatDate(row.nacimiento)}</TableCell>
+                  <TableCell className="text-zinc-700">{row.nacionalidad}</TableCell>
+                  <TableCell className="text-zinc-700">{row.tipoPasajero}</TableCell>
                   <TableCell>
-                    <Badge variant={getBadgeVariant(row.estado)}>
-                      {getEstadoLabel(row.estado)}
+                    <Badge variant={getBadgeVariant(row.estado, row.estadoInterno)}>
+                      {getEstadoLabel(row.estado, row.estadoInterno)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">
                     {formatDate(product?.fecha_salida || product?.salida) || '—'}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">
                     {product?.temporada || '—'}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  <TableCell className="text-zinc-700">
                     {agencyName(row.agencia)}
                   </TableCell>
                   <TableCell>
-                    {row.originalAgency ? (
+                    {row.originalAgency && !sameAgency(row.originalAgency, myAgencia) ? (
                       <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
                         Cupo de {agencyName(row.originalAgency)}
+                      </Badge>
+                    ) : row.originalAgency ? (
+                      // Soy la agencia cedente: esta venta la hizo la agencia
+                      // receptora sobre un cupo que yo cedí — no "cupo de mí
+                      // mismo", sino cesión saliente ya vendida por otro.
+                      <Badge variant="outline" className="w-fit text-[10px] whitespace-nowrap">
+                        Cedido a {agencyName(row.agencia)}
                       </Badge>
                     ) : product?.agencia && row.agencia && !sameAgency(row.agencia, product.agencia) ? (
                       // Producto compartido (visibilidad multi-agencia, mismo
@@ -385,54 +544,18 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
                         Compartido — otra agencia
                       </Badge>
                     ) : (
-                      <span className="text-zinc-300 dark:text-zinc-600" title="Producto propio">—</span>
+                      <span className="text-zinc-300" title="Producto propio">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoNombre}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoEmail}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.contactoTelefono}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.docContable}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300 font-mono text-xs">{row.numeroTicket}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.fichaVenta}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{row.vendedorEmail}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.precioVenta)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{formatMoney(row.neto1)}</TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">{product?.op ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      {row.passengerId && (
-                        <>
-                          <button
-                            onClick={() => onEdit(row)}
-                            title="Editar pasajero"
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => onDuplicate(row)}
-                            title="Duplicar pasajero"
-                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => onDelete(row)}
-                            title="Eliminar pasajero"
-                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => onAdd(row)}
-                        title="Agregar pasajero a este pedido"
-                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
+                  <TableCell className="text-zinc-700">{row.contactoNombre}</TableCell>
+                  <TableCell className="text-zinc-700">{row.contactoEmail}</TableCell>
+                  <TableCell className="text-zinc-700">{row.contactoTelefono}</TableCell>
+                  <TableCell className="text-zinc-700">{row.docContable}</TableCell>
+                  <TableCell className="text-zinc-700 font-mono text-xs">{row.numeroTicket}</TableCell>
+                  <TableCell className="text-zinc-700 text-right font-mono">{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell className="text-zinc-700 text-right font-mono">{formatMoney(row.neto1)}</TableCell>
+                  <TableCell className="text-zinc-700 text-right font-mono">
+                    {product?.[`op_${passengerPriceSuffix(row.tipoPasajero)}`] ?? product?.op ?? '—'}
                   </TableCell>
                 </TableRow>
               ))}
@@ -447,7 +570,7 @@ function ProductSection({ product, reservations, agencyName, onEdit, onDelete, o
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const EMPTY_PASSENGER_FORM = {
-  nombre: '', apellido: '', documento: '', nacimiento: '', nacionalidad: '',
+  nombre: '', apellido: '', documento: '', pasaporte: '', nacimiento: '', nacionalidad: '',
   tipo_pasajero: 'Adulto', precio_venta: '', neto_1: '', numero_ticket: '',
 };
 
@@ -517,6 +640,7 @@ export default function GestionNominas() {
       nombre: row.nombre === '—' ? '' : row.nombre,
       apellido: row.apellido === '—' ? '' : row.apellido,
       documento: row.documento === '—' ? '' : row.documento,
+      pasaporte: row.pasaporte === '—' ? '' : row.pasaporte,
       nacimiento: row.nacimiento ? String(row.nacimiento).slice(0, 10) : '',
       nacionalidad: row.nacionalidad === '—' ? '' : row.nacionalidad,
       tipo_pasajero: row.tipoPasajero === '—' ? 'Adulto' : row.tipoPasajero,
@@ -540,6 +664,7 @@ export default function GestionNominas() {
           nombre: editForm.nombre,
           apellido: editForm.apellido,
           documento: editForm.documento,
+          pasaporte: editForm.pasaporte,
           nacimiento: editForm.nacimiento || null,
           nacionalidad: editForm.nacionalidad,
           tipo_pasajero: editForm.tipo_pasajero,
@@ -583,6 +708,7 @@ export default function GestionNominas() {
         nombre: addForm.nombre,
         apellido: addForm.apellido,
         documento: addForm.documento,
+        pasaporte: addForm.pasaporte,
         nacimiento: addForm.nacimiento || null,
         nacionalidad: addForm.nacionalidad,
         tipo_pasajero: addForm.tipo_pasajero,
@@ -607,7 +733,7 @@ export default function GestionNominas() {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     try {
@@ -710,15 +836,28 @@ export default function GestionNominas() {
   const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
   const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
 
+  // Reservas de los productos que quedaron visibles tras aplicar
+  // búsqueda/temporada/destino/rango de fechas — para exportar solo lo
+  // filtrado, no el crudo completo.
+  const visibleReservations = useMemo(
+    () => filteredProductIds.flatMap((pid) => grouped[pid] || []),
+    [filteredProductIds, grouped]
+  );
+
   // Stats
   const totalProducts = Object.keys(grouped).length;
   const totalReservations = reservations.length;
-  const totalConfirmed = reservations.filter((r) => {
-    const e = r.estado || '';
-    return e === 'confirmada' || e === 'confirmado';
-  }).length;
   const totalPassengers = useMemo(
     () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).length, 0),
+    [reservations]
+  );
+  // Total de PAX confirmados, no de fichas — una ficha con 4 pasajeros
+  // confirmados debe contar 4, no 1.
+  const totalConfirmed = useMemo(
+    () => reservations.reduce((sum, r) => sum + buildPassengerRows(r).filter((row) => {
+      const e = row.estado || '';
+      return e === 'confirmada' || e === 'confirmado';
+    }).length, 0),
     [reservations]
   );
 
@@ -754,12 +893,24 @@ export default function GestionNominas() {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => exportToExcel(reservations, products)}
-              disabled={loading || reservations.length === 0}
+              onClick={() => exportToExcel(visibleReservations, products)}
+              disabled={loading || visibleReservations.length === 0}
               className="flex items-center gap-2"
+              title={hasActiveFilters || search.trim() ? 'Exporta solo lo que queda visible con los filtros actuales' : undefined}
             >
               <Download className="h-4 w-4" />
               Exportar Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToExcelBO(visibleReservations, products, agencies)}
+              disabled={loading || visibleReservations.length === 0}
+              className="flex items-center gap-2"
+              title="Excel con el formato para importar a Netviax Atlas (respeta los filtros activos)"
+            >
+              <Download className="h-4 w-4" />
+              Exportar BO
             </Button>
           </div>
         }
@@ -783,10 +934,10 @@ export default function GestionNominas() {
             color: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
           },
           {
-            label: 'Confirmadas',
+            label: 'PAX Confirmados',
             value: loading ? '—' : totalConfirmed,
             icon: CheckCircle2,
-            description: 'Reservas en estado confirmado.',
+            description: 'Pasajeros confirmados (no fichas).',
             color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
           },
         ]}
@@ -801,49 +952,49 @@ export default function GestionNominas() {
             placeholder="Filtrar por destino o código de cupo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
           />
         </div>
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Temporada</label>
+            <label className="text-xs font-medium text-zinc-500">Temporada</label>
             <select
               value={filters.temporada}
               onChange={(e) => setFilters((f) => ({ ...f, temporada: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas</option>
               {temporadaOptions.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Destino</label>
+            <label className="text-xs font-medium text-zinc-500">Destino</label>
             <select
               value={filters.destino}
               onChange={(e) => setFilters((f) => ({ ...f, destino: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos</option>
               {destinoOptions.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida desde</label>
+            <label className="text-xs font-medium text-zinc-500">Salida desde</label>
             <input
               type="date"
               value={filters.desde}
               onChange={(e) => setFilters((f) => ({ ...f, desde: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Salida hasta</label>
+            <label className="text-xs font-medium text-zinc-500">Salida hasta</label>
             <input
               type="date"
               value={filters.hasta}
               onChange={(e) => setFilters((f) => ({ ...f, hasta: e.target.value }))}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              className="rounded-lg border border-zinc-200 bg-white text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {hasActiveFilters && (
@@ -853,7 +1004,7 @@ export default function GestionNominas() {
           )}
         </div>
 
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="text-xs text-zinc-400">
           {filters.desde || filters.hasta
             ? 'Mostrando histórico según el rango de fechas seleccionado.'
             : 'Por defecto solo se muestran las salidas que todavía no ocurrieron. Filtrá por fecha para consultar el histórico.'}
@@ -862,27 +1013,21 @@ export default function GestionNominas() {
 
       {/* Error state */}
       {error && (
-        <Card className="px-5 py-4 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <Card className="px-5 py-4 border-red-200 bg-red-50">
+          <p className="text-sm text-red-600">{error}</p>
         </Card>
       )}
 
       {/* Loading state */}
-      {loading && (
-        <div className="flex justify-center items-center py-16">
-          <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
-          <span className="ml-2 text-sm text-zinc-500">Cargando nóminas...</span>
-        </div>
-      )}
+      {loading && <SkeletonTable columns={5} rows={5} />}
 
       {/* Empty state */}
       {!loading && !error && filteredProductIds.length === 0 && (
-        <Card className="px-5 py-12 text-center">
-          <Users className="h-10 w-10 mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            {search ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay reservas registradas.'}
-          </p>
-        </Card>
+        <EmptyState
+          icon="👥"
+          title="No hay nóminas"
+          description={search ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay reservas registradas.'}
+        />
       )}
 
       {/* Product sections */}
@@ -916,7 +1061,7 @@ export default function GestionNominas() {
         <div className="space-y-4">
           <PassengerFieldsForm values={editForm} onChange={setEditForm} showTicket />
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="outline" onClick={closeEditPassenger} disabled={savingPassenger}>
+            <Button variant="secondary" onClick={closeEditPassenger} disabled={savingPassenger}>
               Cancelar
             </Button>
             <Button onClick={handleSavePassenger} disabled={savingPassenger}>
@@ -941,7 +1086,7 @@ export default function GestionNominas() {
           )}
           <PassengerFieldsForm values={addForm} onChange={setAddForm} showTicket={false} />
           <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button variant="outline" onClick={closeAddPassenger} disabled={savingAddPassenger}>
+            <Button variant="secondary" onClick={closeAddPassenger} disabled={savingAddPassenger}>
               Cancelar
             </Button>
             <Button onClick={handleSaveAddPassenger} disabled={savingAddPassenger}>

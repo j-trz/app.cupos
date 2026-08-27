@@ -29,30 +29,67 @@ type Profile struct {
 }
 
 type Product struct {
-	ID                     uint       `gorm:"primaryKey" json:"id"`
-	CodigoCupo             string     `gorm:"not null" json:"codigo_cupo"`
-	Destino                string     `gorm:"not null" json:"destino"`
-	Compania               string     `gorm:"not null" json:"compania"`
-	Disponibilidad         int        `gorm:"not null" json:"disponibilidad"`
-	Cupo                   int        `json:"cupo"`
-	Vendidos               int        `json:"vendidos"`
-	FechaSalida            *time.Time `json:"fecha_salida"`
-	FechaRegreso           *time.Time `json:"fecha_regreso"`
-	Precio                 float64    `json:"precio"`
-	Neto1                  float64    `json:"neto_1"`
-	OP                     float64    `json:"op"`
-	Ruta                   string     `json:"ruta"`
-	PNR                    string     `json:"pnr"`
-	Ficha                  string     `json:"ficha"`
-	Temporada              string     `json:"temporada"`
-	TipoProducto           string     `json:"tipo_producto"`
-	BloqueoTemporalMinutos int        `json:"bloqueo_temporal_minutos"`
-	CarryOn                bool       `gorm:"column:carryon;default:false" json:"carryon"`
-	HandBag                bool       `gorm:"column:handbag;default:false" json:"handbag"`
-	CheckedBag             bool       `gorm:"column:checkedbag;default:false" json:"checkedbag"`
-	InfFare                float64    `json:"inf_fare"`
-	ChdFare                float64    `json:"chd_fare"`
-	IsBlockedForSale       bool       `gorm:"default:false" json:"is_blocked_for_sale"`
+	ID             uint       `gorm:"primaryKey" json:"id"`
+	CodigoCupo     string     `gorm:"not null" json:"codigo_cupo"`
+	Destino        string     `gorm:"not null" json:"destino"`
+	Compania       string     `gorm:"not null" json:"compania"`
+	Disponibilidad int        `gorm:"not null" json:"disponibilidad"`
+	Cupo           int        `json:"cupo"`
+	Vendidos       int        `json:"vendidos"`
+	FechaSalida    *time.Time `json:"fecha_salida"`
+	FechaRegreso   *time.Time `json:"fecha_regreso"`
+	// Precio/InfFare/ChdFare son la Venta de cada tipo de pasajero (ADT/INF/CHD)
+	// — se calculan y pisan server-side (ver applyCalculatedPrices en
+	// product_handler.go) como Tarifa+Impuestos+OP de ese tipo. Se mantienen
+	// estos 3 nombres (no se renombran a "venta_adt" etc.) a propósito: son
+	// consumidos por Availability.jsx, reportes, PDFs y el payload de reserva
+	// sin que ninguno de esos lugares necesite saber que ahora es un cálculo.
+	Precio                 float64 `json:"precio"`
+	TarifaAdt              float64 `json:"tarifa_adt"`
+	ImpuestosAdt           float64 `json:"impuestos_adt"`
+	Neto1                  float64 `json:"neto_1"`
+	// OP es el campo legado (un solo valor, aplicado a los 3 tipos por
+	// igual) — se mantiene por compatibilidad con lo que todavía lo lea
+	// directo, sincronizado a OPAdt en applyCalculatedPrices. OPAdt/OPChd/
+	// OPInf (agregados 2026-08-10) son los reales desde que se individualizó
+	// la ganancia por tipo de pasajero — ver NetoForTipo/OPForTipo abajo.
+	OP    float64 `json:"op"`
+	OPAdt float64 `gorm:"column:op_adt;default:0" json:"op_adt"`
+	OPChd float64 `gorm:"column:op_chd;default:0" json:"op_chd"`
+	OPInf float64 `gorm:"column:op_inf;default:0" json:"op_inf"`
+	Ruta                   string  `json:"ruta"`
+	PNR                    string  `json:"pnr"`
+	Ficha                  string  `json:"ficha"`
+	Temporada              string  `json:"temporada"`
+	TipoProducto           string  `json:"tipo_producto"`
+	BloqueoTemporalMinutos int     `json:"bloqueo_temporal_minutos"`
+	CarryOn                bool    `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag                bool    `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag             bool    `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	// Kilaje de cada franquicia de equipaje — puede variar por producto, por
+	// eso vive acá y no como una constante global.
+	CarryOnKg   float64 `gorm:"column:carryon_kg;default:0" json:"carryon_kg"`
+	HandBagKg   float64 `gorm:"column:handbag_kg;default:0" json:"handbag_kg"`
+	CheckedBagKg float64 `gorm:"column:checkedbag_kg;default:0" json:"checkedbag_kg"`
+	// PackageLinks son los paquetes armados a partir de este cupo (lista de
+	// {url, label}), mostrados en la columna "Paquetes" de Disponibilidad.
+	PackageLinks datatypes.JSON `gorm:"column:package_links;default:'[]'" json:"package_links,omitempty"`
+	InfFare                float64 `json:"inf_fare"`
+	TarifaInf              float64 `json:"tarifa_inf"`
+	ImpuestosInf           float64 `json:"impuestos_inf"`
+	ChdFare                float64 `json:"chd_fare"`
+	TarifaChd              float64 `json:"tarifa_chd"`
+	ImpuestosChd           float64 `json:"impuestos_chd"`
+	IsBlockedForSale       bool    `gorm:"default:false" json:"is_blocked_for_sale"`
+	// PendienteAprobacion: true solo para productos creados vía "Convertir a
+	// producto" desde una Oportunidad (ver ConvertOpportunityToProduct en
+	// opportunities_handler.go) — mientras un admin no lo apruebe
+	// (PUT /products/:id/approve), no aparece en la vista de reserva
+	// (Disponibilidad, GetProducts sin scope=management) aunque tenga
+	// disponibilidad > 0. Los productos cargados directo desde Gestión de
+	// Productos nacen en false (default) y no pasan por ningún gate nuevo —
+	// ese flujo sigue exactamente igual que antes.
+	PendienteAprobacion bool `gorm:"column:pendiente_aprobacion;default:false" json:"pendiente_aprobacion"`
 	// Servicio es un texto libre que describe el servicio puntual del
 	// producto (ej. "Traslado", "Seguro de viaje", "Excursión"), distinto de
 	// TipoProducto (que categoriza Aéreo/Hotel/Crucero).
@@ -100,6 +137,33 @@ type Product struct {
 	UpdatedAt              time.Time `json:"updated_at"`
 }
 
+// NetoForTipo devuelve Tarifa+Impuestos del tipo de pasajero indicado
+// ("Adulto"/"Menor"/"Infante", default Adulto) — no hay un campo Neto1
+// separado por tipo: siempre es derivado de Tarifa+Impuestos de ese tipo,
+// para no duplicar estado que ya existe.
+func (p Product) NetoForTipo(tipoPasajero string) float64 {
+	switch tipoPasajero {
+	case "Menor":
+		return p.TarifaChd + p.ImpuestosChd
+	case "Infante":
+		return p.TarifaInf + p.ImpuestosInf
+	default:
+		return p.TarifaAdt + p.ImpuestosAdt
+	}
+}
+
+// OPForTipo devuelve la ganancia (OP) del tipo de pasajero indicado.
+func (p Product) OPForTipo(tipoPasajero string) float64 {
+	switch tipoPasajero {
+	case "Menor":
+		return p.OPChd
+	case "Infante":
+		return p.OPInf
+	default:
+		return p.OPAdt
+	}
+}
+
 // Estados posibles de Reservation.Estado (antes convivían "confirmado"/"confirmada" como
 // valores distintos sin querer; se unifican acá para que el cron y las notificaciones
 // puedan filtrar de forma consistente).
@@ -121,16 +185,33 @@ const (
 	EstadoCedida = "cedido"
 )
 
+// EstadoInternoOptions son los valores válidos de Reservation.EstadoInterno —
+// seguimiento administrativo de pago/emisión, independiente del ciclo de
+// vida de Estado. "" (vacío) es válido y significa "sin definir".
+var EstadoInternoOptions = []string{"Pendiente", "Seña", "Pagado", "Emitido"}
+
+func IsValidEstadoInterno(v string) bool {
+	if v == "" {
+		return true
+	}
+	for _, opt := range EstadoInternoOptions {
+		if opt == v {
+			return true
+		}
+	}
+	return false
+}
+
 type Reservation struct {
-	ID                   uint       `gorm:"primaryKey" json:"id"`
-	ProductID            uint       `json:"product_id"`
-	CreatedBy            uuid.UUID  `gorm:"type:uuid" json:"created_by"`
-	Estado               string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
-	BloqueoExpiraAt      *time.Time `json:"bloqueo_expira_at"`
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	ProductID       uint       `json:"product_id"`
+	CreatedBy       uuid.UUID  `gorm:"type:uuid" json:"created_by"`
+	Estado          string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
+	BloqueoExpiraAt *time.Time `json:"bloqueo_expira_at"`
 	// HoldPassengerCount es la cantidad de asientos que ocupa un pre-hold
 	// (EstadoHoldTemporal) antes de que existan Passengers reales — necesario
 	// para saber cuánto stock devolver si el hold se cancela o vence.
-	HoldPassengerCount int `gorm:"column:hold_passenger_count;default:0" json:"hold_passenger_count,omitempty"`
+	HoldPassengerCount   int        `gorm:"column:hold_passenger_count;default:0" json:"hold_passenger_count,omitempty"`
 	PrecioVenta          float64    `json:"precio_venta"`
 	Neto1                float64    `json:"neto_1"`
 	PedidoID             string     `gorm:"not null" json:"pedido_id"`
@@ -155,6 +236,18 @@ type Reservation struct {
 	FichaVenta           string     `json:"ficha_venta"`
 	DocContable          string     `json:"doc_contable"`
 	DocContableExpiresAt *time.Time `json:"doc_contable_expires_at"`
+	// EstadoInterno es un seguimiento administrativo (Pendiente/Seña/Pagado/
+	// Emitido) independiente del ciclo de vida de Estado (bloqueo/confirmada/
+	// cancelada) — lo carga a mano un admin/agencia desde Gestión de Reservas.
+	// EmitidoAt se calcula solo (nunca lo manda el cliente, ver UpdateReservation
+	// en order_handler.go): queda fijada la primera vez que EstadoInterno pasa
+	// a "Emitido", para poder reportarla en la exportación a Backoffice.
+	EstadoInterno string     `gorm:"column:estado_interno" json:"estado_interno,omitempty"`
+	EmitidoAt     *time.Time `gorm:"column:emitido_at" json:"emitido_at,omitempty"`
+	// StatusBack es una anotación libre sobre si esta reserva ya se cargó
+	// correctamente en el backoffice externo (ej. "BO OK") — manual por ahora,
+	// no hay todavía una integración de escritura real hacia Atlas.
+	StatusBack string `gorm:"column:status_back" json:"status_back,omitempty"`
 	// ExpirationWarningSentAt evita reenviar el aviso de "por vencer" en cada corrida del cron.
 	ExpirationWarningSentAt *time.Time `json:"expiration_warning_sent_at"`
 	// PreCancelEstado guarda el estado que tenía la reserva justo antes de que
@@ -163,9 +256,17 @@ type Reservation struct {
 	PreCancelEstado string `gorm:"column:pre_cancel_estado" json:"pre_cancel_estado,omitempty"`
 	// CancelacionNotas son las notas que carga el admin al aprobar/rechazar
 	// una solicitud de cancelación.
-	CancelacionNotas string    `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	CancelacionNotas string `gorm:"column:cancelacion_notas" json:"cancelacion_notas,omitempty"`
+	// Servicios adicionales de la reserva (sección "Servicios" del formulario).
+	Hotel             string    `gorm:"column:hotel" json:"hotel,omitempty"`
+	TrasladosIncluye  bool      `gorm:"column:traslados_incluye;default:false" json:"traslados_incluye"`
+	TrasladosNotas    string    `gorm:"column:traslados_notas" json:"traslados_notas,omitempty"`
+	// NotasVendedor son notas libres de quien solicita la reserva (dudas o
+	// comentarios para quien la procese) — siempre disponible al cotizar, no
+	// solo cuando algo puntual lo requiere (mismo campo/nombre que Group.NotasVendedor).
+	NotasVendedor     string    `gorm:"column:notas_vendedor" json:"notas_vendedor,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 	// Passengers son los pasajeros desglosados de la reserva (puede haber más de
 	// uno). Si viene vacío, la UI debe usar los campos *Pasajero de arriba como
 	// fallback (reservas creadas sin desglose de pasajeros).
@@ -179,16 +280,23 @@ type Reservation struct {
 // se crea siempre de forma individual (con su propio ticket), aunque varios
 // pasajeros compartan PedidoID/ReservationID por haberse reservado juntos.
 type Passenger struct {
-	ID            uint       `gorm:"primaryKey" json:"id"`
-	ReservationID uint       `json:"reservation_id"`
-	PedidoID      string     `json:"pedido_id"`
-	Nombre        string     `json:"nombre"`
-	Apellido      string     `json:"apellido"`
-	Documento     string     `json:"documento"`
-	Nacimiento    *time.Time `json:"nacimiento"`
-	Nacionalidad  string     `json:"nacionalidad"`
-	TipoPasajero  string     `json:"tipo_pasajero"`
-	NRO           int        `json:"nro"` // 1 = Venta, 0 = Acompañante
+	ID            uint   `gorm:"primaryKey" json:"id"`
+	ReservationID uint   `json:"reservation_id"`
+	PedidoID      string `json:"pedido_id"`
+	Nombre        string `json:"nombre"`
+	Apellido      string `json:"apellido"`
+	Documento     string `json:"documento"`
+	// Pasaporte es un documento aparte del CI (Documento) — un pasajero puede
+	// tener uno, el otro, o los dos (ej. si vino cargado desde Atlas con ambos).
+	Pasaporte    string     `json:"pasaporte"`
+	Nacimiento   *time.Time `json:"nacimiento"`
+	Nacionalidad string     `json:"nacionalidad"`
+	TipoPasajero string     `json:"tipo_pasajero"`
+	NRO          int        `json:"nro"` // 1 = Venta, 0 = Acompañante
+	// Vencimiento del documento de viaje. Si DocumentoVitalicio es true,
+	// DocumentoVencimiento se ignora (el documento no vence).
+	DocumentoVencimiento *time.Time `gorm:"column:documento_vencimiento" json:"documento_vencimiento,omitempty"`
+	DocumentoVitalicio   bool       `gorm:"column:documento_vitalicio;default:false" json:"documento_vitalicio"`
 	// Campos de ticket individual: cada pasajero progresa de forma
 	// independiente dentro del mismo pedido.
 	Estado                  string     `gorm:"default:'bloqueo_temporal'" json:"estado"`
@@ -290,19 +398,31 @@ type Group struct {
 }
 
 type Agency struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Code      string    `gorm:"unique;not null" json:"code"`
-	Name      string    `gorm:"not null" json:"name"`
-	Email     string    `json:"email"`
-	Phone     string    `json:"phone"`
-	Website   string    `json:"website"`
-	Color     string    `gorm:"default:'#3b82f6'" json:"color"`
-	IsActive  bool      `gorm:"default:true" json:"is_active"`
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Code     string    `gorm:"unique;not null" json:"code"`
+	Name     string    `gorm:"not null" json:"name"`
+	Email    string    `json:"email"`
+	Phone    string    `json:"phone"`
+	Website  string    `json:"website"`
+	Color    string    `gorm:"default:'#3b82f6'" json:"color"`
+	IsActive bool      `gorm:"default:true" json:"is_active"`
 	// AIHabilitado permite que una agencia desactive el asistente de IA para
 	// todos sus usuarios (widget de chat + endpoint /ai/chat).
 	AIHabilitado bool      `gorm:"column:ai_habilitado;default:true" json:"ai_habilitado"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// Temporada es una lista global (no por agencia, todas comparten el mismo
+// calendario de temporadas) administrada por el admin — reemplaza el texto
+// libre que tenía Product.Temporada antes, para que el desplegable del
+// formulario de Producto no dependa de que cada uno tipee el nombre igual.
+type Temporada struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Nombre    string    `gorm:"unique;not null" json:"nombre"`
+	Activa    bool      `gorm:"default:true" json:"activa"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type WhiteLabelConfig struct {
@@ -514,10 +634,10 @@ type AIMessage struct {
 // configurado y nombrado por cada agencia — scopeado por Agencia igual que
 // Product/Reservation.
 type AIExpert struct {
-	ID          uuid.UUID          `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Agencia     string             `gorm:"not null;index" json:"agencia"`
-	Name        string             `gorm:"not null" json:"name"`
-	Description string             `json:"description"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Agencia     string    `gorm:"not null;index" json:"agencia"`
+	Name        string    `gorm:"not null" json:"name"`
+	Description string    `json:"description"`
 	// Persona es tono/personalidad opcional, se agrega al system prompt del
 	// turno cuando se consulta a este experto.
 	Persona   string             `json:"persona"`
@@ -598,3 +718,109 @@ type UserAgency struct {
 
 // Agregar campos de cesión a Reservation
 // (Ya existen en el model, pero aseguramos compatibilidad)
+
+// Opportunity representa una oportunidad/cotización de pedido con aerolínea
+// — paso previo a Product (Gestión de Productos). Se carga, analiza y aprueba
+// antes de convertirse en un producto real del catálogo.
+type Opportunity struct {
+	ID                 uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Agencia            string     `gorm:"not null;index" json:"agencia"`
+	Temporada          *string    `json:"temporada"`
+	Estado             string     `gorm:"not null;default:'pendiente';index" json:"estado"` // pendiente, aprobada, rechazada
+	Destino            string     `gorm:"not null;index" json:"destino"`
+	Compania           string     `gorm:"not null;index" json:"compania"`
+	Validez            *time.Time `json:"validez"`
+	FechaSalida        time.Time  `gorm:"not null" json:"fecha_salida"`
+	FechaLlegada       *time.Time `json:"fecha_llegada"`
+	TotalLugares       int        `gorm:"not null;default:0" json:"total_lugares"`
+	TotalLiberados     int        `gorm:"not null;default:0" json:"total_liberados"`
+	Neto1              *float64   `gorm:"column:neto_1" json:"neto_1"`
+	Neto2              *float64   `gorm:"column:neto_2" json:"neto_2"`
+	EstadoInterno      *string    `json:"estado_interno"` // Estado Aerolínea: cotizado, rechazado, confirmado, vencido
+	MotivoRechazo      *string    `json:"motivo_rechazo"`
+	Servicio           string     `gorm:"column:servicio" json:"servicio"`
+	CarryOn            bool       `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag            bool       `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag         bool       `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	CarryOnKg          float64    `gorm:"column:carryon_kg;default:0" json:"carryon_kg"`
+	HandBagKg          float64    `gorm:"column:handbag_kg;default:0" json:"handbag_kg"`
+	CheckedBagKg       float64    `gorm:"column:checkedbag_kg;default:0" json:"checkedbag_kg"`
+	// ProductoID: se completa al convertir la oportunidad en producto (ver
+	// ConvertOpportunityToProduct) — puramente informativo, no hay lectura
+	// automática de vuelta desde Product. Cuando está seteado, Estado pasa a
+	// "producto" (terminal: ni admin puede editar/eliminar/aprobar-rechazar
+	// la oportunidad después de esto, ya cumplió su ciclo).
+	ProductoID         *uint      `gorm:"column:producto_id" json:"producto_id"`
+	FechaCargado       time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_cargado"`
+	UsuarioCargador    uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_cargador"`
+	UsuarioAutorizador *uuid.UUID `gorm:"type:uuid" json:"usuario_autorizador"`
+	FechaAprobado      *time.Time `gorm:"column:fecha_aprobado" json:"fecha_aprobado,omitempty"`
+	CreatedAt          time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt          time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+
+	// Relaciones
+	CargadorUser    *Profile `gorm:"foreignKey:UsuarioCargador" json:"cargador_user,omitempty"`
+	AutorizadorUser *Profile `gorm:"foreignKey:UsuarioAutorizador" json:"autorizador_user,omitempty"`
+}
+
+// Ticket representa un boleto emitido con lógica GDS inmutable (se emite, anula/void, o sincroniza con Netviax Atlas)
+type Ticket struct {
+	ID                uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	NumeroTicket      string     `gorm:"not null;uniqueIndex" json:"numero_ticket"`
+	ReservationID     uuid.UUID  `gorm:"type:uuid;not null;index" json:"reservation_id"`
+	PassengerID       *uuid.UUID `gorm:"type:uuid;index" json:"passenger_id,omitempty"`
+	ProductID         uint       `gorm:"not null;index" json:"product_id"`
+	Agencia           string     `gorm:"not null;index" json:"agencia"`
+	PasajeroNombre    string     `gorm:"not null" json:"pasajero_nombre"`
+	PasajeroDocumento string     `json:"pasajero_documento"`
+	PNR               string     `gorm:"not null;index" json:"pnr"`
+	Ruta              string     `json:"ruta"`
+	// Segmentos es Ruta ya normalizado tramo por tramo (nro. de vuelo, fecha,
+	// origen, destino, salida, llegada) — un ticket puede tener más de un
+	// tramo (ida y vuelta, escalas). Se calcula una sola vez al emitir (ver
+	// services.ParseRuta) para que el backoffice reciba estos datos como
+	// campos propios, no como texto libre a re-parsear.
+	Segmentos         datatypes.JSON `gorm:"column:segmentos;default:'[]'" json:"segmentos"`
+	Destino           string     `json:"destino"`
+	Compania          string     `json:"compania"`
+	Ficha             string     `json:"ficha"`
+	Tarifa            float64    `gorm:"not null;default:0" json:"tarifa"`
+	Impuestos         float64    `gorm:"not null;default:0" json:"impuestos"`
+	Total             float64    `gorm:"not null;default:0" json:"total"`
+	Estado            string     `gorm:"not null;default:'emitido';index" json:"estado"` // emitido, enviado_atlas, void
+	FechaEmision      time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"fecha_emision"`
+	UsuarioEmisorID   uuid.UUID  `gorm:"type:uuid;not null" json:"usuario_emisor_id"`
+	FechaVoid         *time.Time `json:"fecha_void,omitempty"`
+	UsuarioVoidID     *uuid.UUID `gorm:"type:uuid" json:"usuario_void_id,omitempty"`
+	MotivoVoid        *string    `json:"motivo_void,omitempty"`
+	AtlasStatus       string     `gorm:"default:'pendiente'" json:"atlas_status"`
+	AtlasResponse     string     `gorm:"type:text" json:"atlas_response,omitempty"`
+	// Datos adicionales pedidos para que la Bandeja de Tickets sea un E-ticket
+	// completo con cada dato de backoffice separado en su propio campo (no
+	// texto libre a re-parsear) — todos son snapshot al momento de emitir,
+	// igual que Agencia/Ficha/Compania de arriba: Reservation/Passenger no son
+	// joineables desde Ticket (ReservationID/PassengerID son hashes SHA1 no
+	// reversibles, ver upsertTicketForPassenger), así que lo que no se copia
+	// acá en el momento de la emisión se pierde.
+	TipoPasajero  string     `json:"tipo_pasajero"`
+	TipoDocumento string     `json:"tipo_documento"` // "CI" o "Pasaporte" — cuál de los dos snapshoteó PasajeroDocumento
+	PedidoID      string     `json:"pedido_id"`
+	Vendedor      string     `json:"vendedor"` // email de Reservation.CreatedBy al momento de emitir
+	FechaReserva  *time.Time `json:"fecha_reserva,omitempty"`
+	// Franquicia de equipaje del producto al momento de emitir — mismo shape
+	// (carryon/handbag/checkedbag + *_kg) que Product, para poder reusar
+	// directo el componente BaggageFranchise.jsx sin mapeo.
+	CarryOn      bool    `gorm:"column:carryon;default:false" json:"carryon"`
+	HandBag      bool    `gorm:"column:handbag;default:false" json:"handbag"`
+	CheckedBag   bool    `gorm:"column:checkedbag;default:false" json:"checkedbag"`
+	CarryOnKg    float64 `gorm:"column:carryon_kg;default:0" json:"carryon_kg"`
+	HandBagKg    float64 `gorm:"column:handbag_kg;default:0" json:"handbag_kg"`
+	CheckedBagKg float64 `gorm:"column:checkedbag_kg;default:0" json:"checkedbag_kg"`
+	CreatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+
+	// Relaciones
+	EmisorUser *Profile `gorm:"foreignKey:UsuarioEmisorID" json:"emisor_user,omitempty"`
+	VoidUser   *Profile `gorm:"foreignKey:UsuarioVoidID" json:"void_user,omitempty"`
+}
+

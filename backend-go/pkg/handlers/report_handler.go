@@ -12,6 +12,7 @@ import (
 	"backend-go/pkg/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func GetStats(c *gin.Context) {
@@ -21,11 +22,29 @@ func GetStats(c *gin.Context) {
 	var avgAvailability float64
 	var totalPassengers int64
 
-	database.DB.Model(&models.Reservation{}).Count(&totalReservations)
-	database.DB.Model(&models.Reservation{}).Where("estado = ?", "confirmada").Select("COALESCE(sum(precio_venta), 0)").Scan(&totalSales)
-	database.DB.Model(&models.Reservation{}).Where("created_at > ?", time.Now().AddDate(0, 0, -30)).Select("count(distinct created_by)").Scan(&activeUsers)
-	database.DB.Model(&models.Product{}).Select("COALESCE(avg(disponibilidad), 0)").Scan(&avgAvailability)
-	database.DB.Model(&models.Passenger{}).Where("estado IN ?", []string{"confirmada", "confirmado"}).Count(&totalPassengers)
+	// Mismo criterio de scoping que loadDataFromDB (analytics_handler.go):
+	// un caller no-admin nunca ve totales que incluyan otras agencias.
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
+	scoped := role != "admin"
+
+	reservationsQuery := database.DB.Model(&models.Reservation{})
+	productsQuery := database.DB.Model(&models.Product{})
+	passengersQuery := database.DB.Model(&models.Passenger{})
+	if scoped {
+		reservationsQuery = reservationsQuery.Where("LOWER(agencia) = LOWER(?)", callerAgencia)
+		productsQuery = productsQuery.Where("LOWER(agencia) = LOWER(?)", callerAgencia)
+		passengersQuery = passengersQuery.
+			Joins("JOIN reservations ON reservations.id = passengers.reservation_id").
+			Where("LOWER(reservations.agencia) = LOWER(?)", callerAgencia)
+	}
+
+	reservationsQuery.Session(&gorm.Session{}).Count(&totalReservations)
+	reservationsQuery.Session(&gorm.Session{}).Where("estado = ?", "confirmada").Select("COALESCE(sum(precio_venta), 0)").Scan(&totalSales)
+	reservationsQuery.Session(&gorm.Session{}).Where("created_at > ?", time.Now().AddDate(0, 0, -30)).Select("count(distinct created_by)").Scan(&activeUsers)
+	productsQuery.Select("COALESCE(avg(disponibilidad), 0)").Scan(&avgAvailability)
+	passengersQuery.Where("estado IN ?", []string{"confirmada", "confirmado"}).Count(&totalPassengers)
 
 	c.JSON(http.StatusOK, gin.H{
 		"totalReservations": totalReservations,
@@ -37,7 +56,7 @@ func GetStats(c *gin.Context) {
 }
 
 func GetEvolutionPassengers(c *gin.Context) {
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -95,7 +114,7 @@ func GetEvolutionPassengers(c *gin.Context) {
 }
 
 func GetAgencyShare(c *gin.Context) {
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -205,7 +224,7 @@ func GetUserMetrics(c *gin.Context) {
 }
 
 func GetDestinationsDetail(c *gin.Context) {
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -271,7 +290,6 @@ func GetDestinationsDetail(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -289,7 +307,7 @@ func GetDestinationsDetail(c *gin.Context) {
 		}
 
 		item := grouped[key]
-		item.Rentabilidad += opUnit * float64(vendidos)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.CostoReal += neto1Unit * float64(vendidos)
 		item.VentaReal += precioUnit * float64(vendidos)
 		item.Riesgo += riesgoItem
@@ -305,7 +323,7 @@ func GetDestinationsDetail(c *gin.Context) {
 
 // GetEvolutionRevenue retorna la evolución mensual de ventas, rentabilidad y riesgo
 func GetEvolutionRevenue(c *gin.Context) {
-	products, _, err := loadDataFromDB()
+	products, _, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -350,7 +368,7 @@ func GetEvolutionRevenue(c *gin.Context) {
 		}
 		item := evol[period]
 		item.Ventas += float64(cupo.Vendidos) * cupo.Precio
-		item.Rentabilidad += float64(cupo.Vendidos) * cupo.OP
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Riesgo += float64(disp) * cupo.Neto1
 		item.Cupos += cupo.Cupo
 		item.Vendidos += cupo.Vendidos
@@ -391,7 +409,7 @@ func GetEvolutionRevenue(c *gin.Context) {
 
 // GetOccupancy retorna la ocupación por destino/temporada (para heatmap)
 func GetOccupancy(c *gin.Context) {
-	products, _, err := loadDataFromDB()
+	products, _, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -468,7 +486,7 @@ func GetOccupancy(c *gin.Context) {
 
 // GetTopProducts retorna los top productos por rentabilidad o riesgo
 func GetTopProducts(c *gin.Context) {
-	products, _, err := loadDataFromDB()
+	products, _, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -496,7 +514,7 @@ func GetTopProducts(c *gin.Context) {
 		if disp < 0 {
 			disp = 0
 		}
-		rentabilidad := float64(cupo.Vendidos) * cupo.OP
+		rentabilidad := rentabilidadPonderada(cupo)
 		riesgo := float64(disp) * cupo.Neto1
 		ocupacion := 0.0
 		if cupo.Cupo > 0 {
@@ -532,7 +550,7 @@ func GetTopProducts(c *gin.Context) {
 
 // GetRiskAlerts retorna productos con riesgo alto (ocupación < 50% o riesgo > $10K)
 func GetRiskAlerts(c *gin.Context) {
-	products, _, err := loadDataFromDB()
+	products, _, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -601,7 +619,7 @@ func GetRiskAlerts(c *gin.Context) {
 
 // GetCancellations retorna la tasa de cancelación por período
 func GetCancellations(c *gin.Context) {
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error loading data: " + err.Error()})
 		return

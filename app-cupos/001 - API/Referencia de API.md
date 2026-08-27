@@ -1,0 +1,575 @@
+
+Catálogo de endpoints REST del Sistema de Gestión de Cupos, agrupados por recurso. Si es tu primera vez acá, arrancá por el [Quickstart](QUICKSTART.html) para el flujo de autenticación paso a paso.
+
+> Última verificación contra `main.go`/`api/index.go`: 2026-08-10 (incluyó corregir un endpoint faltante en local — ver [[Historial de Bugs Resueltos]]).
+
+> Esta referencia documenta el comportamiento del entorno de producción. Si corrés el backend en local, algún endpoint puntual puede no estar disponible todavía — ante la duda, la fuente de verdad es el propio código (`backend-go/`).
+
+## Convenciones
+
+### Base URL y prefijo
+
+Todas las rutas cuelgan de `/api` (ej. `https://<tu-dominio>/api/products`). No hay versionado en la URL.
+
+### Autenticación
+
+Salvo `POST /api/auth/login` y `POST /api/auth/register`, todo endpoint requiere autenticación mediante una de las siguientes cabeceras:
+
+1. **Sesión Web (JWT):**
+   ```http
+   Authorization: Bearer <token>
+   ```
+   El token es un JWT firmado (HS256) que expira a las 24 horas.
+
+2. **Integración B2B / M2M (API Key):**
+   ```http
+   X-API-Key: cupo_live_sk_...
+   ```
+   Clave secreta permanente generada desde **Configuración ➔ Claves de API**.
+   - **Super Admin (`admin`):** puede generar claves de alcance global o vinculadas a cualquier agencia.
+   - **Administrador de Agencia (`agency_admin`):** puede generar claves vinculadas **exclusivamente a su propia agencia**. Quien consuma la API con ese token solo obtendrá y podrá operar sobre información de esa empresa.
+
+
+### Content-Type
+
+Los bodies de `POST`/`PUT` son JSON plano, sin envoltorio (`{"campo": "valor"}`, nunca `{"data": {"campo": "valor"}}`). Mandá siempre `Content-Type: application/json`.
+
+### Formato de errores
+
+Toda respuesta de error tiene la misma forma:
+
+```json
+{ "error": "Descripción legible del problema" }
+```
+
+Los errores de permisos insuficientes agregan además un campo `message` con el código de permiso puntual que faltaba:
+
+```json
+{ "error": "Acceso prohibido. Permisos insuficientes.", "message": "Se requiere el permiso: PRODUCTS_CREATE" }
+```
+
+| Código | Cuándo aparece |
+|---|---|
+| `400` | Body inválido, campos requeridos faltantes, validación de negocio (ej. sin stock suficiente) |
+| `401` | Falta el header `Authorization`, token inválido/vencido, credenciales incorrectas, cuenta inactiva |
+| `403` | Token válido pero sin el permiso o rol necesario para esa acción, o sin acceso al recurso puntual (ej. un cupo de otra agencia) |
+| `404` | El recurso solicitado no existe |
+| `500` | Error interno (DB, etc.) |
+
+Las respuestas exitosas **no** siguen un único sobre estándar — cada endpoint devuelve la forma que tiene sentido para ese recurso (a veces `{"success": true, "data": [...]}`, a veces el objeto directo, a veces con claves específicas como `token`/`user`). Se indica la forma relevante en los endpoints donde no es obvia.
+
+### Permisos (RBAC)
+
+Además de "requiere sesión", muchos endpoints exigen un permiso puntual con formato `MODULO_ACCION` (ej. `PRODUCTS_CREATE`, `RESERVATIONS_DELETE`). Los permisos se asignan por rol, y un rol se asigna por usuario dentro de su agencia — el rol `admin` **siempre pasa cualquier chequeo de permiso**, sin importar qué tenga asignado. En las tablas de abajo, la columna **Acceso** indica:
+
+- **Sesión** — cualquier usuario logueado
+- **Permiso: `CODIGO`** — sesión + ese permiso puntual (el `admin` siempre lo tiene)
+- **Admin / agency_admin** — el rol debe ser exactamente uno de esos dos, no alcanza con un permiso
+- **Pública** — no requiere token
+
+### Paginación
+
+**No hay una convención global de paginación** — la gran mayoría de los endpoints de listado devuelven el resultado completo. Las únicas excepciones son:
+
+- `GET /api/logs` — acepta `?page=`, `?limit=`, más filtros `?level=`, `?source=`, `?startDate=`, `?endDate=`, `?q=`.
+- `GET /api/ai/logs` — acepta `?days=` y `?limit=`.
+
+Fuera de esos dos casos, si necesitás filtrar un listado grande revisá si ese endpoint puntual acepta query params de filtro (varios de Reportes aceptan `?destino=`, `?temporada=`, etc.) antes de asumir que existe paginación.
+
+---
+
+## Autenticación
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Pública | Login con `{email, password}` → `{success, token, user}` |
+| `POST` | `/api/auth/register` | Pública | Alta de una nueva cuenta |
+| `GET` | `/api/auth/profile` | Sesión | Perfil del usuario autenticado |
+| `PUT` | `/api/auth/profile` | Sesión | Actualiza nombre/apellido/teléfono del propio usuario |
+| `PUT` | `/api/auth/active-agency` | Sesión | Cambia la agencia activa del usuario (entre `Profile.Agencia` y sus `UserAgency` adicionales) — la que viaja en el JWT |
+| `GET` | `/api/users/me/permissions` | Sesión | Códigos de permiso resueltos para el usuario actual (la fuente de verdad para saber qué puede hacer) |
+
+## Disponibilidad y Productos
+
+Los "cupos" (bloqueos aéreos, paquetes, servicios) que una agencia puede reservar.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/products` | Sesión | Lista productos visibles para tu agencia (propios, cedidos o compartidos) |
+| `GET` | `/api/products/:id` | Sesión | Detalle de un producto |
+| `POST` | `/api/products` | Permiso: `PRODUCTS_CREATE` | Crea un producto |
+| `PUT` | `/api/products/:id` | Permiso: `PRODUCTS_UPDATE` | Edita un producto |
+| `DELETE` | `/api/products/:id` | Permiso: `PRODUCTS_DELETE` | Elimina un producto (falla si tiene reservas o cesiones asociadas) |
+| `POST` | `/api/products/bulk` | Permiso: `PRODUCTS_CREATE` | Alta masiva desde una lista de productos |
+| `GET` | `/api/products/:id/shared-agencies` | Sesión | Agencias con las que se comparte este producto |
+| `POST` | `/api/products/:id/shared-agencies` | Sesión | Comparte el producto con otra agencia |
+| `DELETE` | `/api/products/:id/shared-agencies/:agencia` | Sesión | Deja de compartirlo con esa agencia |
+
+## Reservas
+
+El ciclo de vida completo de una reserva — ver [Ciclo de Vida de la Reserva](FLUJOS_FUNCIONALIDADES.html#3-ciclo-de-vida-de-la-reserva) para el detalle de estados.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/orders` | Sesión | Lista reservas (filtradas por rol/agencia del caller) |
+| `GET` | `/api/orders/blocked` | Sesión | Reservas en `bloqueo_temporal` de tu agencia, sin datos de pasajero |
+| `POST` | `/api/orders` | Sesión | Crea una reserva (con o sin `hold_id`, ver [Quickstart](QUICKSTART.html)) |
+| `POST` | `/api/orders/hold` | Sesión | Aparta stock temporalmente antes de cargar los pasajeros |
+| `DELETE` | `/api/orders/hold/:id` | Sesión | Cancela un hold y libera el stock al instante |
+| `GET` | `/api/orders/:id` | Sesión | Detalle de una reserva, con sus pasajeros |
+| `PUT` | `/api/orders/:id` | Sesión | Actualiza campos generales del pedido |
+| `PUT` | `/api/orders/:id/doc-contable` | Sesión | Carga el documento contable — confirma la reserva |
+| `POST` | `/api/orders/:id/confirm` | Sesión | Confirma la reserva manualmente |
+| `PUT` | `/api/orders/:id/cancel-request` | Sesión | Solicita la cancelación |
+| `PUT` | `/api/orders/:id/cancel-request/resolve` | Permiso: `RESERVATIONS_DELETE` | Aprueba o rechaza una solicitud de cancelación |
+| `DELETE` | `/api/orders/:id` | Permiso: `RESERVATIONS_DELETE` | Elimina el pedido completo y libera el stock |
+| `POST` | `/api/orders/:id/passengers` | Sesión | Agrega un pasajero al pedido |
+| `PUT` | `/api/orders/:id/passengers/:passengerId` | Sesión | Asigna número de ticket / estado a un pasajero |
+| `PUT` | `/api/orders/:id/passengers/:passengerId/full` | Sesión | Edita todos los datos de un pasajero |
+| `POST` | `/api/orders/:id/passengers/:passengerId/duplicate` | Sesión | Duplica un pasajero dentro del mismo pedido |
+| `DELETE` | `/api/orders/:id/passengers/:passengerId` | Sesión | Elimina un pasajero puntual y libera su lugar |
+
+## Grupos (vuelos a medida)
+
+Cotizaciones a medida que no son un cupo ya publicado — ver [Grupos y Vuelos a Medida](FLUJOS_FUNCIONALIDADES.html#6-grupos-y-vuelos-a-medida).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/groups` | Sesión | Lista grupos (admin/agency_admin con permiso ven todos; el resto solo los propios) |
+| `GET` | `/api/groups/:id` | Sesión | Detalle de un grupo |
+| `POST` | `/api/groups` | Permiso: `GROUPS_CREATE` | Crea un grupo directamente (uso administrativo) |
+| `PUT` | `/api/groups/:id` | Permiso: `GROUPS_UPDATE` | Edita un grupo |
+| `DELETE` | `/api/groups/:id` | Permiso: `GROUPS_DELETE` | Elimina un grupo |
+| `POST` | `/api/groups/request` | Sesión | Solicita un vuelo a medida con una o más opciones de itinerario |
+| `POST` | `/api/groups/:id/send-quote` | Permiso: `GROUPS_UPDATE` | Envía la cotización cargada al solicitante |
+| `POST` | `/api/groups/:id/accept` | Sesión | Acepta una opción cotizada |
+| `POST` | `/api/groups/:id/confirm` | Permiso: `GROUPS_UPDATE` | Confirma el grupo aceptado |
+| `POST` | `/api/groups/:id/request-cancellation` | Sesión | Solicita cancelar un grupo confirmado |
+| `POST` | `/api/groups/:id/resolve-cancellation` | Permiso: `GROUPS_UPDATE` | Aprueba o rechaza la cancelación |
+
+## Cesión de cupos
+
+Prestar disponibilidad de un producto a otra agencia — ver [Cesión de Cupos entre Agencias](FLUJOS_FUNCIONALIDADES.html#5-cesión-de-cupos-entre-agencias).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/transfers` | Sesión | Cesiones relacionadas con tu agencia |
+| `GET` | `/api/transfers/all` | Permiso: `TRANSFERS_VIEW` | Todas las cesiones del sistema |
+| `POST` | `/api/transfers` | Permiso: `TRANSFERS_CREATE` | Cede disponibilidad de un producto a otra agencia |
+| `POST` | `/api/transfers/:id/reclaim` | Permiso: `TRANSFERS_CREATE` | Recupera stock no reservado de una cesión |
+
+## Agencias
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/agencies` | Sesión | Lista de agencias |
+| `POST` | `/api/agencies` | Permiso: `AGENCIES_CREATE` | Alta de agencia |
+| `PUT` | `/api/agencies/:id` | Permiso: `AGENCIES_UPDATE` | Edita una agencia (incluye `ai_habilitado`) |
+| `DELETE` | `/api/agencies/:id` | Permiso: `AGENCIES_DELETE` | Elimina una agencia |
+
+## Usuarios
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/users` | Permiso: `USERS_VIEW` | Lista usuarios |
+| `GET` | `/api/users/:id` | Permiso: `USERS_VIEW` | Detalle de un usuario |
+| `POST` | `/api/users` | Permiso: `USERS_CREATE` | Alta de usuario |
+| `PUT` | `/api/users/:id` | Permiso: `USERS_UPDATE` | Edita un usuario |
+| `PUT` | `/api/users/:id/status` | Permiso: `USERS_UNLOCK` | Activa/desactiva una cuenta |
+| `DELETE` | `/api/users/:id` | Permiso: `USERS_DELETE` | Elimina un usuario |
+| `GET` | `/api/users/:id/agencies` | Admin + Permiso: `USERS_VIEW` | Agencias adicionales del usuario (`UserAgency`), más allá de su `Profile.Agencia` |
+| `POST` | `/api/users/:id/agencies` | Admin + Permiso: `USERS_UPDATE` | Agrega una agencia adicional al usuario |
+| `DELETE` | `/api/users/:id/agencies/:agencia` | Admin + Permiso: `USERS_UPDATE` | Quita una agencia adicional del usuario |
+
+> Multi-agencia: un usuario puede tener asignada más de una agencia (`UserAgency`), pero solo una está "activa" a la vez (`Profile.Agencia`, la que viaja en el JWT) — se cambia con `PUT /api/auth/active-agency`.
+
+## Netviax Atlas (Backoffice)
+
+Integración **de solo lectura** con el backoffice Netviax Atlas para buscar contactos/pasajeros y autocompletar el formulario de reserva. **Detalle completo de conexión, shapes de request/response y la fase de escritura pendiente (tickets emitidos) en su propia carpeta**: [[Conexión y Estructura General|007 - Integración Netviax Atlas]].
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `POST` | `/api/backoffice/atlas/contactos/buscar` | Sesión | Busca contactos en Atlas por documento/email/celular/nombre |
+| `GET` | `/api/backoffice/atlas/contactos/:codigo` | Sesión | Detalle de un contacto puntual |
+| `POST` | `/api/backoffice/atlas/fichas/buscar` | Sesión | Busca por ficha de venta en Atlas |
+| `GET` | `/api/atlas-config/config` | Sesión | Credenciales de Atlas configuradas para tu agencia (o la config global) |
+| `POST` | `/api/atlas-config/config` | Permiso: `ATLAS_UPDATE` | Crea la configuración de credenciales |
+| `PUT` | `/api/atlas-config/config/:id` | Permiso: `ATLAS_UPDATE` | Edita la configuración |
+| `DELETE` | `/api/atlas-config/config/:id` | Permiso: `ATLAS_UPDATE` | Elimina la configuración |
+| `POST` | `/api/atlas-config/test` | Permiso: `ATLAS_UPDATE` | Prueba la conexión con las credenciales guardadas |
+
+> Es exclusivamente de búsqueda — no existe (todavía) un endpoint que escriba/actualice un contacto de vuelta en Atlas.
+
+## Roles y Permisos
+
+Sistema RBAC granular — ver [RBAC Usuarios Roles y Permisos](FLUJOS_FUNCIONALIDADES.html#9-rbac-usuarios-roles-y-permisos).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/roles` | Permiso: `ROLES_VIEW` | Lista roles |
+| `GET` | `/api/roles/:id` | Permiso: `ROLES_VIEW` | Detalle de un rol |
+| `GET` | `/api/roles/:id/users` | Permiso: `ROLES_VIEW` | Usuarios con ese rol |
+| `GET` | `/api/roles/:id/permissions` | Permiso: `ROLES_VIEW` | Permisos asignados a ese rol |
+| `POST` | `/api/roles` | Permiso: `ROLES_CREATE` | Crea un rol |
+| `PUT` | `/api/roles/:id` | Permiso: `ROLES_UPDATE` | Edita un rol |
+| `DELETE` | `/api/roles/:id` | Permiso: `ROLES_DELETE` | Elimina un rol |
+| `POST` | `/api/roles/:id/permissions` | Permiso: `ROLES_ASSIGN_PERMISSIONS` | Asigna permisos a un rol |
+| `POST` | `/api/user-roles` | Permiso: `ROLES_ASSIGN_PERMISSIONS` | Asigna un rol a un usuario |
+| `GET` | `/api/permissions` | Permiso: `PERMISSIONS_VIEW` | Catálogo de códigos de permiso |
+| `GET` | `/api/permissions/:id` | Permiso: `PERMISSIONS_VIEW` | Detalle de un permiso |
+| `POST` | `/api/permissions` | Permiso: `PERMISSIONS_CREATE` | Crea un permiso |
+| `PUT` | `/api/permissions/:id` | Permiso: `PERMISSIONS_UPDATE` | Edita un permiso |
+| `DELETE` | `/api/permissions/:id` | Permiso: `PERMISSIONS_DELETE` | Elimina un permiso |
+
+## Reportes y analítica
+
+Todo bajo `/api/reports` requiere permiso `REPORTS_VIEW`, salvo `user-metrics` (solo sesión — es la vista personal de métricas propias, no el dashboard administrativo).
+
+> Los dos entrypoints del backend (`cmd/api/main.go` para local, `api/index.go` para Vercel) registran las rutas por separado y pueden desalinearse — `user-metrics` faltaba en `main.go` y devolvía 404 en local hasta que se corrigió el 2026-08-10. Ver [[Gotchas y Reglas de Oro]] antes de asumir que cualquier endpoint nuevo ya está disponible en ambos entornos.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/reports/stats` | Totales generales del sistema |
+| `GET` | `/api/reports/user-metrics` | Métricas personales del usuario actual (**solo sesión**, sin `REPORTS_VIEW`) |
+| `GET` | `/api/reports/occupancy` | Ocupación de cupos |
+| `GET` | `/api/reports/top-products` | Productos más vendidos |
+| `GET` | `/api/reports/risk-alerts` | Alertas de riesgo (disponibles × neto) |
+| `GET` | `/api/reports/cancellations` | Reporte de cancelaciones |
+| `GET` | `/api/reports/agency-share` | Participación por agencia |
+| `GET` | `/api/reports/destinations-detail` | Detalle por destino |
+| `GET` | `/api/reports/evolution` | Evolución de pasajeros en el tiempo |
+| `GET` | `/api/reports/evolution-revenue` | Evolución de ventas en el tiempo |
+| `GET` | `/api/reports/metrics-summary` | Resumen de métricas clave |
+| `GET` | `/api/reports/metrics-by-destination` | Métricas por destino |
+| `GET` | `/api/reports/forecast-sales` | Proyección de ventas |
+| `GET` | `/api/reports/grupos` | Reporte de grupos/vuelos a medida |
+| `GET` | `/api/reports/fields` | Campos disponibles para reportes dinámicos |
+| `POST` | `/api/reports/dashboard-data` | Datos agregados del dashboard principal |
+| `POST` | `/api/reports/evolucion-agencias` | Evolución por agencia (dashboard legacy) |
+| `POST` | `/api/reports/agencias-data` | Datos por agencia (dashboard legacy) |
+| `POST` | `/api/reports/detalle-destinos` | Detalle de destinos (dashboard legacy) |
+| `POST` | `/api/reports/destinos-compania` | Destinos por compañía (dashboard legacy) |
+| `POST` | `/api/reports/evolucion-pasajeros` | Evolución de pasajeros (dashboard legacy) |
+| `POST` | `/api/reports/evolucion-por-cupo` | Evolución por cupo (dashboard legacy) |
+| `POST` | `/api/reports/share-por-cupo` | Participación por cupo (dashboard legacy) |
+| `POST` | `/api/reports/por-salida` | Datos agrupados por fecha de salida (dashboard legacy) |
+
+> Los endpoints marcados "dashboard legacy" conviven con sus equivalentes más nuevos por compatibilidad con el panel de Reportes existente — para una integración nueva, preferí `stats`, `occupancy`, `top-products`, etc.
+
+## Notificaciones
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/notifications` | Sesión | Lista tus notificaciones |
+| `GET` | `/api/notifications/unread-count` | Sesión | Cantidad de no leídas |
+| `PUT` | `/api/notifications/:id/read` | Sesión | Marca una como leída |
+| `PUT` | `/api/notifications/read-all` | Sesión | Marca todas como leídas |
+| `PUT` | `/api/notifications/:id/hide` | Sesión | Oculta una notificación |
+| `POST` | `/api/notifications` | Permiso: `NOTIFICATIONS_CREATE` | Crea una notificación manual |
+| `DELETE` | `/api/notifications/:id` | Permiso: `NOTIFICATIONS_DELETE` | Elimina una notificación |
+
+## Asistente IA
+
+Ver [Asistente IA](FLUJOS_FUNCIONALIDADES.html#10-asistente-ia) para el detalle de cómo arma el system prompt y ejecuta tools.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `POST` | `/api/ai/chat` | Sesión | Manda un mensaje al asistente (texto + imágenes opcionales) |
+| `GET` | `/api/ai/sessions` | Sesión | Tus sesiones de chat |
+| `GET` | `/api/ai/sessions/:id/messages` | Sesión | Historial de una sesión |
+| `PUT` | `/api/ai/sessions/:id/title` | Sesión | Renombra una sesión |
+| `DELETE` | `/api/ai/sessions/:id` | Sesión | Elimina una sesión |
+| `GET` | `/api/ai/experts` | Sesión | Expertos (bases de conocimiento) de tu agencia |
+| `GET` | `/api/ai/experts/:id` | Sesión | Detalle de un experto |
+| `POST` | `/api/ai/experts` | Admin / agency_admin | Crea un experto |
+| `PUT` | `/api/ai/experts/:id` | Admin / agency_admin | Edita un experto |
+| `DELETE` | `/api/ai/experts/:id` | Admin / agency_admin | Elimina un experto |
+| `GET` | `/api/ai/experts/:id/documents` | Sesión | Documentos cargados a un experto |
+| `POST` | `/api/ai/experts/:id/documents` | Admin / agency_admin | Sube un documento a un experto |
+| `PUT` | `/api/ai/experts/:id/documents/:docId` | Admin / agency_admin | Edita un documento |
+| `DELETE` | `/api/ai/experts/:id/documents/:docId` | Admin / agency_admin | Elimina un documento |
+| `GET` | `/api/ai/providers` | Permiso: `AI_VIEW` | Proveedores LLM configurados |
+| `POST` | `/api/ai/providers` | Permiso: `AI_UPDATE` | Da de alta un proveedor |
+| `PUT` | `/api/ai/providers/:id` | Permiso: `AI_UPDATE` | Edita un proveedor |
+| `DELETE` | `/api/ai/providers/:id` | Permiso: `AI_UPDATE` | Elimina un proveedor |
+| `POST` | `/api/ai/providers/:id/test` | Permiso: `AI_UPDATE` | Prueba la conexión con el proveedor |
+| `GET` | `/api/ai/stats` | Permiso: `AI_VIEW` | Estadísticas de uso |
+| `GET` | `/api/ai/logs` | Permiso: `AI_VIEW` | Logs de chat (acepta `?days=`, `?limit=`) |
+
+## Configuración
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/settings` | Permiso: `SETTINGS_VIEW` | Ajustes globales clave-valor (ej. `bloqueo_minutos_default`) |
+| `PUT` | `/api/settings/:key` | Permiso: `SETTINGS_UPDATE` | Actualiza (o crea) un ajuste |
+| `GET` | `/api/white-label/config` | Sesión | Configuración de marca (logo, colores) de tu agencia |
+| `POST` | `/api/white-label/config` | Permiso: `WHITE_LABEL_UPDATE` | Crea la configuración de marca |
+| `PUT` | `/api/white-label/config/:id` | Permiso: `WHITE_LABEL_UPDATE` | Edita la configuración de marca |
+| `DELETE` | `/api/white-label/config/:id` | Permiso: `WHITE_LABEL_UPDATE` | Elimina la configuración de marca |
+| `GET` | `/api/email-config/config` | Sesión | Configuración SMTP de tu agencia |
+| `POST` | `/api/email-config/config` | Sesión | Crea la configuración SMTP |
+| `PUT` | `/api/email-config/config/:id` | Sesión | Edita la configuración SMTP |
+| `DELETE` | `/api/email-config/config/:id` | Sesión | Elimina la configuración SMTP |
+| `POST` | `/api/email-config/test` | Sesión | Prueba la conexión SMTP |
+| `POST` | `/api/email-config/send-test` | Sesión | Envía un email de prueba |
+| `GET` | `/api/email-config/templates` | Sesión | Plantillas de email |
+| `PUT` | `/api/email-config/templates/:id` | Sesión | Edita una plantilla de email |
+| `GET` | `/api/email-config/templates/:id/preview` | Sesión | Previsualiza una plantilla renderizada |
+| `GET` | `/api/notification-config/templates` | Sesión | Plantillas de notificación in-app |
+| `PUT` | `/api/notification-config/templates/:id` | Sesión | Edita una plantilla de notificación |
+| `GET` | `/api/notification-config/templates/:id/preview` | Sesión | Previsualiza una plantilla renderizada |
+
+> Las rutas de `email-config` y `notification-config` solo exigen sesión iniciada (no un permiso puntual) pese a ser configuración administrativa — tenelo en cuenta si tu integración maneja credenciales SMTP.
+
+## Logs, Estado del sistema y exportación
+
+### Estado del sistema
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/system/status` | Permiso: `LOGS_VIEW` | Diagnóstico completo del sistema |
+| `POST` | `/api/system/holds/:id/release` | Solo admin | Libera manualmente un hold/bloqueo estancado |
+
+**`GET /api/system/status`** devuelve:
+
+```json
+{
+  "timestamp": "2025-01-15T14:30:00Z",
+  "database": {
+    "connected": true,
+    "latency_ms": 3
+  },
+  "services": [
+    { "name": "API Go", "status": "ok", "details": "Servidor HTTP activo y respondiendo" },
+    { "name": "SMTP / Email", "status": "ok", "details": "Host configurado: smtp.example.com" },
+    { "name": "Asistente IA", "status": "degraded", "details": "API Key de IA no configurada en el entorno" }
+  ],
+  "counts": {
+    "total_products": 45,
+    "total_reservations": 312,
+    "total_confirmed": 280,
+    "total_blocked": 5,
+    "total_hold_temp": 2,
+    "total_expired": 20,
+    "total_cancelled": 5,
+    "total_users": 38,
+    "total_logs": 15420,
+    "total_error_logs": 12
+  },
+  "active_holds": [
+    {
+      "reservation_id": 99,
+      "pedido_id": "ORD-20250115-001",
+      "estado": "hold_temporal",
+      "producto_id": 12,
+      "destino": "Cancún",
+      "codigo_cupo": "CAN-2025-01",
+      "agencia": "Viajes Express",
+      "contacto_nombre": "Juan Pérez",
+      "contacto_email": "juan@example.com",
+      "hold_passengers": 2,
+      "bloqueo_expira_at": "2025-01-15T14:45:00Z",
+      "minutes_ago": 7.3,
+      "is_expired": false,
+      "created_at": "2025-01-15T14:23:00Z"
+    }
+  ],
+  "stuck_holds": []
+}
+```
+
+**`POST /api/system/holds/:id/release`** — Solo para rol `admin`. Devuelve:
+
+```json
+{
+  "message": "Hold liberado exitosamente",
+  "reservation_id": 99,
+  "pedido_id": "ORD-20250115-001",
+  "passengers_returned": 2,
+  "product_id": 12
+}
+```
+
+---
+
+### Logs del sistema
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/logs` | Permiso: `LOGS_VIEW` | Logs paginados del sistema con filtros |
+| `GET` | `/api/logs/export` | Permiso: `LOGS_VIEW` | Exporta los logs como archivo JSON descargable |
+
+**Query params para `/api/logs` y `/api/logs/export`:**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `page` | int | Página (default: 1). Solo para `/api/logs`. |
+| `limit` | int | Registros por página (1–500, default: 50). Solo para `/api/logs`. |
+| `level` | string | Filtro por nivel: `info`, `warning`, `error` |
+| `source` | string | Filtro por fuente: `http`, `cron`, `email`, `ai`, `admin` |
+| `startDate` | string | Desde (YYYY-MM-DD) |
+| `endDate` | string | Hasta (YYYY-MM-DD, incluye hasta las 23:59:59) |
+| `q` | string | Búsqueda libre sobre mensaje, nombre de usuario, email, agencia, ruta e IP |
+| `userEmail` | string | Filtro exacto por email de usuario |
+| `agencia` | string | Filtro por agencia |
+| `status_code` | int | Filtro por código HTTP |
+
+**Estructura de un `SystemLog`:**
+
+```json
+{
+  "id": "uuid",
+  "level": "error",
+  "source": "http",
+  "method": "POST",
+  "path": "/api/reservations",
+  "status_code": 500,
+  "message": "Error interno al crear reserva",
+  "details": "pq: insert or update violates...",
+  "user_id": "uuid",
+  "user_name": "Juan Pérez",
+  "user_email": "juan@agencia.com",
+  "agencia": "Viajes Express",
+  "ip": "190.123.45.67",
+  "request_id": "1737123456789",
+  "duration_ms": 145,
+  "created_at": "2025-01-15T14:23:00Z"
+}
+```
+
+`/api/logs/export` descarga directamente un archivo `system_logs_YYYYMMDD_HHMMSS.json` con estructura:
+
+```json
+{
+  "exported_at": "2025-01-15T14:30:00Z",
+  "count": 3200,
+  "logs": [ ... ]
+}
+```
+
+### Respaldo y Restauración de Base de Datos (Backup)
+
+El sistema genera copias de seguridad completas de la base de datos en formato **JSON agnóstico**, respaldando las 13 tablas principales (`products`, `reservations`, `passengers`, `profiles`, `agencies`, `roles`, `permissions`, `role_permissions`, `email_smtp_configs`, `email_templates`, `notification_templates`, `ai_providers`, `system_logs`).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/backup` | Permiso: `BACKUP_VIEW` | Lista los archivos de backup guardados en el servidor |
+| `POST` | `/api/backup/generate` | Permiso: `BACKUP_CREATE` | Genera un backup JSON completo y lo guarda en disco |
+| `GET` | `/api/backup/download/:filename` | Permiso: `BACKUP_VIEW` | Descarga el archivo de backup `.json` especificado |
+| `POST` | `/api/backup/restore` | Permiso: `BACKUP_CREATE` | Restaura tablas de la base de datos a partir de un JSON de backup |
+| `DELETE` | `/api/backup/:filename` | Permiso: `BACKUP_CREATE` | Elimina un archivo de backup del servidor |
+
+**Estructura del archivo `backup_YYYYMMDD_HHMMSS.json`:**
+
+```json
+{
+  "meta": {
+    "version": "1.0",
+    "created_at": "2026-07-28T14:45:00Z",
+    "total_records": 1540,
+    "database": "postgresql",
+    "tables_count": 13
+  },
+  "tables": {
+    "products": [ ... ],
+    "reservations": [ ... ],
+    "passengers": [ ... ],
+    "profiles": [ ... ],
+    "agencies": [ ... ],
+    "email_smtp_configs": [ ... ],
+    "ai_providers": [ ... ]
+  }
+}
+```
+
+---
+
+### Otras exportaciones
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/export/csv/:entityType` | Sesión | Exporta una entidad a CSV (`products`, `reservations`, `agencies`, etc.) |
+
+---
+
+## Automatización interna (Cron Jobs)
+
+Estos endpoints están diseñados para ser invocados por un **scheduler externo** (ej. `cron-job.org`, GitHub Actions, Vercel Cron). No usan JWT: se autentican con la cabecera `X-Cron-Secret` o parámetro `?secret=`, comparados contra la variable de entorno `CRON_SECRET` del servidor.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/cron/expire-reservations` | Vence bloqueos temporales y holds cumplidos, devuelve el stock |
+| `GET` | `/api/cron/check-deadlines` | Avisa vencimientos operativos próximos (pago, nominación, emisión) |
+| `GET` | `/api/cron/backup` | Genera automáticamente una copia de seguridad JSON y mantiene la rotación de los últimos 30 backups |
+
+**Ejemplo de llamada cURL para Backup Automático:**
+
+```bash
+curl -X GET "https://<tu-dominio>/api/cron/backup" \
+  -H "X-Cron-Secret: $CRON_SECRET"
+```
+
+Además existe un endpoint genérico `/api/data` (uso interno del panel de administración para CRUD dinámico) que no está pensado para integraciones externas y no se documenta en detalle acá.
+
+---
+
+## Claves de API para Integraciones Externas (M2M)
+
+Permite generar tokens de acceso de larga duración para sistemas externos (ERPs B2B, bots, automatizaciones). La clave plana solo se muestra al momento de creación; en base de datos se almacena únicamente el **hash SHA-256**.
+
+**Permisos:**
+- `admin` (Super Admin): Ve y opera sobre **todas** las API Keys. Puede crear claves globales o vinculadas a cualquier agencia.
+- `agency_admin`: Ve y opera **solo** las claves de **su propia agencia**. El backend fuerza automáticamente el `agency_id` correcto.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/api-keys` | `admin` o `agency_admin` | Lista API Keys (con filtro de agencia para `agency_admin`). |
+| `POST` | `/api/api-keys` | `admin` o `agency_admin` | Genera una nueva API Key. Devuelve `secret_key` una sola vez. |
+| `DELETE` | `/api/api-keys/:id` | `admin` o `agency_admin` | Revoca una API Key (con verificación de pertenencia de agencia). |
+
+**Body de creación (`POST /api/api-keys`):**
+
+```json
+{
+  "name": "Integración ERP B2B",
+  "agency_id": "uuid-opcional",
+  "scopes": ["*"]
+}
+```
+
+**Respuesta de creación (`201`):**
+
+```json
+{
+  "message": "API Key generada exitosamente",
+  "data": {
+    "id": "uuid",
+    "name": "Integración ERP B2B",
+    "prefix": "cupo_live_sk_a1b2c3...",
+    "secret_key": "cupo_live_sk_<hex completo>",
+    "scopes": "*",
+    "created_at": "2026-07-28T18:45:00Z"
+  }
+}
+```
+
+**Uso desde sistemas externos:**
+
+```bash
+curl https://<dominio>/api/products/ \
+  -H "X-API-Key: cupo_live_sk_..."
+```
+
+---
+
+## Estado del Sistema y Backups
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/logs` | Permiso `LOGS_VIEW` | Lista logs del sistema con filtros de nivel, fuente y búsqueda. |
+| `GET` | `/api/backup` | Permiso `BACKUP_VIEW` | Lista los backups disponibles. |
+| `POST` | `/api/backup/generate` | Permiso `BACKUP_CREATE` | Genera un backup JSON instantáneo. |
+| `GET` | `/api/backup/download/:filename` | Permiso `BACKUP_VIEW` | Descarga un backup como archivo JSON. |
+| `DELETE` | `/api/backup/:filename` | Permiso `BACKUP_CREATE` | Elimina un backup del servidor. |
+| `GET` | `/api/cron/backup` | `X-Cron-Secret` | Genera backup automático (para scheduler externo). Mantiene rotación de 30. |
+

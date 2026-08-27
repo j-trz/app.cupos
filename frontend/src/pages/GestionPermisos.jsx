@@ -8,8 +8,11 @@ import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 import { MODULES, ACTIONS, getModuleLabel } from '../lib/permissionModules.js';
 
 const emptyPermission = {
@@ -263,9 +266,13 @@ export default function GestionPermisos() {
                 </div>
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-                    </div>
+                    <div className="p-4"><SkeletonTable columns={6} rows={5} /></div>
+                ) : filteredPermissions.length === 0 ? (
+                    <EmptyState
+                        icon="🔑"
+                        title="No hay permisos"
+                        description={searchTerm || moduleFilter ? 'No se encontraron permisos con los filtros aplicados' : 'No hay permisos registrados'}
+                    />
                 ) : (
                     <TableComponent>
                         <TableHeader>
@@ -279,14 +286,7 @@ export default function GestionPermisos() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredPermissions.length === 0 ? (
-                                <TableRow>
-                                    <TableCell className="text-center py-10" colSpan={6}>
-                                        {searchTerm || moduleFilter ? 'No se encontraron permisos con los filtros aplicados' : 'No hay permisos registrados'}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                filteredPermissions.map((permission) => (
+                                {filteredPermissions.map((permission) => (
                                     <TableRow key={permission.id}>
                                         <TableCell className="text-center">
                                             <div className="flex items-center justify-center gap-2">
@@ -314,28 +314,12 @@ export default function GestionPermisos() {
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className="flex items-center justify-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => openEdit(permission)}
-                                                    title="Editar"
-                                                >
-                                                    <Edit className="h-4 w-4 text-slate-600" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDelete(permission)}
-                                                    title="Eliminar"
-                                                    className="text-red-600 hover:text-red-700"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                <ActionIconButton icon={Edit} onClick={() => openEdit(permission)} title="Editar" />
+                                                <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDelete(permission)} title="Eliminar" />
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
+                                ))}
                         </TableBody>
                     </TableComponent>
                 )}

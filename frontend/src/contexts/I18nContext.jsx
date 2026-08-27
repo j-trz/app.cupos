@@ -93,7 +93,6 @@ const translations = {
     low_availability: 'Baja Disponibilidad',
     product_updated: 'Producto Actualizado',
     navigation: 'Navegación',
-    theme_change: 'Cambio de tema',
     language_change: 'Cambio de idioma',
     completed: 'Completado',
 
@@ -112,7 +111,6 @@ const translations = {
     onboarding_welcome_message: 'Bienvenido al panel de administración. Esta guía le ayudará a familiarizarse con las principales funciones.',
     onboarding_navigation_message: 'Use la barra lateral para navegar entre las diferentes secciones del sistema.',
     onboarding_search_message: 'Utilice la función de búsqueda para encontrar rápidamente elementos específicos.',
-    onboarding_theme_message: 'Cambie entre modo claro y oscuro según su preferencia.',
     onboarding_language_message: 'Cambie el idioma del sistema según sus preferencias.',
     onboarding_completed_message: '¡Ha completado la guía de bienvenida! Ahora está listo para usar el sistema.'
   },
@@ -207,7 +205,6 @@ const translations = {
     low_availability: 'Low Availability',
     product_updated: 'Product Updated',
     navigation: 'Navigation',
-    theme_change: 'Theme Change',
     language_change: 'Language Change',
     completed: 'Completed',
 
@@ -226,7 +223,6 @@ const translations = {
     onboarding_welcome_message: 'Welcome to the admin panel. This guide will help you familiarize yourself with the main functions.',
     onboarding_navigation_message: 'Use the sidebar to navigate between different sections of the system.',
     onboarding_search_message: 'Use the search function to quickly find specific items.',
-    onboarding_theme_message: 'Switch between light and dark mode according to your preference.',
     onboarding_language_message: 'Change the system language according to your preferences.',
     onboarding_completed_message: 'You have completed the welcome guide! You are now ready to use the system.'
   }

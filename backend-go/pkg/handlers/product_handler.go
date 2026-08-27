@@ -34,7 +34,10 @@ func createdByFromContext(c *gin.Context) *uuid.UUID {
 
 // fixNumbers convierte strings numéricos a float64/int para evitar errores de unmarshal
 func fixNumbers(data map[string]interface{}) {
-	floatFields := []string{"precio", "neto_1", "op", "inf_fare", "chd_fare"}
+	floatFields := []string{
+		"precio", "neto_1", "op", "op_adt", "op_chd", "op_inf", "inf_fare", "chd_fare",
+		"tarifa_adt", "impuestos_adt", "tarifa_chd", "impuestos_chd", "tarifa_inf", "impuestos_inf",
+	}
 	intFields := []string{"disponibilidad", "cupo", "vendidos", "bloqueo_temporal_minutos"}
 	for _, field := range floatFields {
 		if v, ok := data[field]; ok {
@@ -54,6 +57,60 @@ func fixNumbers(data map[string]interface{}) {
 			}
 		}
 	}
+}
+
+// applyCalculatedPrices calcula la Venta de cada tipo de pasajero como
+// Tarifa+Impuestos+OP y la escribe en Precio/ChdFare/InfFare — esos 3 campos
+// dejan de cargarse a mano; siempre reflejan lo que se acaba de cargar en
+// Tarifa/Impuestos (por tipo) + OP (compartido). Se llama tanto en
+// CreateProduct como en UpdateProduct para que nunca queden desincronizados.
+func applyCalculatedPrices(product *models.Product) {
+	product.Precio = product.TarifaAdt + product.ImpuestosAdt + product.OPAdt
+	product.ChdFare = product.TarifaChd + product.ImpuestosChd + product.OPChd
+	product.InfFare = product.TarifaInf + product.ImpuestosInf + product.OPInf
+	// OP legado: se sincroniza al de ADT para que cualquier lugar que todavía
+	// lea el campo único (en vez de OPForTipo) muestre algo razonable.
+	product.OP = product.OPAdt
+	product.Neto1 = prorratedRiskNeto1(product)
+}
+
+// prorratedRiskNeto1 autocompleta el Neto1 usado para "Riesgo" en reportes —
+// deja de ser un valor manual: es el promedio prorrateado entre ADT y CHD
+// (Tarifa+Impuestos de cada uno). El infante no ocupa lugar/cupo, así que no
+// participa de un cálculo de riesgo basado en lugares sin vender.
+func prorratedRiskNeto1(product *models.Product) float64 {
+	netoAdt := product.TarifaAdt + product.ImpuestosAdt
+	netoChd := product.TarifaChd + product.ImpuestosChd
+	return (netoAdt + netoChd) / 2
+}
+
+// reconcilePricesForImport se usa en la carga masiva (BulkCreateProducts),
+// que acepta tanto filas "viejas" (precio/chd_fare/inf_fare ya calculado, de
+// una migración de cupos históricos) como filas "nuevas" (con desglose de
+// tarifa/impuestos). Si vino el desglose nuevo, la Venta se recalcula
+// (Tarifa+Impuestos+OP) igual que en CreateProduct/UpdateProduct. Si vino
+// solo el precio viejo sin desglose, se infiere Tarifa=precio pero NO se
+// recalcula el precio (evita sumarle el OP encima a un precio que ya era
+// correcto).
+func reconcilePricesForImport(product *models.Product) {
+	// Si la fila de import solo trae el OP legado (una columna, no las 3
+	// nuevas), se replica a los 3 tipos — mismo criterio que el backfill de
+	// la migración de productos ya cargados.
+	if product.OPAdt == 0 && product.OPChd == 0 && product.OPInf == 0 && product.OP != 0 {
+		product.OPAdt, product.OPChd, product.OPInf = product.OP, product.OP, product.OP
+	}
+	reconcileOne := func(tarifa, impuestos *float64, op float64, venta *float64) {
+		if *tarifa != 0 || *impuestos != 0 {
+			*venta = *tarifa + *impuestos + op
+		} else if *venta != 0 {
+			*tarifa = *venta
+		}
+	}
+	reconcileOne(&product.TarifaAdt, &product.ImpuestosAdt, product.OPAdt, &product.Precio)
+	reconcileOne(&product.TarifaChd, &product.ImpuestosChd, product.OPChd, &product.ChdFare)
+	reconcileOne(&product.TarifaInf, &product.ImpuestosInf, product.OPInf, &product.InfFare)
+	product.OP = product.OPAdt
+	product.Neto1 = prorratedRiskNeto1(product)
 }
 
 // fixDates convierte strings "YYYY-MM-DD" a RFC3339 en un mapa de datos
@@ -108,8 +165,9 @@ func GetProducts(c *gin.Context) {
 	} else {
 		// Vista de reserva (Disponibilidad): nunca mostrar cupos agotados, ni
 		// bloqueados para venta, ni de una agencia que no es la mía, no me
-		// cedió, ni me comparte.
-		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false")
+		// cedió, ni me comparte. Tampoco un producto convertido desde una
+		// Oportunidad que un admin todavía no aprobó (ver ApproveProduct).
+		query = query.Where("disponibilidad > 0 AND is_blocked_for_sale = false AND pendiente_aprobacion = false")
 		if role != "admin" {
 			query = query.Where(
 				"LOWER(agencia) = LOWER(?) OR LOWER(restricted_agency) = LOWER(?) OR "+sharedSubquery,
@@ -173,21 +231,29 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	if product.CodigoCupo == "" {
-		product.CodigoCupo = generateCodigoCupo(product.TipoProducto, product.Destino, 0)
+		product.CodigoCupo = generateCodigoCupo(&product, 0)
 	}
 	if product.TipoProducto == "" {
-		product.TipoProducto = categorizeProduct(product.CodigoCupo)
+		product.TipoProducto = "Aereo"
 	}
 
-	if product.Cupo > 0 && product.Disponibilidad > product.Cupo {
-		product.Disponibilidad = product.Cupo
-	}
+	// Disponibilidad no es un dato que se cargue a mano — siempre es
+	// Cupo - Vendidos (ver recomputeDisponibilidad).
+	product.Disponibilidad = recomputeDisponibilidad(product.Cupo, product.Vendidos)
+	applyCalculatedPrices(&product)
 
 	database.DB.Create(&product)
 
-	services.NotifyBroadcastByCode(createdByFromContext(c), "new_product", "Nuevo producto disponible",
+	// Antes era NotifyBroadcastByCode: llegaba a TODOS los usuarios del
+	// sistema, de cualquier agencia — un producto es privado de su agencia
+	// dueña, así que el aviso también debe serlo (sin agencia dueña, no se
+	// avisa a nadie; NotifyAgencyByCode ya maneja ese caso).
+	services.NotifyAgencyByCode(product.Agencia, createdByFromContext(c), "new_product", "Nuevo producto disponible",
 		fmt.Sprintf("Se agregó el producto %s hacia %s (%s)", product.CodigoCupo, product.Destino, product.Compania),
 		map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania})
+	services.SendTemplateEmailToAgency(product.Agencia, "new_product", map[string]string{
+		"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania,
+	})
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -242,17 +308,37 @@ func UpdateProduct(c *gin.Context) {
 	updated.TransferID = existing.TransferID
 	updated.CreatedAt = existing.CreatedAt
 
-	if updated.Cupo > 0 && updated.Disponibilidad > updated.Cupo {
-		updated.Disponibilidad = updated.Cupo
+	// Disponibilidad no se edita a mano — se recalcula siempre a partir del
+	// Cupo (ya reafirmado arriba que Vendidos no cambia por acá). Si se
+	// amplía el Cupo (ej. +10 lugares comprados), la disponibilidad libre
+	// sube sola sin pisar lo ya vendido.
+	updated.Disponibilidad = recomputeDisponibilidad(updated.Cupo, updated.Vendidos)
+	applyCalculatedPrices(&updated)
+
+	// Avisos: si cambia ruta o fechas de salida/regreso, las reservas activas
+	// sobre este producto quedan afectadas — se detecta ANTES de guardar
+	// (comparando contra `existing`) y se notifica DESPUÉS de guardar con
+	// éxito, más abajo.
+	var cambios []string
+	if existing.Ruta != updated.Ruta {
+		cambios = append(cambios, fmt.Sprintf("ruta: %s → %s", orGuion(existing.Ruta), orGuion(updated.Ruta)))
+	}
+	if !sameDatePtr(existing.FechaSalida, updated.FechaSalida) {
+		cambios = append(cambios, fmt.Sprintf("fecha de salida: %s → %s", formatDatePtr(existing.FechaSalida), formatDatePtr(updated.FechaSalida)))
+	}
+	if !sameDatePtr(existing.FechaRegreso, updated.FechaRegreso) {
+		cambios = append(cambios, fmt.Sprintf("fecha de regreso: %s → %s", formatDatePtr(existing.FechaRegreso), formatDatePtr(updated.FechaRegreso)))
 	}
 
 	if err := database.DB.Select(
 		"destino", "compania", "disponibilidad", "cupo",
 		"fecha_salida", "fecha_regreso", "salida", "regreso",
-		"precio", "neto_1", "op",
+		"precio", "neto_1", "op", "op_adt", "op_chd", "op_inf",
+		"tarifa_adt", "impuestos_adt", "tarifa_chd", "impuestos_chd", "tarifa_inf", "impuestos_inf",
 		"ruta", "pnr", "ficha", "temporada", "tipo_producto",
 		"bloqueo_temporal_minutos",
 		"carryon", "handbag", "checkedbag",
+		"carryon_kg", "handbag_kg", "checkedbag_kg", "package_links",
 		"inf_fare", "chd_fare",
 		"is_blocked_for_sale",
 		"agencia", "source_agency",
@@ -262,7 +348,62 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	if len(cambios) > 0 {
+		notifyProductChanged(&updated, cambios, createdByFromContext(c))
+	}
+
 	c.JSON(http.StatusOK, updated)
+}
+
+// notifyProductChanged avisa a cada reserva activa sobre este producto
+// (excluye hold_temporal/cancelada/expirada/cedido, que ya no representan un
+// viaje real esperando al pasajero) que su ruta o fechas cambiaron.
+func notifyProductChanged(product *models.Product, cambios []string, actor *uuid.UUID) {
+	var reservations []models.Reservation
+	database.DB.Where(
+		"product_id = ? AND estado NOT IN ?", product.ID,
+		[]string{models.EstadoHoldTemporal, models.EstadoCancelada, models.EstadoExpirada, models.EstadoCedida},
+	).Find(&reservations)
+
+	resumen := strings.Join(cambios, "; ")
+	for _, r := range reservations {
+		data := map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "pedido_id": r.PedidoID, "cambios": resumen}
+		services.NotifyUserByCode(r.CreatedBy, actor, r.Agencia, "product_changed",
+			"Tu cupo reservado cambió",
+			fmt.Sprintf("El producto %s hacia %s de tu reserva %s cambió: %s", product.CodigoCupo, product.Destino, r.PedidoID, resumen),
+			data)
+		if recipient := services.ResolveReservationRecipientEmail(r.CreatedBy); recipient != "" {
+			if err := services.SendTemplateEmail(r.Agencia, "product_changed", recipient, data); err != nil {
+				services.LogFailure("email",
+					fmt.Sprintf("No se pudo enviar el aviso de cambio de producto para el pedido %s", r.PedidoID),
+					err.Error())
+			}
+		}
+	}
+}
+
+func orGuion(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
+}
+
+func sameDatePtr(a, b *time.Time) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(*b)
+}
+
+func formatDatePtr(t *time.Time) string {
+	if t == nil {
+		return "—"
+	}
+	return t.Format("2006-01-02")
 }
 
 // DeleteProduct elimina un producto. No existía ningún endpoint para esto —
@@ -312,6 +453,37 @@ func DeleteProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Producto eliminado correctamente"})
 }
 
+// ApproveProduct aprueba un producto creado vía "Convertir a producto" desde
+// una Oportunidad (ver ConvertOpportunityToProduct en opportunities_handler.go).
+// Solo admin (gateado por PRODUCTS_APPROVE en la ruta). Productos cargados
+// directo desde Gestión de Productos nunca pasan por acá (nacen con
+// PendienteAprobacion=false).
+func ApproveProduct(c *gin.Context) {
+	id := c.Param("id")
+	var product models.Product
+	if err := database.DB.First(&product, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Producto no encontrado"})
+		return
+	}
+
+	if !product.PendienteAprobacion {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este producto no está pendiente de aprobación"})
+		return
+	}
+
+	if err := database.DB.Model(&product).Update("pendiente_aprobacion", false).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al aprobar el producto"})
+		return
+	}
+
+	services.NotifyAgencyByCode(product.Agencia, createdByFromContext(c), "product_approved", "Producto aprobado",
+		fmt.Sprintf("Tu producto %s hacia %s (%s) fue aprobado y ya está disponible para reservar", product.CodigoCupo, product.Destino, product.Compania),
+		map[string]string{"codigo_cupo": product.CodigoCupo, "destino": product.Destino, "compania": product.Compania})
+
+	database.DB.First(&product, id)
+	c.JSON(http.StatusOK, product)
+}
+
 func BulkCreateProducts(c *gin.Context) {
 	var rawInput struct {
 		Products []map[string]interface{} `json:"products"`
@@ -335,14 +507,13 @@ func BulkCreateProducts(c *gin.Context) {
 
 	for i := range input.Products {
 		if input.Products[i].CodigoCupo == "" {
-			input.Products[i].CodigoCupo = generateCodigoCupo(input.Products[i].TipoProducto, input.Products[i].Destino, i)
+			input.Products[i].CodigoCupo = generateCodigoCupo(&input.Products[i], i)
 		}
 		if input.Products[i].TipoProducto == "" {
-			input.Products[i].TipoProducto = categorizeProduct(input.Products[i].CodigoCupo)
+			input.Products[i].TipoProducto = "Aereo"
 		}
-		if input.Products[i].Cupo > 0 && input.Products[i].Disponibilidad > input.Products[i].Cupo {
-			input.Products[i].Disponibilidad = input.Products[i].Cupo
-		}
+		input.Products[i].Disponibilidad = recomputeDisponibilidad(input.Products[i].Cupo, input.Products[i].Vendidos)
+		reconcilePricesForImport(&input.Products[i])
 	}
 
 	tx := database.DB.Begin()
@@ -365,25 +536,43 @@ func BulkCreateProducts(c *gin.Context) {
 
 	tx.Commit()
 
-	if len(input.Products) > 0 {
-		services.NotifyBroadcastByCode(createdByFromContext(c), "new_product_bulk", "Nuevos productos disponibles",
-			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", len(input.Products)),
-			map[string]string{"cantidad": fmt.Sprintf("%d", len(input.Products))})
+	// Igual que en CreateProduct: por agencia dueña, no un broadcast global —
+	// una carga masiva puede traer productos de varias agencias a la vez.
+	countByAgency := map[string]int{}
+	for _, p := range input.Products {
+		if p.Agencia != "" {
+			countByAgency[p.Agencia]++
+		}
+	}
+	for agencia, count := range countByAgency {
+		services.NotifyAgencyByCode(agencia, createdByFromContext(c), "new_product_bulk", "Nuevos productos disponibles",
+			fmt.Sprintf("Se agregaron %d productos nuevos a disponibilidad", count),
+			map[string]string{"cantidad": fmt.Sprintf("%d", count)})
+		services.SendTemplateEmailToAgency(agencia, "new_product_bulk", map[string]string{"cantidad": fmt.Sprintf("%d", count)})
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Bulk creation successful", "count": len(input.Products)})
 }
 
 // generateCodigoCupo arma un código legible y prácticamente único a partir
-// del tipo de producto y el destino (ej. "AER-BUE-04821"), para que el
+// de fecha de salida, destino, un secuencial, el tipo de servicio (Cupo/
+// Charter) y la aerolínea — ej. "20/09/26-REC-431123_CH-AD" — para que el
 // código de cupo deje de ser un campo manual — se completa solo si no vino
 // en el request (así la carga masiva que ya trae sus propios códigos no se
 // ve afectada).
-func generateCodigoCupo(tipoProducto, destino string, salt int) string {
-	tipoPrefix := letterPrefix(tipoProducto, 3, "GEN")
-	destPrefix := letterPrefix(destino, 3, "XXX")
-	unique := (time.Now().UnixNano()/1000 + int64(salt)) % 100000
-	return fmt.Sprintf("%s-%s-%05d", tipoPrefix, destPrefix, unique)
+func generateCodigoCupo(product *models.Product, salt int) string {
+	fecha := "00/00/00"
+	if product.FechaSalida != nil {
+		fecha = product.FechaSalida.Format("02/01/06")
+	}
+	destPrefix := letterPrefix(product.Destino, 3, "XXX")
+	unique := (time.Now().UnixNano()/1000 + int64(salt)) % 1000000
+	tipo := "CP"
+	if strings.EqualFold(strings.TrimSpace(product.Servicio), "Charter") {
+		tipo = "CH"
+	}
+	aerolinea := letterPrefix(product.Compania, 2, "XX")
+	return fmt.Sprintf("%s-%s-%06d_%s-%s", fecha, destPrefix, unique, tipo, aerolinea)
 }
 
 // letterPrefix devuelve las primeras n letras (sin espacios/acentos/símbolos)
@@ -404,13 +593,92 @@ func letterPrefix(s string, n int, fallback string) string {
 	return b.String()
 }
 
-func categorizeProduct(codigo string) string {
-	codigo = strings.ToUpper(codigo)
-	if strings.Contains(codigo, "_CH-") || strings.Contains(codigo, "_CH_") {
-		return "CHARTERS"
+// recomputeDisponibilidad: Disponibilidad no se carga a mano, siempre es
+// Cupo - Vendidos — así, si se amplía el Cupo (ej. se compran 10 lugares más),
+// la disponibilidad libre se recalcula sola en vez de quedar desalineada con
+// lo que ya se vendió.
+func recomputeDisponibilidad(cupo, vendidos int) int {
+	d := cupo - vendidos
+	if d < 0 {
+		return 0
 	}
-	if strings.Contains(codigo, "DEST_ARG") {
-		return "DESTINO ARG"
+	return d
+}
+
+// BulkDeleteProducts elimina un listado de productos seleccionados
+func BulkDeleteProducts(c *gin.Context) {
+	var req struct {
+		IDs []uint `json:"ids"`
 	}
-	return "CUPOS"
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de producto."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+
+	result := query.Delete(&models.Product{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar productos masivamente: " + result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d producto(s) eliminado(s) correctamente.", result.RowsAffected),
+		"count":   result.RowsAffected,
+	})
+}
+
+// BulkDuplicateProducts duplica un listado de productos seleccionados
+func BulkDuplicateProducts(c *gin.Context) {
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de producto."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	var products []models.Product
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+	if err := query.Find(&products).Error; err != nil || len(products) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No se encontraron productos válidos para duplicar."})
+		return
+	}
+
+	var duplicatedCount int
+	for i, orig := range products {
+		dup := orig
+		dup.ID = 0
+		dup.Vendidos = 0
+		dup.Disponibilidad = orig.Cupo
+		dup.CodigoCupo = generateCodigoCupo(&dup, i+1)
+		dup.CreatedAt = time.Now()
+		dup.UpdatedAt = time.Now()
+
+		if err := database.DB.Create(&dup).Error; err == nil {
+			duplicatedCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d producto(s) duplicado(s) correctamente.", duplicatedCount),
+		"count":   duplicatedCount,
+	})
 }

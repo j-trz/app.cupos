@@ -195,7 +195,7 @@ export default function ExpertsTab() {
                         <div>
                             <label className="block text-sm font-medium mb-1">Descripción</label>
                             <textarea
-                                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800"
+                                className="w-full px-3 py-2 border rounded-lg bg-white"
                                 rows={2}
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -206,7 +206,7 @@ export default function ExpertsTab() {
                         <div>
                             <label className="block text-sm font-medium mb-1">Personalidad (opcional)</label>
                             <textarea
-                                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800"
+                                className="w-full px-3 py-2 border rounded-lg bg-white"
                                 rows={2}
                                 value={form.persona}
                                 onChange={(e) => setForm({ ...form, persona: e.target.value })}

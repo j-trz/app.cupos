@@ -32,11 +32,17 @@ func atlasBaseURL(environment string) string {
 		if v := os.Getenv("ATLAS_API_URL_PROD"); v != "" {
 			return v
 		}
-		return "https://api-atlas-netviax-com.azurewebsites.net/rest"
+		// Confirmado por el usuario contra un request real: el dominio real es
+		// api-atlas.netviax.com, no el *.azurewebsites.net que se había
+		// asumido a partir del link de Gmail (probablemente un alias/redirect
+		// viejo, o el custom domain apunta al mismo backend de Azure).
+		return "https://api-atlas.netviax.com/rest"
 	}
 	if v := os.Getenv("ATLAS_API_URL_TEST"); v != "" {
 		return v
 	}
+	// Sin confirmar todavía (nadie probó el sandbox con esta URL real) — si
+	// falla, pedir la URL de test/sandbox correcta y setear ATLAS_API_URL_TEST.
 	return "https://api-atlas-netviax-com-test.azurewebsites.net/rest"
 }
 
@@ -71,15 +77,42 @@ type AtlasCredentials struct {
 }
 
 func credentialsFromConfig(cfg *models.AtlasConfig) AtlasCredentials {
-	return AtlasCredentials{Usuario: cfg.Usuario, Clave: cfg.Clave, Empresa: cfg.Empresa, Sucursal: cfg.Sucursal}
+	// DecryptSecret tolera un valor en texto plano (config recién tipeada en
+	// el formulario de "test de conexión" antes de guardar, o un dato legacy
+	// guardado antes de que existiera el cifrado) — este es el único punto
+	// donde la clave real se usa para armar un request, no hace falta
+	// desencriptar en ningún otro lado.
+	return AtlasCredentials{Usuario: cfg.Usuario, Clave: DecryptSecret(cfg.Clave), Empresa: cfg.Empresa, Sucursal: cfg.Sucursal}
+}
+
+// AtlasFlexString existe porque Atlas no es consistente entre endpoints: la
+// colección Postman muestra "Error"/"Mensaje" como string ("0", ""), pero
+// wscontactovendedorbuscar los devuelve como número (0) — un string común
+// tira "cannot unmarshal number into Go struct field" apenas llega la
+// primera respuesta real. Acepta cualquiera de las dos formas y normaliza a
+// string.
+type AtlasFlexString string
+
+func (s *AtlasFlexString) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		*s = AtlasFlexString(str)
+		return nil
+	}
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err != nil {
+		return fmt.Errorf("no es ni string ni número: %w", err)
+	}
+	*s = AtlasFlexString(num.String())
+	return nil
 }
 
 // AtlasEnvelope son los campos de negocio que Atlas usa para indicar
 // éxito/error ("0" = OK) — el status HTTP no es confiable (ver
 // doAtlasRequest), así que el éxito/fracaso se decide siempre con este campo.
 type AtlasEnvelope struct {
-	Error   string `json:"Error"`
-	Mensaje string `json:"Mensaje"`
+	Error   AtlasFlexString `json:"Error"`
+	Mensaje AtlasFlexString `json:"Mensaje"`
 }
 
 func (e AtlasEnvelope) asError() error {
@@ -120,16 +153,22 @@ func doAtlasRequest(cfg *models.AtlasConfig, endpoint string, body interface{}, 
 // ---- Búsqueda de contactos (wscontactobuscar) ----
 
 type WSContactoFiltro struct {
-	Filtros           string `json:"Filtros"`
-	ContactoCodigo    string `json:"ContactoCodigo,omitempty"`
-	ContactoNombre    string `json:"ContactoNombre,omitempty"`
-	ContactoTelefono  string `json:"ContactoTelefono,omitempty"`
-	ContactoCelular   string `json:"ContactoCelular,omitempty"`
-	ContactoEmail     string `json:"ContactoEmail,omitempty"`
-	ContactoDocumento string `json:"ContactoDocumento,omitempty"`
-	Paginado          string `json:"Paginado"`
-	PaginadoRegistros string `json:"PaginadoRegistros"`
-	PaginadoPaginas   string `json:"PaginadoPaginas"`
+	Filtros          string `json:"Filtros"`
+	ContactoCodigo   string `json:"ContactoCodigo,omitempty"`
+	ContactoNombre   string `json:"ContactoNombre,omitempty"`
+	ContactoTelefono string `json:"ContactoTelefono,omitempty"`
+	ContactoCelular  string `json:"ContactoCelular,omitempty"`
+	ContactoEmail    string `json:"ContactoEmail,omitempty"`
+	// Buscar por documento requiere los 3 juntos — Atlas soporta el mismo
+	// número de documento repetido en distintos países/tipos, así que sin
+	// IdentificacionCodigo (CI/PAS/DNI/RUT) y PaisCodigo (ISO alpha-2 del
+	// país emisor) el filtro queda ambiguo.
+	ContactoDocumento                     string `json:"ContactoDocumento,omitempty"`
+	ContactoDocumentoIdentificacionCodigo string `json:"ContactoDocumentoIdentificacionCodigo,omitempty"`
+	ContactoDocumentoPaisCodigo           string `json:"ContactoDocumentoPaisCodigo,omitempty"`
+	Paginado                              string `json:"Paginado"`
+	PaginadoRegistros                     string `json:"PaginadoRegistros"`
+	PaginadoPaginas                       string `json:"PaginadoPaginas"`
 }
 
 type wsContactoBuscarRequest struct {
@@ -152,21 +191,37 @@ type wsContactoBuscarResponse struct {
 	WSContactos []WSContactoResumen `json:"WSContactos"`
 }
 
+// BuscarContactoParams son los criterios de búsqueda — documentoTipo
+// (CI/PAS/DNI/RUT) y documentoPais (ISO alpha-2 del país emisor, ej. "UY")
+// solo aplican cuando FiltroTipo es "documento"; el resto de los tipos los
+// ignora.
+type BuscarContactoParams struct {
+	FiltroTipo    string
+	Valor         string
+	DocumentoTipo string
+	DocumentoPais string
+}
+
 // BuscarContacto arma un filtro con un único criterio relleno (documento,
 // email, celular o nombre) y devuelve los contactos que matchean.
-func BuscarContacto(cfg *models.AtlasConfig, filtroTipo, valor string) ([]WSContactoResumen, error) {
+func BuscarContacto(cfg *models.AtlasConfig, params BuscarContactoParams) ([]WSContactoResumen, error) {
 	filtro := WSContactoFiltro{Filtros: "S", Paginado: "N", PaginadoRegistros: "20", PaginadoPaginas: "1"}
-	switch filtroTipo {
+	switch params.FiltroTipo {
 	case "documento":
-		filtro.ContactoDocumento = valor
+		if params.DocumentoTipo == "" || params.DocumentoPais == "" {
+			return nil, fmt.Errorf("para buscar por documento hace falta el tipo (CI/PAS/DNI/RUT) y el país emisor")
+		}
+		filtro.ContactoDocumento = params.Valor
+		filtro.ContactoDocumentoIdentificacionCodigo = params.DocumentoTipo
+		filtro.ContactoDocumentoPaisCodigo = params.DocumentoPais
 	case "email":
-		filtro.ContactoEmail = valor
+		filtro.ContactoEmail = params.Valor
 	case "celular":
-		filtro.ContactoCelular = valor
+		filtro.ContactoCelular = params.Valor
 	case "nombre":
-		filtro.ContactoNombre = valor
+		filtro.ContactoNombre = params.Valor
 	default:
-		return nil, fmt.Errorf("tipo de filtro desconocido: %q", filtroTipo)
+		return nil, fmt.Errorf("tipo de filtro desconocido: %q", params.FiltroTipo)
 	}
 
 	req := wsContactoBuscarRequest{AtlasCredentials: credentialsFromConfig(cfg), WSContactoFiltro: filtro}
@@ -219,7 +274,9 @@ type wsContactoDetalleResponse struct {
 // atlasEmptyDate es el placeholder que Atlas usa para fechas vacías.
 const atlasEmptyDate = "0000-00-00"
 
-func normalizeAtlasDate(v string) string {
+// NormalizeAtlasDate convierte el placeholder "0000-00-00" en "" — Atlas lo
+// usa para representar una fecha vacía.
+func NormalizeAtlasDate(v string) string {
 	if v == atlasEmptyDate {
 		return ""
 	}
@@ -237,8 +294,107 @@ func DetalleContacto(cfg *models.AtlasConfig, contactoCodigo string) (*WSContact
 	if err := contacto.asError(); err != nil {
 		return nil, err
 	}
-	contacto.ContactoNacimiento = normalizeAtlasDate(contacto.ContactoNacimiento)
+	contacto.ContactoNacimiento = NormalizeAtlasDate(contacto.ContactoNacimiento)
 	return &contacto, nil
+}
+
+// ---- Fichas (wsfichabuscar) — solo lectura ----
+//
+// Confirmado contra un request real: el campo de filtro correcto es
+// "FichaNumero" (no "Ficha" ni "FichaCodigo", que Atlas ignora en silencio y
+// devuelve todo el listado sin filtrar). La respuesta de wsfichabuscar ya
+// trae el detalle completo de la ficha, incluyendo el array "Contactos" con
+// TODOS los pasajeros asociados — no hace falta wsfichadetallebuscar aparte
+// para esto. Deliberadamente no se implementa wsfichaguardar (alta/edición).
+//
+// Igual que en Contactos, el campo "Error" viene inconsistente entre
+// niveles (número en el nivel raíz, string adentro de cada ficha) — por eso
+// se usa AtlasEnvelope (con AtlasFlexString) en los dos lugares.
+
+type WSFichaFiltro struct {
+	Filtros           string `json:"Filtros"`
+	FichaNumero       string `json:"FichaNumero,omitempty"`
+	Paginado          string `json:"Paginado"`
+	PaginadoRegistros string `json:"PaginadoRegistros"`
+	PaginadoPaginas   string `json:"PaginadoPaginas"`
+}
+
+type wsFichaBuscarRequest struct {
+	AtlasCredentials
+	WSFichaFiltro WSFichaFiltro `json:"WSFichaFiltro"`
+}
+
+// WSFichaContacto es un pasajero/contacto asociado a una ficha de venta.
+type WSFichaContacto struct {
+	ContactoCodigo                         string `json:"ContactoCodigo"`
+	ContactoNombre                         string `json:"ContactoNombre"`
+	ContactoPrimerNombre                   string `json:"ContactoPrimerNombre"`
+	ContactoSegundoNombre                  string `json:"ContactoSegundoNombre"`
+	ContactoPrimerApellido                 string `json:"ContactoPrimerApellido"`
+	ContactoSegundoApellido                string `json:"ContactoSegundoApellido"`
+	ContactoDocumentoIdentificacionCodigo  string `json:"ContactoDocumentoIdentificacionCodigo"`
+	ContactoDocumentoPaisCodigo            string `json:"ContactoDocumentoPaisCodigo"`
+	ContactoDocumento                      string `json:"ContactoDocumento"`
+	ContactoDocumento2IdentificacionCodigo string `json:"ContactoDocumento2IdentificacionCodigo"`
+	ContactoDocumento2PaisCodigo           string `json:"ContactoDocumento2PaisCodigo"`
+	ContactoDocumento2                     string `json:"ContactoDocumento2"`
+	ContactoTelefono                       string `json:"ContactoTelefono"`
+	ContactoCelular                        string `json:"ContactoCelular"`
+	ContactoEmail                          string `json:"ContactoEmail"`
+	ContactoNacionalidadPaisCodigo         string `json:"ContactoNacionalidadPaisCodigo"`
+	ContactoNacionalidadPaisNombre         string `json:"ContactoNacionalidadPaisNombre"`
+	ContactoNacimiento                     string `json:"ContactoNacimiento"`
+	ContactoTipoCodigo                     string `json:"ContactoTipoCodigo"` // ADT | CHD | INF
+	ContactoEsPasajero                     string `json:"ContactoEsPasajero"`
+	ContactoEsCliente                      string `json:"ContactoEsCliente"`
+}
+
+// WSFicha es una ficha de venta con su listado de pasajeros asociados.
+type WSFicha struct {
+	AtlasEnvelope
+	FichaSerie               string            `json:"FichaSerie"`
+	FichaNumero              string            `json:"FichaNumero"`
+	FichaAsunto              string            `json:"FichaAsunto"`
+	FichaDescripcion         string            `json:"FichaDescripcion"`
+	FichaViajeEstimadoInicio string            `json:"FichaViajeEstimadoInicio"`
+	FichaViajeEstimadoFin    string            `json:"FichaViajeEstimadoFin"`
+	EstadoCodigo             string            `json:"EstadoCodigo"`
+	EstadoNombre             string            `json:"EstadoNombre"`
+	Vendedor1Nombre          string            `json:"Vendedor1Nombre"`
+	Contactos                []WSFichaContacto `json:"Contactos"`
+}
+
+type wsFichaBuscarResponse struct {
+	AtlasEnvelope
+	WSFichas []WSFicha `json:"WSFichas"`
+}
+
+// BuscarFicha trae la(s) ficha(s) de venta que matchean ese número exacto,
+// con el listado completo de pasajeros asociados.
+func BuscarFicha(cfg *models.AtlasConfig, fichaNumero string) ([]WSFicha, error) {
+	req := wsFichaBuscarRequest{
+		AtlasCredentials: credentialsFromConfig(cfg),
+		WSFichaFiltro: WSFichaFiltro{
+			Filtros:           "S",
+			FichaNumero:       fichaNumero,
+			Paginado:          "N",
+			PaginadoRegistros: "20",
+			PaginadoPaginas:   "1",
+		},
+	}
+	var resp wsFichaBuscarResponse
+	if err := doAtlasRequest(cfg, "wsfichabuscar", req, &resp); err != nil {
+		return nil, err
+	}
+	if err := resp.asError(); err != nil {
+		return nil, err
+	}
+	for i := range resp.WSFichas {
+		if err := resp.WSFichas[i].asError(); err != nil {
+			return nil, err
+		}
+	}
+	return resp.WSFichas, nil
 }
 
 // ---- Probar conexión (wscontactovendedorbuscar) ----

@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import { Sparkles } from 'lucide-react';
+import Swal from 'sweetalert2';
+import ApiClient from '../services/apiClient';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
 import { Textarea } from './ui/Textarea';
 import { toDateOnlyString } from '../lib/dateOnly.js';
 import { useAgencies } from '../hooks/useAgencies';
+import { useTemporadas } from '../hooks/useTemporadas';
 
 // Tipos de producto soportados. El campo "ruta" se relabela según el tipo
 // (Cabina para Crucero, Habitación para Hotel) — la lógica de negocio
@@ -14,6 +18,18 @@ const TIPOS_PRODUCTO = [
   { value: 'Aereo', label: 'Aéreo' },
   { value: 'Hotel', label: 'Hotel' },
   { value: 'Crucero', label: 'Crucero' },
+];
+
+const SERVICIO_OPTIONS = ['Cupo', 'Charter'];
+
+// Los 3 tipos de pasajero tienen tarifa/impuestos independientes — la Venta
+// de cada uno se calcula (Tarifa+Impuestos+OP) y la termina fijando el
+// backend en Precio/ChdFare/InfFare (ver applyCalculatedPrices en
+// product_handler.go); acá solo se previsualiza en vivo mientras se edita.
+const PASSENGER_PRICE_TYPES = [
+  { key: 'adt', label: 'ADT' },
+  { key: 'chd', label: 'CHD' },
+  { key: 'inf', label: 'INF' },
 ];
 
 const RUTA_LABEL_BY_TIPO = {
@@ -28,12 +44,19 @@ const EMPTY_FORM = {
   destino: '',
   compania: '',
   disponibilidad: '',
+  vendidos: 0,
   cupo: '',
   fecha_salida: '',
   fecha_regreso: '',
-  precio: '',
-  neto_1: '',
-  op: '',
+  tarifa_adt: '',
+  impuestos_adt: '',
+  tarifa_chd: '',
+  impuestos_chd: '',
+  tarifa_inf: '',
+  impuestos_inf: '',
+  op_adt: '',
+  op_chd: '',
+  op_inf: '',
   ruta: '',
   pnr: '',
   ficha: '',
@@ -44,8 +67,10 @@ const EMPTY_FORM = {
   carryon: false,
   handbag: false,
   checkedbag: false,
-  inf_fare: '',
-  chd_fare: '',
+  carryon_kg: '',
+  handbag_kg: '',
+  checkedbag_kg: '',
+  package_links: [],
   is_blocked_for_sale: false,
   notas_internas: '',
   notas_externas: '',
@@ -64,12 +89,19 @@ function toFormValues(product) {
     destino: product.destino || '',
     compania: product.compania || '',
     disponibilidad: product.disponibilidad ?? '',
+    vendidos: product.vendidos ?? 0,
     cupo: product.cupo ?? '',
     fecha_salida: fmt(product.fecha_salida),
     fecha_regreso: fmt(product.fecha_regreso),
-    precio: product.precio ?? '',
-    neto_1: product.neto_1 ?? '',
-    op: product.op ?? '',
+    tarifa_adt: product.tarifa_adt ?? '',
+    impuestos_adt: product.impuestos_adt ?? '',
+    tarifa_chd: product.tarifa_chd ?? '',
+    impuestos_chd: product.impuestos_chd ?? '',
+    tarifa_inf: product.tarifa_inf ?? '',
+    impuestos_inf: product.impuestos_inf ?? '',
+    op_adt: product.op_adt ?? '',
+    op_chd: product.op_chd ?? '',
+    op_inf: product.op_inf ?? '',
     ruta: product.ruta || '',
     pnr: product.pnr || '',
     ficha: product.ficha || '',
@@ -80,8 +112,10 @@ function toFormValues(product) {
     carryon: product.carryon ?? false,
     handbag: product.handbag ?? false,
     checkedbag: product.checkedbag ?? false,
-    inf_fare: product.inf_fare ?? '',
-    chd_fare: product.chd_fare ?? '',
+    carryon_kg: product.carryon_kg ?? '',
+    handbag_kg: product.handbag_kg ?? '',
+    checkedbag_kg: product.checkedbag_kg ?? '',
+    package_links: Array.isArray(product.package_links) ? product.package_links : [],
     is_blocked_for_sale: product.is_blocked_for_sale ?? false,
     notas_internas: product.notas_internas || '',
     notas_externas: product.notas_externas || '',
@@ -99,13 +133,22 @@ function toPayload(form) {
     agencia: form.agencia,
     destino: form.destino,
     compania: form.compania,
-    disponibilidad: num(form.disponibilidad),
+    // disponibilidad NO se manda — es un dato calculado (Cupo - Vendidos),
+    // el backend la recalcula siempre a partir de Cupo, ver product_handler.go.
     cupo: num(form.cupo),
     fecha_salida: form.fecha_salida || null,
     fecha_regreso: form.fecha_regreso || null,
-    precio: num(form.precio),
-    neto_1: num(form.neto_1),
-    op: num(form.op),
+    tarifa_adt: num(form.tarifa_adt),
+    impuestos_adt: num(form.impuestos_adt),
+    tarifa_chd: num(form.tarifa_chd),
+    impuestos_chd: num(form.impuestos_chd),
+    tarifa_inf: num(form.tarifa_inf),
+    impuestos_inf: num(form.impuestos_inf),
+    // neto_1 NO se manda — se autocompleta en el backend (promedio
+    // prorrateado ADT/CHD), ver applyCalculatedPrices en product_handler.go.
+    op_adt: num(form.op_adt),
+    op_chd: num(form.op_chd),
+    op_inf: num(form.op_inf),
     ruta: form.ruta,
     pnr: form.pnr,
     ficha: form.ficha,
@@ -116,8 +159,11 @@ function toPayload(form) {
     carryon: form.carryon,
     handbag: form.handbag,
     checkedbag: form.checkedbag,
-    inf_fare: num(form.inf_fare),
-    chd_fare: num(form.chd_fare),
+    carryon_kg: num(form.carryon_kg),
+    handbag_kg: num(form.handbag_kg),
+    checkedbag_kg: num(form.checkedbag_kg),
+    // Se descartan los links sin URL (filas vacías que quedaron del editor).
+    package_links: (form.package_links || []).filter((l) => l.url?.trim()),
     is_blocked_for_sale: form.is_blocked_for_sale,
     notas_internas: form.notas_internas,
     notas_externas: form.notas_externas,
@@ -135,13 +181,25 @@ const ProductForm = ({
   defaultValues = {},
   isEditing = false,
 }) => {
-  const [form, setForm] = useState(() => toFormValues(isEditing ? defaultValues : null));
+  // No solo en edición: al duplicar un producto también llega precargado
+  // (isEditing=false, pero defaultValues trae los datos del original).
+  const [form, setForm] = useState(() => toFormValues(defaultValues));
   const [errors, setErrors] = useState({});
   const { data: agencies = [] } = useAgencies();
+  const { data: temporadas = [] } = useTemporadas();
 
   const set = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors((prev) => { const e = { ...prev }; delete e[key]; return e; });
+  };
+
+  const handleFechaSalidaChange = (val) => {
+    setForm((prev) => ({
+      ...prev,
+      fecha_salida: val,
+      fecha_regreso: !prev.fecha_regreso || prev.fecha_regreso < val ? val : prev.fecha_regreso,
+    }));
+    if (errors.fecha_salida) setErrors((prev) => { const e = { ...prev }; delete e.fecha_salida; return e; });
   };
 
   const validate = () => {
@@ -149,9 +207,64 @@ const ProductForm = ({
     if (!form.agencia) e.agencia = 'Requerido';
     if (!form.destino.trim()) e.destino = 'Requerido';
     if (!form.compania.trim()) e.compania = 'Requerido';
-    if (form.disponibilidad === '' || isNaN(Number(form.disponibilidad))) e.disponibilidad = 'Número requerido';
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const handleGenerateInfantFare = async () => {
+    const tarifaAdt = Number(form.tarifa_adt) || 0;
+    const impuestosAdt = Number(form.impuestos_adt) || 0;
+    const totalAdulto = tarifaAdt + impuestosAdt;
+
+    if (totalAdulto <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Atención',
+        text: 'Debes ingresar primero la tarifa e impuestos del adulto para poder calcular la del infant.',
+      });
+      return;
+    }
+
+    let pctInfant = 15;
+    let pctImpuestos = 10;
+
+    try {
+      const res = await ApiClient.get('/settings');
+      let settingsObj = {};
+      if (Array.isArray(res)) {
+        res.forEach((s) => { settingsObj[s.key] = s.value; });
+      } else if (res && typeof res === 'object') {
+        settingsObj = res;
+      }
+      if (settingsObj.porcentaje_tarifa_infant !== undefined) {
+        pctInfant = Number(settingsObj.porcentaje_tarifa_infant) || 15;
+      }
+      if (settingsObj.porcentaje_impuestos_infant !== undefined) {
+        pctImpuestos = Number(settingsObj.porcentaje_impuestos_infant) || 10;
+      }
+    } catch {
+      // usa los defaults 15% y 10%
+    }
+
+    const totalInfant = totalAdulto * (pctInfant / 100);
+    const impuestosInf = Math.round(totalInfant * (pctImpuestos / 100) * 100) / 100;
+    const tarifaInf = Math.round((totalInfant - impuestosInf) * 100) / 100;
+
+    setForm((prev) => ({
+      ...prev,
+      tarifa_inf: String(tarifaInf),
+      impuestos_inf: String(impuestosInf),
+    }));
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Tarifa Infant Generada',
+      html: `Se aplicó un <b>${pctInfant}%</b> sobre el total adulto ($${totalAdulto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}):<br/><br/>` +
+            `• Tarifa INF (${100 - pctImpuestos}%): <b>$${tarifaInf.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</b><br/>` +
+            `• Impuestos INF (${pctImpuestos}%): <b>$${impuestosInf.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</b>`,
+      timer: 3000,
+      showConfirmButton: false,
+    });
   };
 
   const handleSubmit = (e) => {
@@ -173,7 +286,7 @@ const ProductForm = ({
         min={opts.min}
         className={errors[id] ? 'border-red-500' : ''}
       />
-      {errors[id] && <p className="text-xs text-red-500">{errors[id]}</p>}
+      {errors[id] ? <p className="text-xs text-red-500">{errors[id]}</p> : opts.help ? <p className="text-xs text-slate-400">{opts.help}</p> : null}
     </div>
   );
 
@@ -191,6 +304,19 @@ const ProductForm = ({
       <span className="text-sm">{label}</span>
     </label>
   );
+
+  const addPackageLink = () => {
+    setForm((prev) => ({ ...prev, package_links: [...(prev.package_links || []), { url: '', label: '' }] }));
+  };
+  const updatePackageLink = (index, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      package_links: prev.package_links.map((l, i) => (i === index ? { ...l, [key]: value } : l)),
+    }));
+  };
+  const removePackageLink = (index) => {
+    setForm((prev) => ({ ...prev, package_links: prev.package_links.filter((_, i) => i !== index) }));
+  };
 
   const sectionLabel = (text) => (
     <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{text}</h4>
@@ -212,6 +338,7 @@ const ProductForm = ({
               <div className="space-y-1">
                 <Label htmlFor="codigo_cupo">Código de Cupo</Label>
                 <Input id="codigo_cupo" type="text" value={form.codigo_cupo} disabled className="bg-slate-50 text-slate-500" />
+                <p className="text-xs text-slate-400">Formato: fecha de salida-destino-id_tipo-aerolínea (ej. 20/09/26-REC-431123_CH-AD). CH = Charter, CP = Cupo.</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -219,6 +346,7 @@ const ProductForm = ({
                 <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm text-slate-400">
                   Se genera automáticamente
                 </div>
+                <p className="text-xs text-slate-400">Formato: fecha de salida-destino-id_tipo-aerolínea (ej. 20/09/26-REC-431123_CH-AD). CH = Charter, CP = Cupo.</p>
               </div>
             )}
             <div className="space-y-1 col-span-2">
@@ -259,11 +387,25 @@ const ProductForm = ({
         <div>
           {sectionLabel('Fechas y cupo')}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-            {field('fecha_salida', 'Fecha de Salida', 'date')}
+            <div className="space-y-1">
+              <Label htmlFor="fecha_salida">Fecha de Salida</Label>
+              <Input
+                id="fecha_salida"
+                type="date"
+                value={form.fecha_salida}
+                onChange={(e) => handleFechaSalidaChange(e.target.value)}
+              />
+            </div>
             {field('fecha_regreso', 'Fecha de Regreso', 'date')}
-            {field('disponibilidad', 'Disponibilidad', 'number', { required: true, min: '0' })}
             {field('cupo', 'Cupo Total', 'number', { min: '0' })}
-            {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60' })}
+            <div className="space-y-1">
+              <Label>Disponibilidad</Label>
+              <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                {Math.max(0, (Number(form.cupo) || 0) - (Number(form.vendidos) || 0))}
+              </div>
+              <p className="text-xs text-slate-400">Calculada: Cupo Total − Vendidos ({form.vendidos || 0}). No se edita a mano.</p>
+            </div>
+            {field('bloqueo_temporal_minutos', 'Bloqueo (min)', 'number', { min: '0', placeholder: '60', help: 'Minutos que el cupo queda bloqueado si se reserva sin doc. contable. Vacío = usa el valor global del sistema.' })}
           </div>
         </div>
 
@@ -281,12 +423,60 @@ const ProductForm = ({
         {/* Precios */}
         <div>
           {sectionLabel('Precios')}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-            {field('precio', 'Precio ADT', 'number', { step: '0.01', min: '0' })}
-            {field('inf_fare', 'Precio INF', 'number', { step: '0.01', min: '0' })}
-            {field('chd_fare', 'Precio CHD', 'number', { step: '0.01', min: '0' })}
-            {field('neto_1', 'Neto 1', 'number', { step: '0.01', min: '0' })}
-            {field('op', 'OP', 'number', { step: '0.01', min: '0' })}
+          <div className="space-y-3">
+            {PASSENGER_PRICE_TYPES.map(({ key, label }) => {
+              const tarifa = Number(form[`tarifa_${key}`]) || 0;
+              const impuestos = Number(form[`impuestos_${key}`]) || 0;
+              const neto1 = tarifa + impuestos;
+              const op = Number(form[`op_${key}`]) || 0;
+              const venta = neto1 + op;
+              return (
+                <div key={key} className="space-y-1">
+                  {key === 'inf' && (
+                    <div className="flex items-center justify-between pb-0.5">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bebés (INF)</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateInfantFare}
+                        className="h-7 text-xs text-sky-700 border-sky-200 bg-sky-50 hover:bg-sky-100 px-2 py-0"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1 text-sky-600" />
+                        Generar Tarifa Infant
+                      </Button>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4 items-end lg:grid-cols-4">
+                    {field(`tarifa_${key}`, `Tarifa ${label}`, 'number', { step: '0.01', min: '0' })}
+                    {field(`impuestos_${key}`, `Impuestos ${label}`, 'number', { step: '0.01', min: '0' })}
+                    {field(`op_${key}`, `OP ${label}`, 'number', { step: '0.01', min: '0' })}
+                    <div className="space-y-1">
+                      <Label>Venta {label}</Label>
+                      <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700" title={`Neto 1 ${label}: $${neto1.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
+                        ${venta.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {(() => {
+              const netoAdt = (Number(form.tarifa_adt) || 0) + (Number(form.impuestos_adt) || 0);
+              const netoChd = (Number(form.tarifa_chd) || 0) + (Number(form.impuestos_chd) || 0);
+              const neto1Riesgo = (netoAdt + netoChd) / 2;
+              return (
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5 pt-2 border-t border-slate-200">
+                  <div className="space-y-1">
+                    <Label>Neto 1 (Riesgo)</Label>
+                    <div className="flex h-10 w-full items-center rounded-md border border-dashed border-input bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                      ${neto1Riesgo.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <p className="text-xs text-slate-400">Calculado: promedio prorrateado entre Neto ADT y Neto CHD. No se edita a mano.</p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -294,11 +484,53 @@ const ProductForm = ({
         <div>
           {sectionLabel('Clasificación')}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-            {field('ruta', rutaLabel)}
+            {field('ruta', rutaLabel, 'text', form.tipo_producto === 'Aereo' ? {
+              placeholder: 'Ej: 1JA 763 31DEC MVDGIG 1432 1715',
+              help: 'Un segmento de vuelo por línea (formato GDS): N° de segmento, aerolínea + N° de vuelo, fecha, aeropuertos origen+destino pegados, hora de salida y hora de llegada.',
+              className: 'col-span-2',
+            } : {})}
             {field('pnr', 'PNR')}
-            {field('ficha', 'Ficha')}
-            {field('temporada', 'Temporada')}
-            {field('servicio', 'Servicio', 'text', { placeholder: 'Ej: Traslado, Seguro de viaje...', className: 'col-span-2' })}
+            {field('ficha', 'Ficha Operativa')}
+            <div className="space-y-1">
+              <Label htmlFor="temporada">Temporada</Label>
+              <select
+                id="temporada"
+                value={form.temporada}
+                onChange={(e) => set('temporada', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Sin especificar</option>
+                {temporadas.filter((t) => t.activa || t.nombre === form.temporada).map((t) => (
+                  <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                ))}
+                {/* Si el producto ya tenía un valor viejo (texto libre, de antes de
+                    que esto fuera un desplegable) que ni siquiera está en la lista
+                    de Gestión de Temporadas, se muestra igual para no perderlo. */}
+                {form.temporada && !temporadas.some((t) => t.nombre === form.temporada) && (
+                  <option value={form.temporada}>{form.temporada}</option>
+                )}
+              </select>
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label htmlFor="servicio">Servicio</Label>
+              <select
+                id="servicio"
+                value={form.servicio}
+                onChange={(e) => set('servicio', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Sin especificar</option>
+                {SERVICIO_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                {/* Si el producto ya tenía un valor viejo (texto libre, de antes de
+                    que este campo fuera un desplegable), se muestra igual acá para
+                    no perderlo/resetearlo silenciosamente al editar. */}
+                {form.servicio && !SERVICIO_OPTIONS.includes(form.servicio) && (
+                  <option value={form.servicio}>{form.servicio}</option>
+                )}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -331,9 +563,52 @@ const ProductForm = ({
         <div>
           {sectionLabel('Equipaje incluido')}
           <div className="flex flex-wrap gap-6">
-            {check('carryon', 'Carry-on')}
-            {check('handbag', 'Handbag')}
-            {check('checkedbag', 'Checked Bag')}
+            {[
+              { id: 'carryon', kgId: 'carryon_kg', label: 'Carry-on' },
+              { id: 'handbag', kgId: 'handbag_kg', label: 'Handbag' },
+              { id: 'checkedbag', kgId: 'checkedbag_kg', label: 'Checked Bag' },
+            ].map(({ id, kgId, label }) => (
+              <div key={id} className="flex items-center gap-2">
+                {check(id, label)}
+                <Input
+                  type="number" step="0.5" min="0" placeholder="Kg"
+                  value={form[kgId]}
+                  onChange={(e) => set(kgId, e.target.value)}
+                  className="w-20"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Paquetes */}
+        <div>
+          {sectionLabel('Links de paquetes')}
+          <div className="space-y-2">
+            {(form.package_links || []).map((link, i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center">
+                <Input
+                  placeholder="https://..."
+                  value={link.url}
+                  onChange={(e) => updatePackageLink(i, 'url', e.target.value)}
+                  className="flex-1"
+                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Etiqueta (opcional)"
+                    value={link.label}
+                    onChange={(e) => updatePackageLink(i, 'label', e.target.value)}
+                    className="w-48"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => removePackageLink(i)}>
+                    Quitar
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={addPackageLink}>
+              + Agregar link
+            </Button>
           </div>
         </div>
 

@@ -159,6 +159,31 @@ func isEmptyFilters(filters map[string]interface{}) bool {
 	return true
 }
 
+// rentabilidadPonderada suma OP_tipo × vendidos_tipo de un producto — desde
+// que la ganancia (OP) se individualiza por tipo de pasajero (ADT/CHD/INF),
+// ya no alcanza con `product.OP × product.Vendidos` (un solo valor aplicado
+// a todos los tipos por igual). Cuenta pasajeros activos (excluye
+// cancelada/expirada) de este producto agrupados por tipo.
+func rentabilidadPonderada(product models.Product) float64 {
+	var counts []struct {
+		TipoPasajero string
+		Count        int64
+	}
+	database.DB.Model(&models.Passenger{}).
+		Select("tipo_pasajero, count(*) as count").
+		Where("reservation_id IN (?) AND LOWER(estado) NOT IN ?",
+			database.DB.Model(&models.Reservation{}).Select("id").Where("product_id = ?", product.ID),
+			[]string{"cancelada", "expirada"}).
+		Group("tipo_pasajero").
+		Scan(&counts)
+
+	var total float64
+	for _, c := range counts {
+		total += product.OPForTipo(c.TipoPasajero) * float64(c.Count)
+	}
+	return total
+}
+
 func filterUniqueProducts(products []models.Product) []models.Product {
 	seen := make(map[string]bool)
 	var unique []models.Product
@@ -195,14 +220,42 @@ func isPassengerSale(p models.Passenger, returnDate *time.Time) bool {
 	return false
 }
 
-func loadDataFromDB() ([]models.Product, []models.Passenger, error) {
+// loadDataFromDB es la fuente de datos de TODOS los reportes (legacy y
+// nuevos) — productos y pasajeros con su reserva. Reportes son datos
+// financieros/comerciales sensibles (ventas, rentabilidad, ocupación por
+// cupo), así que el scoping por agencia va ACÁ, no repetido en cada handler:
+// un caller no-admin (agency_admin u otro rol al que se le haya otorgado
+// REPORTS_VIEW) nunca recibe productos ni pasajeros de otra agencia, sin
+// importar qué filtro mande el frontend en el body — nunca confiar en un
+// filtro client-side para esto. admin ve todo, sin scoping.
+//
+// Los productos se scopean por `Product.Agencia` (quién es la dueña del
+// cupo); los pasajeros por `Reservation.Agencia` (quién hizo la venta) — son
+// campos distintos a propósito (ver [[Cesión de Cupos]]): una agencia puede
+// vender un cupo cedido por otra, y en ese caso `Reservation.Agencia` es la
+// que vendió, no la dueña original del cupo.
+func loadDataFromDB(c *gin.Context) ([]models.Product, []models.Passenger, error) {
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	callerAgencia, _ := agenciaVal.(string)
+
+	productsQuery := database.DB.Model(&models.Product{})
+	passengersQuery := database.DB.Preload("Reservation").Preload("Reservation.Product")
+
+	if role != "admin" {
+		productsQuery = productsQuery.Where("LOWER(agencia) = LOWER(?)", callerAgencia)
+		passengersQuery = passengersQuery.
+			Joins("JOIN reservations ON reservations.id = passengers.reservation_id").
+			Where("LOWER(reservations.agencia) = LOWER(?)", callerAgencia)
+	}
+
 	var products []models.Product
-	if err := database.DB.Find(&products).Error; err != nil {
+	if err := productsQuery.Find(&products).Error; err != nil {
 		return nil, nil, err
 	}
 
 	var passengers []models.Passenger
-	if err := database.DB.Preload("Reservation").Preload("Reservation.Product").Find(&passengers).Error; err != nil {
+	if err := passengersQuery.Find(&passengers).Error; err != nil {
 		return nil, nil, err
 	}
 
@@ -519,7 +572,7 @@ func getOrderedKeys(granularity string, now time.Time, keysWithData []string) []
 // Handlers
 
 func GetFieldsHandler(c *gin.Context) {
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -588,7 +641,7 @@ func EvolucionAgenciasHandler(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -684,7 +737,7 @@ func AgenciasDataHandler(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -793,7 +846,7 @@ func DetalleDestinosHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -854,7 +907,6 @@ func DetalleDestinosHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio // Tarifa o precio de venta is "Neto Vendedor" or Precio base
 
@@ -877,7 +929,7 @@ func DetalleDestinosHandler(c *gin.Context) {
 		item.LugaresVendidos += vendidos
 		item.LugaresCancelados += cancelados
 		item.LugaresDisponibles += disponibles
-		item.Rentabilidad += opUnit * float64(vendidos)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Costo += neto1Unit * float64(vendidos)
 		item.CostoTotal += float64(tomados) * neto1Unit
 		item.Venta += precioUnit * float64(vendidos)
@@ -909,7 +961,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -964,7 +1016,6 @@ func DestinosCompaniaHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -980,7 +1031,7 @@ func DestinosCompaniaHandler(c *gin.Context) {
 		m.Vendidos += vendidos
 		m.Disponibles += disponibles
 		m.Cancelados += cancelados
-		m.Rentabilidad += opUnit * float64(vendidos)
+		m.Rentabilidad += rentabilidadPonderada(cupo)
 		m.Costo += neto1Unit * float64(vendidos)
 		m.Venta += precioUnit * float64(vendidos)
 	}
@@ -1137,7 +1188,7 @@ func EvolucionPasajerosHandler(c *gin.Context) {
 		return
 	}
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1210,7 +1261,7 @@ func EvolucionPorCupoHandler(c *gin.Context) {
 		return
 	}
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1273,7 +1324,7 @@ func SharePorCupoHandler(c *gin.Context) {
 	agenciaVal, _ := c.Get("agencia")
 	callerAgencia, _ := agenciaVal.(string)
 
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1342,7 +1393,7 @@ func PorSalidaHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1407,7 +1458,6 @@ func PorSalidaHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -1439,7 +1489,7 @@ func PorSalidaHandler(c *gin.Context) {
 			LugaresVendidos:    vendidos,
 			LugaresCancelados:  cancelados,
 			LugaresDisponibles: disponibles,
-			Rentabilidad:       opUnit * float64(vendidos),
+			Rentabilidad:       rentabilidadPonderada(cupo),
 			Costo:              neto1Unit * float64(vendidos),
 			CostoTotal:         float64(tomados) * neto1Unit,
 			Venta:              precioUnit * float64(vendidos),
@@ -1469,7 +1519,7 @@ func DashboardDataHandler(c *gin.Context) {
 		return
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1611,7 +1661,6 @@ func DashboardDataHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1Unit := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -1634,7 +1683,7 @@ func DashboardDataHandler(c *gin.Context) {
 		item.LugaresVendidos += vendidos
 		item.LugaresCancelados += cancelados
 		item.LugaresDisponibles += disponibles
-		item.Rentabilidad += opUnit * float64(vendidos)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Costo += neto1Unit * float64(vendidos)
 		item.CostoTotal += float64(tomados) * neto1Unit
 		item.Venta += precioUnit * float64(vendidos)
@@ -1682,7 +1731,7 @@ func MetricsSummaryHandler(c *gin.Context) {
 		to, _ = time.Parse(time.RFC3339, toStr)
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1735,14 +1784,13 @@ func MetricsSummaryHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1 := cupo.Neto1
 		precioUnit := cupo.Precio
 
 		cuposTomados += tomados
 		vendidos += v
 		cancelados += canc
-		rentabilidad += opUnit * float64(v)
+		rentabilidad += rentabilidadPonderada(cupo)
 		costo += neto1 * float64(v)
 		venta += precioUnit * float64(v)
 		costoTotal += float64(tomados) * neto1
@@ -1786,7 +1834,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		to, _ = time.Parse(time.RFC3339, toStr)
 	}
 
-	products, passengers, err := loadDataFromDB()
+	products, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return
@@ -1837,7 +1885,6 @@ func MetricsByDestinationHandler(c *gin.Context) {
 			}
 		}
 
-		opUnit := cupo.OP
 		neto1 := cupo.Neto1
 		precioUnit := cupo.Precio
 
@@ -1855,7 +1902,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 		item.CuposTomados += tomados
 		item.Vendidos += v
 		item.Cancelados += canc
-		item.Rentabilidad += opUnit * float64(v)
+		item.Rentabilidad += rentabilidadPonderada(cupo)
 		item.Costo += neto1 * float64(v)
 		item.Venta += precioUnit * float64(v)
 		item.Riesgo += float64(disponiblesCupo) * neto1
@@ -1874,7 +1921,7 @@ func MetricsByDestinationHandler(c *gin.Context) {
 }
 
 func ForecastSalesHandler(c *gin.Context) {
-	_, passengers, err := loadDataFromDB()
+	_, passengers, err := loadDataFromDB(c)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Error loading data: " + err.Error()})
 		return

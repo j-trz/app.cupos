@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug } from 'lucide-react';
+import { Home, Plane, ClipboardList, CheckCircle2, BarChart3, User, Settings, Users, UserCheck, Bell, Package, Luggage, Building2, CreditCard, ChevronLeft, ChevronRight, LogOut, ChevronDown, Palette, Mail, Bot, Shield, Key, Menu, X, Sparkles, ScrollText, BookOpen, Plug, Tag, Briefcase, Ticket } from 'lucide-react';
 import { ShadcnButton as Button } from './shadcn-button';
 import clsx from 'clsx';
 import Swal from 'sweetalert2';
@@ -9,6 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './shad
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './shadcn-dropdown-menu';
 import NotificationService from '../../services/notificationService.js';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext.jsx';
+import Badge from './Badge.jsx';
 import { visibleDocsSections } from '../../lib/docsSections.js';
 
 const navItems = [
@@ -19,16 +20,27 @@ const navItems = [
   { label: 'Asistente IA', path: '/asistente', icon: Bot, key: 'ia' },
 ];
 
-// Admin-only items — cada uno declara el permiso MODULO_ACCION que lo
+// Ítems de gestión — cada uno declara el permiso MODULO_ACCION que lo
 // habilita (ver GET /users/me/permissions), para que un rol personalizado
 // pueda ver, por ejemplo, "Reportes" sin heredar automáticamente el resto.
-const adminNavItems = [
+// Agrupados en 3 submenús colapsables (mismo patrón que Ajustes/Usuarios,
+// ver más abajo) en vez de una lista plana de 10 — antes eran siempre
+// visibles de una, dominando el sidebar para cualquier admin.
+const cuposReservasItems = [
   { label: 'Productos', path: '/productos', icon: Package, permission: 'PRODUCTS_VIEW' },
   { label: 'Grupos', path: '/grupos', icon: Luggage, permission: 'GROUPS_VIEW' },
-  { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
+  { label: 'Oportunidades', path: '/oportunidades', icon: Sparkles, permission: 'OPPORTUNITIES_VIEW' },
   { label: 'Reservas', path: '/reservas', icon: CreditCard, permission: 'RESERVATIONS_VIEW' },
-  { label: 'Nóminas', path: '/nominas', icon: Users, permission: 'RESERVATIONS_VIEW' },
+  { label: 'Nóminas', path: '/nominas', icon: UserCheck, permission: 'RESERVATIONS_VIEW' },
+];
+const catalogoItems = [
+  { label: 'Agencias', path: '/agencias', icon: Building2, permission: 'AGENCIES_VIEW' },
+  { label: 'Temporadas', path: '/temporadas', icon: Tag, permission: 'TEMPORADAS_VIEW' },
+];
+const sistemaItems = [
   { label: 'Reportes', path: '/reportes', icon: BarChart3, permission: 'REPORTS_VIEW' },
+  { label: 'Administración', path: '/administracion', icon: Briefcase, permission: 'ADMINISTRACION_VIEW' },
+  { label: 'Bandeja de Tickets', path: '/tickets', icon: Ticket, permission: 'TICKETS_VIEW' },
   { label: 'Estado del sistema', path: '/logs', icon: ScrollText, permission: 'LOGS_VIEW' },
 ];
 
@@ -56,9 +68,27 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
   const collapsed = ctx ? ctx.collapsed : localCollapsed;
   const setCollapsed = ctx ? ctx.setCollapsed : setLocalCollapsed;
   const mobileOpen = ctx ? ctx.mobileOpen : false;
-  const setMobileOpen = ctx ? ctx.setMobileOpen : () => {};
-  const [openSubmenus, setOpenSubmenus] = useState({});
+  const setMobileOpen = ctx ? ctx.setMobileOpen : () => { };
+  // Persistido en localStorage: qué acordeones dejó abiertos el usuario la
+  // última vez, para no tener que reabrirlos a mano cada sesión — combinado
+  // con el auto-expand de la ruta activa (más abajo), que corre una sola vez
+  // al montar y no pisa lo que ya venía de acá.
+  const [openSubmenus, setOpenSubmenus] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sidebar_open_submenus')) || {};
+    } catch {
+      return {};
+    }
+  });
   const [unreadCount, setUnreadCount] = useState(0);
+  // Item de menú bajo el mouse (por path/clave) — reemplaza a las mutaciones
+  // directas de el.style.* que había antes en onMouseEnter/onMouseLeave. Esas
+  // mutaciones pisaban el DOM por fuera de React, y en la próxima navegación
+  // React podía "saltarse" la reescritura del estilo activo porque comparaba
+  // contra su propio registro interno del último render, no contra el DOM
+  // real — de ahí el bug de "se pierde el resaltado hasta que refrescás".
+  // Con esto, el color siempre sale de un solo render de React.
+  const [hoveredKey, setHoveredKey] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   const previousUnreadRef = useRef(null);
@@ -72,7 +102,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
     if (isAdmin) return true;
     return Array.isArray(user?.permissions) && user.permissions.includes(code);
   };
-  const visibleAdminNavItems = adminNavItems.filter((item) => can(item.permission));
+  const visibleCuposReservasItems = cuposReservasItems.filter((item) => can(item.permission));
+  const visibleCatalogoItems = catalogoItems.filter((item) => can(item.permission));
+  const visibleSistemaItems = sistemaItems.filter((item) => can(item.permission));
   const visibleSettingsItems = settingsItems.filter((item) => can(item.permission));
   const visibleUserManagementItems = userManagementItems.filter((item) => can(item.permission));
   // "Asistente IA" se oculta si la propia agencia lo desactivó desde Ajustes
@@ -89,6 +121,26 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
       .map((s) => ({ label: s.label, path: `/documentacion/${s.key}`, icon: s.icon })),
     [user?.permissions, isAdmin, user?.ai_habilitado]
   );
+
+  // Auto-abre el submenú que contiene la ruta actual al montar — antes los 6
+  // acordeones arrancaban siempre cerrados y había que reabrir el correcto
+  // en cada sesión/reload, incluso estando parado en una de sus páginas.
+  useEffect(() => {
+    const path = location.pathname;
+    const groups = {
+      docs: docsItems,
+      cuposReservas: visibleCuposReservasItems,
+      catalogo: visibleCatalogoItems,
+      sistema: visibleSistemaItems,
+      settings: visibleSettingsItems,
+      userManagement: visibleUserManagementItems,
+    };
+    const activeGroup = Object.entries(groups).find(([, items]) => items.some((i) => path.startsWith(i.path)));
+    if (activeGroup) {
+      setOpenSubmenus((prev) => ({ ...prev, [activeGroup[0]]: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // El ancho puede venir del white-label como número/string sin unidad (ej.
   // guardado como "240" en vez de "240px") — CSS descarta silenciosamente un
@@ -154,6 +206,15 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
     }));
   };
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_open_submenus', JSON.stringify(openSubmenus));
+    } catch {
+      // localStorage puede fallar en modo privado — no es crítico, se pierde
+      // la persistencia entre sesiones pero el sidebar sigue funcionando.
+    }
+  }, [openSubmenus]);
+
   // Check if current path belongs to a submenu
   const isSubmenuActive = (items) => {
     return items.some(item => location.pathname.startsWith(item.path));
@@ -164,27 +225,17 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  // Helper para estilos de items del sidebar
-  const itemStyle = (active) => {
-    const base = {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.625rem',
-      borderRadius: '0.5rem',
-      padding: '0.5rem 0.75rem',
-      fontSize: '0.875rem',
-      fontWeight: '500',
-      transition: 'all 0.2s ease',
-      cursor: 'pointer',
-      textDecoration: 'none',
-      color: active ? '#fff' : sbText,
-      backgroundColor: active ? sbActiveBg : 'transparent',
-    };
-    if (!active) {
-      base._hover = { backgroundColor: sbHoverBg, color: '#fff' };
-    }
-    return base;
+  // Color de un ítem de menú (activo / hover / normal) — una sola fuente de
+  // verdad para que style y hover nunca se desincronicen entre sí.
+  const navItemColors = (key, active) => {
+    if (active) return { color: '#fff', backgroundColor: sbActiveBg };
+    if (hoveredKey === key) return { color: sbHoverText, backgroundColor: sbHoverBg };
+    return { color: sbText, backgroundColor: 'transparent' };
   };
+  const navHoverHandlers = (key) => ({
+    onMouseEnter: () => setHoveredKey(key),
+    onMouseLeave: () => setHoveredKey((k) => (k === key ? null : k)),
+  });
 
   return (
     <TooltipProvider>
@@ -259,7 +310,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCollapsed(true)}
-                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                      className="absolute -right-3 top-[30%] z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
                       aria-label="Colapsar sidebar"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -273,7 +324,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCollapsed(false)}
-                      className="absolute -right-3 top-[30%] z-10 h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                      className="absolute -right-3 top-[30%] z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
                       aria-label="Expandir sidebar"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -286,7 +337,7 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
 
             {/* Separador sutil */}
             {!collapsed && (
-              <div className="mx-3 border-t border-zinc-200 dark:border-zinc-800" />
+              <div className="mx-3 border-t border-zinc-200" />
             )}
 
 
@@ -312,29 +363,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       collapsed ? 'justify-center px-2 py-2' : ''
                     );
                   }}
-                  style={({ isActive }) => {
-                    const active = isActive || location.pathname.startsWith(path + '/');
-                    return {
-                      color: active ? '#fff' : sbText,
-                      backgroundColor: active ? sbActiveBg : 'transparent',
-                    };
-                  }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget;
-                    const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                    if (!isActive) {
-                      el.style.backgroundColor = sbHoverBg;
-                      el.style.color = sbHoverText;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget;
-                    const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                    if (!isActive) {
-                      el.style.backgroundColor = 'transparent';
-                      el.style.color = sbText;
-                    }
-                  }}
+                  style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                  {...navHoverHandlers(path)}
                 >
                   {({ isActive }) => {
                     const active = isActive || location.pathname.startsWith(path + '/');
@@ -360,22 +390,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                     collapsed ? 'justify-center px-2 py-2' : ''
                   )}
-                  style={{
-                    color: isSubmenuActive(docsItems) ? '#fff' : sbText,
-                    backgroundColor: isSubmenuActive(docsItems) ? sbActiveBg : 'transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSubmenuActive(docsItems)) {
-                      e.currentTarget.style.backgroundColor = sbHoverBg;
-                      e.currentTarget.style.color = sbHoverText;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSubmenuActive(docsItems)) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = sbText;
-                    }
-                  }}
+                  style={navItemColors('docs-toggle', isSubmenuActive(docsItems))}
+                  {...navHoverHandlers('docs-toggle')}
                 >
                   <BookOpen className="h-4 w-4" style={{ color: isSubmenuActive(docsItems) ? '#fff' : sbText }} />
                   {!collapsed && (
@@ -391,30 +407,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       <NavLink
                         key={path}
                         to={path}
-                        className={() => 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200'}
-                        style={({ isActive }) => {
-                          const active = isActive || location.pathname.startsWith(path + '/');
-                          return {
-                            color: active ? '#fff' : sbText,
-                            backgroundColor: active ? sbActiveBg : 'transparent',
-                          };
-                        }}
-                        onMouseEnter={(e) => {
-                          const el = e.currentTarget;
-                          const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                          if (!isActive) {
-                            el.style.backgroundColor = sbHoverBg;
-                            el.style.color = sbHoverText;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          const el = e.currentTarget;
-                          const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                          if (!isActive) {
-                            el.style.backgroundColor = 'transparent';
-                            el.style.color = sbText;
-                          }
-                        }}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                        style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                        {...navHoverHandlers(path)}
                       >
                         {({ isActive }) => {
                           const active = isActive || location.pathname.startsWith(path + '/');
@@ -432,73 +427,145 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                 )}
               </div>
 
-              {/* Admin-only menu items */}
-              {visibleAdminNavItems.length > 0 && (
-                <>
-                  {!collapsed && (
-                    <div className="my-2 px-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Administración</p>
+              {/* Cupos y Reservas submenu */}
+              {visibleCuposReservasItems.length > 0 && (
+                <div className="mt-0.5">
+                  <button
+                    onClick={() => toggleSubmenu('cuposReservas')}
+                    className={clsx(
+                      'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                      collapsed ? 'justify-center px-2 py-2' : ''
+                    )}
+                    style={navItemColors('cuposReservas-toggle', isSubmenuActive(visibleCuposReservasItems))}
+                    {...navHoverHandlers('cuposReservas-toggle')}
+                  >
+                    <Plane className="h-4 w-4" style={{ color: isSubmenuActive(visibleCuposReservasItems) ? '#fff' : sbText }} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">Cupos y Reservas</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.cuposReservas ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleCuposReservasItems) ? '#fff' : sbText }} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && openSubmenus.cuposReservas && (
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                      {visibleCuposReservasItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
+                        >
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
+                        </NavLink>
+                      ))}
                     </div>
                   )}
-                  {visibleAdminNavItems.map(({ label, path, icon: Icon }) => (
-                    <NavLink
-                      key={path}
-                      to={path}
-                      className={({ isActive }) => {
-                        const active = isActive || location.pathname.startsWith(path + '/');
-                        return clsx(
-                          'group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                          collapsed ? 'justify-center px-2 py-2' : ''
-                        );
-                      }}
-                      style={({ isActive }) => {
-                        const active = isActive || location.pathname.startsWith(path + '/');
-                        return {
-                          color: active ? '#fff' : sbText,
-                          backgroundColor: active ? sbActiveBg : 'transparent',
-                        };
-                      }}
-                      onMouseEnter={(e) => {
-                        const el = e.currentTarget;
-                        const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                        if (!isActive) {
-                          el.style.backgroundColor = sbHoverBg;
-                          el.style.color = '#fff';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        const el = e.currentTarget;
-                        const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                        if (!isActive) {
-                          el.style.backgroundColor = 'transparent';
-                          el.style.color = sbText;
-                        }
-                      }}
-                    >
-                      {({ isActive }) => {
-                        const active = isActive || location.pathname.startsWith(path + '/');
-                        return (
-                          <>
-                            <Icon className={clsx(collapsed ? 'h-4 w-4' : 'h-4 w-4')} style={{ color: active ? '#fff' : sbText }} />
-                            {!collapsed && <span className="truncate">{label}</span>}
-                            {!collapsed && active && (
-                              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />
-                            )}
-                          </>
-                        );
-                      }}
-                    </NavLink>
-                  ))}
-                </>
+                </div>
               )}
 
-              {/* Separadores para submenús */}
-              {(visibleSettingsItems.length > 0 || visibleUserManagementItems.length > 0) && !collapsed && (
-                <>
-                  <div className="my-2 px-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: `${sbText}60` }}>Gestión</p>
-                  </div>
-                </>
+              {/* Catálogo submenu */}
+              {visibleCatalogoItems.length > 0 && (
+                <div className="mt-0.5">
+                  <button
+                    onClick={() => toggleSubmenu('catalogo')}
+                    className={clsx(
+                      'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                      collapsed ? 'justify-center px-2 py-2' : ''
+                    )}
+                    style={navItemColors('catalogo-toggle', isSubmenuActive(visibleCatalogoItems))}
+                    {...navHoverHandlers('catalogo-toggle')}
+                  >
+                    <Building2 className="h-4 w-4" style={{ color: isSubmenuActive(visibleCatalogoItems) ? '#fff' : sbText }} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">Catálogo</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.catalogo ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleCatalogoItems) ? '#fff' : sbText }} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && openSubmenus.catalogo && (
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                      {visibleCatalogoItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
+                        >
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sistema submenu */}
+              {visibleSistemaItems.length > 0 && (
+                <div className="mt-0.5">
+                  <button
+                    onClick={() => toggleSubmenu('sistema')}
+                    className={clsx(
+                      'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                      collapsed ? 'justify-center px-2 py-2' : ''
+                    )}
+                    style={navItemColors('sistema-toggle', isSubmenuActive(visibleSistemaItems))}
+                    {...navHoverHandlers('sistema-toggle')}
+                  >
+                    <ScrollText className="h-4 w-4" style={{ color: isSubmenuActive(visibleSistemaItems) ? '#fff' : sbText }} />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left truncate">Sistema</span>
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openSubmenus.sistema ? 'rotate-180' : ''}`} style={{ color: isSubmenuActive(visibleSistemaItems) ? '#fff' : sbText }} />
+                      </>
+                    )}
+                  </button>
+                  {!collapsed && openSubmenus.sistema && (
+                    <div className="mt-1 ml-2 space-y-0.5 pl-2" style={{ borderLeftColor: `${sbText}20` }}>
+                      {visibleSistemaItems.map(({ label, path, icon: Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
+                        >
+                          {({ isActive }) => {
+                            const active = isActive || location.pathname.startsWith(path + '/');
+                            return (
+                              <>
+                                <Icon className="h-4 w-4" style={{ color: active ? '#fff' : sbText }} />
+                                <span className="truncate">{label}</span>
+                                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/60" />}
+                              </>
+                            );
+                          }}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Settings submenu */}
@@ -510,22 +577,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
-                    style={{
-                      color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText,
-                      backgroundColor: isSubmenuActive(visibleSettingsItems) ? sbActiveBg : 'transparent',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSubmenuActive(visibleSettingsItems)) {
-                        e.currentTarget.style.backgroundColor = sbHoverBg;
-                        e.currentTarget.style.color = sbHoverText;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSubmenuActive(visibleSettingsItems)) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = sbText;
-                      }
-                    }}
+                    style={navItemColors('settings-toggle', isSubmenuActive(visibleSettingsItems))}
+                    {...navHoverHandlers('settings-toggle')}
                   >
                     <Settings className="h-4 w-4" style={{ color: isSubmenuActive(visibleSettingsItems) ? '#fff' : sbText }} />
                     {!collapsed && (
@@ -541,34 +594,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                         <NavLink
                           key={path}
                           to={path}
-                          className={({ isActive }) =>
-                            clsx(
-                              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                            )
-                          }
-                          style={({ isActive }) => {
-                            const active = isActive || location.pathname.startsWith(path + '/');
-                            return {
-                              color: active ? '#fff' : sbText,
-                              backgroundColor: active ? sbActiveBg : 'transparent',
-                            };
-                          }}
-                          onMouseEnter={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = sbHoverBg;
-                              el.style.color = sbHoverText;
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = 'transparent';
-                              el.style.color = sbText;
-                            }
-                          }}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
                         >
                           {({ isActive }) => {
                             const active = isActive || location.pathname.startsWith(path + '/');
@@ -596,22 +624,8 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                       'group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                       collapsed ? 'justify-center px-2 py-2' : ''
                     )}
-                    style={{
-                      color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText,
-                      backgroundColor: isSubmenuActive(visibleUserManagementItems) ? sbActiveBg : 'transparent',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSubmenuActive(visibleUserManagementItems)) {
-                        e.currentTarget.style.backgroundColor = sbHoverBg;
-                        e.currentTarget.style.color = sbHoverText;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSubmenuActive(visibleUserManagementItems)) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = sbText;
-                      }
-                    }}
+                    style={navItemColors('usermgmt-toggle', isSubmenuActive(visibleUserManagementItems))}
+                    {...navHoverHandlers('usermgmt-toggle')}
                   >
                     <Users className="h-4 w-4" style={{ color: isSubmenuActive(visibleUserManagementItems) ? '#fff' : sbText }} />
                     {!collapsed && (
@@ -627,34 +641,9 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                         <NavLink
                           key={path}
                           to={path}
-                          className={({ isActive }) =>
-                            clsx(
-                              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                            )
-                          }
-                          style={({ isActive }) => {
-                            const active = isActive || location.pathname.startsWith(path + '/');
-                            return {
-                              color: active ? '#fff' : sbText,
-                              backgroundColor: active ? sbActiveBg : 'transparent',
-                            };
-                          }}
-                          onMouseEnter={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = sbHoverBg;
-                              el.style.color = sbHoverText;
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            const el = e.currentTarget;
-                            const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-                            if (!isActive) {
-                              el.style.backgroundColor = 'transparent';
-                              el.style.color = sbText;
-                            }
-                          }}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200"
+                          style={({ isActive }) => navItemColors(path, isActive || location.pathname.startsWith(path + '/'))}
+                          {...navHoverHandlers(path)}
                         >
                           {({ isActive }) => {
                             const active = isActive || location.pathname.startsWith(path + '/');
@@ -736,10 +725,10 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     </TooltipTrigger>
                     <TooltipContent side="top">Opciones de perfil</TooltipContent>
                   </Tooltip>
-                  <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg">
+                  <DropdownMenuContent align="end" className="w-56 bg-white border border-zinc-200 shadow-lg">
                     <DropdownMenuLabel className="px-3 py-2">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                        <span className="text-sm font-semibold text-zinc-900 truncate">
                           {user.nombre || user.email || 'Invitado'}
                         </span>
                         <span className="text-xs text-zinc-500 truncate">
@@ -749,35 +738,35 @@ export default function Sidebar({ user = {}, onLogout = () => { }, dir = 'ltr' }
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                      <a href="/profile" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <a href="/profile" className="flex items-center gap-2 text-zinc-700 hover:bg-zinc-100">
                         <User className="h-4 w-4 text-zinc-500" />
                         <span>Perfil</span>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                      <a href="/settings" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <a href="/settings" className="flex items-center gap-2 text-zinc-700 hover:bg-zinc-100">
                         <Settings className="h-4 w-4 text-zinc-500" />
                         <span>Ajustes</span>
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                      <a href="/notificaciones" className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                      <a href="/notificaciones" className="flex items-center gap-2 text-zinc-700 hover:bg-zinc-100">
                         <div className="relative">
                           <Bell className="h-4 w-4 text-zinc-500" />
                           {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white dark:ring-zinc-900" />
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white" />
                           )}
                         </div>
                         <span>Notificaciones</span>
                         {unreadCount > 0 && (
-                          <span className="ml-auto text-xs font-semibold text-red-500">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                          <Badge variant="danger" className="ml-auto px-1.5 py-0 text-[10px]">{unreadCount > 99 ? '99+' : unreadCount}</Badge>
                         )}
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={onLogout}
-                      className="gap-2 cursor-pointer text-red-600 hover:bg-red-30 dark:hover:bg-red-950/30 focus:bg-red-50 dark:focus:bg-red-950/30"
+                      className="gap-2 cursor-pointer text-red-600 hover:bg-red-30 focus:bg-red-50"
                     >
                       <LogOut className="h-4 w-4" />
                       <span>Cerrar sesión</span>

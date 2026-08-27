@@ -3,6 +3,7 @@ import { CheckCircle2, Trophy, TrendingUp, RefreshCw, MapPin, X, XCircle, FileTe
 import ReservationService from '../services/reservationService';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -31,6 +32,10 @@ export default function Confirmations() {
   const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
   const [pdfLoadingId, setPdfLoadingId] = useState(null);
   const [filters, setFilters] = useState({ temporada: '', destino: '', desde: '', hasta: '' });
+  // Selección múltiple para agrupar en un solo PDF (misma familia/producto,
+  // en vez de un voucher por pasajero por separado).
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [groupPdfLoading, setGroupPdfLoading] = useState(false);
 
   const temporadaOptions = useMemo(
     () => Array.from(new Set(data.map((d) => d.Temporada).filter(Boolean))).sort(),
@@ -61,6 +66,27 @@ export default function Confirmations() {
 
   const hasActiveFilters = !!(filters.temporada || filters.destino || filters.desde || filters.hasta);
   const clearFilters = () => setFilters({ temporada: '', destino: '', desde: '', hasta: '' });
+
+  const selectedItems = useMemo(
+    () => filteredData.filter((item) => selectedIds.has(item.id)),
+    [filteredData, selectedIds]
+  );
+  // Solo tiene sentido agrupar reservas del mismo producto — si se seleccionó
+  // de más de uno, se avisa en vez de armar un PDF que mezcle vuelos distintos.
+  const selectedProductIds = useMemo(
+    () => new Set(selectedItems.map((item) => String(item.ProductId || item.Vuelo_Codigo || ''))),
+    [selectedItems]
+  );
+  const canGroupPdf = selectedItems.length >= 2 && selectedProductIds.size === 1;
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const stats = useMemo(
     () => [
@@ -160,6 +186,32 @@ export default function Confirmations() {
     }
   };
 
+  // Agrupa N reservas del mismo producto en un solo PDF con todos los
+  // nombres, en vez de un voucher por pasajero — pensado para una familia
+  // que reservó por separado pero viaja junta.
+  const handleShowGroupedItinerary = async () => {
+    if (!canGroupPdf) return;
+    setGroupPdfLoading(true);
+    try {
+      const details = await Promise.all(
+        selectedItems.map((item) => ReservationService.getReservationById(item.id).catch(() => null))
+      );
+      const passengers = details.flatMap((full, i) => {
+        const item = selectedItems[i];
+        if (Array.isArray(full?.passengers) && full.passengers.length > 0) return full.passengers;
+        return [{ nombre: item.Nombre_Pasajero, apellido: item.Apellido_Pasajero }];
+      });
+      const first = selectedItems[0];
+      setPdfModalData({
+        reservation: { pedido_id: selectedItems.map((i) => i.Pedido_ID).join(' / '), estado: first.Estado },
+        passengers,
+        product: { ruta: first.Ruta, destino: first.Vuelo_Destino, fecha_salida: first.Vuelo_Salida, pnr: first.Pnr, carryon: first.CarryOn, handbag: first.HandBag, checkedbag: first.CheckedBag },
+      });
+    } finally {
+      setGroupPdfLoading(false);
+    }
+  };
+
   const formatDate = formatDateOnly;
 
   return (
@@ -233,17 +285,32 @@ export default function Confirmations() {
       </Card>
 
       <Card>
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 gap-3">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Reservas confirmadas</h2>
             <p className="text-sm text-slate-500">Revisa los cupos que ya finalizaron el proceso de confirmación.</p>
           </div>
-          <span className="text-sm text-slate-500">Actualiza para sincronizar con el backend</span>
+          <div className="flex items-center gap-3">
+            {selectedItems.length > 0 && (
+              <Button
+                size="sm"
+                onClick={handleShowGroupedItinerary}
+                disabled={!canGroupPdf || groupPdfLoading}
+                title={canGroupPdf ? 'Genera un solo PDF con todos los pasajeros seleccionados' : 'Seleccioná 2 o más reservas del mismo producto'}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {groupPdfLoading ? 'Generando...' : `Generar PDF agrupado (${selectedItems.length})`}
+              </Button>
+            )}
+            <span className="text-sm text-slate-500">Actualiza para sincronizar con el backend</span>
+          </div>
         </div>
 
         <TableComponent>
           <TableHeader>
             <TableRow>
+              <TableHead className="text-center">Acciones</TableHead>
+              <TableHead className="text-center">Sel.</TableHead>
               <TableHead className="text-center">Pedido</TableHead>
               <TableHead className="text-center">Agencia</TableHead>
               <TableHead className="text-center">Pasajero</TableHead>
@@ -256,25 +323,45 @@ export default function Confirmations() {
               <TableHead className="text-center">Equipaje</TableHead>
               <TableHead className="text-center">Tarifa</TableHead>
               <TableHead className="text-center">Estado</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={13}>
+                <TableCell className="text-center py-10" colSpan={14}>
                   Cargando confirmaciones...
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={13}>
+                <TableCell className="text-center py-10" colSpan={14}>
                   {hasActiveFilters ? 'No hay confirmaciones que coincidan con los filtros.' : 'No hay confirmaciones registradas.'}
                 </TableCell>
               </TableRow>
             ) : (
               filteredData.map((item, index) => (
                 <TableRow key={index}>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <ActionIconButton icon={XCircle} variant="danger" onClick={() => handleRequestCancellation(item)} title="Solicitar cancelación de esta reserva" />
+                      <ActionIconButton
+                        icon={FileText}
+                        className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        onClick={() => handleShowItinerary(item)}
+                        disabled={pdfLoadingId === item.id}
+                        title="Generar itinerario PDF"
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelect(item.id)}
+                      className="h-4 w-4 rounded border-gray-300"
+                      title="Seleccionar para agrupar en un solo PDF"
+                    />
+                  </TableCell>
                   <TableCell className="text-center font-medium">{item.Pedido_ID}</TableCell>
                   <TableCell className="text-center">{item.Agencia || '—'}</TableCell>
                   <TableCell className="text-center">{`${item.Nombre_Pasajero || '-'} ${item.Apellido_Pasajero || ''}`.trim()}</TableCell>
@@ -302,28 +389,6 @@ export default function Confirmations() {
                   <TableCell className="text-center">{formatMoney(item.Vuelo_Precio)}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="success">{statusLabel(item.Estado)}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleRequestCancellation(item)}
-                        title="Solicitar cancelación de esta reserva"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleShowItinerary(item)}
-                        disabled={pdfLoadingId === item.id}
-                        title="Generar itinerario PDF"
-                      >
-                        <FileText className="h-4 w-4 text-blue-600" />
-                      </Button>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))
