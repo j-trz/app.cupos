@@ -137,6 +137,56 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	issueSession(c, &profile)
+}
+
+// LoginOffice365 recibe el ID token real que el frontend obtuvo de Microsoft
+// (vía MSAL.js contra el tenant configurado) y lo valida contra las claves
+// públicas reales de Microsoft — nunca confía en el email de un token sin
+// verificar su firma primero (ver services.ValidateOffice365IDToken).
+//
+// Preparación para el reemplazo del login propio en producción (decisión ya
+// tomada, ver docs/FLUJOS_FUNCIONALIDADES.md sección 1) — coexiste con Login
+// mientras se termina de configurar y probar el App Registration de Azure;
+// no hay auto-provisioning: el email verificado tiene que matchear un
+// Profile ya existente (mismo criterio que "sin auto-registro público" del
+// resto del sistema), si no existe se rechaza con un mensaje claro en vez de
+// crear una cuenta nueva sola.
+func LoginOffice365(c *gin.Context) {
+	var input struct {
+		IDToken string `json:"id_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id_token es requerido."})
+		return
+	}
+
+	if !services.Office365LoginConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "El login con Office 365 todavía no está configurado en el servidor."})
+		return
+	}
+
+	email, _, err := services.ValidateOffice365IDToken(input.IDToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No se pudo verificar la sesión de Office 365: " + err.Error()})
+		return
+	}
+
+	var profile models.Profile
+	if err := database.DB.Where("LOWER(email) = LOWER(?)", email).First(&profile).Error; err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Tu cuenta de Office 365 (" + email + ") no está registrada en el sistema. Pedile a un administrador que te cree un usuario con ese mismo email."})
+		return
+	}
+
+	issueSession(c, &profile)
+}
+
+// issueSession firma nuestro propio JWT de sesión (HS256, 24h) para un
+// Profile ya autenticado — punto único usado tanto por el login propio
+// (Login) como por Office 365 (LoginOffice365), para que ambos caminos
+// terminen en exactamente la misma sesión/RBAC/respuesta, sin duplicar la
+// lógica de emisión del token.
+func issueSession(c *gin.Context, profile *models.Profile) {
 	if !profile.IsActive {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tu cuenta está inactiva. Contactá a un administrador."})
 		return
@@ -172,7 +222,7 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"token":   tokenString,
-		"user":    withAIFlag(profile),
+		"user":    withAIFlag(*profile),
 	})
 }
 

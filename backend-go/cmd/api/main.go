@@ -80,6 +80,11 @@ func main() {
 	{
 		// Rutas públicas
 		api.POST("/auth/login", middleware.RateLimit(15, 5*time.Minute), handlers.Login)
+		// Login corporativo (Office 365 / Microsoft Entra ID) — preparación
+		// para el reemplazo del login propio en producción, ver
+		// services/office365_auth.go. Se apaga solo (503) si AZURE_TENANT_ID/
+		// AZURE_CLIENT_ID no están configuradas todavía.
+		api.POST("/auth/login-office365", middleware.RateLimit(15, 5*time.Minute), handlers.LoginOffice365)
 		// No hay auto-registro público: el alta de usuarios la hace un admin
 		// desde Gestión de Usuarios (CreateUser, autenticado). Existió un
 		// /auth/register público que dejaba a cualquier anónimo declararse
