@@ -39,3 +39,6 @@ tmp_*
 tmp-*
 backups/
 
+# graphify (local-only artifact, not versioned)
+graphify-out/cost.json
+

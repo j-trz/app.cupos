@@ -36,3 +36,13 @@ Hay una base de conocimiento persistente del proyecto en el vault de Obsidian **
 1. **Antes** de tocar un área que el vault documenta, leer la nota correspondiente primero (evita re-explorar desde cero) — pero para cualquier acción consecuente (no solo explicar), **re-verificar contra el código real** antes de confiar en ella: son snapshots con fecha, no estado en vivo.
 2. **Al terminar** un cambio que afecte algo documentado (endpoint nuevo, tabla/columna nueva, bug corregido, regla operativa descubierta), actualizar la nota del vault correspondiente como parte de "terminado" — no un paso opcional posterior. Protocolo completo y sellos de frescura: `006 - Operación y Mantenimiento/Gotchas y Reglas de Oro.md` (sección final).
 3. La memoria privada de Claude Code (`~/.claude/projects/.../memory/`) no debe duplicar lo que ya vive en el vault — ahí van preferencias de colaboración y feedback puntual, con puntero a la nota del vault en vez de repetir contenido.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
