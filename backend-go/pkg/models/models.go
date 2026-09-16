@@ -595,7 +595,12 @@ type NotificationTemplate struct {
 }
 
 type AIProvider struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	// Agencia scopea el proveedor a una sola agencia (mismo criterio que
+	// AIExpert) — "" significa un proveedor legacy aún sin reasignar tras la
+	// migración 2026-09-15, visible/gestionable solo por admin hasta que se
+	// le asigne una agencia real.
+	Agencia      string    `gorm:"index" json:"agencia"`
 	Name         string    `gorm:"unique;not null" json:"name"`
 	DisplayName  string    `json:"display_name"`
 	ProviderType string    `gorm:"column:provider_type;default:'openai'" json:"provider_type"`

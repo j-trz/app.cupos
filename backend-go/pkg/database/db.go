@@ -743,6 +743,12 @@ func runSQLMigrations(db *gorm.DB) {
 		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS carryon_kg numeric DEFAULT 0;`,
 		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS handbag_kg numeric DEFAULT 0;`,
 		`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS checkedbag_kg numeric DEFAULT 0;`,
+		// AIProvider pasa a scopearse por agencia (bug 2026-09-15: cualquier
+		// agencia con AI_UPDATE podía ver/editar/borrar/probar el proveedor de
+		// cualquier otra agencia, ya que no existía ninguna columna de
+		// pertenencia). Filas ya existentes quedan con agencia='' (legacy, sin
+		// asignar) — solo admin las ve/gestiona hasta reasignarlas a mano.
+		`ALTER TABLE ai_providers ADD COLUMN IF NOT EXISTS agencia VARCHAR(255) DEFAULT '';`,
 	}
 	for _, sql := range colSQLs {
 		if err := db.Exec(sql).Error; err != nil {

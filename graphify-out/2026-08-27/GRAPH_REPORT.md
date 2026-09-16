@@ -1,16 +1,16 @@
 # Graph Report - form-cupos  (2026-08-27)
 
 ## Corpus Check
-- 299 files · ~352,153 words
+- 299 files · ~351,758 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1677 nodes · 4474 edges · 127 communities (74 shown, 53 thin omitted)
+- 1676 nodes · 4474 edges · 126 communities (73 shown, 53 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 96 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fe43fcad`
+- Built from commit: `11f18711`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -48,7 +48,7 @@
 - UserService
 - Card.jsx
 - What You Must Do When Invoked
-- product_handler.go
+- Product
 - AgencyService
 - group_handler.go
 - qa_diagnostic_handler.go
@@ -66,7 +66,7 @@
 - itinerary_parser.go
 - PermissionService
 - Dashboard
-- rbac_handler.go
+- GetIntSettingForAgency
 - ItineraryTable.jsx
 - graphify reference: extra exports and benchmark
 - system_handler.go
@@ -76,7 +76,7 @@
 - AtlasConfig
 - canManageSharing
 - BandejaTickets
-- Product
+- agency_handler.go
 - ExportService
 - resolveAgencyForSettings
 - backend-go/vercel.json
@@ -128,7 +128,7 @@
 - frontend/vercel.json
 - backend-go
 - graphify reference: query, path, explain
-- transfer_handler.go
+- user_agency_handler.go
 - graphify reference: add a URL and watch a folder
 - graphify reference: commit hook and native CLAUDE.md integration
 - graphify reference: incremental update and cluster-only
@@ -164,7 +164,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (127 total, 53 thin omitted)
+## Communities (126 total, 53 thin omitted)
 
 ### Community 0 - "ai_handler.go"
 Cohesion: 0.06
@@ -187,8 +187,8 @@ Cohesion: 0.11
 Nodes (8): ExpertPicker(), ExpertDocumentsPanel(), ExpertsTab(), useAIChat(), useGroup(), AIChatPage(), AIConfig(), AIService
 
 ### Community 5 - "github.com/gin-gonic/gin.Context"
-Cohesion: 0.09
-Nodes (26): CreateAgency(), DeleteAgency(), ListAgencies(), ToggleMyAgencyAI(), UpdateAgency(), ExportCSV(), ExportSystemLogsJSON(), GetSystemLogs() (+18 more)
+Cohesion: 0.10
+Nodes (35): ExportCSV(), ExportSystemLogsJSON(), GetSystemLogs(), CreateNotification(), DeleteNotification(), GetNotifications(), GetUnreadCount(), HideNotification() (+27 more)
 
 ### Community 6 - "ItineraryPDF.jsx"
 Cohesion: 0.19
@@ -263,12 +263,12 @@ Cohesion: 0.09
 Nodes (12): ShareProductModal(), TransferModal(), useApproveProduct(), useCreateProduct(), useDeleteProduct(), useProduct(), useProducts(), useUpdateProduct() (+4 more)
 
 ### Community 24 - "notification_service.go"
-Cohesion: 0.35
-Nodes (10): createNotification(), NotifyAgency(), NotifyBroadcast(), NotifyBroadcastByCode(), NotifyRole(), NotifyUser(), parseExtraEmails(), renderPlaceholders() (+2 more)
+Cohesion: 0.33
+Nodes (11): createNotification(), NotifyAgency(), NotifyAgencyByCode(), NotifyBroadcast(), NotifyBroadcastByCode(), NotifyRole(), NotifyUser(), parseExtraEmails() (+3 more)
 
 ### Community 25 - "ResolveAgencyCode"
-Cohesion: 0.14
-Nodes (19): ApproveOpportunity(), BulkApproveOpportunities(), BulkDeleteOpportunities(), CreateOpportunity(), DeleteOpportunity(), fixOpportunityDates(), fixOpportunityNumbers(), GetOpportunities() (+11 more)
+Cohesion: 0.12
+Nodes (23): ApproveOpportunity(), BulkApproveOpportunities(), BulkDeleteOpportunities(), CreateOpportunity(), DeleteOpportunity(), fixOpportunityDates(), fixOpportunityNumbers(), GetOpportunities() (+15 more)
 
 ### Community 26 - "ApiClient"
 Cohesion: 0.12
@@ -279,8 +279,8 @@ Cohesion: 0.17
 Nodes (15): callerOwnsTemplateAgency(), CreateEmailConfig(), DeleteEmailConfig(), GetEmailConfig(), GetEmailTemplates(), logEmailError(), resolveAgencyForEmailConfig(), SendTestEmail() (+7 more)
 
 ### Community 28 - "order_handler.go"
-Cohesion: 0.13
-Nodes (26): AddDocContable(), AddPassenger(), BulkCancelReservations(), BulkUpdateReservations(), callerOwnsReservation(), canReserveProduct(), countPassengerSeats(), CreateHold() (+18 more)
+Cohesion: 0.10
+Nodes (32): AddDocContable(), AddPassenger(), BulkCancelReservations(), BulkUpdateReservations(), callerOwnsReservation(), countPassengerSeats(), DeletePassenger(), DeleteReservation() (+24 more)
 
 ### Community 29 - ".delete"
 Cohesion: 0.10
@@ -298,17 +298,17 @@ Nodes (15): DashboardCharts(), FALLBACK_COLORS, formatCompactUSD(), STATUS_COLOR
 Cohesion: 0.07
 Nodes (26): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+18 more)
 
-### Community 33 - "product_handler.go"
-Cohesion: 0.26
-Nodes (19): ConvertOpportunityToProduct(), applyCalculatedPrices(), ApproveProduct(), BulkCreateProducts(), BulkDuplicateProducts(), createdByFromContext(), CreateProduct(), DeleteProduct() (+11 more)
+### Community 33 - "Product"
+Cohesion: 0.22
+Nodes (20): ConvertOpportunityToProduct(), applyCalculatedPrices(), ApproveProduct(), BulkCreateProducts(), BulkDuplicateProducts(), createdByFromContext(), CreateProduct(), DeleteProduct() (+12 more)
 
 ### Community 34 - "AgencyService"
 Cohesion: 0.18
 Nodes (5): useAgency(), useCreateAgency(), useDeleteAgency(), useUpdateAgency(), AgencyService
 
 ### Community 35 - "group_handler.go"
-Cohesion: 0.14
-Nodes (19): AcceptGroupQuote(), canViewAllGroups(), ConfirmGroup(), CreateGroup(), DeleteGroup(), fixGroupDates(), GetGroupByID(), GetGroupsReport() (+11 more)
+Cohesion: 0.16
+Nodes (17): AcceptGroupQuote(), canViewAllGroups(), ConfirmGroup(), CreateGroup(), DeleteGroup(), fixGroupDates(), GetGroupByID(), GetGroupsReport() (+9 more)
 
 ### Community 36 - "qa_diagnostic_handler.go"
 Cohesion: 0.27
@@ -327,16 +327,16 @@ Cohesion: 0.24
 Nodes (14): BuildBackupDump(), DeleteBackupHandler(), DownloadBackupHandler(), ensureBackupsDir(), formatSize(), GenerateBackupHandler(), GetBackup(), ListBackupsHandler() (+6 more)
 
 ### Community 41 - "FindAgencyByCodeOrName"
-Cohesion: 0.19
-Nodes (19): PreviewEmailTemplate(), AdjustHold(), FindAgencyByCodeOrName(), lookupAgencySMTPConfig(), lookupGlobalSMTPConfig(), RenderTemplate(), resolveSMTPConfig(), resolveTemplate() (+11 more)
+Cohesion: 0.29
+Nodes (12): PreviewEmailTemplate(), FindAgencyByCodeOrName(), lookupAgencySMTPConfig(), lookupGlobalSMTPConfig(), RenderTemplate(), resolveSMTPConfig(), resolveTemplate(), sendMail() (+4 more)
 
 ### Community 42 - "dependencies"
 Cohesion: 0.15
 Nodes (13): chartjs-plugin-datalabels, dependencies, chartjs-plugin-datalabels, papaparse, @radix-ui/react-dropdown-menu, @radix-ui/react-radio-group, @radix-ui/react-separator, react-dom (+5 more)
 
 ### Community 43 - "NotifyRoleByCode"
-Cohesion: 0.26
-Nodes (15): expireOverdueHolds(), expireOverdueReservations(), ExpireReservations(), warnExpiringReservations(), CheckDeadlineReminders(), warnGroupDeadlines(), warnProductDeadlines(), buildReservationEmailVars() (+7 more)
+Cohesion: 0.21
+Nodes (19): expireOverdueHolds(), expireOverdueReservations(), ExpireReservations(), warnExpiringReservations(), CheckDeadlineReminders(), warnGroupDeadlines(), warnProductDeadlines(), RequestGroup() (+11 more)
 
 ### Community 44 - "useWhiteLabel"
 Cohesion: 0.18
@@ -347,8 +347,8 @@ Cohesion: 0.11
 Nodes (7): WhiteLabelProvider(), EmailConfig(), NotificationTemplates(), WhiteLabelConfig(), EmailConfigService, NotificationTemplatesService, WhiteLabelService
 
 ### Community 46 - "user_handler.go"
-Cohesion: 0.17
-Nodes (20): AssignRoleToUser(), setUserRole(), assignedAgencyCodes(), attachUserRoles(), callerAgencyIfScoped(), CreateUser(), DeleteUser(), GetProfile() (+12 more)
+Cohesion: 0.16
+Nodes (19): assignedAgencyCodes(), attachUserRoles(), callerAgencyIfScoped(), CreateUser(), DeleteUser(), GetProfile(), GetUserById(), issueSession() (+11 more)
 
 ### Community 47 - "AIChatWindow.jsx"
 Cohesion: 0.18
@@ -366,9 +366,9 @@ Nodes (5): useCreatePermission(), useDeletePermission(), usePermission(), useUpd
 Cohesion: 0.33
 Nodes (4): Dashboard(), formatCurrency(), Notificaciones(), NotificationService
 
-### Community 51 - "rbac_handler.go"
-Cohesion: 0.18
-Nodes (16): AssignPermissionsToRole(), callerCanAccessRole(), CreatePermission(), CreateRole(), DeletePermission(), DeleteRole(), GetMyPermissions(), GetPermissionById() (+8 more)
+### Community 51 - "GetIntSettingForAgency"
+Cohesion: 0.39
+Nodes (7): AdjustHold(), canReserveProduct(), CreateHold(), GetIntSetting(), GetIntSettingForAgency(), GetSetting(), settingValueToString()
 
 ### Community 52 - "ItineraryTable.jsx"
 Cohesion: 0.18
@@ -379,8 +379,8 @@ Cohesion: 0.22
 Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
 
 ### Community 54 - "system_handler.go"
-Cohesion: 0.39
-Nodes (8): AdminReleaseHold(), buildHoldDetails(), GetSystemStatus(), DBStatus, HoldDetail, ServiceStatus, SystemCounts, SystemStatusResponse
+Cohesion: 0.46
+Nodes (7): buildHoldDetails(), GetSystemStatus(), DBStatus, HoldDetail, ServiceStatus, SystemCounts, SystemStatusResponse
 
 ### Community 55 - "white_label_handler.go"
 Cohesion: 0.52
@@ -402,9 +402,9 @@ Nodes (5): canManageSharing(), ListSharedAgencies(), ShareProduct(), UnshareProd
 Cohesion: 0.33
 Nodes (7): BandejaTickets(), fmtCurrency(), fmtDate(), fmtDateTime(), segField(), TicketDetailModal(), ticketSegments()
 
-### Community 61 - "Product"
-Cohesion: 0.31
-Nodes (9): UpdatePassengerTicket(), buildSegmentosJSON(), generateReservationLevelTicket(), GenerateTicketsForReservationInternal(), resolveVendedorEmail(), upsertTicketForPassenger(), Product, Reservation (+1 more)
+### Community 61 - "agency_handler.go"
+Cohesion: 0.33
+Nodes (5): CreateAgency(), DeleteAgency(), ListAgencies(), ToggleMyAgencyAI(), UpdateAgency()
 
 ### Community 63 - "resolveAgencyForSettings"
 Cohesion: 0.83
@@ -422,9 +422,9 @@ Nodes (5): CreateAPIKeyHandler(), GenerateSecretKey(), HashAPIKey(), ListAPIKeys
 Cohesion: 0.33
 Nodes (5): For /graphify explain, For /graphify path, graphify reference: query, path, explain, Step 0 — Constrained query expansion (REQUIRED before traversal), Step 1 — Traversal
 
-### Community 118 - "transfer_handler.go"
-Cohesion: 0.33
-Nodes (5): CreateTransfer(), GetUserTransfers(), ListTransfers(), ReclaimTransfer(), TransferInput
+### Community 118 - "user_agency_handler.go"
+Cohesion: 0.40
+Nodes (4): AddUserAgency(), ListUserAgencies(), RemoveUserAgency(), addUserAgencyInput
 
 ### Community 119 - "graphify reference: add a URL and watch a folder"
 Cohesion: 0.50
@@ -439,7 +439,7 @@ Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
 ## Knowledge Gaps
-- **223 isolated node(s):** `expertInput`, `itinerarioProductoDTO`, `itinerarioReservaDTO`, `knownPage`, `BuscarContactoAtlasRequest` (+218 more)
+- **223 isolated node(s):** `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+218 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **53 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -447,12 +447,12 @@ Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphif
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ApiClient` connect `ApiClient` to `OportunityForm.jsx`, `.get`, `Button.jsx`, `.post`, `LogsDelSitio.jsx`, `cn`, `.request`, `GestionNominas.jsx`, `GestionReservas.jsx`, `PermissionService`, `Reportes.jsx`, `ReservationService`, `App.jsx`, `ProductService`, `.delete`, `UserService`?**
-  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+  _High betweenness centrality (0.039) - this node is a cross-community bridge._
 - **Why does `useAuth()` connect `App.jsx` to `OportunityForm.jsx`, `.get`, `GestionProductos.jsx`, `Button.jsx`, `.post`, `LogsDelSitio.jsx`, `cn`, `Documentacion.jsx`, `GestionNominas.jsx`, `GestionReservas.jsx`, `Reportes.jsx`, `GestionGrupos.jsx`, `ReservationService`, `ProductService`, `.delete`, `UserService`, `Layout.jsx`, `useWhiteLabel`, `.request`, `AIChatWindow.jsx`, `Dashboard`, `AtlasConfig`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
-- **Why does `GestionReservas()` connect `ReservationService` to `.get`, `GestionProductos.jsx`, `GestionNominas.jsx`, `GestionReservas.jsx`, `App.jsx`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **What connects `expertInput`, `itinerarioProductoDTO`, `itinerarioReservaDTO` to the rest of the system?**
+- **Why does `Button()` connect `Button.jsx` to `OportunityForm.jsx`, `UserForm.jsx`, `GestionProductos.jsx`, `WhiteLabelPreviewModal.jsx`, `LogsDelSitio.jsx`, `GestionNominas.jsx`, `GestionReservas.jsx`, `GestionGrupos.jsx`, `App.jsx`, `Card.jsx`?**
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
+- **What connects `graphify`, `Usage`, `What graphify is for` to the rest of the system?**
   _223 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `ai_handler.go` be split into smaller, more focused modules?**
   _Cohesion score 0.05711849957374254 - nodes in this community are weakly interconnected._

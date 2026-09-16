@@ -1530,9 +1530,9 @@
     "semantic_hash": ""
   },
   "app-cupos/006 - Operaci\u00f3n y Mantenimiento/Gotchas y Reglas de Oro.md": {
-    "mtime": 1787845285.106112,
-    "seen": 1787845363.59427,
-    "ast_hash": "146660b26345ba9ae6ceea9ee3564ebb",
+    "mtime": 1786765075.1810453,
+    "seen": 1787838270.063366,
+    "ast_hash": "273d9d804fb7929f7589088b4dadb470",
     "semantic_hash": ""
   },
   "app-cupos/006 - Operaci\u00f3n y Mantenimiento/Historial de Bugs Resueltos.md": {
@@ -1602,9 +1602,9 @@
     "semantic_hash": ""
   },
   "app-cupos/log.md": {
-    "mtime": 1787845307.4565544,
-    "seen": 1787845363.5943103,
-    "ast_hash": "e2fd9b6570fc1182ed39673e2194a4f5",
+    "mtime": 1787759791.7408235,
+    "seen": 1787838270.0633981,
+    "ast_hash": "a283e1ddbc7063389c107b82427cda3a",
     "semantic_hash": ""
   },
   "backend-go/README.md": {

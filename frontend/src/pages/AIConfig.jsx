@@ -383,6 +383,9 @@ export default function AIConfig() {
                                                             <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${provider.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                                 {provider.is_active ? 'Activo' : 'Inactivo'}
                                                             </span>
+                                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full font-medium">
+                                                                {provider.agencia || 'Sin agencia asignada'}
+                                                            </span>
                                                         </div>
                                                         <p className="text-sm text-gray-500 mt-0.5 truncate">
                                                             <span className="capitalize">{PROVIDER_TYPES.find(p => p.value === provider.provider_type)?.label || provider.provider_type}</span>

@@ -2288,17 +2288,24 @@ func Chat(c *gin.Context) {
 		return
 	}
 
-	// Obtener proveedor
+	// Obtener proveedor — siempre scopeado a la agencia del usuario (o sin
+	// restricción si es admin), para que ninguna agencia pueda usar ni
+	// consumir la API Key de otra (bug 2026-09-15: antes era un único
+	// proveedor global compartido por todo el sistema).
 	var provider models.AIProvider
+	providerScope := database.DB
+	if role != "admin" {
+		providerScope = providerScope.Where("LOWER(agencia) = LOWER(?)", u.Agencia)
+	}
 	if req.ProviderID != "" {
-		if err := database.DB.First(&provider, "id = ? AND is_active = true", req.ProviderID).Error; err != nil {
+		if err := providerScope.First(&provider, "id = ? AND is_active = true", req.ProviderID).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
 			return
 		}
 	} else {
-		if err := database.DB.Where("is_active = true AND is_default = true").First(&provider).Error; err != nil {
-			if err := database.DB.Where("is_active = true").First(&provider).Error; err != nil {
-				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No hay ningún proveedor de IA configurado y activo"})
+		if err := providerScope.Where("is_active = true AND is_default = true").First(&provider).Error; err != nil {
+			if err := providerScope.Where("is_active = true").First(&provider).Error; err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Tu agencia no tiene ningún proveedor de IA configurado y activo"})
 				return
 			}
 		}
@@ -2735,9 +2742,36 @@ func mustJSON(v interface{}) string {
 // PROVIDERS CRUD
 // ─────────────────────────────────────────────
 
+// findProviderScoped busca un proveedor de IA por ID y verifica que pertenezca
+// a la agencia del usuario (o sea admin) — mismo criterio que
+// findExpertScoped, para que ninguna agencia pueda ver/editar/borrar/probar el
+// proveedor (y la API Key) de otra.
+func findProviderScoped(c *gin.Context, providerID string) (*models.AIProvider, bool) {
+	var provider models.AIProvider
+	if err := database.DB.First(&provider, "id = ?", providerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+		return nil, false
+	}
+	agencia, isAdmin := expertAgencyScope(c)
+	if !isAdmin && !strings.EqualFold(provider.Agencia, agencia) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+		return nil, false
+	}
+	return &provider, true
+}
+
 func ListAIProviders(c *gin.Context) {
+	agencia, isAdmin := expertAgencyScope(c)
+	q := database.DB.Model(&models.AIProvider{})
+	if isAdmin {
+		if filtro := c.Query("agencia"); filtro != "" {
+			q = q.Where("LOWER(agencia) = LOWER(?)", filtro)
+		}
+	} else {
+		q = q.Where("LOWER(agencia) = LOWER(?)", agencia)
+	}
 	providers := make([]models.AIProvider, 0)
-	database.DB.Find(&providers)
+	q.Order("created_at desc").Find(&providers)
 	for i := range providers {
 		if providers[i].APIKey != "" {
 			providers[i].APIKey = "••••••••"
@@ -2752,9 +2786,21 @@ func CreateAIProvider(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	agencia, isAdmin := expertAgencyScope(c)
+	// Nunca confiar en la agencia del body salvo que sea admin eligiéndola
+	// explícitamente — el resto siempre queda con la agencia real del caller.
+	if !isAdmin || strings.TrimSpace(provider.Agencia) == "" {
+		provider.Agencia = agencia
+	}
+	if provider.Agencia == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Falta la agencia del proveedor"})
+		return
+	}
 	provider.ID = uuid.New()
 	if provider.IsDefault {
-		database.DB.Model(&models.AIProvider{}).Where("is_default = true").Update("is_default", false)
+		database.DB.Model(&models.AIProvider{}).
+			Where("is_default = true AND LOWER(agencia) = LOWER(?)", provider.Agencia).
+			Update("is_default", false)
 	}
 	database.DB.Create(&provider)
 	provider.APIKey = "••••••••"
@@ -2762,10 +2808,8 @@ func CreateAIProvider(c *gin.Context) {
 }
 
 func UpdateAIProvider(c *gin.Context) {
-	id := c.Param("id")
-	var existing models.AIProvider
-	if err := database.DB.First(&existing, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+	existing, ok := findProviderScoped(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	var updates models.AIProvider
@@ -2777,8 +2821,15 @@ func UpdateAIProvider(c *gin.Context) {
 		updates.APIKey = existing.APIKey
 	}
 	updates.ID = existing.ID
+	// Solo un admin puede reasignar la agencia de un proveedor; cualquier
+	// otro valor recibido en el body se ignora y se conserva el actual.
+	if _, isAdmin := expertAgencyScope(c); !isAdmin || strings.TrimSpace(updates.Agencia) == "" {
+		updates.Agencia = existing.Agencia
+	}
 	if updates.IsDefault {
-		database.DB.Model(&models.AIProvider{}).Where("id != ? AND is_default = true", id).Update("is_default", false)
+		database.DB.Model(&models.AIProvider{}).
+			Where("id != ? AND is_default = true AND LOWER(agencia) = LOWER(?)", existing.ID, updates.Agencia).
+			Update("is_default", false)
 	}
 	database.DB.Save(&updates)
 	updates.APIKey = "••••••••"
@@ -2786,23 +2837,24 @@ func UpdateAIProvider(c *gin.Context) {
 }
 
 func DeleteAIProvider(c *gin.Context) {
-	id := c.Param("id")
-	database.DB.Delete(&models.AIProvider{}, "id = ?", id)
+	provider, ok := findProviderScoped(c, c.Param("id"))
+	if !ok {
+		return
+	}
+	database.DB.Delete(provider)
 	c.JSON(http.StatusOK, gin.H{"message": "Proveedor eliminado"})
 }
 
 func TestAIProvider(c *gin.Context) {
-	id := c.Param("id")
-	var provider models.AIProvider
-	if err := database.DB.First(&provider, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+	provider, ok := findProviderScoped(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	if provider.APIKey == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay API Key configurada"})
 		return
 	}
-	response, err := callProvider(provider, "Responde exactamente: 'Conexión exitosa'")
+	response, err := callProvider(*provider, "Responde exactamente: 'Conexión exitosa'")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error()})
 		return

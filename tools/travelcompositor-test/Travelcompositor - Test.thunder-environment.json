@@ -1,0 +1,14 @@
+{
+  "client": "Thunder Client",
+  "environmentName": "Travelcompositor - Test",
+  "variables": [
+    { "name": "baseUrl", "value": "https://online.travelcompositor.com/resources", "isSecret": false },
+    { "name": "username", "value": "", "isSecret": true },
+    { "name": "password", "value": "", "isSecret": true },
+    { "name": "micrositeId", "value": "", "isSecret": false },
+    { "name": "authToken", "value": "", "isSecret": true },
+    { "name": "supplierId", "value": "", "isSecret": false },
+    { "name": "transportId", "value": "", "isSecret": false },
+    { "name": "optionCode", "value": "TEST-OPT-01", "isSecret": false }
+  ]
+}

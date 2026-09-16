@@ -9375,70 +9375,59 @@
       "source_location": "L61"
     },
     {
-      "id": "backend_go_pkg_handlers_transfer_handler",
-      "label": "transfer_handler.go",
+      "id": "backend_go_pkg_handlers_user_agency_handler",
+      "label": "user_agency_handler.go",
       "_origin": "ast",
       "community": 118,
-      "community_name": "transfer_handler.go",
+      "community_name": "user_agency_handler.go",
       "file_type": "code",
-      "norm_label": "transfer_handler.go",
-      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
+      "norm_label": "user_agency_handler.go",
+      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
       "source_location": "L1"
     },
     {
-      "id": "backend_go_pkg_handlers_transfer_handler_createtransfer",
-      "label": "CreateTransfer()",
+      "id": "backend_go_pkg_handlers_user_agency_handler_adduseragency",
+      "label": "AddUserAgency()",
       "_origin": "ast",
       "community": 118,
-      "community_name": "transfer_handler.go",
+      "community_name": "user_agency_handler.go",
       "file_type": "code",
-      "norm_label": "createtransfer()",
-      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
-      "source_location": "L31"
+      "norm_label": "adduseragency()",
+      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
+      "source_location": "L41"
     },
     {
-      "id": "backend_go_pkg_handlers_transfer_handler_getusertransfers",
-      "label": "GetUserTransfers()",
+      "id": "backend_go_pkg_handlers_user_agency_handler_listuseragencies",
+      "label": "ListUserAgencies()",
       "_origin": "ast",
       "community": 118,
-      "community_name": "transfer_handler.go",
+      "community_name": "user_agency_handler.go",
       "file_type": "code",
-      "norm_label": "getusertransfers()",
-      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
-      "source_location": "L205"
+      "norm_label": "listuseragencies()",
+      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
+      "source_location": "L17"
     },
     {
-      "id": "backend_go_pkg_handlers_transfer_handler_listtransfers",
-      "label": "ListTransfers()",
+      "id": "backend_go_pkg_handlers_user_agency_handler_removeuseragency",
+      "label": "RemoveUserAgency()",
       "_origin": "ast",
       "community": 118,
-      "community_name": "transfer_handler.go",
+      "community_name": "user_agency_handler.go",
       "file_type": "code",
-      "norm_label": "listtransfers()",
-      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
-      "source_location": "L190"
+      "norm_label": "removeuseragency()",
+      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
+      "source_location": "L87"
     },
     {
-      "id": "backend_go_pkg_handlers_transfer_handler_reclaimtransfer",
-      "label": "ReclaimTransfer()",
+      "id": "handlers_adduseragencyinput",
+      "label": "addUserAgencyInput",
       "_origin": "ast",
       "community": 118,
-      "community_name": "transfer_handler.go",
+      "community_name": "user_agency_handler.go",
       "file_type": "code",
-      "norm_label": "reclaimtransfer()",
-      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
-      "source_location": "L227"
-    },
-    {
-      "id": "handlers_transferinput",
-      "label": "TransferInput",
-      "_origin": "ast",
-      "community": 118,
-      "community_name": "transfer_handler.go",
-      "file_type": "code",
-      "norm_label": "transferinput",
-      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
-      "source_location": "L18"
+      "norm_label": "adduseragencyinput",
+      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
+      "source_location": "L33"
     },
     {
       "id": "claude_skills_graphify_references_add_watch",
@@ -9812,18 +9801,6 @@
       "node_kind": "heading",
       "norm_label": "graphify reference: extraction subagent prompt",
       "source_file": ".claude/skills/graphify/references/extraction-spec.md",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_cupos_log",
-      "label": "log.md",
-      "_origin": "ast",
-      "community": 126,
-      "community_name": "log.md",
-      "file_type": "document",
-      "node_kind": "page",
-      "norm_label": "log.md",
-      "source_file": "app-cupos/log.md",
       "source_location": "L1"
     },
     {
@@ -12225,6 +12202,17 @@
       "source_location": "L112"
     },
     {
+      "id": "backend_go_pkg_services_notification_service_notifyagencybycode",
+      "label": "NotifyAgencyByCode()",
+      "_origin": "ast",
+      "community": 24,
+      "community_name": "notification_service.go",
+      "file_type": "code",
+      "norm_label": "notifyagencybycode()",
+      "source_file": "backend-go/pkg/services/notification_service.go",
+      "source_location": "L174"
+    },
+    {
       "id": "backend_go_pkg_services_notification_service_notifybroadcast",
       "label": "NotifyBroadcast()",
       "_origin": "ast",
@@ -12522,26 +12510,59 @@
       "source_location": "L107"
     },
     {
-      "id": "backend_go_pkg_services_agency_helpers",
-      "label": "agency_helpers.go",
+      "id": "backend_go_pkg_handlers_transfer_handler",
+      "label": "transfer_handler.go",
       "_origin": "ast",
       "community": 25,
       "community_name": "ResolveAgencyCode",
       "file_type": "code",
-      "norm_label": "agency_helpers.go",
-      "source_file": "backend-go/pkg/services/agency_helpers.go",
+      "norm_label": "transfer_handler.go",
+      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
       "source_location": "L1"
     },
     {
-      "id": "backend_go_pkg_services_agency_helpers_resolveagencyaihabilitado",
-      "label": "ResolveAgencyAIHabilitado()",
+      "id": "backend_go_pkg_handlers_transfer_handler_createtransfer",
+      "label": "CreateTransfer()",
       "_origin": "ast",
       "community": 25,
       "community_name": "ResolveAgencyCode",
       "file_type": "code",
-      "norm_label": "resolveagencyaihabilitado()",
-      "source_file": "backend-go/pkg/services/agency_helpers.go",
-      "source_location": "L28"
+      "norm_label": "createtransfer()",
+      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
+      "source_location": "L31"
+    },
+    {
+      "id": "backend_go_pkg_handlers_transfer_handler_getusertransfers",
+      "label": "GetUserTransfers()",
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "ResolveAgencyCode",
+      "file_type": "code",
+      "norm_label": "getusertransfers()",
+      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
+      "source_location": "L205"
+    },
+    {
+      "id": "backend_go_pkg_handlers_transfer_handler_listtransfers",
+      "label": "ListTransfers()",
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "ResolveAgencyCode",
+      "file_type": "code",
+      "norm_label": "listtransfers()",
+      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
+      "source_location": "L190"
+    },
+    {
+      "id": "backend_go_pkg_handlers_transfer_handler_reclaimtransfer",
+      "label": "ReclaimTransfer()",
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "ResolveAgencyCode",
+      "file_type": "code",
+      "norm_label": "reclaimtransfer()",
+      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
+      "source_location": "L227"
     },
     {
       "id": "backend_go_pkg_services_agency_helpers_resolveagencycode",
@@ -12553,6 +12574,17 @@
       "norm_label": "resolveagencycode()",
       "source_file": "backend-go/pkg/services/agency_helpers.go",
       "source_location": "L12"
+    },
+    {
+      "id": "handlers_transferinput",
+      "label": "TransferInput",
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "ResolveAgencyCode",
+      "file_type": "code",
+      "norm_label": "transferinput",
+      "source_file": "backend-go/pkg/handlers/transfer_handler.go",
+      "source_location": "L18"
     },
     {
       "id": "frontend_src_components_useragenciesmodal",
@@ -13039,17 +13071,6 @@
       "source_location": "L110"
     },
     {
-      "id": "backend_go_pkg_handlers_order_handler_canreserveproduct",
-      "label": "canReserveProduct()",
-      "_origin": "ast",
-      "community": 28,
-      "community_name": "order_handler.go",
-      "file_type": "code",
-      "norm_label": "canreserveproduct()",
-      "source_file": "backend-go/pkg/handlers/order_handler.go",
-      "source_location": "L86"
-    },
-    {
       "id": "backend_go_pkg_handlers_order_handler_countpassengerseats",
       "label": "countPassengerSeats()",
       "_origin": "ast",
@@ -13059,17 +13080,6 @@
       "norm_label": "countpassengerseats()",
       "source_file": "backend-go/pkg/handlers/order_handler.go",
       "source_location": "L72"
-    },
-    {
-      "id": "backend_go_pkg_handlers_order_handler_createhold",
-      "label": "CreateHold()",
-      "_origin": "ast",
-      "community": 28,
-      "community_name": "order_handler.go",
-      "file_type": "code",
-      "norm_label": "createhold()",
-      "source_file": "backend-go/pkg/handlers/order_handler.go",
-      "source_location": "L126"
     },
     {
       "id": "backend_go_pkg_handlers_order_handler_deletepassenger",
@@ -13215,6 +13225,17 @@
       "source_location": "L1452"
     },
     {
+      "id": "backend_go_pkg_handlers_order_handler_updatepassengerticket",
+      "label": "UpdatePassengerTicket()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "updatepassengerticket()",
+      "source_file": "backend-go/pkg/handlers/order_handler.go",
+      "source_location": "L1366"
+    },
+    {
       "id": "backend_go_pkg_handlers_order_handler_updatereservation",
       "label": "UpdateReservation()",
       "_origin": "ast",
@@ -13226,6 +13247,83 @@
       "source_location": "L1023"
     },
     {
+      "id": "backend_go_pkg_handlers_system_handler_adminreleasehold",
+      "label": "AdminReleaseHold()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "adminreleasehold()",
+      "source_file": "backend-go/pkg/handlers/system_handler.go",
+      "source_location": "L267"
+    },
+    {
+      "id": "backend_go_pkg_handlers_ticket_handler_buildsegmentosjson",
+      "label": "buildSegmentosJSON()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "buildsegmentosjson()",
+      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
+      "source_location": "L25"
+    },
+    {
+      "id": "backend_go_pkg_handlers_ticket_handler_generatereservationlevelticket",
+      "label": "generateReservationLevelTicket()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "generatereservationlevelticket()",
+      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
+      "source_location": "L353"
+    },
+    {
+      "id": "backend_go_pkg_handlers_ticket_handler_generateticketsforreservationinternal",
+      "label": "GenerateTicketsForReservationInternal()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "generateticketsforreservationinternal()",
+      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
+      "source_location": "L405"
+    },
+    {
+      "id": "backend_go_pkg_handlers_ticket_handler_resolvevendedoremail",
+      "label": "resolveVendedorEmail()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "resolvevendedoremail()",
+      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
+      "source_location": "L222"
+    },
+    {
+      "id": "backend_go_pkg_handlers_ticket_handler_upsertticketforpassenger",
+      "label": "upsertTicketForPassenger()",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "upsertticketforpassenger()",
+      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
+      "source_location": "L242"
+    },
+    {
+      "id": "backend_go_pkg_models_models_go_models_reservation",
+      "label": "Reservation",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "reservation",
+      "source_file": "backend-go/pkg/models/models.go",
+      "source_location": "L205"
+    },
+    {
       "id": "backend_go_pkg_models_models_isvalidestadointerno",
       "label": "IsValidEstadoInterno()",
       "_origin": "ast",
@@ -13235,17 +13333,6 @@
       "norm_label": "isvalidestadointerno()",
       "source_file": "backend-go/pkg/models/models.go",
       "source_location": "L193"
-    },
-    {
-      "id": "backend_go_pkg_services_notification_service_notifyagencybycode",
-      "label": "NotifyAgencyByCode()",
-      "_origin": "ast",
-      "community": 28,
-      "community_name": "order_handler.go",
-      "file_type": "code",
-      "norm_label": "notifyagencybycode()",
-      "source_file": "backend-go/pkg/services/notification_service.go",
-      "source_location": "L174"
     },
     {
       "id": "handlers_passengerinput",
@@ -13268,6 +13355,17 @@
       "norm_label": "reservationinput",
       "source_file": "backend-go/pkg/handlers/order_handler.go",
       "source_location": "L40"
+    },
+    {
+      "id": "handlers_reservationwithvendor",
+      "label": "reservationWithVendor",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "order_handler.go",
+      "file_type": "code",
+      "norm_label": "reservationwithvendor",
+      "source_file": "backend-go/pkg/handlers/order_handler.go",
+      "source_location": "L723"
     },
     {
       "id": "backend_go_pkg_handlers_analytics_handler",
@@ -14295,7 +14393,7 @@
       "label": "ConvertOpportunityToProduct()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "convertopportunitytoproduct()",
       "source_file": "backend-go/pkg/handlers/opportunities_handler.go",
@@ -14306,7 +14404,7 @@
       "label": "product_handler.go",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "product_handler.go",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14317,7 +14415,7 @@
       "label": "applyCalculatedPrices()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "applycalculatedprices()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14328,7 +14426,7 @@
       "label": "ApproveProduct()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "approveproduct()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14339,7 +14437,7 @@
       "label": "BulkCreateProducts()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "bulkcreateproducts()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14350,7 +14448,7 @@
       "label": "BulkDuplicateProducts()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "bulkduplicateproducts()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14361,7 +14459,7 @@
       "label": "createdByFromContext()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "createdbyfromcontext()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14372,7 +14470,7 @@
       "label": "CreateProduct()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "createproduct()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14383,7 +14481,7 @@
       "label": "DeleteProduct()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "deleteproduct()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14394,7 +14492,7 @@
       "label": "fixDates()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "fixdates()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14405,7 +14503,7 @@
       "label": "fixNumbers()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "fixnumbers()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14416,7 +14514,7 @@
       "label": "formatDatePtr()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "formatdateptr()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14427,7 +14525,7 @@
       "label": "generateCodigoCupo()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "generatecodigocupo()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14438,7 +14536,7 @@
       "label": "letterPrefix()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "letterprefix()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14449,7 +14547,7 @@
       "label": "orGuion()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "orguion()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14460,7 +14558,7 @@
       "label": "prorratedRiskNeto1()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "prorratedriskneto1()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14471,7 +14569,7 @@
       "label": "recomputeDisponibilidad()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "recomputedisponibilidad()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14482,7 +14580,7 @@
       "label": "reconcilePricesForImport()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "reconcilepricesforimport()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14493,7 +14591,7 @@
       "label": "sameDatePtr()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "samedateptr()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
@@ -14504,11 +14602,44 @@
       "label": "UpdateProduct()",
       "_origin": "ast",
       "community": 33,
-      "community_name": "product_handler.go",
+      "community_name": "Product",
       "file_type": "code",
       "norm_label": "updateproduct()",
       "source_file": "backend-go/pkg/handlers/product_handler.go",
       "source_location": "L269"
+    },
+    {
+      "id": "backend_go_pkg_models_models_go_models_product",
+      "label": "Product",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "Product",
+      "file_type": "code",
+      "norm_label": "product",
+      "source_file": "backend-go/pkg/models/models.go",
+      "source_location": "L31"
+    },
+    {
+      "id": "models_product_netofortipo",
+      "label": ".NetoForTipo()",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "Product",
+      "file_type": "code",
+      "norm_label": ".netofortipo()",
+      "source_file": "backend-go/pkg/models/models.go",
+      "source_location": "L144"
+    },
+    {
+      "id": "models_product_opfortipo",
+      "label": ".OPForTipo()",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "Product",
+      "file_type": "code",
+      "norm_label": ".opfortipo()",
+      "source_file": "backend-go/pkg/models/models.go",
+      "source_location": "L156"
     },
     {
       "id": "backend_go_pkg_handlers_group_handler",
@@ -14641,28 +14772,6 @@
       "norm_label": "listgroups()",
       "source_file": "backend-go/pkg/handlers/group_handler.go",
       "source_location": "L76"
-    },
-    {
-      "id": "backend_go_pkg_handlers_group_handler_requestgroup",
-      "label": "RequestGroup()",
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "group_handler.go",
-      "file_type": "code",
-      "norm_label": "requestgroup()",
-      "source_file": "backend-go/pkg/handlers/group_handler.go",
-      "source_location": "L335"
-    },
-    {
-      "id": "backend_go_pkg_handlers_group_handler_requestgroupcancellation",
-      "label": "RequestGroupCancellation()",
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "group_handler.go",
-      "file_type": "code",
-      "norm_label": "requestgroupcancellation()",
-      "source_file": "backend-go/pkg/handlers/group_handler.go",
-      "source_location": "L467"
     },
     {
       "id": "backend_go_pkg_handlers_group_handler_resolvegroupcancellation",
@@ -15358,17 +15467,6 @@
       "source_location": "L244"
     },
     {
-      "id": "backend_go_pkg_handlers_order_handler_adjusthold",
-      "label": "AdjustHold()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "adjusthold()",
-      "source_file": "backend-go/pkg/handlers/order_handler.go",
-      "source_location": "L263"
-    },
-    {
       "id": "backend_go_pkg_services_email_service",
       "label": "email_service.go",
       "_origin": "ast",
@@ -15477,83 +15575,6 @@
       "norm_label": "sendrawemail()",
       "source_file": "backend-go/pkg/services/email_service.go",
       "source_location": "L155"
-    },
-    {
-      "id": "backend_go_pkg_services_email_service_sendtemplateemail",
-      "label": "SendTemplateEmail()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "sendtemplateemail()",
-      "source_file": "backend-go/pkg/services/email_service.go",
-      "source_location": "L166"
-    },
-    {
-      "id": "backend_go_pkg_services_email_service_sendtemplateemailtoagency",
-      "label": "SendTemplateEmailToAgency()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "sendtemplateemailtoagency()",
-      "source_file": "backend-go/pkg/services/email_service.go",
-      "source_location": "L188"
-    },
-    {
-      "id": "backend_go_pkg_services_settings_service",
-      "label": "settings_service.go",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "settings_service.go",
-      "source_file": "backend-go/pkg/services/settings_service.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "backend_go_pkg_services_settings_service_getintsetting",
-      "label": "GetIntSetting()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "getintsetting()",
-      "source_file": "backend-go/pkg/services/settings_service.go",
-      "source_location": "L46"
-    },
-    {
-      "id": "backend_go_pkg_services_settings_service_getintsettingforagency",
-      "label": "GetIntSettingForAgency()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "getintsettingforagency()",
-      "source_file": "backend-go/pkg/services/settings_service.go",
-      "source_location": "L62"
-    },
-    {
-      "id": "backend_go_pkg_services_settings_service_getsetting",
-      "label": "GetSetting()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "getsetting()",
-      "source_file": "backend-go/pkg/services/settings_service.go",
-      "source_location": "L19"
-    },
-    {
-      "id": "backend_go_pkg_services_settings_service_settingvaluetostring",
-      "label": "settingValueToString()",
-      "_origin": "ast",
-      "community": 41,
-      "community_name": "FindAgencyByCodeOrName",
-      "file_type": "code",
-      "norm_label": "settingvaluetostring()",
-      "source_file": "backend-go/pkg/services/settings_service.go",
-      "source_location": "L27"
     },
     {
       "id": "go_type_net_smtp_auth",
@@ -15820,6 +15841,28 @@
       "source_location": "L101"
     },
     {
+      "id": "backend_go_pkg_handlers_group_handler_requestgroup",
+      "label": "RequestGroup()",
+      "_origin": "ast",
+      "community": 43,
+      "community_name": "NotifyRoleByCode",
+      "file_type": "code",
+      "norm_label": "requestgroup()",
+      "source_file": "backend-go/pkg/handlers/group_handler.go",
+      "source_location": "L335"
+    },
+    {
+      "id": "backend_go_pkg_handlers_group_handler_requestgroupcancellation",
+      "label": "RequestGroupCancellation()",
+      "_origin": "ast",
+      "community": 43,
+      "community_name": "NotifyRoleByCode",
+      "file_type": "code",
+      "norm_label": "requestgroupcancellation()",
+      "source_file": "backend-go/pkg/handlers/group_handler.go",
+      "source_location": "L467"
+    },
+    {
       "id": "backend_go_pkg_handlers_order_handler_buildreservationemailvars",
       "label": "buildReservationEmailVars()",
       "_origin": "ast",
@@ -15873,6 +15916,28 @@
       "norm_label": "resolvereservationrecipientemail()",
       "source_file": "backend-go/pkg/services/email_service.go",
       "source_location": "L143"
+    },
+    {
+      "id": "backend_go_pkg_services_email_service_sendtemplateemail",
+      "label": "SendTemplateEmail()",
+      "_origin": "ast",
+      "community": 43,
+      "community_name": "NotifyRoleByCode",
+      "file_type": "code",
+      "norm_label": "sendtemplateemail()",
+      "source_file": "backend-go/pkg/services/email_service.go",
+      "source_location": "L166"
+    },
+    {
+      "id": "backend_go_pkg_services_email_service_sendtemplateemailtoagency",
+      "label": "SendTemplateEmailToAgency()",
+      "_origin": "ast",
+      "community": 43,
+      "community_name": "NotifyRoleByCode",
+      "file_type": "code",
+      "norm_label": "sendtemplateemailtoagency()",
+      "source_file": "backend-go/pkg/services/email_service.go",
+      "source_location": "L188"
     },
     {
       "id": "backend_go_pkg_services_notification_service_logfailure",
@@ -15950,28 +16015,6 @@
       "norm_label": "whitelabelcontext",
       "source_file": "frontend/src/contexts/WhiteLabelContext.jsx",
       "source_location": "L4"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_assignroletouser",
-      "label": "AssignRoleToUser()",
-      "_origin": "ast",
-      "community": 46,
-      "community_name": "user_handler.go",
-      "file_type": "code",
-      "norm_label": "assignroletouser()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L432"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_setuserrole",
-      "label": "setUserRole()",
-      "_origin": "ast",
-      "community": 46,
-      "community_name": "user_handler.go",
-      "file_type": "code",
-      "norm_label": "setuserrole()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L396"
     },
     {
       "id": "backend_go_pkg_handlers_user_handler",
@@ -16148,6 +16191,28 @@
       "norm_label": "withaiflag()",
       "source_file": "backend-go/pkg/handlers/user_handler.go",
       "source_location": "L45"
+    },
+    {
+      "id": "backend_go_pkg_services_agency_helpers",
+      "label": "agency_helpers.go",
+      "_origin": "ast",
+      "community": 46,
+      "community_name": "user_handler.go",
+      "file_type": "code",
+      "norm_label": "agency_helpers.go",
+      "source_file": "backend-go/pkg/services/agency_helpers.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "backend_go_pkg_services_agency_helpers_resolveagencyaihabilitado",
+      "label": "ResolveAgencyAIHabilitado()",
+      "_origin": "ast",
+      "community": 46,
+      "community_name": "user_handler.go",
+      "file_type": "code",
+      "norm_label": "resolveagencyaihabilitado()",
+      "source_file": "backend-go/pkg/services/agency_helpers.go",
+      "source_location": "L28"
     },
     {
       "id": "handlers_logininput",
@@ -16458,72 +16523,6 @@
       "source_location": "L1"
     },
     {
-      "id": "backend_go_pkg_handlers_agency_handler",
-      "label": "agency_handler.go",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "agency_handler.go",
-      "source_file": "backend-go/pkg/handlers/agency_handler.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "backend_go_pkg_handlers_agency_handler_createagency",
-      "label": "CreateAgency()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "createagency()",
-      "source_file": "backend-go/pkg/handlers/agency_handler.go",
-      "source_location": "L19"
-    },
-    {
-      "id": "backend_go_pkg_handlers_agency_handler_deleteagency",
-      "label": "DeleteAgency()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "deleteagency()",
-      "source_file": "backend-go/pkg/handlers/agency_handler.go",
-      "source_location": "L86"
-    },
-    {
-      "id": "backend_go_pkg_handlers_agency_handler_listagencies",
-      "label": "ListAgencies()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "listagencies()",
-      "source_file": "backend-go/pkg/handlers/agency_handler.go",
-      "source_location": "L13"
-    },
-    {
-      "id": "backend_go_pkg_handlers_agency_handler_togglemyagencyai",
-      "label": "ToggleMyAgencyAI()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "togglemyagencyai()",
-      "source_file": "backend-go/pkg/handlers/agency_handler.go",
-      "source_location": "L60"
-    },
-    {
-      "id": "backend_go_pkg_handlers_agency_handler_updateagency",
-      "label": "UpdateAgency()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "updateagency()",
-      "source_file": "backend-go/pkg/handlers/agency_handler.go",
-      "source_location": "L33"
-    },
-    {
       "id": "backend_go_pkg_handlers_export_handler",
       "label": "export_handler.go",
       "_origin": "ast",
@@ -16667,6 +16666,215 @@
       "source_location": "L51"
     },
     {
+      "id": "backend_go_pkg_handlers_rbac_handler",
+      "label": "rbac_handler.go",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "rbac_handler.go",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L1"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_assignpermissionstorole",
+      "label": "AssignPermissionsToRole()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "assignpermissionstorole()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L200"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_assignroletouser",
+      "label": "AssignRoleToUser()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "assignroletouser()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L432"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_callercanaccessrole",
+      "label": "callerCanAccessRole()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "callercanaccessrole()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L34"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_createpermission",
+      "label": "CreatePermission()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "createpermission()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L299"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_createrole",
+      "label": "CreateRole()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "createrole()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L81"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_deletepermission",
+      "label": "DeletePermission()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "deletepermission()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L339"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_deleterole",
+      "label": "DeleteRole()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "deleterole()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L138"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_getmypermissions",
+      "label": "GetMyPermissions()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "getmypermissions()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L360"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_getpermissionbyid",
+      "label": "GetPermissionById()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "getpermissionbyid()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L289"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_getrolebyid",
+      "label": "GetRoleById()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "getrolebyid()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L67"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_getrolepermissions",
+      "label": "GetRolePermissions()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "getrolepermissions()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L181"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_getroleusers",
+      "label": "GetRoleUsers()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "getroleusers()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L163"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_listpermissions",
+      "label": "ListPermissions()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "listpermissions()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L283"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_listroles",
+      "label": "ListRoles()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "listroles()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L51"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_resolvecalleragencyid",
+      "label": "resolveCallerAgencyID()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "resolvecalleragencyid()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L19"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_setuserrole",
+      "label": "setUserRole()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "setuserrole()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L396"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_updatepermission",
+      "label": "UpdatePermission()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "updatepermission()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L313"
+    },
+    {
+      "id": "backend_go_pkg_handlers_rbac_handler_updaterole",
+      "label": "UpdateRole()",
+      "_origin": "ast",
+      "community": 5,
+      "community_name": "github.com/gin-gonic/gin.Context",
+      "file_type": "code",
+      "norm_label": "updaterole()",
+      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "source_location": "L111"
+    },
+    {
       "id": "backend_go_pkg_handlers_report_handler_getstats",
       "label": "GetStats()",
       "_origin": "ast",
@@ -16744,50 +16952,6 @@
       "source_location": "L44"
     },
     {
-      "id": "backend_go_pkg_handlers_user_agency_handler",
-      "label": "user_agency_handler.go",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "user_agency_handler.go",
-      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
-      "source_location": "L1"
-    },
-    {
-      "id": "backend_go_pkg_handlers_user_agency_handler_adduseragency",
-      "label": "AddUserAgency()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "adduseragency()",
-      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
-      "source_location": "L41"
-    },
-    {
-      "id": "backend_go_pkg_handlers_user_agency_handler_listuseragencies",
-      "label": "ListUserAgencies()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "listuseragencies()",
-      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
-      "source_location": "L17"
-    },
-    {
-      "id": "backend_go_pkg_handlers_user_agency_handler_removeuseragency",
-      "label": "RemoveUserAgency()",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "removeuseragency()",
-      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
-      "source_location": "L87"
-    },
-    {
       "id": "go_type_github_com_gin_gonic_gin_context",
       "label": "github.com/gin-gonic/gin.Context",
       "_origin": "ast",
@@ -16799,202 +16963,92 @@
       "source_location": ""
     },
     {
-      "id": "handlers_adduseragencyinput",
-      "label": "addUserAgencyInput",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "github.com/gin-gonic/gin.Context",
-      "file_type": "code",
-      "norm_label": "adduseragencyinput",
-      "source_file": "backend-go/pkg/handlers/user_agency_handler.go",
-      "source_location": "L33"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler",
-      "label": "rbac_handler.go",
+      "id": "backend_go_pkg_handlers_order_handler_adjusthold",
+      "label": "AdjustHold()",
       "_origin": "ast",
       "community": 51,
-      "community_name": "rbac_handler.go",
+      "community_name": "GetIntSettingForAgency",
       "file_type": "code",
-      "norm_label": "rbac_handler.go",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "norm_label": "adjusthold()",
+      "source_file": "backend-go/pkg/handlers/order_handler.go",
+      "source_location": "L263"
+    },
+    {
+      "id": "backend_go_pkg_handlers_order_handler_canreserveproduct",
+      "label": "canReserveProduct()",
+      "_origin": "ast",
+      "community": 51,
+      "community_name": "GetIntSettingForAgency",
+      "file_type": "code",
+      "norm_label": "canreserveproduct()",
+      "source_file": "backend-go/pkg/handlers/order_handler.go",
+      "source_location": "L86"
+    },
+    {
+      "id": "backend_go_pkg_handlers_order_handler_createhold",
+      "label": "CreateHold()",
+      "_origin": "ast",
+      "community": 51,
+      "community_name": "GetIntSettingForAgency",
+      "file_type": "code",
+      "norm_label": "createhold()",
+      "source_file": "backend-go/pkg/handlers/order_handler.go",
+      "source_location": "L126"
+    },
+    {
+      "id": "backend_go_pkg_services_settings_service",
+      "label": "settings_service.go",
+      "_origin": "ast",
+      "community": 51,
+      "community_name": "GetIntSettingForAgency",
+      "file_type": "code",
+      "norm_label": "settings_service.go",
+      "source_file": "backend-go/pkg/services/settings_service.go",
       "source_location": "L1"
     },
     {
-      "id": "backend_go_pkg_handlers_rbac_handler_assignpermissionstorole",
-      "label": "AssignPermissionsToRole()",
+      "id": "backend_go_pkg_services_settings_service_getintsetting",
+      "label": "GetIntSetting()",
       "_origin": "ast",
       "community": 51,
-      "community_name": "rbac_handler.go",
+      "community_name": "GetIntSettingForAgency",
       "file_type": "code",
-      "norm_label": "assignpermissionstorole()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L200"
+      "norm_label": "getintsetting()",
+      "source_file": "backend-go/pkg/services/settings_service.go",
+      "source_location": "L46"
     },
     {
-      "id": "backend_go_pkg_handlers_rbac_handler_callercanaccessrole",
-      "label": "callerCanAccessRole()",
+      "id": "backend_go_pkg_services_settings_service_getintsettingforagency",
+      "label": "GetIntSettingForAgency()",
       "_origin": "ast",
       "community": 51,
-      "community_name": "rbac_handler.go",
+      "community_name": "GetIntSettingForAgency",
       "file_type": "code",
-      "norm_label": "callercanaccessrole()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L34"
+      "norm_label": "getintsettingforagency()",
+      "source_file": "backend-go/pkg/services/settings_service.go",
+      "source_location": "L62"
     },
     {
-      "id": "backend_go_pkg_handlers_rbac_handler_createpermission",
-      "label": "CreatePermission()",
+      "id": "backend_go_pkg_services_settings_service_getsetting",
+      "label": "GetSetting()",
       "_origin": "ast",
       "community": 51,
-      "community_name": "rbac_handler.go",
+      "community_name": "GetIntSettingForAgency",
       "file_type": "code",
-      "norm_label": "createpermission()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L299"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_createrole",
-      "label": "CreateRole()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "createrole()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L81"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_deletepermission",
-      "label": "DeletePermission()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "deletepermission()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L339"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_deleterole",
-      "label": "DeleteRole()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "deleterole()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L138"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_getmypermissions",
-      "label": "GetMyPermissions()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "getmypermissions()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L360"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_getpermissionbyid",
-      "label": "GetPermissionById()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "getpermissionbyid()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L289"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_getrolebyid",
-      "label": "GetRoleById()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "getrolebyid()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L67"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_getrolepermissions",
-      "label": "GetRolePermissions()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "getrolepermissions()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L181"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_getroleusers",
-      "label": "GetRoleUsers()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "getroleusers()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L163"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_listpermissions",
-      "label": "ListPermissions()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "listpermissions()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L283"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_listroles",
-      "label": "ListRoles()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "listroles()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L51"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_resolvecalleragencyid",
-      "label": "resolveCallerAgencyID()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "resolvecalleragencyid()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
+      "norm_label": "getsetting()",
+      "source_file": "backend-go/pkg/services/settings_service.go",
       "source_location": "L19"
     },
     {
-      "id": "backend_go_pkg_handlers_rbac_handler_updatepermission",
-      "label": "UpdatePermission()",
+      "id": "backend_go_pkg_services_settings_service_settingvaluetostring",
+      "label": "settingValueToString()",
       "_origin": "ast",
       "community": 51,
-      "community_name": "rbac_handler.go",
+      "community_name": "GetIntSettingForAgency",
       "file_type": "code",
-      "norm_label": "updatepermission()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L313"
-    },
-    {
-      "id": "backend_go_pkg_handlers_rbac_handler_updaterole",
-      "label": "UpdateRole()",
-      "_origin": "ast",
-      "community": 51,
-      "community_name": "rbac_handler.go",
-      "file_type": "code",
-      "norm_label": "updaterole()",
-      "source_file": "backend-go/pkg/handlers/rbac_handler.go",
-      "source_location": "L111"
+      "norm_label": "settingvaluetostring()",
+      "source_file": "backend-go/pkg/services/settings_service.go",
+      "source_location": "L27"
     },
     {
       "id": "frontend_src_components_itinerarytable",
@@ -17202,17 +17256,6 @@
       "norm_label": "system_handler.go",
       "source_file": "backend-go/pkg/handlers/system_handler.go",
       "source_location": "L1"
-    },
-    {
-      "id": "backend_go_pkg_handlers_system_handler_adminreleasehold",
-      "label": "AdminReleaseHold()",
-      "_origin": "ast",
-      "community": 54,
-      "community_name": "system_handler.go",
-      "file_type": "code",
-      "norm_label": "adminreleasehold()",
-      "source_file": "backend-go/pkg/handlers/system_handler.go",
-      "source_location": "L267"
     },
     {
       "id": "backend_go_pkg_handlers_system_handler_buildholddetails",
@@ -17629,125 +17672,70 @@
       "source_location": "L96"
     },
     {
-      "id": "backend_go_pkg_handlers_order_handler_updatepassengerticket",
-      "label": "UpdatePassengerTicket()",
+      "id": "backend_go_pkg_handlers_agency_handler",
+      "label": "agency_handler.go",
       "_origin": "ast",
       "community": 61,
-      "community_name": "Product",
+      "community_name": "agency_handler.go",
       "file_type": "code",
-      "norm_label": "updatepassengerticket()",
-      "source_file": "backend-go/pkg/handlers/order_handler.go",
-      "source_location": "L1366"
+      "norm_label": "agency_handler.go",
+      "source_file": "backend-go/pkg/handlers/agency_handler.go",
+      "source_location": "L1"
     },
     {
-      "id": "backend_go_pkg_handlers_ticket_handler_buildsegmentosjson",
-      "label": "buildSegmentosJSON()",
+      "id": "backend_go_pkg_handlers_agency_handler_createagency",
+      "label": "CreateAgency()",
       "_origin": "ast",
       "community": 61,
-      "community_name": "Product",
+      "community_name": "agency_handler.go",
       "file_type": "code",
-      "norm_label": "buildsegmentosjson()",
-      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
-      "source_location": "L25"
+      "norm_label": "createagency()",
+      "source_file": "backend-go/pkg/handlers/agency_handler.go",
+      "source_location": "L19"
     },
     {
-      "id": "backend_go_pkg_handlers_ticket_handler_generatereservationlevelticket",
-      "label": "generateReservationLevelTicket()",
+      "id": "backend_go_pkg_handlers_agency_handler_deleteagency",
+      "label": "DeleteAgency()",
       "_origin": "ast",
       "community": 61,
-      "community_name": "Product",
+      "community_name": "agency_handler.go",
       "file_type": "code",
-      "norm_label": "generatereservationlevelticket()",
-      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
-      "source_location": "L353"
+      "norm_label": "deleteagency()",
+      "source_file": "backend-go/pkg/handlers/agency_handler.go",
+      "source_location": "L86"
     },
     {
-      "id": "backend_go_pkg_handlers_ticket_handler_generateticketsforreservationinternal",
-      "label": "GenerateTicketsForReservationInternal()",
+      "id": "backend_go_pkg_handlers_agency_handler_listagencies",
+      "label": "ListAgencies()",
       "_origin": "ast",
       "community": 61,
-      "community_name": "Product",
+      "community_name": "agency_handler.go",
       "file_type": "code",
-      "norm_label": "generateticketsforreservationinternal()",
-      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
-      "source_location": "L405"
+      "norm_label": "listagencies()",
+      "source_file": "backend-go/pkg/handlers/agency_handler.go",
+      "source_location": "L13"
     },
     {
-      "id": "backend_go_pkg_handlers_ticket_handler_resolvevendedoremail",
-      "label": "resolveVendedorEmail()",
+      "id": "backend_go_pkg_handlers_agency_handler_togglemyagencyai",
+      "label": "ToggleMyAgencyAI()",
       "_origin": "ast",
       "community": 61,
-      "community_name": "Product",
+      "community_name": "agency_handler.go",
       "file_type": "code",
-      "norm_label": "resolvevendedoremail()",
-      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
-      "source_location": "L222"
+      "norm_label": "togglemyagencyai()",
+      "source_file": "backend-go/pkg/handlers/agency_handler.go",
+      "source_location": "L60"
     },
     {
-      "id": "backend_go_pkg_handlers_ticket_handler_upsertticketforpassenger",
-      "label": "upsertTicketForPassenger()",
+      "id": "backend_go_pkg_handlers_agency_handler_updateagency",
+      "label": "UpdateAgency()",
       "_origin": "ast",
       "community": 61,
-      "community_name": "Product",
+      "community_name": "agency_handler.go",
       "file_type": "code",
-      "norm_label": "upsertticketforpassenger()",
-      "source_file": "backend-go/pkg/handlers/ticket_handler.go",
-      "source_location": "L242"
-    },
-    {
-      "id": "backend_go_pkg_models_models_go_models_product",
-      "label": "Product",
-      "_origin": "ast",
-      "community": 61,
-      "community_name": "Product",
-      "file_type": "code",
-      "norm_label": "product",
-      "source_file": "backend-go/pkg/models/models.go",
-      "source_location": "L31"
-    },
-    {
-      "id": "backend_go_pkg_models_models_go_models_reservation",
-      "label": "Reservation",
-      "_origin": "ast",
-      "community": 61,
-      "community_name": "Product",
-      "file_type": "code",
-      "norm_label": "reservation",
-      "source_file": "backend-go/pkg/models/models.go",
-      "source_location": "L205"
-    },
-    {
-      "id": "handlers_reservationwithvendor",
-      "label": "reservationWithVendor",
-      "_origin": "ast",
-      "community": 61,
-      "community_name": "Product",
-      "file_type": "code",
-      "norm_label": "reservationwithvendor",
-      "source_file": "backend-go/pkg/handlers/order_handler.go",
-      "source_location": "L723"
-    },
-    {
-      "id": "models_product_netofortipo",
-      "label": ".NetoForTipo()",
-      "_origin": "ast",
-      "community": 61,
-      "community_name": "Product",
-      "file_type": "code",
-      "norm_label": ".netofortipo()",
-      "source_file": "backend-go/pkg/models/models.go",
-      "source_location": "L144"
-    },
-    {
-      "id": "models_product_opfortipo",
-      "label": ".OPForTipo()",
-      "_origin": "ast",
-      "community": 61,
-      "community_name": "Product",
-      "file_type": "code",
-      "norm_label": ".opfortipo()",
-      "source_file": "backend-go/pkg/models/models.go",
-      "source_location": "L156"
+      "norm_label": "updateagency()",
+      "source_file": "backend-go/pkg/handlers/agency_handler.go",
+      "source_location": "L33"
     },
     {
       "id": "backend_go_pkg_handlers_settings_handler",
@@ -71468,5 +71456,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "fe43fcad3db3738ed80535b6eaf98525b9b1fe87"
+  "built_at_commit": "11f187117f3959fb6a3f16b4d96f14788aeeccec"
 }

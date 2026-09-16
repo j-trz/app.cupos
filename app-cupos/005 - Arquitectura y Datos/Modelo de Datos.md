@@ -138,7 +138,7 @@ Todas siguen el mismo patrón: `AgencyID *uuid.UUID` nulo = config **global/defa
 
 ## 7. Asistente IA
 
-- **`AIProvider`**: proveedores LLM configurados (OpenAI/Anthropic/Google), con `IsDefault` para elegir cuál usa el chat si no se especifica.
+- **`AIProvider`**: proveedores LLM configurados (OpenAI/Anthropic/Google), con `IsDefault` para elegir cuál usa el chat si no se especifica. **Scopeado por `Agencia` desde 2026-09-15** (bug: antes era 100% global — cualquier agencia con `AI_UPDATE` podía ver/editar/borrar/probar el proveedor de cualquier otra, y el chat de todo el sistema compartía un único proveedor "default" global). Filas previas a la migración quedan con `Agencia=""` (legacy, sin asignar) — solo admin las ve/gestiona hasta reasignarlas a mano desde AIConfig.jsx. `IsDefault` ahora se resuelve **por agencia** (unset al crear/editar solo alcanza a la misma agencia), y `Chat()` resuelve el proveedor (explícito por `ProviderID` o el default) siempre scopeado a la agencia del caller — sin fallback cruzado a otra agencia.
 - **`AISession`** / **`AIMessage`**: historial de conversación por usuario. `AIMessage.ToolCalls`/`TokenUsage` son JSON crudo (`datatypes.JSON`).
 - **`AIExpert`**: base de conocimiento con nombre y `Persona` (tono opcional agregado al system prompt), **scopeada por `Agencia`** igual que `Product`/`Reservation`.
 - **`AIExpertDocument`**: el archivo original **nunca se persiste** (no hay filesystem persistente en runtime serverless) — se convierte a Markdown en memoria al subirlo y solo se guarda `ContentMarkdown`. Editable a mano desde el panel (para corregir errores de OCR sin resubir).
