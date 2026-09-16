@@ -179,6 +179,28 @@ func SendTemplateEmail(agencyCode, templateCode, recipientEmail string, data map
 	return sendMail(cfg, recipientEmail, subject, body)
 }
 
+// SendTemplateEmailToAgency manda el mismo email a todos los usuarios activos
+// de una agencia — a diferencia de SendTemplateEmail (un solo destinatario
+// puntual, ej. quien creó una reserva), para avisos que son "de toda la
+// agencia" (ej. "new_product": un cupo nuevo lo puede vender cualquier
+// vendedor de esa agencia). Falla en silencio por destinatario (best-effort,
+// logueado) para que un email roto no frene el resto de la agencia.
+func SendTemplateEmailToAgency(agencyCode, templateCode string, data map[string]string) {
+	if agencyCode == "" {
+		return
+	}
+	var profiles []models.Profile
+	database.DB.Where("LOWER(agencia) = LOWER(?) AND is_active = true", agencyCode).Find(&profiles)
+	for _, p := range profiles {
+		if p.Email == "" {
+			continue
+		}
+		if err := SendTemplateEmail(agencyCode, templateCode, p.Email, data); err != nil {
+			LogFailure("email", fmt.Sprintf("No se pudo enviar el aviso %q a %s", templateCode, p.Email), err.Error())
+		}
+	}
+}
+
 func sendMail(cfg *resolvedSMTPConfig, to, subject, body string) error {
 	from := cfg.EmailFrom
 	if from == "" {

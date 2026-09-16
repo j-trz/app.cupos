@@ -8,7 +8,11 @@ import { useEffect, useRef, useState } from 'react';
 // la única pista de que hay más columnas swipeando a la derecha — sin esto,
 // una tabla ancha se ve simplemente "cortada" sin indicar que se puede
 // deslizar.
-const Table = ({ className, ...props }) => {
+// containerClassName va al div que efectivamente scrollea (className solo
+// llega al <table>) — para casos como una tabla muy larga que necesita un
+// alto acotado con scroll propio (y headers sticky relativos a ESE
+// contenedor, no a uno nuevo anidado que competiría por el mismo eje).
+const Table = ({ className, containerClassName, ...props }) => {
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
   const [showLeftShadow, setShowLeftShadow] = useState(false);
@@ -43,12 +47,12 @@ const Table = ({ className, ...props }) => {
   return (
     <div className="relative w-full">
       {showLeftShadow && (
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-white to-transparent" />
       )}
       {showRightShadow && (
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-white to-transparent" />
       )}
-      <div ref={scrollRef} onScroll={updateShadows} className="w-full overflow-auto">
+      <div ref={scrollRef} onScroll={updateShadows} className={clsx('w-full overflow-auto', containerClassName)}>
         <table
           ref={tableRef}
           className={clsx(

@@ -149,7 +149,7 @@ export default function AIChatPage() {
         <div className="flex-1 overflow-y-auto p-3 space-y-6">
                         {/* Agentes de IA */}
                         <div>
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 dark:text-zinc-500 px-2 mb-2">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 px-2 mb-2">
                                 Agentes de IA
                             </p>
                             <div className="space-y-1">
@@ -161,18 +161,18 @@ export default function AIChatPage() {
                                     }}
                                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${
                                         selectedExpertId === null
-                                            ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-xs'
-                                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400'
+                                            ? 'bg-zinc-100 text-zinc-900 font-semibold shadow-xs'
+                                            : 'hover:bg-zinc-50 text-zinc-600'
                                     }`}
                                 >
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                        selectedExpertId === null ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                                        selectedExpertId === null ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500'
                                     }`}>
                                         <Bot className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-xs truncate">Asistente general</p>
-                                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate">Soporte y reservas</p>
+                                        <p className="text-[10px] text-zinc-400 truncate">Soporte y reservas</p>
                                     </div>
                                 </button>
 
@@ -188,18 +188,18 @@ export default function AIChatPage() {
                                             }}
                                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${
                                                 isActive
-                                                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-xs'
-                                                    : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400'
+                                                    ? 'bg-zinc-100 text-zinc-900 font-semibold shadow-xs'
+                                                    : 'hover:bg-zinc-50 text-zinc-600'
                                             }`}
                                         >
                                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 uppercase text-xs font-bold ${
-                                                isActive ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                                                isActive ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-500'
                                             }`}>
                                                 {exp.name.slice(0, 2)}
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-xs truncate">{exp.name}</p>
-                                                <p className="text-[10px] text-zinc-400 dark:text-zinc-550 truncate">{exp.description || 'Experto de conocimiento'}</p>
+                                                <p className="text-[10px] text-zinc-400 truncate">{exp.description || 'Experto de conocimiento'}</p>
                                             </div>
                                         </button>
                                     );
@@ -208,7 +208,7 @@ export default function AIChatPage() {
                         </div>
 
                         {/* Conversaciones del usuario */}
-                        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4">
+                        <div className="border-t border-zinc-100 pt-4">
                             <AIChatSessionsSidebar
                                 sessions={sessions}
                                 currentSessionId={currentSessionId}
@@ -223,13 +223,13 @@ export default function AIChatPage() {
     );
 
     return (
-        <div className="h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
+        <div className="h-screen flex flex-col bg-zinc-50">
             <AIChatTopbar onOpenSessions={() => setMobileSessionsOpen(true)} />
 
             <div className="flex-1 flex flex-row overflow-hidden">
                 {/* Barra lateral estilo ChatGPT (Agentes + Conversaciones) —
                     oculta por debajo de md, se accede desde el botón del topbar */}
-                <aside className="hidden md:flex w-[290px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex-col justify-between overflow-hidden">
+                <aside className="hidden md:flex w-[290px] shrink-0 border-r border-zinc-200 bg-white flex-col justify-between overflow-hidden">
                     {sessionsSidebarContent}
                 </aside>
 
@@ -246,15 +246,15 @@ export default function AIChatPage() {
                 {/* Área de chat */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Header del Agente Activo */}
-                    <div className="flex items-center justify-between px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+                    <div className="flex items-center justify-between px-6 py-3 border-b border-zinc-200 bg-white shrink-0">
                         <div className="flex items-center gap-2">
                             <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-                            <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-                                Agente activo: <span className="font-bold text-zinc-900 dark:text-white">{activeExpert ? activeExpert.name : 'Asistente general'}</span>
+                            <p className="text-xs font-semibold text-zinc-700">
+                                Agente activo: <span className="font-bold text-zinc-900">{activeExpert ? activeExpert.name : 'Asistente general'}</span>
                             </p>
                         </div>
                         {activeExpert && (
-                            <p className="hidden md:block text-[11px] text-zinc-400 dark:text-zinc-500 truncate max-w-sm">
+                            <p className="hidden md:block text-[11px] text-zinc-400 truncate max-w-sm">
                                 {activeExpert.description}
                             </p>
                         )}
@@ -264,7 +264,7 @@ export default function AIChatPage() {
                         {isChatEmpty ? (
                             <div className="flex flex-col items-center justify-center text-center py-12 px-4 max-w-2xl mx-auto space-y-6">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md ${
-                                    activeExpert ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                                    activeExpert ? 'bg-indigo-100 text-indigo-700' : 'bg-zinc-900 text-white'
                                 }`}>
                                     {activeExpert ? (
                                         <Sparkles className="w-7 h-7" />
@@ -273,10 +273,10 @@ export default function AIChatPage() {
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <h2 className="text-2xl font-extrabold text-zinc-900 dark:text-white">
+                                    <h2 className="text-2xl font-extrabold text-zinc-900">
                                         {activeExpert ? `Chatea con ${activeExpert.name}` : 'Asistente de IA'}
                                     </h2>
-                                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                    <p className="text-sm text-zinc-500">
                                         {activeExpert 
                                             ? (activeExpert.description || 'Agente de IA especializado con base de conocimiento propia.') 
                                             : 'Tu copiloto inteligente para buscar cupos, crear reservas, procesar DNI/pasaportes y resolver tus dudas del sistema.'
@@ -285,7 +285,7 @@ export default function AIChatPage() {
                                 </div>
 
                                 <div className="w-full pt-4">
-                                    <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3 text-left">
+                                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 text-left">
                                         Preguntas sugeridas
                                     </p>
                                     <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 text-left">
@@ -293,12 +293,12 @@ export default function AIChatPage() {
                                             <button
                                                 key={idx}
                                                 onClick={() => handleSendMessage(sug.text)}
-                                                className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left transition-all hover:scale-[1.01] active:scale-95 group shadow-2xs cursor-pointer"
+                                                className="p-3.5 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-left transition-all hover:scale-[1.01] active:scale-95 group shadow-2xs cursor-pointer"
                                             >
-                                                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                                <p className="text-xs font-bold text-zinc-800 group-hover:text-indigo-600 transition-colors">
                                                     {sug.title}
                                                 </p>
-                                                <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 leading-tight">
+                                                <p className="text-[11px] text-zinc-400 mt-1 leading-tight">
                                                     {sug.desc}
                                                 </p>
                                             </button>
@@ -310,7 +310,7 @@ export default function AIChatPage() {
                             <div className="max-w-3xl mx-auto space-y-4">
                                 {isLoading && messages.length === 0 ? (
                                     <div className="flex items-center justify-center h-full min-h-[300px]">
-                                        <div className="w-10 h-10 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 border-t-zinc-900 dark:border-t-zinc-100 animate-spin"></div>
+                                        <div className="w-10 h-10 rounded-xl border-2 border-zinc-200 border-t-zinc-900 animate-spin"></div>
                                     </div>
                                 ) : (
                                     <>
@@ -329,21 +329,21 @@ export default function AIChatPage() {
 
                                         {isTyping && (
                                             <div className="flex gap-3">
-                                                <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center flex-shrink-0 shadow-sm">
-                                                    <Bot className="w-4 h-4 text-white dark:text-zinc-900" />
+                                                <div className="w-8 h-8 rounded-xl bg-zinc-900 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                    <Bot className="w-4 h-4 text-white" />
                                                 </div>
-                                                <div className="bg-zinc-100 dark:bg-zinc-850 rounded-xl rounded-tl-none px-4 py-3 border border-zinc-200 dark:border-zinc-700">
+                                                <div className="bg-zinc-100 rounded-xl rounded-tl-none px-4 py-3 border border-zinc-200">
                                                     <div className="flex gap-1.5">
-                                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                                        <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                                                     </div>
                                                 </div>
                                             </div>
                                         )}
 
                                         {error && (
-                                            <div className="text-center text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-lg border border-red-200 dark:border-red-800">
+                                            <div className="text-center text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">
                                                 {error}
                                             </div>
                                         )}

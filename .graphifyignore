@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+
+# Build output
+dist/
+build/
+frontend/dist/
+
+# Obsidian vault local app state (workspace layout, plugin cache — not content)
+app-cupos/.obsidian/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Graphify's own output (avoid graphing itself)
+graphify-out/

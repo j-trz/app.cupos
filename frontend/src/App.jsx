@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DEFAULT_DOCS_SECTION } from './lib/docsSections.js';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { HeaderProvider } from './contexts/HeaderContext';
 import { AIPageProvider } from './contexts/AIPageContext';
@@ -14,8 +13,11 @@ import Dashboard from './pages/Dashboard';
 import GestionUsuarios from './pages/GestionUsuarios';
 import GestionProductos from './pages/GestionProductos';
 import GestionGrupos from './pages/GestionGrupos';
+import GestionOportunidades from './pages/GestionOportunidades';
 import GestionReservas from './pages/GestionReservas';
 import GestionAgencias from './pages/GestionAgencias';
+import GestionTemporadas from './pages/GestionTemporadas';
+import Administracion from './pages/Administracion';
 import GestionTemas from './pages/GestionTemas';
 import GestionRoles from './pages/GestionRoles';
 import GestionPermisos from './pages/GestionPermisos';
@@ -36,6 +38,7 @@ import Reportes from './pages/Reportes';
 import LogsDelSitio from './pages/LogsDelSitio';
 import GestionNominas from './pages/GestionNominas';
 import Documentacion from './pages/Documentacion';
+import BandejaTickets from './pages/BandejaTickets';
 import TestPage from './pages/TestPage';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -45,8 +48,7 @@ import './i18n/i18n';
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <I18nProvider>
+      <I18nProvider>
           <SidebarProvider>
             <HeaderProvider>
               <AIPageProvider>
@@ -105,6 +107,16 @@ function App() {
                       }
                     />
                     <Route
+                      path="/oportunidades"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <GestionOportunidades />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
                       path="/reservas"
                       element={
                         <ProtectedRoute>
@@ -130,6 +142,26 @@ function App() {
                         <ProtectedRoute>
                           <Layout>
                             <GestionAgencias />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/temporadas"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <GestionTemporadas />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/administracion"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <Administracion />
                           </Layout>
                         </ProtectedRoute>
                       }
@@ -328,6 +360,16 @@ function App() {
                         </ProtectedRoute>
                       }
                     />
+                    <Route
+                      path="/tickets"
+                      element={
+                        <ProtectedRoute>
+                          <Layout>
+                            <BandejaTickets />
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
                     {/* Ruta para pruebas sin protección */}
                     <Route
                       path="/test-public"
@@ -355,8 +397,7 @@ function App() {
               </AIPageProvider>
             </HeaderProvider>
           </SidebarProvider>
-        </I18nProvider>
-      </ThemeProvider>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

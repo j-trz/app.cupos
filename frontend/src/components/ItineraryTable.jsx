@@ -1,9 +1,16 @@
 import { useMemo } from 'react';
 import Swal from 'sweetalert2';
 import { useWhiteLabel } from '../contexts/WhiteLabelContext';
+import { airlineNames as EXTRA_AIRLINE_NAMES } from '../lib/data/airlineNames.js';
+import { airportCodes as EXTRA_AIRPORT_CODES } from '../lib/data/airportCodes.js';
 
 // ─── Diccionarios ─────────────────────────────────────────────────────────────
-export const AIRLINES = {
+// CURATED_* son los nombres/aeropuertos ya revisados a mano para esta agencia
+// (español, formato consistente) — tienen prioridad. EXTRA_* (lib/data/) son
+// diccionarios grandes (~400 aerolíneas, ~1900 aeropuertos) para que un código
+// que no está en la lista curada no quede sin resolver, en vez de mostrarse
+// crudo. AIRLINES/AIRPORTS exportados abajo son la fusión de ambos.
+const CURATED_AIRLINES = {
   'A3': 'Aegean Airlines', 'AA': 'American Airlines', 'AC': 'Air Canada',
   'AD': 'Azul Linhas Aéreas', 'AI': 'Air India', 'AM': 'Aeroméxico',
   'AF': 'Air France', 'AR': 'Aerolíneas Argentinas', 'AS': 'Alaska Airlines',
@@ -25,6 +32,8 @@ export const AIRLINES = {
   'TP': 'TAP Air Portugal', 'U2': 'easyJet', 'UA': 'United Airlines',
   'UX': 'Air Europa', 'W6': 'Wizz Air', 'P5': 'Wingo', 'VY': 'Vueling',
 };
+
+export const AIRLINES = { ...EXTRA_AIRLINE_NAMES, ...CURATED_AIRLINES };
 
 export const AIRLINE_LOGOS = {
   'AA': 'https://resources.netviax.com/images/airlines/AA.png',
@@ -54,7 +63,7 @@ export const AIRLINE_LOGOS = {
   'UX': 'https://resources.netviax.com/images/airlines/UX.png',
 };
 
-export const AIRPORTS = {
+const CURATED_AIRPORTS = {
   'EZE': 'Buenos Aires, Ezeiza',
   'AEP': 'Buenos Aires, Aeroparque',
   'MVD': 'Montevideo, Carrasco',
@@ -84,12 +93,15 @@ export const AIRPORTS = {
 
 };
 
+export const AIRPORTS = { ...EXTRA_AIRPORT_CODES, ...CURATED_AIRPORTS };
+
 // Zona horaria IANA por aeropuerto — necesaria para calcular la duración real
 // de un vuelo (la hora de llegada es hora LOCAL de la ciudad de destino, no
 // tiempo transcurrido; sin la zona horaria de origen/destino no se puede
 // calcular la duración real, solo la diferencia entre relojes de pared).
-// Solo cubre los aeropuertos de AIRPORTS de arriba — si falta alguno, la
-// duración se muestra como "N/A" en vez de arriesgar un cálculo incorrecto.
+// Solo cubre los aeropuertos de mayor tráfico para esta agencia (no los ~1900
+// de AIRPORTS) — si falta alguno, la duración se muestra como "N/A" en vez de
+// arriesgar un cálculo incorrecto.
 export const AIRPORT_TIMEZONES = {
   EZE: 'America/Argentina/Buenos_Aires',
   AEP: 'America/Argentina/Buenos_Aires',

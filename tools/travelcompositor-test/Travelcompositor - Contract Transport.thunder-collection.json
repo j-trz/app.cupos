@@ -1,0 +1,150 @@
+{
+  "client": "Thunder Client",
+  "collectionName": "Travelcompositor - Prueba Contract API (Transport)",
+  "dateExported": "2026-09-16T00:00:00.000Z",
+  "version": "1.2",
+  "folders": [],
+  "requests": [
+    {
+      "_id": "tc-req-1-authenticate",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "1 - Authenticate",
+      "url": "{{baseUrl}}/authentication/authenticate",
+      "method": "POST",
+      "sortNum": 10000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept-Encoding", "value": "gzip" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"micrositeId\": \"{{micrositeId}}\"\n}"
+      },
+      "tests": []
+    },
+    {
+      "_id": "tc-req-2-create-supplier",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "2 - Crear Supplier (una sola vez)",
+      "url": "{{baseUrl}}/suppliers",
+      "method": "POST",
+      "sortNum": 20000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept-Encoding", "value": "gzip" },
+        { "name": "auth-token", "value": "{{authToken}}" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"commercialName\": \"Jetmar Test Supplier\",\n  \"legalName\": \"Jetmar S.A.\",\n  \"email\": \"integraciones@jetmar.com.uy\",\n  \"fromEmail\": \"integraciones@jetmar.com.uy\",\n  \"active\": true\n}"
+      },
+      "tests": []
+    },
+    {
+      "_id": "tc-req-3-create-transport",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "3 - Crear Transporte (contrato / ruta)",
+      "url": "{{baseUrl}}/transport/{{supplierId}}",
+      "method": "POST",
+      "sortNum": 30000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept-Encoding", "value": "gzip" },
+        { "name": "auth-token", "value": "{{authToken}}" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"active\": true,\n  \"name\": \"Prueba Cupo Test 1\",\n  \"airlineCode\": \"XX\",\n  \"transportType\": \"PLANE\",\n  \"segments\": [\n    {\n      \"departureLocationCode\": \"MVD\",\n      \"arrivalLocationCode\": \"GRU\",\n      \"departureTime\": \"08:00:00\",\n      \"arrivalTime\": \"10:30:00\",\n      \"durationTime\": \"02:30:00\",\n      \"numService\": \"XX1234\"\n    }\n  ],\n  \"productTypes\": [\"ONLY_FLIGHT\"],\n  \"currency\": \"USD\",\n  \"pricePerPax\": true,\n  \"baseAdultPrice\": 250,\n  \"baseChildrenPrice\": 180,\n  \"baseInfantPrice\": 0,\n  \"adultTaxesAmount\": 50,\n  \"childrenTaxesAmount\": 30,\n  \"infantTaxesAmount\": 0,\n  \"startDate\": \"2026-10-01\",\n  \"endDate\": \"2026-12-31\",\n  \"operationalDays\": [\"MONDAY\", \"WEDNESDAY\", \"FRIDAY\"],\n  \"allowOWPrice\": true,\n  \"allowRTPrice\": false\n}"
+      },
+      "tests": []
+    },
+    {
+      "_id": "tc-req-4-create-option",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "4 - Crear Option (tarifa + inventario/stock)",
+      "url": "{{baseUrl}}/transport/{{supplierId}}/{{transportId}}",
+      "method": "POST",
+      "sortNum": 40000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept-Encoding", "value": "gzip" },
+        { "name": "auth-token", "value": "{{authToken}}" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"code\": \"{{optionCode}}\",\n  \"active\": true,\n  \"cabinClassType\": \"ECONOMY\",\n  \"baggageAllowance\": \"23\",\n  \"baggageAllowanceType\": \"KG\",\n  \"minPassengers\": 1,\n  \"maxPassengers\": 9,\n  \"onRequest\": false,\n  \"inventories\": [\n    { \"inventoryDate\": { \"start\": \"2026-10-05\", \"end\": \"2026-10-05\" }, \"quantity\": 10 }\n  ],\n  \"prices\": [\n    { \"name\": \"Temporada prueba\", \"startDate\": \"2026-10-01\", \"endDate\": \"2026-12-31\", \"adultPriceSupplement\": 0, \"childrenPriceSupplement\": 0, \"infantPriceSupplement\": 0 }\n  ]\n}"
+      },
+      "tests": []
+    },
+    {
+      "_id": "tc-req-5-get-transport",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "5 - Ver Transporte creado (verificación)",
+      "url": "{{baseUrl}}/transport/{{supplierId}}/{{transportId}}",
+      "method": "GET",
+      "sortNum": 50000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Accept-Encoding", "value": "gzip" },
+        { "name": "auth-token", "value": "{{authToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": []
+    },
+    {
+      "_id": "tc-req-6-get-option",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "6 - Ver Option por código (verificación de stock)",
+      "url": "{{baseUrl}}/transport/{{supplierId}}/{{transportId}}/{{optionCode}}",
+      "method": "GET",
+      "sortNum": 60000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Accept-Encoding", "value": "gzip" },
+        { "name": "auth-token", "value": "{{authToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": []
+    },
+    {
+      "_id": "tc-req-7-list-transports",
+      "colId": "tc-col-travelcompositor-transport",
+      "containerId": "",
+      "name": "7 - Listar Transportes del Supplier (opcional)",
+      "url": "{{baseUrl}}/transport/{{supplierId}}",
+      "method": "GET",
+      "sortNum": 70000,
+      "created": "2026-09-16T00:00:00.000Z",
+      "modified": "2026-09-16T00:00:00.000Z",
+      "headers": [
+        { "name": "Accept-Encoding", "value": "gzip" },
+        { "name": "auth-token", "value": "{{authToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": []
+    }
+  ]
+}

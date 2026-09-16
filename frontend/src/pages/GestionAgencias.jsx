@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, X, Lock } from 'lucide-react';
+import { Building2, BarChart3, CheckCircle, Plus, Edit, Trash2, RefreshCw, X, Lock, Search } from 'lucide-react';
 import AgencyService from '../services/agencyService';
 import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
@@ -9,8 +9,11 @@ import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 
 const emptyAgency = {
   code: '',
@@ -98,7 +101,7 @@ export default function GestionAgencias() {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
       cancelButtonColor: '#3085d6',
     });
     if (!result.isConfirmed) return;
@@ -199,51 +202,41 @@ export default function GestionAgencias() {
         ]}
       />
 
-      <Card>
-        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Lista de Agencias</h2>
-              <p className="text-sm text-slate-500">Gestioná las agencias y sus configuraciones.</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Buscar por código, nombre o email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
-          </div>
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por código, nombre o email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          />
         </div>
+      </div>
 
-        <TableComponent>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-center">Código</TableHead>
-              <TableHead className="text-center">Nombre</TableHead>
-              <TableHead className="text-center">Email</TableHead>
-              <TableHead className="text-center">Color</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      {loading ? (
+        <SkeletonTable columns={5} rows={5} />
+      ) : filteredAgencies.length === 0 ? (
+        <EmptyState
+          icon="🏢"
+          title="No hay agencias"
+          description={searchTerm ? 'No se encontraron agencias con la búsqueda.' : 'No hay agencias registradas.'}
+        />
+      ) : (
+        <Card>
+          <TableComponent>
+            <TableHeader>
               <TableRow>
-                <TableCell className="text-center py-10" colSpan={5}>
-                  Cargando agencias...
-                </TableCell>
+                <TableHead className="text-center">Código</TableHead>
+                <TableHead className="text-center">Nombre</TableHead>
+                <TableHead className="text-center">Email</TableHead>
+                <TableHead className="text-center">Color</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
-            ) : filteredAgencies.length === 0 ? (
-              <TableRow>
-                <TableCell className="text-center py-10" colSpan={5}>
-                  {searchTerm ? 'No se encontraron agencias con la búsqueda.' : 'No hay agencias registradas.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredAgencies.map((agency) => (
+            </TableHeader>
+            <TableBody>
+              {filteredAgencies.map((agency) => (
                 <TableRow key={agency.id}>
                   <TableCell className="text-center font-medium">{agency.code}</TableCell>
                   <TableCell className="text-center">{agency.name}</TableCell>
@@ -259,20 +252,16 @@ export default function GestionAgencias() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(agency)} title="Editar agencia">
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(agency)} title="Eliminar agencia" className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <ActionIconButton icon={Edit} onClick={() => openEdit(agency)} title="Editar agencia" />
+                      <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDelete(agency)} title="Eliminar agencia" />
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </TableComponent>
-      </Card>
+              ))}
+            </TableBody>
+          </TableComponent>
+        </Card>
+      )}
 
       {/* Modal de Crear/Editar Agencia */}
       <Modal title={editAgency ? 'Editar Agencia' : 'Nueva Agencia'} open={dialogOpen} onClose={closeDialog}>

@@ -43,10 +43,10 @@ export default function AIChatItineraryResult({ toolCalls }) {
                         <button
                             type="button"
                             onClick={() => setOpenIdx(idx)}
-                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 transition-colors text-xs"
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors text-xs"
                         >
                             {isPDF ? <FileText className="w-4 h-4 text-zinc-500 shrink-0" /> : <Route className="w-4 h-4 text-zinc-500 shrink-0" />}
-                            <span className="flex-1 truncate font-medium text-zinc-700 dark:text-zinc-200">
+                            <span className="flex-1 truncate font-medium text-zinc-700">
                                 {isPDF ? 'Itinerario' : 'Detalle de ruta'}{pedido ? ` — Pedido ${pedido}` : ''}
                             </span>
                             <span className="text-zinc-400">{isPDF ? 'Ver / Descargar' : 'Ver / Copiar'}</span>

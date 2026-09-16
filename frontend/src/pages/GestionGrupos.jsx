@@ -9,6 +9,8 @@ import { Input } from '../components/ui/Input';
 import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import ActionsOverflow from '../components/ui/ActionsOverflow.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import SkeletonTable from '../components/SkeletonTable';
@@ -128,7 +130,7 @@ const GestionGrupos = () => {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     try {
@@ -279,40 +281,58 @@ const GestionGrupos = () => {
             <TableComponent>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="text-center">Acciones</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Agencia</TableHead>
                   <TableHead>Destino</TableHead>
                   <TableHead>Compañía</TableHead>
-                  <TableHead>Lugares</TableHead>
+                  <TableHead className="text-right">Lugares</TableHead>
                   <TableHead>Salida</TableHead>
                   <TableHead>Regreso</TableHead>
                   <TableHead>PNR Aerolínea</TableHead>
                   <TableHead>PNR Agencia</TableHead>
-                  <TableHead>Neto 01</TableHead>
+                  <TableHead className="text-right">Neto 01</TableHead>
                   <TableHead>Estado Cotización</TableHead>
                   <TableHead>Estado Reserva</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredGroups.map((group) => (
                   <TableRow key={group.id}>
-                    <TableCell className="font-medium text-slate-900">{userName(group.vendedor)}</TableCell>
-                    <TableCell>{agencyName(group.agency)}</TableCell>
-                    <TableCell>{group.destino || '—'}</TableCell>
-                    <TableCell>{group.compania || '—'}</TableCell>
-                    <TableCell>{group.cantidad_lugares || '—'}</TableCell>
-                    <TableCell>{formatDate(group.salida)}</TableCell>
-                    <TableCell>{formatDate(group.regreso)}</TableCell>
-                    <TableCell>{group.pnr_airline || '—'}</TableCell>
-                    <TableCell>{group.pnr_agency || '—'}</TableCell>
-                    <TableCell>{formatMoney(group.neto_01)}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <ActionIconButton icon={Edit} onClick={() => handleEditGroup(group)} title="Editar / Cotizar" />
+                        <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteGroup(group.id)} title="Eliminar" />
+                        <ActionsOverflow
+                          items={[
+                            (group.estado_cotizacion === 'pendiente' || group.estado_cotizacion === 'cotizada') &&
+                              { icon: Send, label: 'Enviar cotización al usuario', onClick: () => handleSendQuote(group) },
+                            group.estado_cotizacion === 'aceptada' && !group.estado_reservar &&
+                              { icon: CheckCircle2, label: 'Confirmar grupo', onClick: () => handleConfirmGroup(group) },
+                            group.estado_reservar === 'cancelacion_solicitada' &&
+                              { icon: ThumbsUp, label: 'Aprobar cancelación', onClick: () => handleResolveCancellation(group, 'approve') },
+                            group.estado_reservar === 'cancelacion_solicitada' &&
+                              { icon: ThumbsDown, label: 'Rechazar cancelación', onClick: () => handleResolveCancellation(group, 'decline') },
+                          ]}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center font-medium text-slate-900">{userName(group.vendedor)}</TableCell>
+                    <TableCell className="text-center">{agencyName(group.agency)}</TableCell>
+                    <TableCell className="text-center">{group.destino || '—'}</TableCell>
+                    <TableCell className="text-center">{group.compania || '—'}</TableCell>
+                    <TableCell className="text-right font-mono">{group.cantidad_lugares || '—'}</TableCell>
+                    <TableCell className="text-center">{formatDate(group.salida)}</TableCell>
+                    <TableCell className="text-center">{formatDate(group.regreso)}</TableCell>
+                    <TableCell className="text-center">{group.pnr_airline || '—'}</TableCell>
+                    <TableCell className="text-center">{group.pnr_agency || '—'}</TableCell>
+                    <TableCell className="text-right font-mono">{formatMoney(group.neto_01)}</TableCell>
+                    <TableCell className="text-center">
                       <Badge variant={COTIZACION_VARIANT[group.estado_cotizacion] || 'default'}>
                         {COTIZACION_LABEL[group.estado_cotizacion] || group.estado_cotizacion || '—'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       {group.estado_reservar ? (
                         <Badge variant={RESERVAR_VARIANT[group.estado_reservar] || 'default'}>
                           {RESERVAR_LABEL[group.estado_reservar] || group.estado_reservar}
@@ -320,36 +340,6 @@ const GestionGrupos = () => {
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" onClick={() => handleEditGroup(group)} title="Editar / Cotizar">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {(group.estado_cotizacion === 'pendiente' || group.estado_cotizacion === 'cotizada') && (
-                          <Button variant="outline" size="sm" onClick={() => handleSendQuote(group)} title="Enviar cotización al usuario" className="text-blue-600 hover:text-blue-800">
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {group.estado_cotizacion === 'aceptada' && !group.estado_reservar && (
-                          <Button variant="outline" size="sm" onClick={() => handleConfirmGroup(group)} title="Confirmar grupo" className="text-emerald-600 hover:text-emerald-800">
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {group.estado_reservar === 'cancelacion_solicitada' && (
-                          <>
-                            <Button variant="outline" size="sm" onClick={() => handleResolveCancellation(group, 'approve')} title="Aprobar cancelación" className="text-emerald-600 hover:text-emerald-800">
-                              <ThumbsUp className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleResolveCancellation(group, 'decline')} title="Rechazar cancelación" className="text-amber-600 hover:text-amber-800">
-                              <ThumbsDown className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => handleDeleteGroup(group.id)} title="Eliminar">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -31,6 +31,12 @@ export class ProductService {
     return await ApiClient.delete(`/products/${id}`);
   }
 
+  // Aprueba un producto creado vía "Convertir a producto" desde una
+  // Oportunidad (nace con pendiente_aprobacion=true, no reservable hasta esto).
+  static async approveProduct(id) {
+    return await ApiClient.put(`/products/${id}/approve`, {});
+  }
+
   static async updateProductAvailability(productId, availabilityData) {
     return await ApiClient.put(`/products/${productId}/availability`, availabilityData);
   }
@@ -60,6 +66,14 @@ export class ProductService {
 
   static async unshareProduct(productId, agencia) {
     return await ApiClient.delete(`/products/${productId}/shared-agencies/${encodeURIComponent(agencia)}`);
+  }
+
+  static async bulkDeleteProducts(ids) {
+    return await ApiClient.post('/products/bulk-delete', { ids });
+  }
+
+  static async bulkDuplicateProducts(ids) {
+    return await ApiClient.post('/products/bulk-duplicate', { ids });
   }
 }
 

@@ -187,11 +187,38 @@ func GetEmailTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"templates": templates})
 }
 
+// callerOwnsTemplateAgency determina si el caller puede editar una plantilla
+// (de email o de notificación) con este AgencyID. admin siempre puede; el
+// resto SOLO si la plantilla es de su propia agencia — nunca si es global
+// (AgencyID nil, se manda a clientes reales de cualquier agencia) ni de otra
+// agencia. Sin esto, cualquier usuario autenticado podía reescribir una
+// plantilla global (ej. confirmación de reserva) — vector de phishing real.
+func callerOwnsTemplateAgency(c *gin.Context, agencyID *uuid.UUID) bool {
+	role, _ := c.Get("role")
+	if role == "admin" {
+		return true
+	}
+	if agencyID == nil {
+		return false
+	}
+	agenciaVal, _ := c.Get("agencia")
+	agenciaCode, _ := agenciaVal.(string)
+	agency, err := services.FindAgencyByCodeOrName(agenciaCode)
+	if err != nil {
+		return false
+	}
+	return agency.ID == *agencyID
+}
+
 func UpdateEmailTemplate(c *gin.Context) {
 	id := c.Param("id")
 	var tpl models.EmailTemplate
 	if err := database.DB.First(&tpl, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Plantilla no encontrada"})
+		return
+	}
+	if !callerOwnsTemplateAgency(c, tpl.AgencyID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso para editar esta plantilla."})
 		return
 	}
 

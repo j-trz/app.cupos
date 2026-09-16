@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import EmailConfigService from '../services/emailConfigService';
 import Swal from 'sweetalert2';
 import {
-    Mail, Save, TestTube, Send, RefreshCw, Eye, Code, Settings,
+    Mail, Save, TestTube, Send, RefreshCw, Eye, Edit, Code, Settings,
     CheckCircle, XCircle, AlertCircle, Server, Lock, User
 } from 'lucide-react';
 import Button from '../components/ui/Button.jsx';
@@ -13,6 +13,21 @@ import Modal from '../components/Modal.jsx';
 
 const INPUT_CLASSES = "w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 const LABEL_CLASSES = "mb-1 block text-xs font-medium text-slate-600";
+
+// Variables disponibles por código de plantilla — deben coincidir con lo que
+// cada handler le pasa a RenderTemplate (ver buildReservationEmailVars en
+// order_handler.go y los demás sitios que llaman a SendTemplateEmail en el
+// backend). Agregar una clave nueva ahí y listarla acá es lo único que hace
+// falta para que aparezca en el selector.
+const TEMPLATE_VARIABLES = {
+    reservation_blocked: ['pedido_id', 'contacto_nombre', 'destino', 'compania', 'precio_venta', 'pasajeros', 'vence'],
+    reservation_confirmed: ['pedido_id', 'contacto_nombre', 'destino', 'compania', 'precio_venta', 'pasajeros'],
+    passenger_confirmation: ['pedido_id', 'contacto_nombre', 'destino', 'compania', 'pasajeros'],
+    reservation_expiring_soon: ['pedido_id', 'contacto_nombre', 'minutos'],
+    reservation_expired: ['pedido_id', 'contacto_nombre'],
+    new_product: ['codigo_cupo', 'destino', 'compania'],
+    test_email: [],
+};
 
 export default function EmailConfig() {
     const { user, can } = useAuth();
@@ -29,6 +44,13 @@ export default function EmailConfig() {
     const [previewHtml, setPreviewHtml] = useState('');
     const [showPreview, setShowPreview] = useState(false);
     const [activeTab, setActiveTab] = useState('smtp');
+    const [editingTemplate, setEditingTemplate] = useState(null);
+    const [editSubject, setEditSubject] = useState('');
+    const [editBody, setEditBody] = useState('');
+    const [savingTemplate, setSavingTemplate] = useState(false);
+    const [activeEditField, setActiveEditField] = useState('body'); // 'subject' | 'body' — a cuál se le insertó la última variable
+    const subjectInputRef = useRef(null);
+    const bodyInputRef = useRef(null);
 
     useEffect(() => {
         loadConfig();
@@ -174,6 +196,58 @@ export default function EmailConfig() {
 
     const handleConfigChange = (key, value) => {
         setConfig(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleOpenEditTemplate = (template) => {
+        setEditingTemplate(template);
+        setEditSubject(template.subject || '');
+        setEditBody(template.body_html || '');
+        setActiveEditField('body');
+    };
+
+    const handleCloseEditTemplate = () => {
+        if (savingTemplate) return;
+        setEditingTemplate(null);
+    };
+
+    // Inserta {{variable}} en el cursor del último campo enfocado (asunto o
+    // cuerpo) — así cada agencia puede armar su propio diseño sin tener que
+    // acordarse de memoria el nombre exacto de cada variable.
+    const handleInsertVariable = (variable) => {
+        const token = `{{${variable}}}`;
+        const ref = activeEditField === 'subject' ? subjectInputRef : bodyInputRef;
+        const el = ref.current;
+        const setValue = activeEditField === 'subject' ? setEditSubject : setEditBody;
+        if (!el) {
+            setValue((prev) => prev + token);
+            return;
+        }
+        const start = el.selectionStart ?? el.value.length;
+        const end = el.selectionEnd ?? el.value.length;
+        const next = el.value.slice(0, start) + token + el.value.slice(end);
+        setValue(next);
+        // Vuelve a poner el cursor justo después del token insertado, en el
+        // próximo tick (después de que React re-renderice el nuevo value).
+        requestAnimationFrame(() => {
+            el.focus();
+            const cursor = start + token.length;
+            el.setSelectionRange(cursor, cursor);
+        });
+    };
+
+    const handleSaveTemplate = async () => {
+        try {
+            setSavingTemplate(true);
+            await EmailConfigService.updateTemplate(editingTemplate.id, { subject: editSubject, body_html: editBody });
+            Swal.fire({ icon: 'success', title: 'Guardado', text: 'Plantilla actualizada', timer: 1500, showConfirmButton: false });
+            setEditingTemplate(null);
+            loadTemplates();
+        } catch (error) {
+            console.error('Error al guardar la plantilla:', error);
+            Swal.fire('Error', error.message || 'No se pudo guardar la plantilla', 'error');
+        } finally {
+            setSavingTemplate(false);
+        }
     };
 
     if (loading) {
@@ -388,9 +462,14 @@ export default function EmailConfig() {
                                                         <div className="text-xs text-slate-500 font-mono">{template.code}</div>
                                                     </div>
                                                 </div>
-                                                <Button size="sm" variant="ghost" onClick={() => handlePreviewTemplate(template)}>
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
+                                                <div className="flex items-center gap-1">
+                                                    <Button size="sm" variant="ghost" onClick={() => handleOpenEditTemplate(template)} title="Editar">
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" onClick={() => handlePreviewTemplate(template)} title="Vista previa">
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -449,6 +528,70 @@ export default function EmailConfig() {
                         <Button variant="secondary" onClick={() => setShowPreview(false)}>Cerrar</Button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* Modal de edición de plantilla — asunto + cuerpo HTML libre, con
+                variables clickeables para no tener que memorizar el {{nombre}}
+                exacto de cada una. */}
+            <Modal title={`Editar: ${editingTemplate?.name || ''}`} open={!!editingTemplate} onClose={handleCloseEditTemplate} size="2xl">
+                {editingTemplate && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className={LABEL_CLASSES}>Asunto</label>
+                            <input
+                                ref={subjectInputRef}
+                                type="text"
+                                value={editSubject}
+                                onChange={(e) => setEditSubject(e.target.value)}
+                                onFocus={() => setActiveEditField('subject')}
+                                className={INPUT_CLASSES}
+                            />
+                        </div>
+                        <div>
+                            <label className={LABEL_CLASSES}>Cuerpo (HTML)</label>
+                            <textarea
+                                ref={bodyInputRef}
+                                value={editBody}
+                                onChange={(e) => setEditBody(e.target.value)}
+                                onFocus={() => setActiveEditField('body')}
+                                rows={12}
+                                className={`${INPUT_CLASSES} font-mono text-xs leading-relaxed`}
+                                placeholder="<p>Hola {{contacto_nombre}}...</p>"
+                            />
+                            <p className="mt-1 text-xs text-slate-400">
+                                Se guarda como HTML tal cual — armá el diseño que mejor le quede a tu agencia.
+                            </p>
+                        </div>
+                        <div>
+                            <label className={LABEL_CLASSES}>
+                                Variables disponibles (clic para insertar en {activeEditField === 'subject' ? 'el asunto' : 'el cuerpo'})
+                            </label>
+                            {(TEMPLATE_VARIABLES[editingTemplate.code] || []).length === 0 ? (
+                                <p className="text-xs text-slate-400">Esta plantilla no tiene variables.</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(TEMPLATE_VARIABLES[editingTemplate.code] || []).map((variable) => (
+                                        <button
+                                            key={variable}
+                                            type="button"
+                                            onClick={() => handleInsertVariable(variable)}
+                                            className="rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-mono text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors"
+                                        >
+                                            {`{{${variable}}}`}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                            <Button variant="secondary" onClick={handleCloseEditTemplate} disabled={savingTemplate}>Cancelar</Button>
+                            <Button onClick={handleSaveTemplate} disabled={savingTemplate}>
+                                {savingTemplate ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                Guardar
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

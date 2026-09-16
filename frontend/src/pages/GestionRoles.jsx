@@ -11,8 +11,11 @@ import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
 
 const emptyRole = {
     name: '',
@@ -358,9 +361,13 @@ export default function GestionRoles() {
                 </div>
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-                    </div>
+                    <div className="p-4"><SkeletonTable columns={7} rows={5} /></div>
+                ) : filteredRoles.length === 0 ? (
+                    <EmptyState
+                        icon="🛡️"
+                        title="No hay roles"
+                        description={searchTerm ? 'No se encontraron roles' : 'No hay roles registrados'}
+                    />
                 ) : (
                     <TableComponent>
                         <TableHeader>
@@ -375,14 +382,7 @@ export default function GestionRoles() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredRoles.length === 0 ? (
-                                <TableRow>
-                                    <TableCell className="text-center py-10" colSpan={7}>
-                                        {searchTerm ? 'No se encontraron roles' : 'No hay roles registrados'}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                filteredRoles.map((role) => (
+                                {filteredRoles.map((role) => (
                                     <TableRow key={role.id}>
                                         <TableCell className="text-center">
                                             <div className="flex items-center justify-center gap-2">
@@ -417,25 +417,16 @@ export default function GestionRoles() {
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className="flex items-center justify-center gap-1">
-                                                <Button variant="ghost" size="sm" onClick={() => openPermissions(role)} title="Gestionar permisos">
-                                                    <Shield className="h-4 w-4 text-indigo-600" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => openUsers(role)} title="Ver usuarios">
-                                                    <UserCheck className="h-4 w-4 text-blue-600" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(role)} title="Editar">
-                                                    <Edit className="h-4 w-4 text-slate-600" />
-                                                </Button>
+                                                <ActionIconButton icon={Shield} onClick={() => openPermissions(role)} title="Gestionar permisos" className="text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700" />
+                                                <ActionIconButton icon={UserCheck} onClick={() => openUsers(role)} title="Ver usuarios" className="text-blue-600 hover:bg-blue-50 hover:text-blue-700" />
+                                                <ActionIconButton icon={Edit} onClick={() => openEdit(role)} title="Editar" />
                                                 {!role.is_system && (
-                                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(role)} title="Eliminar" className="text-red-600 hover:text-red-700">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDelete(role)} title="Eliminar" />
                                                 )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
+                                ))}
                         </TableBody>
                     </TableComponent>
                 )}

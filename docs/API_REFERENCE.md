@@ -59,7 +59,12 @@ Los errores de permisos insuficientes agregan además un campo `message` con el 
 | `401` | Falta el header `Authorization`, token inválido/vencido, credenciales incorrectas, cuenta inactiva |
 | `403` | Token válido pero sin el permiso o rol necesario para esa acción, o sin acceso al recurso puntual (ej. un cupo de otra agencia) |
 | `404` | El recurso solicitado no existe |
+| `429` | Rate limit excedido (ver [Rate limiting](#rate-limiting) abajo) — el header `Retry-After` trae los segundos hasta que se puede reintentar |
 | `500` | Error interno (DB, etc.) |
+
+### Rate limiting
+
+Límite por IP, en memoria (no exacto en el borde de la ventana, ni compartido entre instancias serverless — ver detalle en el código, `middleware/rate_limit.go`): **300 requests/minuto** en toda la API, y **15 requests/5 minutos** específicamente en `POST /api/auth/login` (para frenar fuerza bruta de contraseñas). Al excederse, la respuesta es `429` con `{"error": "Demasiadas solicitudes..."}` y un header `Retry-After` en segundos.
 
 Las respuestas exitosas **no** siguen un único sobre estándar — cada endpoint devuelve la forma que tiene sentido para ese recurso (a veces `{"success": true, "data": [...]}`, a veces el objeto directo, a veces con claves específicas como `token`/`user`). Se indica la forma relevante en los endpoints donde no es obvia.
 
@@ -105,6 +110,7 @@ Los "cupos" (bloqueos aéreos, paquetes, servicios) que una agencia puede reserv
 | `PUT` | `/api/products/:id` | Permiso: `PRODUCTS_UPDATE` | Edita un producto |
 | `DELETE` | `/api/products/:id` | Permiso: `PRODUCTS_DELETE` | Elimina un producto (falla si tiene reservas o cesiones asociadas) |
 | `POST` | `/api/products/bulk` | Permiso: `PRODUCTS_CREATE` | Alta masiva desde una lista de productos |
+| `POST` | `/api/products/bulk-duplicate` | Permiso: `PRODUCTS_CREATE` | Duplica varios productos seleccionados a la vez |
 | `GET` | `/api/products/:id/shared-agencies` | Sesión | Agencias con las que se comparte este producto |
 | `POST` | `/api/products/:id/shared-agencies` | Sesión | Comparte el producto con otra agencia |
 | `DELETE` | `/api/products/:id/shared-agencies/:agencia` | Sesión | Deja de compartirlo con esa agencia |
@@ -122,6 +128,8 @@ El ciclo de vida completo de una reserva — ver [Ciclo de Vida de la Reserva](F
 | `DELETE` | `/api/orders/hold/:id` | Sesión | Cancela un hold y libera el stock al instante |
 | `GET` | `/api/orders/:id` | Sesión | Detalle de una reserva, con sus pasajeros |
 | `PUT` | `/api/orders/:id` | Sesión | Actualiza campos generales del pedido |
+| `POST` | `/api/orders/bulk-update` | Permiso: `RESERVATIONS_UPDATE` | Confirma o emite (`estado`/`estado_interno`) varias reservas seleccionadas a la vez |
+| `POST` | `/api/orders/bulk-cancel` | Permiso: `RESERVATIONS_DELETE` | Cancela varias reservas seleccionadas a la vez |
 | `PUT` | `/api/orders/:id/doc-contable` | Sesión | Carga el documento contable — confirma la reserva |
 | `POST` | `/api/orders/:id/confirm` | Sesión | Confirma la reserva manualmente |
 | `PUT` | `/api/orders/:id/cancel-request` | Sesión | Solicita la cancelación |
@@ -132,6 +140,17 @@ El ciclo de vida completo de una reserva — ver [Ciclo de Vida de la Reserva](F
 | `PUT` | `/api/orders/:id/passengers/:passengerId/full` | Sesión | Edita todos los datos de un pasajero |
 | `POST` | `/api/orders/:id/passengers/:passengerId/duplicate` | Sesión | Duplica un pasajero dentro del mismo pedido |
 | `DELETE` | `/api/orders/:id/passengers/:passengerId` | Sesión | Elimina un pasajero puntual y libera su lugar |
+
+## Bandeja de Tickets
+
+Registro **inmutable** del boleto GDS emitido por pasajero (nunca se borra, solo se marca `void`) — ver [Bandeja de Tickets](FLUJOS_FUNCIONALIDADES.html#17-bandeja-de-tickets) para el flujo completo de emisión.
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/tickets` | Permiso: `TICKETS_VIEW` | Lista tickets (filtrados por agencia salvo `admin`); acepta `?estado=`, `?pnr=`, `?numero_ticket=`, `?search=` |
+| `GET` | `/api/tickets/:id` | Permiso: `TICKETS_VIEW` | Detalle de un ticket, con itinerario normalizado por tramo |
+| `POST` | `/api/tickets/:id/void` | Permiso: `TICKETS_VOID` | Anula el ticket (`{ motivo_void, restore_stock }`) — `restore_stock: true` devuelve el lugar al `Product` |
+| `POST` | `/api/tickets/:id/sync-atlas` | Permiso: `TICKETS_SYNC` | Marca el ticket como sincronizado con Netviax Atlas (hoy manual, sin integración de escritura real todavía) |
 
 ## Grupos (vuelos a medida)
 
@@ -150,6 +169,22 @@ Cotizaciones a medida que no son un cupo ya publicado — ver [Grupos y Vuelos a
 | `POST` | `/api/groups/:id/confirm` | Permiso: `GROUPS_UPDATE` | Confirma el grupo aceptado |
 | `POST` | `/api/groups/:id/request-cancellation` | Sesión | Solicita cancelar un grupo confirmado |
 | `POST` | `/api/groups/:id/resolve-cancellation` | Permiso: `GROUPS_UPDATE` | Aprueba o rechaza la cancelación |
+
+## Oportunidades
+
+Propuestas de vuelo/paquete pendientes de aprobación, previas a convertirse en un producto vendible — ver [Oportunidades](FLUJOS_FUNCIONALIDADES.html#18-oportunidades).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/opportunities` | Permiso: `OPPORTUNITIES_VIEW` | Lista oportunidades (admin ve todas y puede filtrar por `?agencia=`; el resto solo las propias) |
+| `GET` | `/api/opportunities/:id` | Permiso: `OPPORTUNITIES_VIEW` | Detalle de una oportunidad |
+| `POST` | `/api/opportunities` | Permiso: `OPPORTUNITIES_CREATE` | Crea una oportunidad (nace en `pendiente`) |
+| `PUT` | `/api/opportunities/:id` | Permiso: `OPPORTUNITIES_UPDATE` | Edita una oportunidad (bloqueado si ya está `aprobada` o `producto`) |
+| `DELETE` | `/api/opportunities/:id` | Permiso: `OPPORTUNITIES_DELETE` | Elimina una oportunidad |
+| `PUT` | `/api/opportunities/:id/approve` | Permiso: `OPPORTUNITIES_UPDATE`, solo `admin` | Aprueba la oportunidad |
+| `POST` | `/api/opportunities/:id/convert-to-product` | Permiso: `OPPORTUNITIES_CONVERT` | Crea un `Product` (pendiente de aprobación) a partir de una oportunidad `aprobada` |
+| `POST` | `/api/opportunities/bulk-approve` | Permiso: `OPPORTUNITIES_APPROVE` | Aprueba varias oportunidades a la vez |
+| `POST` | `/api/opportunities/bulk-delete` | Permiso: `OPPORTUNITIES_DELETE` | Elimina varias oportunidades a la vez |
 
 ## Cesión de cupos
 
@@ -298,8 +333,27 @@ Ver [Asistente IA](FLUJOS_FUNCIONALIDADES.html#10-asistente-ia) para el detalle 
 | `GET` | `/api/notification-config/templates` | Sesión | Plantillas de notificación in-app |
 | `PUT` | `/api/notification-config/templates/:id` | Sesión | Edita una plantilla de notificación |
 | `GET` | `/api/notification-config/templates/:id/preview` | Sesión | Previsualiza una plantilla renderizada |
+| `GET` | `/api/atlas-config/config` | Sesión | Configuración de credenciales de Netviax Atlas de tu agencia (la clave nunca se devuelve) |
+| `POST` | `/api/atlas-config/config` | Sesión | Crea la configuración de Atlas de tu agencia |
+| `PUT` | `/api/atlas-config/config/:id` | Sesión | Edita la configuración de Atlas |
+| `DELETE` | `/api/atlas-config/config/:id` | Sesión | Elimina la configuración de Atlas |
+| `POST` | `/api/atlas-config/test` | Sesión | Prueba la conexión con Atlas con las credenciales cargadas |
+| `GET` | `/api/temporadas` | Sesión | Lista de temporadas (ej. "Verano 2027"), usadas como filtro en Productos/Oportunidades |
+| `POST` | `/api/temporadas` | Admin + permiso `TEMPORADAS_CREATE` | Crea una temporada |
+| `PUT` | `/api/temporadas/:id` | Admin + permiso `TEMPORADAS_UPDATE` | Edita una temporada |
+| `DELETE` | `/api/temporadas/:id` | Admin + permiso `TEMPORADAS_DELETE` | Elimina una temporada |
 
-> Las rutas de `email-config` y `notification-config` solo exigen sesión iniciada (no un permiso puntual) pese a ser configuración administrativa — tenelo en cuenta si tu integración maneja credenciales SMTP.
+> Las rutas de `email-config`, `notification-config` y `atlas-config` solo exigen sesión iniciada (no un permiso puntual) pese a ser configuración administrativa — tenelo en cuenta si tu integración maneja credenciales SMTP o de Atlas.
+
+## Netviax Atlas (búsqueda, solo lectura)
+
+Consulta contactos y fichas de venta ya cargados en el backoffice de la agencia, para no volver a tipearlos al crear una reserva — ver [Integración Netviax Atlas](FLUJOS_FUNCIONALIDADES.html#19-integración-netviax-atlas).
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| `POST` | `/api/backoffice/atlas/contactos/buscar` | Sesión | Busca un contacto por documento u otro filtro |
+| `GET` | `/api/backoffice/atlas/contactos/:codigo` | Sesión | Detalle de un contacto por su código Atlas |
+| `POST` | `/api/backoffice/atlas/fichas/buscar` | Sesión | Busca una ficha de venta por número (trae también sus pasajeros) |
 
 ## Logs, Estado del sistema y exportación
 

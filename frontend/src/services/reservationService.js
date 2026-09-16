@@ -37,10 +37,15 @@ const adaptProduct = (producto) => ({
   carryon: !!producto.carryon,
   handbag: !!producto.handbag,
   checkedbag: !!producto.checkedbag,
+  carryon_kg: producto.carryon_kg || 0,
+  handbag_kg: producto.handbag_kg || 0,
+  checkedbag_kg: producto.checkedbag_kg || 0,
+  package_links: Array.isArray(producto.package_links) ? producto.package_links : [],
 });
 
 const adaptRequest = (item) => ({
   id: item.id || item.ID || '',
+  ProductId: item.product_id ?? item.ProductID ?? item.product?.id ?? '',
   Pedido_ID: item.Pedido_ID || item.pedido_id || '',
   Agencia: item.Agencia || item.agencia || '',
   Contacto_Nombre: item.Contacto_Nombre || item.contacto_nombre || item.contacto?.nombre || '',
@@ -67,6 +72,7 @@ const adaptRequest = (item) => ({
   Usuario_Email: item.Usuario_Email || item.usuario_email || '',
   Pnr: item.Pnr || item.pnr || item.product?.pnr || '',
   Ficha: item.Ficha || item.ficha || item.ficha_venta || '',
+  Notas_Vendedor: item.Notas_Vendedor || item.notas_vendedor || '',
   TipoProducto: item.product?.tipo_producto || item.tipo_producto || '',
   InfFare: item.product?.inf_fare ?? 0,
   ChdFare: item.product?.chd_fare ?? 0,
@@ -209,6 +215,7 @@ class ReservationService {
     const result = await ApiClient.get('/orders/blocked');
     return toArray(result).map((r) => ({
       id: r.id,
+      product_id: r.product_id,
       Pedido_ID: r.pedido_id,
       Vuelo_Destino: r.vuelo_destino,
       Bloqueo_Expira_At: r.bloqueo_expira_at,
@@ -243,6 +250,21 @@ class ReservationService {
   static async createHold(productId, passengerCount) {
     const result = await ApiClient.post('/orders/hold', {
       product_id: productId,
+      passenger_count: passengerCount,
+    });
+    return {
+      id: result.id,
+      pedidoId: result.pedido_id,
+      expiresAt: result.bloqueo_expira_at,
+      passengerCount: result.passenger_count,
+    };
+  }
+
+  // Cambia la cantidad de pasajeros de un hold ya creado (el usuario agregó
+  // o quitó una fila en el modal) — ajusta la disponibilidad reservada y
+  // extiende el vencimiento. Tira si no hay más stock para agregar.
+  static async adjustHold(holdId, passengerCount) {
+    const result = await ApiClient.put(`/orders/hold/${holdId}`, {
       passenger_count: passengerCount,
     });
     return {
@@ -378,6 +400,24 @@ class ReservationService {
     }
 
     return true;
+  }
+
+  // El backend distingue dos campos independientes (ver Modelo de Datos):
+  // Estado (ciclo de vida de la reserva, ej. "confirmada") y EstadoInterno
+  // (seguimiento de backoffice, ej. "Emitido") — no son intercambiables ni
+  // el mismo valor sirve para los dos. La ruta real es /orders/bulk-update
+  // (POST) — antes esto llamaba a /reservations/bulk-update con PUT, que no
+  // existe (la app no tiene ningún grupo de rutas "/reservations").
+  static async bulkConfirmReservations(ids) {
+    return await ApiClient.post('/orders/bulk-update', { ids, estado: 'confirmada' });
+  }
+
+  static async bulkEmitReservations(ids) {
+    return await ApiClient.post('/orders/bulk-update', { ids, estado_interno: 'Emitido' });
+  }
+
+  static async bulkCancelReservations(ids, notas) {
+    return await ApiClient.post('/orders/bulk-cancel', { ids, notas });
   }
 }
 

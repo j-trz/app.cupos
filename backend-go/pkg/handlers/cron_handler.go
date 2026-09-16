@@ -82,20 +82,16 @@ func expireOverdueReservations(now time.Time) int {
 	for i := range reservations {
 		r := &reservations[i]
 
-		var passengersCount int64
-		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", r.ID).Count(&passengersCount)
-		if passengersCount == 0 {
-			passengersCount = 1
-		}
+		seats, total := countPassengerSeats(r.ID)
 		database.DB.Model(&models.Product{}).Where("id = ?", r.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 			})
 		database.DB.Create(&models.SystemLog{
 			Level:   "info",
 			Source:  "cron",
-			Message: fmt.Sprintf("Vencimiento: se liberaron %d lugar(es) del producto %d (pedido %s)", passengersCount, r.ProductID, r.PedidoID),
+			Message: fmt.Sprintf("Vencimiento: se liberaron %d lugar(es) del producto %d (pedido %s)", seats, r.ProductID, r.PedidoID),
 		})
 
 		database.DB.Model(&models.Reservation{}).Where("id = ?", r.ID).Update("estado", models.EstadoExpirada)

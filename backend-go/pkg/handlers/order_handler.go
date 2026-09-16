@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -24,12 +25,16 @@ type PassengerInput struct {
 	Nombre       string   `json:"nombre"`
 	Apellido     string   `json:"apellido"`
 	Documento    string   `json:"documento"`
+	Pasaporte    string   `json:"pasaporte,omitempty"`
 	Nacimiento   string   `json:"nacimiento"` // "1994-10-20" o "1994-10-20T00:00:00Z"
 	Nacionalidad string   `json:"nacionalidad"`
 	TipoPasajero string   `json:"tipo_pasajero"`
 	PrecioVenta  *float64 `json:"precio_venta,omitempty"`
 	Neto1        *float64 `json:"neto_1,omitempty"`
 	DocContable  string   `json:"doc_contable,omitempty"`
+	// Vencimiento de documento de viaje — Vitalicio=true ignora Vencimiento.
+	DocumentoVencimiento string `json:"documento_vencimiento,omitempty"`
+	DocumentoVitalicio   bool   `json:"documento_vitalicio,omitempty"`
 }
 
 type ReservationInput struct {
@@ -39,6 +44,39 @@ type ReservationInput struct {
 	// caso el stock ya fue descontado al crear el hold y esta llamada solo
 	// completa los datos reales de contacto/pasajeros sobre esa misma fila.
 	HoldID uint `json:"hold_id,omitempty"`
+}
+
+// buildReservationEmailVars centraliza las variables disponibles para las
+// plantillas de reserva (reservation_blocked/reservation_confirmed/
+// passenger_confirmation) — agregar una clave nueva acá la habilita
+// automáticamente en el editor de plantillas del frontend (ver
+// GetAvailableEmailVariables en email_config_handler.go, que debe listar las
+// mismas claves).
+func buildReservationEmailVars(reservation *models.Reservation, vence string, passengerNames []string) map[string]string {
+	return map[string]string{
+		"pedido_id":       reservation.PedidoID,
+		"contacto_nombre": reservation.NombrePasajero,
+		"destino":         reservation.VueloDestino,
+		"compania":        reservation.VueloCompania,
+		"precio_venta":    fmt.Sprintf("%.2f", reservation.PrecioVenta),
+		"pasajeros":       strings.Join(passengerNames, ", "),
+		"vence":           vence,
+	}
+}
+
+// countPassengerSeats cuenta los pasajeros de una reserva, separando el total
+// (para reponer Vendidos) de los que ocupan lugar/cupo (para reponer
+// Disponibilidad) — el infante es pasajero pero no ocupa lugar (ver
+// CreateReservation), así que al devolver stock por cancelación/expiración
+// hay que devolver solo los lugares que en verdad se habían descontado.
+func countPassengerSeats(reservationID uint) (seats int64, total int64) {
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservationID).Count(&total)
+	database.DB.Model(&models.Passenger{}).Where("reservation_id = ? AND tipo_pasajero != ?", reservationID, "Infante").Count(&seats)
+	if total == 0 {
+		total = 1
+		seats = 1
+	}
+	return seats, total
 }
 
 // canReserveProduct valida si el usuario puede reservar este producto: es
@@ -60,6 +98,24 @@ func canReserveProduct(tx *gorm.DB, product *models.Product, role interface{}, u
 		Where("product_id = ? AND LOWER(agencia) = LOWER(?)", product.ID, userAgencia).
 		Count(&count)
 	return count > 0
+}
+
+// callerOwnsReservation: admin siempre puede; el resto solo si la reserva es
+// de su propia agencia. Hallazgo de la auditoría de seguridad 2026-08-13:
+// ConfirmReservation/UpdateReservation/AddDocContable/DeletePassenger no
+// tenían NINGÚN chequeo de este tipo — cualquier usuario autenticado de
+// cualquier agencia podía confirmar/editar/borrar pasajeros de una reserva
+// ajena (incluyendo liberar el stock de un competidor para reservarlo uno
+// mismo). Mismo criterio de scoping que canReserveProduct usa para productos.
+func callerOwnsReservation(c *gin.Context, reservation *models.Reservation) bool {
+	role, _ := c.Get("role")
+	if role == "admin" {
+		return true
+	}
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agencia := services.ResolveAgencyCode(agenciaRaw)
+	return strings.EqualFold(reservation.Agencia, agencia)
 }
 
 // CreateHold descuenta de inmediato N lugares de un producto, antes de que
@@ -199,6 +255,95 @@ func ReleaseHold(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// AdjustHold cambia la cantidad de pasajeros de un pre-hold ya creado — el
+// usuario agregó o quitó una fila de pasajero en el modal después de haber
+// elegido la cantidad inicial (ver CreateHold). Ajusta la disponibilidad del
+// producto según la diferencia y extiende el vencimiento del bloqueo, ya que
+// sigue activamente completando el formulario.
+func AdjustHold(c *gin.Context) {
+	id := c.Param("id")
+	userIDStr, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	var input struct {
+		PassengerCount int `json:"passenger_count"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.PassengerCount <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "passenger_count debe ser mayor a 0"})
+		return
+	}
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var hold models.Reservation
+	if err := tx.First(&hold, id).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bloqueo temporal no encontrado."})
+		return
+	}
+	if hold.Estado != models.EstadoHoldTemporal {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Este bloqueo ya no está activo — cerrá el formulario y volvé a empezar."})
+		return
+	}
+	if role != "admin" && userIDStr != nil {
+		if uid, err := uuid.Parse(userIDStr.(string)); err == nil && hold.CreatedBy != uid {
+			tx.Rollback()
+			c.JSON(http.StatusForbidden, gin.H{"error": "No podés modificar un bloqueo de otro usuario"})
+			return
+		}
+	}
+
+	delta := input.PassengerCount - hold.HoldPassengerCount
+	if delta != 0 {
+		var product models.Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, hold.ProductID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
+			return
+		}
+		if delta > 0 && product.Disponibilidad < delta {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Solo hay %d cupo(s) más disponible(s).", product.Disponibilidad)})
+			return
+		}
+		product.Disponibilidad -= delta
+		product.Vendidos += delta
+		if err := tx.Save(&product).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+			return
+		}
+	}
+
+	hold.HoldPassengerCount = input.PassengerCount
+	holdMinutes := services.GetIntSettingForAgency("bloqueo_hold_minutos", hold.Agencia, 10)
+	expiresAt := time.Now().Add(time.Duration(holdMinutes) * time.Minute)
+	hold.BloqueoExpiraAt = &expiresAt
+	if err := tx.Save(&hold).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el bloqueo"})
+		return
+	}
+
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{
+		"id":                hold.ID,
+		"pedido_id":         hold.PedidoID,
+		"bloqueo_expira_at": hold.BloqueoExpiraAt,
+		"passenger_count":   hold.HoldPassengerCount,
+	})
+}
+
 // parseDateFlexible acepta "YYYY-MM-DD" o RFC3339
 func parseDateFlexible(s string) *time.Time {
 	if s == "" {
@@ -216,12 +361,15 @@ func parseDateFlexible(s string) *time.Time {
 // toPassengerModel convierte PassengerInput a models.Passenger
 func toPassengerModel(pi PassengerInput) models.Passenger {
 	return models.Passenger{
-		Nombre:       pi.Nombre,
-		Apellido:     pi.Apellido,
-		Documento:    pi.Documento,
-		Nacimiento:   parseDateFlexible(pi.Nacimiento),
-		Nacionalidad: pi.Nacionalidad,
-		TipoPasajero: pi.TipoPasajero,
+		Nombre:               pi.Nombre,
+		Apellido:             pi.Apellido,
+		Documento:            pi.Documento,
+		Pasaporte:            pi.Pasaporte,
+		Nacimiento:           parseDateFlexible(pi.Nacimiento),
+		Nacionalidad:         pi.Nacionalidad,
+		TipoPasajero:         pi.TipoPasajero,
+		DocumentoVencimiento: parseDateFlexible(pi.DocumentoVencimiento),
+		DocumentoVitalicio:   pi.DocumentoVitalicio,
 	}
 }
 
@@ -318,25 +466,49 @@ func CreateReservation(c *gin.Context) {
 	if numPassengers == 0 {
 		numPassengers = 1
 	}
+	// El infante no ocupa lugar/cupo (Disponibilidad), pero sigue siendo
+	// pasajero: tiene su propia fila en `passengers` y cuenta para Vendidos.
+	// El hold (CreateHold) todavía no conoce el tipo de cada pasajero — por
+	// eso descontó de más (numPassengers a secas) — se reconcilia acá abajo.
+	seatsNeeded := 0
+	for _, p := range input.Passengers {
+		if p.TipoPasajero != "Infante" {
+			seatsNeeded++
+		}
+	}
+	if len(input.Passengers) == 0 && input.Reservation.TipoPasajero != "Infante" {
+		seatsNeeded = 1
+	}
 
 	if existingHold != nil {
-		// La cantidad quedó fija al crear el hold: si no coincide, el cliente
-		// está tratando de reservar más/menos lugares de los que en verdad
-		// tiene apartados.
+		// La cantidad TOTAL quedó fija al crear el hold: si no coincide, el
+		// cliente está tratando de reservar más/menos lugares de los que en
+		// verdad tiene apartados.
 		if numPassengers != existingHold.HoldPassengerCount {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "La cantidad de pasajeros no coincide con el bloqueo temporal"})
 			return
 		}
+		// El hold descontó numPassengers lugares (sin saber todavía cuáles
+		// eran infantes). Ahora que se conoce el tipo real, se devuelve la
+		// diferencia si hubo infantes entre los pasajeros del hold.
+		if seatsFreed := existingHold.HoldPassengerCount - seatsNeeded; seatsFreed > 0 {
+			product.Disponibilidad += seatsFreed
+			if err := tx.Save(&product).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar disponibilidad"})
+				return
+			}
+		}
 	} else {
-		if product.Disponibilidad < numPassengers {
+		if product.Disponibilidad < seatsNeeded {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente"})
 			return
 		}
 
 		// 2. Actualizar disponibilidad del producto
-		product.Disponibilidad -= numPassengers
+		product.Disponibilidad -= seatsNeeded
 		product.Vendidos += numPassengers
 		if err := tx.Save(&product).Error; err != nil {
 			tx.Rollback()
@@ -455,7 +627,10 @@ func CreateReservation(c *gin.Context) {
 		if pi.PrecioVenta != nil {
 			pax.PrecioVenta = *pi.PrecioVenta
 		}
-		pax.Neto1 = input.Reservation.Neto1
+		// Neto1 por pasajero usa el desglose de SU tipo (ADT/CHD/INF), no un
+		// valor único heredado de la reserva — antes todos los pasajeros de
+		// un mismo pedido compartían el Neto1 del tipo principal.
+		pax.Neto1 = product.NetoForTipo(pi.TipoPasajero)
 		if pi.Neto1 != nil {
 			pax.Neto1 = *pi.Neto1
 		}
@@ -508,11 +683,12 @@ func CreateReservation(c *gin.Context) {
 		if input.Reservation.BloqueoExpiraAt != nil {
 			vence = input.Reservation.BloqueoExpiraAt.Format("02/01/2006 15:04")
 		}
-		if err := services.SendTemplateEmail(input.Reservation.Agencia, templateCode, recipient, map[string]string{
-			"pedido_id":       input.Reservation.PedidoID,
-			"contacto_nombre": input.Reservation.NombrePasajero,
-			"vence":           vence,
-		}); err != nil {
+		passengerNames := make([]string, 0, len(input.Passengers))
+		for _, pi := range input.Passengers {
+			passengerNames = append(passengerNames, strings.TrimSpace(pi.Nombre+" "+pi.Apellido))
+		}
+		if err := services.SendTemplateEmail(input.Reservation.Agencia, templateCode, recipient,
+			buildReservationEmailVars(&input.Reservation, vence, passengerNames)); err != nil {
 			services.LogFailure("email",
 				fmt.Sprintf("No se pudo enviar el email de aviso para el pedido %s", input.Reservation.PedidoID),
 				fmt.Sprintf("template=%s pedido=%s error=%s", templateCode, input.Reservation.PedidoID, err.Error()))
@@ -573,13 +749,19 @@ func GetAllReservations(c *gin.Context) {
 	// completando el formulario.
 	query := database.DB.Preload("Passengers").Where("estado != ?", models.EstadoHoldTemporal)
 	if role == "agency_admin" {
-		// Además de lo reservado por mi propia agencia, también lo que OTRA
-		// agencia reservó sobre un producto que yo poseo (visibilidad
-		// compartida vía ProductSharedAgency) — al owner le tiene que caer la
-		// nómina/reserva igual, aunque la haya tomado otra agencia.
+		// Además de lo reservado por mi propia agencia, también:
+		// - lo que OTRA agencia reservó sobre un producto que yo poseo
+		//   (visibilidad compartida vía ProductSharedAgency);
+		// - lo que se vendió sobre un producto-espejo de una cesión que YO
+		//   otorgué (source_agency) — el espejo nace con Agencia="", así que
+		//   sin este match el cedente nunca veía esas ventas, aunque el
+		//   comentario de RosterProductID ya asumía que sí las vería. Sin
+		//   esto, una agencia que a la vez cede algunos cupos y recibe otros
+		//   (ej. UTG) ve su nómina/reservas incompleta o con los badges de
+		//   cedido/genuino cruzados entre ambos roles.
 		query = query.Where(
-			"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?))",
-			agencia, agencia,
+			"LOWER(agencia) = LOWER(?) OR product_id IN (SELECT id FROM products WHERE LOWER(agencia) = LOWER(?) OR LOWER(source_agency) = LOWER(?))",
+			agencia, agencia, agencia,
 		)
 	} else if role != "admin" {
 		userID, _ := c.Get("userID")
@@ -688,6 +870,11 @@ func ConfirmReservation(c *gin.Context) {
 		return
 	}
 
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
+		return
+	}
+
 	// Las reservas expiradas volvieron al stock; no se pueden reactivar.
 	if reservation.Estado == models.EstadoExpirada ||
 		reservation.Estado == models.EstadoCancelada ||
@@ -709,13 +896,30 @@ func ConfirmReservation(c *gin.Context) {
 		fmt.Sprintf("Tu reserva del pedido %s fue confirmada", reservation.PedidoID),
 		map[string]string{"pedido_id": reservation.PedidoID})
 
+	var confirmedPassengers []models.Passenger
+	database.DB.Where("reservation_id = ?", reservation.ID).Find(&confirmedPassengers)
+	passengerNames := make([]string, 0, len(confirmedPassengers))
+	for _, p := range confirmedPassengers {
+		passengerNames = append(passengerNames, strings.TrimSpace(p.Nombre+" "+p.Apellido))
+	}
+	emailVars := buildReservationEmailVars(&reservation, "", passengerNames)
+
 	if recipient := services.ResolveReservationRecipientEmail(reservation.CreatedBy); recipient != "" {
-		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", recipient, map[string]string{
-			"pedido_id":       reservation.PedidoID,
-			"contacto_nombre": reservation.NombrePasajero,
-		}); err != nil {
+		if err := services.SendTemplateEmail(reservation.Agencia, "reservation_confirmed", recipient, emailVars); err != nil {
 			services.LogFailure("email",
 				fmt.Sprintf("No se pudo enviar el email de confirmación para el pedido %s", reservation.PedidoID),
+				fmt.Sprintf("pedido=%s error=%s", reservation.PedidoID, err.Error()))
+		}
+	}
+
+	// Mail de cortesía al pasajero/cliente final — a diferencia del de arriba
+	// (que siempre va a la agencia), este es opcional y depende de que la
+	// reserva tenga un email de contacto cargado. Plantilla propia
+	// ("passenger_confirmation") para poder redactarla sin jerga interna.
+	if reservation.ContactoEmail != "" {
+		if err := services.SendTemplateEmail(reservation.Agencia, "passenger_confirmation", reservation.ContactoEmail, emailVars); err != nil {
+			services.LogFailure("email",
+				fmt.Sprintf("No se pudo enviar el email de confirmación al pasajero para el pedido %s", reservation.PedidoID),
 				fmt.Sprintf("pedido=%s error=%s", reservation.PedidoID, err.Error()))
 		}
 	}
@@ -734,16 +938,11 @@ func DeleteReservation(c *gin.Context) {
 	// Devolver disponibilidad solo si el cron o una cancelación NO lo hizo ya.
 	// Las reservas expiradas o canceladas ya tuvieron su stock devuelto.
 	if found && reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada {
-		var passengersCount int64
-		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
-		if passengersCount == 0 {
-			passengersCount = 1
-		}
-
+		seats, total := countPassengerSeats(reservation.ID)
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 			})
 	}
 
@@ -784,14 +983,20 @@ func DeletePassenger(c *gin.Context) {
 		return
 	}
 
-	// Liberar únicamente el lugar de este pasajero si no estaba ya cancelado/expirado.
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
+		return
+	}
+
+	// Liberar únicamente el lugar de este pasajero si no estaba ya
+	// cancelado/expirado — y solo si ocupaba lugar (el infante no lo hacía).
 	if reservation.Estado != models.EstadoExpirada && reservation.Estado != models.EstadoCancelada &&
 		passenger.Estado != models.EstadoExpirada && passenger.Estado != models.EstadoCancelada {
-		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
-			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + 1)) ELSE GREATEST(0, disponibilidad + 1) END"),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - 1)"),
-			})
+		updates := map[string]interface{}{"vendidos": gorm.Expr("GREATEST(0, vendidos - 1)")}
+		if passenger.TipoPasajero != "Infante" {
+			updates["disponibilidad"] = gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + 1)) ELSE GREATEST(0, disponibilidad + 1) END")
+		}
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).Updates(updates)
 	}
 
 	if err := database.DB.Delete(&passenger).Error; err != nil {
@@ -820,6 +1025,11 @@ func UpdateReservation(c *gin.Context) {
 	var reservation models.Reservation
 	if err := database.DB.First(&reservation, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
 		return
 	}
 
@@ -854,12 +1064,44 @@ func UpdateReservation(c *gin.Context) {
 		}
 	}
 
+	// emitido_at nunca se acepta directo del cliente — se calcula acá abajo,
+	// la primera vez que estado_interno pasa a "Emitido".
+	delete(input, "emitido_at")
+	justEmitted := false
+	if v, ok := input["estado_interno"].(string); ok {
+		if !models.IsValidEstadoInterno(v) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "estado_interno inválido"})
+			return
+		}
+		if v == "Emitido" && reservation.EstadoInterno != "Emitido" {
+			input["emitido_at"] = time.Now()
+			justEmitted = true
+		}
+	}
+
 	if err := database.DB.Model(&reservation).Updates(input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar la reserva: " + err.Error()})
 		return
 	}
 
 	database.DB.First(&reservation, id)
+
+	// Al emitirse (individual, no solo en bulk) se generan los boletos de la
+	// Bandeja de Tickets — antes solo BulkUpdateReservations lo hacía, así que
+	// la enorme mayoría de emisiones (flujo de a una reserva) nunca caían ahí.
+	// GenerateTicketsForReservationInternal no depende de Atlas para nada — el
+	// ticket queda con AtlasStatus="pendiente" y es visible en la bandeja
+	// igual, se sincroniza con Atlas después (o nunca) desde ahí.
+	if justEmitted {
+		userIDVal, _ := c.Get("userID")
+		userUUID, err := uuid.Parse(fmt.Sprintf("%v", userIDVal))
+		if err != nil {
+			log.Printf("UpdateReservation: userID de contexto no es un UUID válido (%v), no se puede generar ticket para la reserva #%d: %v", userIDVal, reservation.ID, err)
+		} else if _, err := GenerateTicketsForReservationInternal(&reservation, userUUID); err != nil {
+			log.Printf("UpdateReservation: no se pudo generar el ticket de la reserva #%d al emitirla: %v", reservation.ID, err)
+		}
+	}
+
 	c.JSON(http.StatusOK, reservation)
 }
 
@@ -868,6 +1110,11 @@ func AddDocContable(c *gin.Context) {
 	var reservation models.Reservation
 	if err := database.DB.First(&reservation, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Reserva no encontrada."})
+		return
+	}
+
+	if !callerOwnsReservation(c, &reservation) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No tenés permiso sobre esta reserva."})
 		return
 	}
 
@@ -931,6 +1178,31 @@ func RequestCancellation(c *gin.Context) {
 		return
 	}
 
+	// Bloqueo temporal: todavía no es una reserva confirmada (nadie más la
+	// dio por buena) — quien la pidió puede cancelarla directo, sin pedir
+	// autorización a un admin, y el lugar se libera al instante. Solo a
+	// partir de "confirmada" (o cualquier otro estado post-confirmación)
+	// pasa por el flujo de aprobación de abajo.
+	if reservation.Estado == models.EstadoBloqueoTemporal {
+		seats, total := countPassengerSeats(reservation.ID)
+		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
+			Updates(map[string]interface{}{
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
+			})
+		database.DB.Model(&reservation).Update("estado", models.EstadoCancelada)
+		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Update("estado", models.EstadoCancelada)
+
+		database.DB.First(&reservation, id)
+
+		services.NotifyAgencyByCode(reservation.Agencia, createdByFromContext(c), "reservation_cancelled_direct", "Reserva cancelada",
+			fmt.Sprintf("Se canceló la reserva del pedido %s (bloqueo temporal) y el cupo fue liberado", reservation.PedidoID),
+			map[string]string{"pedido_id": reservation.PedidoID})
+
+		c.JSON(http.StatusOK, reservation)
+		return
+	}
+
 	// Guarda el estado previo para poder restaurarlo tal cual si un admin
 	// rechaza la solicitud (ver ResolveCancellation más abajo).
 	prevEstado := reservation.Estado
@@ -988,15 +1260,11 @@ func ResolveCancellation(c *gin.Context) {
 	actor := createdByFromContext(c)
 
 	if input.Decision == "approve" {
-		var passengersCount int64
-		database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reservation.ID).Count(&passengersCount)
-		if passengersCount == 0 {
-			passengersCount = 1
-		}
+		seats, total := countPassengerSeats(reservation.ID)
 		database.DB.Model(&models.Product{}).Where("id = ?", reservation.ProductID).
 			Updates(map[string]interface{}{
-				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+				"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+				"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 			})
 		database.DB.Model(&reservation).Updates(map[string]interface{}{
 			"estado":            models.EstadoCancelada,
@@ -1053,6 +1321,10 @@ func GetBlockedReservations(c *gin.Context) {
 		result[i] = gin.H{
 			"id":                r.ID,
 			"pedido_id":         r.PedidoID,
+			// product_id (no es dato personal) permite que Disponibilidad
+			// muestre el bloqueo en la línea del producto puntual, en vez de
+			// solo en un banner general agrupado por destino.
+			"product_id":        r.ProductID,
 			"vuelo_destino":     r.VueloDestino,
 			"bloqueo_expira_at": r.BloqueoExpiraAt,
 			"vuelo_salida":      r.VueloSalida,
@@ -1141,6 +1413,35 @@ func UpdatePassengerTicket(c *gin.Context) {
 	}
 
 	database.DB.First(&passenger, passenger.ID)
+
+	// Cargar el número de ticket real de un pasajero (desde Reservas o
+	// Nóminas) ES el momento real de emisión — antes esto no generaba nada en
+	// la Bandeja de Tickets, que solo se disparaba desde el dropdown de
+	// estado_interno="Emitido" (un control aparte que en la práctica casi
+	// nadie usaba). Ahora genera/completa el ticket de este pasajero y marca
+	// la reserva como Emitido si no lo estaba, para que quede consistente.
+	if input.NumeroTicket != "" && parentReservation.ID != 0 {
+		userIDVal, _ := c.Get("userID")
+		userUUID, uerr := uuid.Parse(fmt.Sprintf("%v", userIDVal))
+		if uerr != nil {
+			log.Printf("UpdatePassengerTicket: userID de contexto no es un UUID válido (%v): %v — no se genera ticket", userIDVal, uerr)
+		} else {
+			var product models.Product
+			database.DB.First(&product, parentReservation.ProductID)
+			vendedorEmail := resolveVendedorEmail(parentReservation.CreatedBy)
+			if _, err := upsertTicketForPassenger(&passenger, &parentReservation, product, vendedorEmail, userUUID); err != nil {
+				log.Printf("UpdatePassengerTicket: %v", err)
+			}
+			if parentReservation.EstadoInterno != "Emitido" {
+				now := time.Now()
+				database.DB.Model(&parentReservation).Updates(map[string]interface{}{
+					"estado_interno": "Emitido",
+					"emitido_at":     now,
+				})
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, passenger)
 }
 
@@ -1159,14 +1460,17 @@ func UpdatePassenger(c *gin.Context) {
 	}
 
 	var input struct {
-		Nombre       string   `json:"nombre"`
-		Apellido     string   `json:"apellido"`
-		Documento    string   `json:"documento"`
-		Nacimiento   string   `json:"nacimiento"`
-		Nacionalidad string   `json:"nacionalidad"`
-		TipoPasajero string   `json:"tipo_pasajero"`
-		PrecioVenta  *float64 `json:"precio_venta"`
-		Neto1        *float64 `json:"neto_1"`
+		Nombre               string   `json:"nombre"`
+		Apellido             string   `json:"apellido"`
+		Documento            string   `json:"documento"`
+		Pasaporte            string   `json:"pasaporte"`
+		Nacimiento           string   `json:"nacimiento"`
+		Nacionalidad         string   `json:"nacionalidad"`
+		TipoPasajero         string   `json:"tipo_pasajero"`
+		PrecioVenta          *float64 `json:"precio_venta"`
+		Neto1                *float64 `json:"neto_1"`
+		DocumentoVencimiento string   `json:"documento_vencimiento"`
+		DocumentoVitalicio   bool     `json:"documento_vitalicio"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1174,12 +1478,15 @@ func UpdatePassenger(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{
-		"nombre":        input.Nombre,
-		"apellido":      input.Apellido,
-		"documento":     input.Documento,
-		"nacionalidad":  input.Nacionalidad,
-		"tipo_pasajero": input.TipoPasajero,
-		"nacimiento":    parseDateFlexible(input.Nacimiento),
+		"nombre":                 input.Nombre,
+		"apellido":               input.Apellido,
+		"documento":              input.Documento,
+		"pasaporte":              input.Pasaporte,
+		"nacionalidad":           input.Nacionalidad,
+		"tipo_pasajero":          input.TipoPasajero,
+		"nacimiento":             parseDateFlexible(input.Nacimiento),
+		"documento_vencimiento": parseDateFlexible(input.DocumentoVencimiento),
+		"documento_vitalicio":   input.DocumentoVitalicio,
 	}
 	if input.PrecioVenta != nil {
 		updates["precio_venta"] = *input.PrecioVenta
@@ -1230,13 +1537,18 @@ func DuplicatePassenger(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
 		return
 	}
-	if product.Disponibilidad < 1 {
+	// El infante no ocupa lugar/cupo — no hace falta disponibilidad para
+	// duplicar uno.
+	needsSeat := source.TipoPasajero != "Infante"
+	if needsSeat && product.Disponibilidad < 1 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente para duplicar el pasajero"})
 		return
 	}
 
-	product.Disponibilidad -= 1
+	if needsSeat {
+		product.Disponibilidad -= 1
+	}
 	product.Vendidos += 1
 	if err := tx.Save(&product).Error; err != nil {
 		tx.Rollback()
@@ -1250,6 +1562,7 @@ func DuplicatePassenger(c *gin.Context) {
 		Nombre:          source.Nombre,
 		Apellido:        source.Apellido,
 		Documento:       source.Documento,
+		Pasaporte:       source.Pasaporte,
 		Nacimiento:      source.Nacimiento,
 		Nacionalidad:    source.Nacionalidad,
 		TipoPasajero:    source.TipoPasajero,
@@ -1288,14 +1601,17 @@ func AddPassenger(c *gin.Context) {
 	}
 
 	var input struct {
-		Nombre       string   `json:"nombre"`
-		Apellido     string   `json:"apellido"`
-		Documento    string   `json:"documento"`
-		Nacimiento   string   `json:"nacimiento"`
-		Nacionalidad string   `json:"nacionalidad"`
-		TipoPasajero string   `json:"tipo_pasajero"`
-		PrecioVenta  *float64 `json:"precio_venta"`
-		Neto1        *float64 `json:"neto_1"`
+		Nombre               string   `json:"nombre"`
+		Apellido             string   `json:"apellido"`
+		Documento            string   `json:"documento"`
+		Pasaporte            string   `json:"pasaporte"`
+		Nacimiento           string   `json:"nacimiento"`
+		Nacionalidad         string   `json:"nacionalidad"`
+		TipoPasajero         string   `json:"tipo_pasajero"`
+		PrecioVenta          *float64 `json:"precio_venta"`
+		Neto1                *float64 `json:"neto_1"`
+		DocumentoVencimiento string   `json:"documento_vencimiento"`
+		DocumentoVitalicio   bool     `json:"documento_vitalicio"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1315,13 +1631,18 @@ func AddPassenger(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Producto no encontrado"})
 		return
 	}
-	if product.Disponibilidad < 1 {
+	// El infante no ocupa lugar/cupo — no hace falta disponibilidad para
+	// agregarlo.
+	needsSeat := input.TipoPasajero != "Infante"
+	if needsSeat && product.Disponibilidad < 1 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay disponibilidad suficiente para agregar un pasajero"})
 		return
 	}
 
-	product.Disponibilidad -= 1
+	if needsSeat {
+		product.Disponibilidad -= 1
+	}
 	product.Vendidos += 1
 	if err := tx.Save(&product).Error; err != nil {
 		tx.Rollback()
@@ -1329,27 +1650,33 @@ func AddPassenger(c *gin.Context) {
 		return
 	}
 
-	var precioVenta, neto1 float64
+	var precioVenta float64
 	if input.PrecioVenta != nil {
 		precioVenta = *input.PrecioVenta
 	}
+	// Neto1 usa el desglose de SU tipo (ADT/CHD/INF) salvo que venga un
+	// override explícito — mismo criterio que CreateReservation.
+	neto1 := product.NetoForTipo(input.TipoPasajero)
 	if input.Neto1 != nil {
 		neto1 = *input.Neto1
 	}
 
 	newPassenger := models.Passenger{
-		ReservationID:   reservation.ID,
-		PedidoID:        reservation.PedidoID,
-		Nombre:          input.Nombre,
-		Apellido:        input.Apellido,
-		Documento:       input.Documento,
-		Nacimiento:      parseDateFlexible(input.Nacimiento),
-		Nacionalidad:    input.Nacionalidad,
-		TipoPasajero:    input.TipoPasajero,
-		Estado:          reservation.Estado,
-		PrecioVenta:     precioVenta,
-		Neto1:           neto1,
-		BloqueoExpiraAt: reservation.BloqueoExpiraAt,
+		ReservationID:        reservation.ID,
+		PedidoID:             reservation.PedidoID,
+		Nombre:               input.Nombre,
+		Apellido:             input.Apellido,
+		Documento:            input.Documento,
+		Pasaporte:            input.Pasaporte,
+		Nacimiento:           parseDateFlexible(input.Nacimiento),
+		Nacionalidad:         input.Nacionalidad,
+		TipoPasajero:         input.TipoPasajero,
+		Estado:               reservation.Estado,
+		PrecioVenta:          precioVenta,
+		Neto1:                neto1,
+		BloqueoExpiraAt:      reservation.BloqueoExpiraAt,
+		DocumentoVencimiento: parseDateFlexible(input.DocumentoVencimiento),
+		DocumentoVitalicio:   input.DocumentoVitalicio,
 	}
 	if err := tx.Create(&newPassenger).Error; err != nil {
 		tx.Rollback()
@@ -1364,4 +1691,146 @@ func AddPassenger(c *gin.Context) {
 		map[string]string{"pedido_id": reservation.PedidoID})
 
 	c.JSON(http.StatusCreated, newPassenger)
+}
+
+// BulkUpdateReservations permite cambiar masivamente el estado de reservas seleccionadas (ej. pasar a "Emitido")
+func BulkUpdateReservations(c *gin.Context) {
+	var req struct {
+		IDs           []uint `json:"ids"`
+		Estado        string `json:"estado"`
+		EstadoInterno string `json:"estado_interno"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de reserva."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+
+	var reservations []models.Reservation
+	if err := query.Find(&reservations).Error; err != nil || len(reservations) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No se encontraron reservas para actualizar."})
+		return
+	}
+
+	userIDVal, _ := c.Get("userID")
+	userIDStr := fmt.Sprintf("%v", userIDVal)
+	userUUID, userIDErr := uuid.Parse(userIDStr)
+	if userIDErr != nil {
+		log.Printf("BulkUpdateReservations: userID de contexto no es un UUID válido (%v): %v — los tickets de esta emisión no se van a poder generar", userIDVal, userIDErr)
+	}
+
+	var updatedCount int
+	now := time.Now()
+
+	for _, res := range reservations {
+		updates := map[string]interface{}{}
+		if req.Estado != "" {
+			updates["estado"] = req.Estado
+		}
+		if req.EstadoInterno != "" {
+			if !models.IsValidEstadoInterno(req.EstadoInterno) {
+				continue
+			}
+			updates["estado_interno"] = req.EstadoInterno
+			if req.EstadoInterno == "Emitido" && res.EstadoInterno != "Emitido" {
+				updates["emitido_at"] = now
+			}
+		}
+
+		if len(updates) > 0 {
+			if err := database.DB.Model(&models.Reservation{}).Where("id = ?", res.ID).Updates(updates).Error; err == nil {
+				updatedCount++
+				// Si pasó a Emitido, auto-genera los boletos en la Bandeja de Tickets
+				if req.EstadoInterno == "Emitido" && userIDErr == nil {
+					resCopy := res
+					resCopy.EstadoInterno = "Emitido"
+					if _, err := GenerateTicketsForReservationInternal(&resCopy, userUUID); err != nil {
+						log.Printf("BulkUpdateReservations: no se pudo generar el ticket de la reserva #%d al emitirla: %v", res.ID, err)
+					}
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d reserva(s) actualizada(s) correctamente.", updatedCount),
+		"count":   updatedCount,
+	})
+}
+
+// BulkCancelReservations cancela masivamente un grupo de reservas restituyendo el stock
+func BulkCancelReservations(c *gin.Context) {
+	var req struct {
+		IDs   []uint `json:"ids"`
+		Notas string `json:"notas"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere un array 'ids' con al menos un ID de reserva."})
+		return
+	}
+
+	role, _ := c.Get("role")
+	agenciaVal, _ := c.Get("agencia")
+	agenciaRaw, _ := agenciaVal.(string)
+	agenciaCaller := services.ResolveAgencyCode(agenciaRaw)
+
+	query := database.DB.Where("id IN ?", req.IDs)
+	if role != "admin" {
+		query = query.Where("LOWER(agencia) = ?", strings.ToLower(agenciaCaller))
+	}
+
+	var reservations []models.Reservation
+	if err := query.Find(&reservations).Error; err != nil || len(reservations) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No se encontraron reservas para cancelar."})
+		return
+	}
+
+	var canceledCount int
+	for _, res := range reservations {
+		if res.Estado == "cancelada" {
+			continue
+		}
+		tx := database.DB.Begin()
+		var product models.Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, res.ProductID).Error; err == nil {
+			var passengerCount int64
+			tx.Model(&models.Passenger{}).Where("reservation_id = ?", res.ID).Count(&passengerCount)
+			toRelease := int(passengerCount)
+			if toRelease == 0 {
+				toRelease = res.HoldPassengerCount
+			}
+			if toRelease == 0 {
+				toRelease = 1
+			}
+			product.Vendidos -= toRelease
+			if product.Vendidos < 0 {
+				product.Vendidos = 0
+			}
+			product.Disponibilidad = product.Cupo - product.Vendidos
+			tx.Save(&product)
+		}
+
+		res.Estado = "cancelada"
+		res.CancelacionNotas = req.Notas
+		if err := tx.Save(&res).Error; err == nil {
+			tx.Commit()
+			canceledCount++
+		} else {
+			tx.Rollback()
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("%d reserva(s) cancelada(s) correctamente.", canceledCount),
+		"count":   canceledCount,
+	})
 }

@@ -73,6 +73,16 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 2. Fallback: Autenticación normal por JWT para sesión web
 		if authHeader == "" {
+			if cookieToken, err := c.Cookie("token"); err == nil && cookieToken != "" {
+				authHeader = "Bearer " + cookieToken
+			} else if cookieToken, err := c.Cookie("access_token"); err == nil && cookieToken != "" {
+				authHeader = "Bearer " + cookieToken
+			} else if queryToken := c.Query("token"); queryToken != "" {
+				authHeader = "Bearer " + queryToken
+			}
+		}
+
+		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado. Se requiere token Bearer o X-API-Key."})
 			c.Abort()
 			return

@@ -3,7 +3,28 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
 
-const COLORS = ['#0f172a', '#2563eb', '#16a34a', '#f59e0b', '#dc2626'];
+// Colores atados a los mismos semantic que Badge.jsx (success/warning/danger)
+// para que "confirmadas" sea el mismo verde en la torta que en cualquier
+// badge de estado del resto de la app — antes eran hex sueltos sin relación.
+const STATUS_COLORS = {
+  Confirmadas: '#059669',
+  Pendientes: '#d97706',
+  Canceladas: '#dc2626',
+};
+const FALLBACK_COLORS = ['#2563eb', '#64748b', '#7c3aed'];
+
+const formatCompactUSD = (n) =>
+  new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(n || 0);
+
+// contentStyle del Tooltip de Recharts — por default sale una caja blanca de
+// esquinas rectas y sombra dura, que desentona con el resto del kit
+// (rounded-2xl/3xl + shadow-sm). Esto lo acerca al mismo lenguaje visual.
+const tooltipStyle = {
+  borderRadius: 12,
+  border: '1px solid #e2e8f0',
+  boxShadow: '0 4px 12px rgba(15,23,42,0.12)',
+  fontSize: 12,
+};
 
 const EmptyState = ({ isLoading, message }) => (
   <div className="flex h-full items-center justify-center text-xs text-slate-400">
@@ -45,9 +66,9 @@ const DashboardCharts = ({ destinoVentas, evolucionPasajeros, reservationStatus,
                 <BarChart data={ventasPorDestino}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="destino" fontSize={10} stroke="#64748b" />
-                  <YAxis fontSize={10} stroke="#64748b" />
-                  <Tooltip />
-                  <Bar dataKey="venta" fill="#0f172a" name="Ventas (USD)" radius={[4, 4, 0, 0]} />
+                  <YAxis fontSize={10} stroke="#64748b" tickFormatter={formatCompactUSD} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => [formatCompactUSD(value), 'Ventas']} />
+                  <Bar dataKey="venta" fill="#2563eb" name="Ventas" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -75,10 +96,10 @@ const DashboardCharts = ({ destinoVentas, evolucionPasajeros, reservationStatus,
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {estados.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={tooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -98,8 +119,8 @@ const DashboardCharts = ({ destinoVentas, evolucionPasajeros, reservationStatus,
                 <BarChart data={evolucion}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="periodo" fontSize={10} stroke="#64748b" />
-                  <YAxis fontSize={10} stroke="#64748b" />
-                  <Tooltip />
+                  <YAxis fontSize={10} stroke="#64748b" allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
                   <Bar dataKey="pasajeros" fill="#2563eb" name="Pasajeros" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

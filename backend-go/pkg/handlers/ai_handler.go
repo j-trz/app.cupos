@@ -1242,7 +1242,9 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, productID).Error; err != nil {
 				return fmt.Errorf("Producto no encontrado")
 			}
-			if product.Disponibilidad <= 0 {
+			// El infante no ocupa lugar/cupo (ver CreateReservation en order_handler.go).
+			esInfante := strings.EqualFold(fmt.Sprintf("%v", args["pasajero_tipo"]), "Infante")
+			if !esInfante && product.Disponibilidad <= 0 {
 				return fmt.Errorf("El producto no tiene disponibilidad")
 			}
 
@@ -1260,12 +1262,15 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				return ""
 			}
 
+			// Neto1 (y el OP usado más abajo para "rentabilidad") van según el
+			// tipo real del pasajero, no un valor único del producto.
+			tipoPasajero := strArg("pasajero_tipo")
 			reserva = models.Reservation{
 				ProductID:            uint(productID),
 				CreatedBy:            u.ID,
 				Estado:               models.EstadoBloqueoTemporal,
 				PrecioVenta:          precio,
-				Neto1:                product.Neto1,
+				Neto1:                product.NetoForTipo(tipoPasajero),
 				PedidoID:             pedidoID,
 				Agencia:              agencia,
 				ContactoNombre:       strArg("contacto_nombre"),
@@ -1276,7 +1281,7 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				DocumentoPasajero:    strArg("pasajero_documento"),
 				NacionalidadPasajero: strArg("pasajero_nacionalidad"),
 				NacimientoPasajero:   parseDateFlexible(strArg("pasajero_nacimiento")),
-				TipoPasajero:         strArg("pasajero_tipo"),
+				TipoPasajero:         tipoPasajero,
 				FichaVenta:           strArg("ficha_venta"),
 			}
 
@@ -1298,10 +1303,15 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 				return err
 			}
 
-			// Descontar disponibilidad e incrementar vendidos de forma atómica y segura
+			// Descontar disponibilidad (salvo infante, que no ocupa lugar) e
+			// incrementar vendidos de forma atómica y segura.
+			disponibilidad := product.Disponibilidad
+			if !esInfante {
+				disponibilidad--
+			}
 			if err := tx.Model(&models.Product{}).Where("id = ?", productID).
 				Updates(map[string]interface{}{
-					"disponibilidad": product.Disponibilidad - 1,
+					"disponibilidad": disponibilidad,
 					"vendidos":       product.Vendidos + 1,
 				}).Error; err != nil {
 				return err
@@ -1368,15 +1378,11 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 		var reserva models.Reservation
 		if database.DB.First(&reserva, id).Error == nil {
 			if reserva.Estado != models.EstadoExpirada && reserva.Estado != models.EstadoCancelada {
-				var passengersCount int64
-				database.DB.Model(&models.Passenger{}).Where("reservation_id = ?", reserva.ID).Count(&passengersCount)
-				if passengersCount == 0 {
-					passengersCount = 1
-				}
+				seats, total := countPassengerSeats(reserva.ID)
 				database.DB.Model(&models.Product{}).Where("id = ?", reserva.ProductID).
 					Updates(map[string]interface{}{
-						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", passengersCount, passengersCount),
-						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", passengersCount),
+						"disponibilidad": gorm.Expr("CASE WHEN cupo > 0 THEN LEAST(cupo, GREATEST(0, disponibilidad + ?)) ELSE GREATEST(0, disponibilidad + ?) END", seats, seats),
+						"vendidos":       gorm.Expr("GREATEST(0, vendidos - ?)", total),
 					})
 			}
 			database.DB.Where("reservation_id = ?", reserva.ID).Delete(&models.Passenger{})
@@ -1454,10 +1460,24 @@ func executeTool(name string, args map[string]interface{}, u userCtx, pageCtx *P
 
 		var totalReservas int64
 		baseQ().Count(&totalReservas)
+
+		// Ventas/costo se suman por PASAJERO, no por reserva: cada pasajero
+		// tiene su propio precio_venta/neto_1 según su tipo (ADT/CHD/INF) —
+		// sumar a nivel Reservation usaría un solo valor por pedido, ciego a
+		// la mezcla real de tipos si el pedido tiene más de un pasajero.
+		passengerQ := func() *gorm.DB {
+			q := database.DB.Model(&models.Passenger{}).
+				Joins("JOIN reservations ON reservations.id = passengers.reservation_id").
+				Where("reservations.estado = ?", models.EstadoConfirmada)
+			if scopeAgencia != "" {
+				q = q.Where("LOWER(reservations.agencia) = LOWER(?)", scopeAgencia)
+			}
+			return q
+		}
 		var totalVentas float64
-		baseQ().Select("COALESCE(SUM(precio_venta), 0)").Scan(&totalVentas)
+		passengerQ().Select("COALESCE(SUM(passengers.precio_venta), 0)").Scan(&totalVentas)
 		var totalCosto float64
-		baseQ().Select("COALESCE(SUM(neto_1), 0)").Scan(&totalCosto)
+		passengerQ().Select("COALESCE(SUM(passengers.neto_1), 0)").Scan(&totalCosto)
 
 		rentabilidad := totalVentas - totalCosto
 		margenPct := 0.0
@@ -2268,17 +2288,24 @@ func Chat(c *gin.Context) {
 		return
 	}
 
-	// Obtener proveedor
+	// Obtener proveedor — siempre scopeado a la agencia del usuario (o sin
+	// restricción si es admin), para que ninguna agencia pueda usar ni
+	// consumir la API Key de otra (bug 2026-09-15: antes era un único
+	// proveedor global compartido por todo el sistema).
 	var provider models.AIProvider
+	providerScope := database.DB
+	if role != "admin" {
+		providerScope = providerScope.Where("LOWER(agencia) = LOWER(?)", u.Agencia)
+	}
 	if req.ProviderID != "" {
-		if err := database.DB.First(&provider, "id = ? AND is_active = true", req.ProviderID).Error; err != nil {
+		if err := providerScope.First(&provider, "id = ? AND is_active = true", req.ProviderID).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
 			return
 		}
 	} else {
-		if err := database.DB.Where("is_active = true AND is_default = true").First(&provider).Error; err != nil {
-			if err := database.DB.Where("is_active = true").First(&provider).Error; err != nil {
-				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No hay ningún proveedor de IA configurado y activo"})
+		if err := providerScope.Where("is_active = true AND is_default = true").First(&provider).Error; err != nil {
+			if err := providerScope.Where("is_active = true").First(&provider).Error; err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Tu agencia no tiene ningún proveedor de IA configurado y activo"})
 				return
 			}
 		}
@@ -2715,9 +2742,36 @@ func mustJSON(v interface{}) string {
 // PROVIDERS CRUD
 // ─────────────────────────────────────────────
 
+// findProviderScoped busca un proveedor de IA por ID y verifica que pertenezca
+// a la agencia del usuario (o sea admin) — mismo criterio que
+// findExpertScoped, para que ninguna agencia pueda ver/editar/borrar/probar el
+// proveedor (y la API Key) de otra.
+func findProviderScoped(c *gin.Context, providerID string) (*models.AIProvider, bool) {
+	var provider models.AIProvider
+	if err := database.DB.First(&provider, "id = ?", providerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+		return nil, false
+	}
+	agencia, isAdmin := expertAgencyScope(c)
+	if !isAdmin && !strings.EqualFold(provider.Agencia, agencia) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+		return nil, false
+	}
+	return &provider, true
+}
+
 func ListAIProviders(c *gin.Context) {
+	agencia, isAdmin := expertAgencyScope(c)
+	q := database.DB.Model(&models.AIProvider{})
+	if isAdmin {
+		if filtro := c.Query("agencia"); filtro != "" {
+			q = q.Where("LOWER(agencia) = LOWER(?)", filtro)
+		}
+	} else {
+		q = q.Where("LOWER(agencia) = LOWER(?)", agencia)
+	}
 	providers := make([]models.AIProvider, 0)
-	database.DB.Find(&providers)
+	q.Order("created_at desc").Find(&providers)
 	for i := range providers {
 		if providers[i].APIKey != "" {
 			providers[i].APIKey = "••••••••"
@@ -2732,9 +2786,21 @@ func CreateAIProvider(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	agencia, isAdmin := expertAgencyScope(c)
+	// Nunca confiar en la agencia del body salvo que sea admin eligiéndola
+	// explícitamente — el resto siempre queda con la agencia real del caller.
+	if !isAdmin || strings.TrimSpace(provider.Agencia) == "" {
+		provider.Agencia = agencia
+	}
+	if provider.Agencia == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Falta la agencia del proveedor"})
+		return
+	}
 	provider.ID = uuid.New()
 	if provider.IsDefault {
-		database.DB.Model(&models.AIProvider{}).Where("is_default = true").Update("is_default", false)
+		database.DB.Model(&models.AIProvider{}).
+			Where("is_default = true AND LOWER(agencia) = LOWER(?)", provider.Agencia).
+			Update("is_default", false)
 	}
 	database.DB.Create(&provider)
 	provider.APIKey = "••••••••"
@@ -2742,10 +2808,8 @@ func CreateAIProvider(c *gin.Context) {
 }
 
 func UpdateAIProvider(c *gin.Context) {
-	id := c.Param("id")
-	var existing models.AIProvider
-	if err := database.DB.First(&existing, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+	existing, ok := findProviderScoped(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	var updates models.AIProvider
@@ -2757,8 +2821,15 @@ func UpdateAIProvider(c *gin.Context) {
 		updates.APIKey = existing.APIKey
 	}
 	updates.ID = existing.ID
+	// Solo un admin puede reasignar la agencia de un proveedor; cualquier
+	// otro valor recibido en el body se ignora y se conserva el actual.
+	if _, isAdmin := expertAgencyScope(c); !isAdmin || strings.TrimSpace(updates.Agencia) == "" {
+		updates.Agencia = existing.Agencia
+	}
 	if updates.IsDefault {
-		database.DB.Model(&models.AIProvider{}).Where("id != ? AND is_default = true", id).Update("is_default", false)
+		database.DB.Model(&models.AIProvider{}).
+			Where("id != ? AND is_default = true AND LOWER(agencia) = LOWER(?)", existing.ID, updates.Agencia).
+			Update("is_default", false)
 	}
 	database.DB.Save(&updates)
 	updates.APIKey = "••••••••"
@@ -2766,23 +2837,24 @@ func UpdateAIProvider(c *gin.Context) {
 }
 
 func DeleteAIProvider(c *gin.Context) {
-	id := c.Param("id")
-	database.DB.Delete(&models.AIProvider{}, "id = ?", id)
+	provider, ok := findProviderScoped(c, c.Param("id"))
+	if !ok {
+		return
+	}
+	database.DB.Delete(provider)
 	c.JSON(http.StatusOK, gin.H{"message": "Proveedor eliminado"})
 }
 
 func TestAIProvider(c *gin.Context) {
-	id := c.Param("id")
-	var provider models.AIProvider
-	if err := database.DB.First(&provider, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Proveedor no encontrado"})
+	provider, ok := findProviderScoped(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	if provider.APIKey == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No hay API Key configurada"})
 		return
 	}
-	response, err := callProvider(provider, "Responde exactamente: 'Conexión exitosa'")
+	response, err := callProvider(*provider, "Responde exactamente: 'Conexión exitosa'")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error()})
 		return

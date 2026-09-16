@@ -6,9 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-	"gorm.io/gorm"
-
 	"backend-go/pkg/database"
 	"backend-go/pkg/models"
 	"backend-go/pkg/services"
@@ -140,6 +137,56 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	issueSession(c, &profile)
+}
+
+// LoginOffice365 recibe el ID token real que el frontend obtuvo de Microsoft
+// (vía MSAL.js contra el tenant configurado) y lo valida contra las claves
+// públicas reales de Microsoft — nunca confía en el email de un token sin
+// verificar su firma primero (ver services.ValidateOffice365IDToken).
+//
+// Preparación para el reemplazo del login propio en producción (decisión ya
+// tomada, ver docs/FLUJOS_FUNCIONALIDADES.md sección 1) — coexiste con Login
+// mientras se termina de configurar y probar el App Registration de Azure;
+// no hay auto-provisioning: el email verificado tiene que matchear un
+// Profile ya existente (mismo criterio que "sin auto-registro público" del
+// resto del sistema), si no existe se rechaza con un mensaje claro en vez de
+// crear una cuenta nueva sola.
+func LoginOffice365(c *gin.Context) {
+	var input struct {
+		IDToken string `json:"id_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id_token es requerido."})
+		return
+	}
+
+	if !services.Office365LoginConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "El login con Office 365 todavía no está configurado en el servidor."})
+		return
+	}
+
+	email, _, err := services.ValidateOffice365IDToken(input.IDToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No se pudo verificar la sesión de Office 365: " + err.Error()})
+		return
+	}
+
+	var profile models.Profile
+	if err := database.DB.Where("LOWER(email) = LOWER(?)", email).First(&profile).Error; err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Tu cuenta de Office 365 (" + email + ") no está registrada en el sistema. Pedile a un administrador que te cree un usuario con ese mismo email."})
+		return
+	}
+
+	issueSession(c, &profile)
+}
+
+// issueSession firma nuestro propio JWT de sesión (HS256, 24h) para un
+// Profile ya autenticado — punto único usado tanto por el login propio
+// (Login) como por Office 365 (LoginOffice365), para que ambos caminos
+// terminen en exactamente la misma sesión/RBAC/respuesta, sin duplicar la
+// lógica de emisión del token.
+func issueSession(c *gin.Context, profile *models.Profile) {
 	if !profile.IsActive {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tu cuenta está inactiva. Contactá a un administrador."})
 		return
@@ -147,7 +194,11 @@ func Login(c *gin.Context) {
 
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		secret = "fallback_secret_key"
+		// Nunca firmar con un secreto de fallback hardcodeado — si falta la
+		// env var, fallar cerrado (mismo criterio que middleware/auth.go, que
+		// ya rechaza la validación de tokens en este mismo caso).
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error de configuración del servidor."})
+		return
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -171,7 +222,7 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"token":   tokenString,
-		"user":    withAIFlag(profile),
+		"user":    withAIFlag(*profile),
 	})
 }
 
@@ -288,6 +339,18 @@ func CreateUser(c *gin.Context) {
 		profile.Agencia = agencia
 	}
 
+	// Hallazgo de la auditoría de seguridad 2026-08-13: profile.Role/Admin
+	// venían tal cual del body sin ninguna restricción — cualquier caller con
+	// USERS_CREATE (ej. un agency_admin) podía crear un usuario nuevo con
+	// role:"admin"/admin:true directo. Mismo criterio "se ignora en vez de
+	// error" que ya se usa arriba para la agencia.
+	if callerRole, _ := c.Get("role"); callerRole != "admin" {
+		if strings.EqualFold(profile.Role, "admin") {
+			profile.Role = "agency_user"
+		}
+		profile.Admin = false
+	}
+
 	// El campo bindeado desde JSON es Password (texto plano); EncryptedPassword
 	// tiene json:"-" y nunca llega en el request, así que hashear ese campo
 	// (como se hacía antes) dejaba la contraseña sin encriptar guardada.
@@ -311,85 +374,13 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if input.RoleID != nil {
-		if err := setUserRole(profile.ID, *input.RoleID, profile.Agencia); err != nil {
+		if err := setUserRole(c, profile.ID, *input.RoleID, profile.Agencia); err != nil {
 			c.JSON(http.StatusCreated, gin.H{"success": true, "user": profile, "role_warning": err.Error()})
 			return
 		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "user": profile})
-}
-
-func Register(c *gin.Context) {
-	var profile models.Profile
-	if err := c.ShouldBindJSON(&profile); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Verificar si el email ya existe
-	var existingProfile models.Profile
-	err := database.DB.Where("email = ?", profile.Email).First(&existingProfile).Error
-	if err == nil {
-		// Email already exists
-		c.JSON(http.StatusBadRequest, gin.H{"error": "El email ya está registrado."})
-		return
-	}
-	// Check if there was an error other than record not found
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al verificar el email."})
-		return
-	}
-
-	// Encriptar la contraseña
-	if profile.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "La contraseña es requerida."})
-		return
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al encriptar la contraseña."})
-		return
-	}
-	profile.EncryptedPassword = string(hashedPassword)
-
-	// Set default role and ensure no admin privileges
-	profile.Role = "agency_user"
-	profile.Admin = false // Explicitly set admin to false
-	profile.ID = uuid.New()
-
-	if err := database.DB.Create(&profile).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear el usuario."})
-		return
-	}
-
-	// Generar token JWT para el nuevo usuario
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "fallback_secret_key"
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":      profile.ID,
-		"email":   profile.Email,
-		"nombre":  profile.Nombre,
-		"agencia": profile.Agencia,
-		"role":    profile.Role,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Remove admin claim from token
-	})
-
-	tokenString, err := token.SignedString([]byte(secret))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al generar el token."})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
-		"token":   tokenString,
-		"user":    profile,
-	})
 }
 
 func GetUserById(c *gin.Context) {
@@ -463,11 +454,26 @@ func UpdateUser(c *gin.Context) {
 			updates["agencia"] = *input.Agencia
 		}
 	}
+	// Hallazgo de la auditoría de seguridad 2026-08-13: role/admin se
+	// aplicaban tal cual del body sin ninguna restricción — cualquier caller
+	// con USERS_UPDATE (ej. un agency_admin editando un usuario de su propia
+	// agencia, ya validado como "no cross-agencia" arriba) podía poner
+	// role:"admin"/admin:true y promoverse a sí mismo (o a cualquiera) a
+	// admin global. Solo un admin real puede otorgar ese valor.
+	callerIsAdmin, _ := c.Get("role")
 	if input.Role != nil {
-		updates["role"] = *input.Role
+		if callerIsAdmin != "admin" && strings.EqualFold(*input.Role, "admin") {
+			// se ignora, igual que la reasignación de agencia cross-scope arriba
+		} else {
+			updates["role"] = *input.Role
+		}
 	}
 	if input.Admin != nil {
-		updates["admin"] = *input.Admin
+		if callerIsAdmin != "admin" && *input.Admin {
+			// se ignora
+		} else {
+			updates["admin"] = *input.Admin
+		}
 	}
 	if input.IsActive != nil {
 		updates["is_active"] = *input.IsActive
@@ -479,7 +485,7 @@ func UpdateUser(c *gin.Context) {
 	database.DB.First(&profile, "id = ?", id)
 
 	if input.RoleID != nil {
-		if err := setUserRole(profile.ID, *input.RoleID, profile.Agencia); err != nil {
+		if err := setUserRole(c, profile.ID, *input.RoleID, profile.Agencia); err != nil {
 			c.JSON(http.StatusOK, gin.H{"success": true, "user": profile, "role_warning": err.Error()})
 			return
 		}

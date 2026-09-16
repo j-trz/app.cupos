@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useApproveProduct } from '../hooks/useProducts';
 import { useCreateProduct as useCreateProductMutation } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import ActionsOverflow from '../components/ui/ActionsOverflow.jsx';
 import { Input } from '../components/ui/Input';
 import Modal from '../components/Modal.jsx';
 import { Card } from '../components/ui/Card';
@@ -16,7 +18,8 @@ import SkeletonTable from '../components/SkeletonTable';
 import EmptyState from '../components/EmptyState';
 import ProductForm from '../components/ProductForm';
 import ProductBulkUpload from '../components/ProductBulkUpload';
-import { Search, Plus, Edit, Trash2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw } from 'lucide-react';
+import BulkSelectionBar from '../components/ui/BulkSelectionBar.jsx';
+import { Search, Plus, Edit, Trash2, Copy, CheckCircle2, Upload, ArrowRightLeft, Package, RotateCcw, MapPin, X, StickyNote, Share2, Download, Lock, RefreshCw, History, Clock, Columns3 } from 'lucide-react';
 import TransferModal from '../components/TransferModal';
 import ShareProductModal from '../components/ShareProductModal';
 import TransferService from '../services/transferService';
@@ -46,10 +49,20 @@ const GestionProductos = () => {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  // Datos con los que se precarga el modal al duplicar — a diferencia de
+  // editingProduct, sigue siendo un alta nueva (handleCreateProduct), solo
+  // que el formulario no arranca en blanco.
+  const [duplicatingProduct, setDuplicatingProduct] = useState(null);
   const [transferringProduct, setTransferringProduct] = useState(null);
   const [sharingProduct, setSharingProduct] = useState(null);
   const [routeModalProduct, setRouteModalProduct] = useState(null);
   const [notesModalProduct, setNotesModalProduct] = useState(null);
+  const [movementsModalProduct, setMovementsModalProduct] = useState(null);
+
+  // Multi-selección
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkDuplicating, setIsBulkDuplicating] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,15 +75,27 @@ const GestionProductos = () => {
   // Disponibilidad (reserva real) ya no le aparezca.
   const { data: productsResult, isLoading, isError, isFetching } = useProducts({ search: searchTerm, scope: 'management' });
 
-  if (!can('PRODUCTS_VIEW')) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Lock className="h-12 w-12 text-slate-300 mb-3" />
-        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
-        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
-      </div>
-    );
-  }
+  // Cesiones salientes por producto — para la columna "Cedidos". Se fetchea
+  // una vez (no es react-query, TransferService no tiene hook propio todavía)
+  // y se agrupa por AvailabilityTransfer.ProductID (el producto ORIGEN, no el
+  // espejo) para poder mostrar "cedido a X: N cupos" en la fila del producto
+  // dueño sin tener que buscar la fila del espejo aparte.
+  const [transfers, setTransfers] = useState([]);
+  useEffect(() => {
+    TransferService.listTransfers().then((data) => {
+      setTransfers(Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
+    }).catch(() => setTransfers([]));
+  }, []);
+  const cedidosByProductId = useMemo(() => {
+    const map = {};
+    transfers.forEach((t) => {
+      const pid = String(t.product_id);
+      if (!map[pid]) map[pid] = [];
+      map[pid].push({ agencia: t.target_agency, cantidad: t.quantity, fecha: t.created_at });
+    });
+    return map;
+  }, [transfers]);
+
   // El backend devuelve el array "pelado" (no { data: [...] }) — igual que
   // consumen /products el resto de las pantallas (Nóminas, Disponibilidad,
   // Reservas). Sin este fallback, products.data siempre daba undefined y la
@@ -108,8 +133,44 @@ const GestionProductos = () => {
   const hasActiveFilters = !!(filters.agencia || filters.destino || filters.compania || filters.temporada || filters.tipo_producto || filters.estado);
   const clearFilters = () => setFilters({ agencia: '', destino: '', compania: '', temporada: '', tipo_producto: '', estado: '' });
 
+  // Mostrar/ocultar columnas de la tabla principal (30 columnas es demasiado
+  // para escanear de una) — persistido para no rearmarlo cada sesión. La
+  // columna Acciones no entra acá: siempre visible y fija a la izquierda.
+  const [hiddenColumns, setHiddenColumns] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('gestionProductos.hiddenColumns') || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem('gestionProductos.hiddenColumns', JSON.stringify(hiddenColumns));
+  }, [hiddenColumns]);
+  const isColumnVisible = (key) => !hiddenColumns.includes(key);
+  const toggleColumn = (key) => setHiddenColumns((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
+  const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
+  const columnsMenuRef = useRef(null);
+  useEffect(() => {
+    if (!isColumnsMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target)) {
+        setIsColumnsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isColumnsMenuOpen]);
+
+  // Productos convertidos desde una Oportunidad que todavía no aprobó un
+  // admin — se muestran aparte (ver sección "Pendientes de aprobación") y no
+  // entran a la tabla principal ni a sus filtros.
+  const pendingProducts = useMemo(() => products.filter((p) => p.pendiente_aprobacion), [products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      if (p.pendiente_aprobacion) return false;
       if (filters.agencia && p.agencia !== filters.agencia) return false;
       if (filters.destino && p.destino !== filters.destino) return false;
       if (filters.compania && p.compania !== filters.compania) return false;
@@ -124,6 +185,8 @@ const GestionProductos = () => {
   const createProductMutation = useCreateProductMutation();
   const updateProductMutation = useUpdateProduct();
   const deleteProductMutation = useDeleteProduct();
+  const approveProductMutation = useApproveProduct();
+  const canApprove = can('PRODUCTS_APPROVE');
 
   const handleCreateProduct = async (productData) => {
     try {
@@ -134,6 +197,7 @@ const GestionProductos = () => {
       });
       setIsModalOpen(false);
       setEditingProduct(null);
+      setDuplicatingProduct(null);
     } catch (error) {
       toast({
         title: 'Error',
@@ -169,7 +233,7 @@ const GestionProductos = () => {
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!result.isConfirmed) return;
     try {
@@ -180,8 +244,84 @@ const GestionProductos = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const result = await Swal.fire({
+      title: `¿Eliminar ${selectedIds.length} productos?`,
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkDeleting(true);
+    try {
+      await ProductService.bulkDeleteProducts(selectedIds);
+      toast({ title: 'Éxito', description: `${selectedIds.length} productos eliminados.` });
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (err) {
+      toast({ title: 'Error', description: err.message || 'Error al eliminar masivamente.', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleBulkDuplicate = async () => {
+    const result = await Swal.fire({
+      title: `¿Duplicar ${selectedIds.length} productos?`,
+      text: 'Se crearán copias exactas con el cupo y tarifas originales.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Duplicar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkDuplicating(true);
+    try {
+      await ProductService.bulkDuplicateProducts(selectedIds);
+      toast({ title: 'Éxito', description: `${selectedIds.length} productos duplicados.` });
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (err) {
+      toast({ title: 'Error', description: err.message || 'Error al duplicar masivamente.', variant: 'destructive' });
+    } finally {
+      setIsBulkDuplicating(false);
+    }
+  };
+
+  const handleApproveProduct = async (product) => {
+    const result = await Swal.fire({
+      title: '¿Aprobar producto?',
+      html: `<b>${product.codigo_cupo}</b> hacia ${product.destino} (${product.compania}) va a quedar disponible para reservar.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Aprobar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await approveProductMutation.mutateAsync(product.id);
+      Swal.fire({ icon: 'success', title: 'Producto aprobado', timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Error al aprobar el producto' });
+    }
+  };
+
   const handleEditProduct = (product) => {
     setEditingProduct(product);
+    setIsModalOpen(true);
+  };
+
+  // Duplicar: abre el modal de alta (no edición) precargado con los datos
+  // del producto original — se descartan los campos que identifican a ESE
+  // producto puntual (id, código de cupo, vendidos, fechas de auditoría) y
+  // los de cesión (no tiene sentido que la copia nazca ya restringida/cedida).
+  const handleDuplicateProduct = (product) => {
+    const { id, codigo_cupo, vendidos, created_at, updated_at, restricted_agency, source_agency, transfer_id, ...rest } = product;
+    setEditingProduct(null);
+    setDuplicatingProduct(rest);
     setIsModalOpen(true);
   };
 
@@ -307,6 +447,96 @@ const GestionProductos = () => {
     return result;
   };
 
+  // Gestión de columnas visibles de la tabla principal (30 columnas es
+  // demasiado para escanear de una — se pueden ocultar las que no importan
+  // ahora mismo). Persistido en localStorage para no tener que rearmarlo
+  // cada sesión. La columna Acciones no se lista acá: siempre está visible
+  // y fija a la izquierda (sticky) mientras se scrollea horizontalmente.
+  const productColumns = [
+    { key: 'codigo', label: 'Código', cellClassName: 'font-mono text-xs font-medium', render: (p) => p.codigo_cupo },
+    { key: 'tipo', label: 'Tipo', render: (p) => p.tipo_producto || '—' },
+    { key: 'destino', label: 'Destino', cellClassName: 'font-medium text-slate-900', render: (p) => p.destino },
+    { key: 'compania', label: 'Compañía', render: (p) => p.compania },
+    {
+      key: 'agencia', label: 'Agencia', cellClassName: 'font-medium text-slate-700',
+      render: (p) => (p.agencia ? agencyName(p.agencia) : (
+        <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
+          Sin agencia dueña
+        </span>
+      )),
+    },
+    {
+      key: 'ruta', label: 'Ruta / Cabina / Hab.',
+      render: (p) => (p.ruta ? (
+        <button
+          type="button"
+          onClick={() => setRouteModalProduct(p)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+          title="Ver detalle de la ruta"
+        >
+          <MapPin className="h-3 w-3" />
+          Ruta
+        </button>
+      ) : <span className="text-slate-400">—</span>),
+    },
+    { key: 'pnr', label: 'PNR', render: (p) => p.pnr || '—' },
+    { key: 'ficha', label: 'Ficha', render: (p) => p.ficha || '—' },
+    { key: 'servicio', label: 'Servicio', render: (p) => p.servicio || '—' },
+    {
+      key: 'notas', label: 'Notas',
+      render: (p) => ((p.notas_externas || p.notas_internas) ? (
+        <button
+          type="button"
+          onClick={() => setNotesModalProduct(p)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+          title="Ver notas"
+        >
+          <StickyNote className="h-3 w-3" />
+          Notas
+        </button>
+      ) : <span className="text-slate-400">—</span>),
+    },
+    { key: 'temporada', label: 'Temporada', render: (p) => p.temporada || '—' },
+    { key: 'disponibilidad', label: 'Disp.', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => p.disponibilidad },
+    { key: 'cupo', label: 'Cupo', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => p.cupo || '—' },
+    { key: 'salida', label: 'Salida', render: (p) => formatDate(p.fecha_salida) },
+    { key: 'regreso', label: 'Regreso', render: (p) => formatDate(p.fecha_regreso) },
+    { key: 'vencimiento_pago', label: 'Venc. Pago', render: (p) => formatDate(p.vencimiento_pago) },
+    { key: 'nomination', label: 'Nómina', render: (p) => formatDate(p.nomination_date) },
+    { key: 'emision', label: 'Emisión', render: (p) => formatDate(p.fecha_emision) },
+    { key: 'gastos', label: 'Gastos', render: (p) => formatDate(p.fecha_gastos) },
+    { key: 'bloqueo', label: 'Bloqueo (min)', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => p.bloqueo_temporal_minutos || '—' },
+    { key: 'adt', label: 'ADT', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.precio) },
+    { key: 'inf', label: 'INF', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.inf_fare) },
+    { key: 'chd', label: 'CHD', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.chd_fare) },
+    { key: 'neto1', label: 'Neto 1', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.neto_1) },
+    { key: 'op_adt', label: 'OP ADT', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.op_adt) },
+    { key: 'op_inf', label: 'OP INF', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.op_inf) },
+    { key: 'op_chd', label: 'OP CHD', headClassName: 'text-right', cellClassName: 'text-right font-mono', render: (p) => formatMoney(p.op_chd) },
+    { key: 'equipaje', label: 'Equipaje', render: (p) => <BaggageFranchise item={p} /> },
+    {
+      key: 'estado', label: 'Estado',
+      render: (p) => (
+        <Badge variant={p.is_blocked_for_sale ? 'danger' : 'success'}>
+          {p.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
+        </Badge>
+      ),
+    },
+  ];
+
+  // Guards después de TODOS los hooks (ver regla 5 de Gotchas y Reglas de
+  // Oro) — antes estaba antes de varios useMemo/mutations, encontrado por la
+  // auditoría del 2026-08-13 como violación crítica de reglas de hooks.
+  if (!can('PRODUCTS_VIEW')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Lock className="h-12 w-12 text-slate-300 mb-3" />
+        <h2 className="text-lg font-semibold text-slate-900">Acceso restringido</h2>
+        <p className="text-sm text-slate-500 mt-1">No tenés permiso para ver esta sección.</p>
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <div className="space-y-6">
@@ -363,9 +593,9 @@ const GestionProductos = () => {
       </Modal>
 
       <Modal
-        title={editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
+        title={editingProduct ? 'Editar Producto' : duplicatingProduct ? 'Duplicar Producto' : 'Crear Nuevo Producto'}
         open={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingProduct(null); }}
+        onClose={() => { setIsModalOpen(false); setEditingProduct(null); setDuplicatingProduct(null); }}
         size="4xl"
       >
         <ProductForm
@@ -373,11 +603,67 @@ const GestionProductos = () => {
           onCancel={() => {
             setIsModalOpen(false);
             setEditingProduct(null);
+            setDuplicatingProduct(null);
           }}
-          defaultValues={editingProduct || {}}
+          defaultValues={editingProduct || duplicatingProduct || {}}
           isEditing={!!editingProduct}
         />
       </Modal>
+
+      {/* Productos convertidos desde una Oportunidad (ver GestionOportunidades.jsx)
+          que todavía no aprobó un admin — apartados de la tabla principal, no
+          reservables en Disponibilidad hasta que se aprueben acá. */}
+      {pendingProducts.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <div className="p-4">
+            <div className="mb-1 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-600" />
+              <h3 className="text-sm font-semibold text-amber-900">
+                Pendientes de aprobación ({pendingProducts.length})
+              </h3>
+            </div>
+            <p className="mb-3 text-xs text-amber-700">
+              Creados desde una oportunidad convertida a producto — no aparecen en Disponibilidad hasta que un admin los apruebe.
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-amber-200 bg-white">
+              <TableComponent>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Acciones</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Destino</TableHead>
+                    <TableHead>Compañía</TableHead>
+                    <TableHead>Agencia</TableHead>
+                    <TableHead>Cupo</TableHead>
+                    <TableHead>Salida</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {canApprove && (
+                            <ActionIconButton icon={CheckCircle2} onClick={() => handleApproveProduct(product)} title="Aprobar" className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" />
+                          )}
+                          <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
+                          <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
+                      <TableCell>{product.compania}</TableCell>
+                      <TableCell>{product.agencia ? agencyName(product.agencia) : '—'}</TableCell>
+                      <TableCell>{product.cupo || '—'}</TableCell>
+                      <TableCell>{formatDate(product.fecha_salida)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </TableComponent>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Barra de búsqueda y filtros */}
       <div className="flex flex-col gap-3 mb-6">
@@ -464,6 +750,27 @@ const GestionProductos = () => {
               Limpiar filtros
             </Button>
           )}
+          <div className="relative ml-auto" ref={columnsMenuRef}>
+            <Button variant="outline" size="sm" onClick={() => setIsColumnsMenuOpen((v) => !v)}>
+              <Columns3 className="h-4 w-4 mr-2" />
+              Columnas
+            </Button>
+            {isColumnsMenuOpen && (
+              <div className="absolute right-0 z-30 mt-2 max-h-80 w-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                {productColumns.map((c) => (
+                  <label key={c.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={isColumnVisible(c.key)}
+                      onChange={() => toggleColumn(c.key)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -471,157 +778,76 @@ const GestionProductos = () => {
       {isLoading ? (
         <SkeletonTable columns={8} rows={5} />
       ) : filteredProducts.length > 0 ? (
-        <Card>
-          <div className="overflow-x-auto">
-            <TableComponent>
-              <TableHeader>
+        <Card className="overflow-hidden">
+          {/* containerClassName acota el alto y hace que el header/columna
+              sticky sean relativos a este mismo contenedor con scroll — ver
+              comentario en Table.jsx sobre por qué no envolver con otro div. */}
+          <TableComponent containerClassName="max-h-[70vh]">
+              <TableHeader className="sticky top-0 z-20 [&_th]:bg-slate-50">
                 <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Destino</TableHead>
-                  <TableHead>Compañía</TableHead>
-                  <TableHead>Agencia</TableHead>
-                  <TableHead>{'Ruta / Cabina / Hab.'}</TableHead>
-                  <TableHead>PNR</TableHead>
-                  <TableHead>Ficha</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Notas</TableHead>
-                  <TableHead>Temporada</TableHead>
-                  <TableHead>Disp.</TableHead>
-                  <TableHead>Cupo</TableHead>
-                  <TableHead>Salida</TableHead>
-                  <TableHead>Regreso</TableHead>
-                  <TableHead>Venc. Pago</TableHead>
-                  <TableHead>Nómina</TableHead>
-                  <TableHead>Emisión</TableHead>
-                  <TableHead>Gastos</TableHead>
-                  <TableHead>Bloqueo (min)</TableHead>
-                  <TableHead>ADT</TableHead>
-                  <TableHead>INF</TableHead>
-                  <TableHead>CHD</TableHead>
-                  <TableHead>Neto 1</TableHead>
-                  <TableHead>OP</TableHead>
-                  <TableHead>Equipaje</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Acciones</TableHead>
+                  <TableHead className="w-10 sticky left-0 z-30 bg-slate-50 border-r border-b border-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(filteredProducts.map(p => p.id));
+                        else setSelectedIds([]);
+                      }}
+                      className="rounded border-gray-300 w-4 h-4"
+                    />
+                  </TableHead>
+                  <TableHead className="sticky left-10 z-30 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
+                  {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
+                    <TableHead key={c.key} className={c.headClassName}>{c.label}</TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-mono text-xs font-medium">{product.codigo_cupo}</TableCell>
-                    <TableCell>{product.tipo_producto || '—'}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{product.destino}</TableCell>
-                    <TableCell>{product.compania}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="font-medium text-slate-700">
-                          {product.agencia ? agencyName(product.agencia) : (
-                            <span className="text-red-500" title="Este producto no tiene agencia dueña asignada — hoy no lo ve ninguna agencia, solo el admin.">
-                              Sin agencia dueña
-                            </span>
-                          )}
-                        </span>
-                        {/* Si soy el dueño original (o el admin viendo todo) */}
-                        {product.restricted_agency && (user.role === 'admin' || user.agencia === product.source_agency) && (
-                          <Badge variant="outline" className="w-fit text-[10px]">
-                            Prestado a {agencyName(product.restricted_agency)}
-                          </Badge>
-                        )}
-                        {/* Si soy la agencia que recibió el cupo */}
-                        {product.source_agency && (user.role === 'admin' || user.agencia === product.restricted_agency) && (
-                          <span className="text-[10px] text-slate-400">
-                            Cedido por {agencyName(product.source_agency)}
-                          </span>
-                        )}
+                {filteredProducts.map((product) => {
+                  const tieneMovimientos = !!product.restricted_agency || !!product.source_agency
+                    || (cedidosByProductId[String(product.id)] || []).length > 0;
+                  return (
+                  <TableRow key={product.id} className={`group ${selectedIds.includes(product.id) ? 'bg-blue-50/50' : ''}`}>
+                    <TableCell className="w-10 sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(product.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(prev => [...prev, product.id]);
+                          else setSelectedIds(prev => prev.filter(id => id !== product.id));
+                        }}
+                        className="rounded border-gray-300 w-4 h-4"
+                      />
+                    </TableCell>
+                    <TableCell className="sticky left-10 z-10 bg-white group-hover:bg-slate-50/80 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                      <div className="flex items-center gap-1">
+                        <ActionIconButton icon={Edit} onClick={() => handleEditProduct(product)} title="Editar" />
+                        <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeleteProduct(product.id)} title="Eliminar" />
+                        <ActionsOverflow
+                          items={[
+                            { icon: Copy, label: 'Duplicar producto', onClick: () => handleDuplicateProduct(product) },
+                            { icon: ArrowRightLeft, label: 'Ceder disponibilidad', onClick: () => handleOpenTransfer(product) },
+                            // Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra
+                            (user.role === 'admin' || product.agencia === user.agencia) &&
+                              { icon: Share2, label: 'Compartir con otras agencias', onClick: () => handleOpenShare(product) },
+                            // Recuperar cupo cedido, solo si soy el cedente
+                            product.restricted_agency && product.source_agency === user.agencia &&
+                              { icon: RotateCcw, label: 'Recuperar cupo cedido', onClick: () => handleReclaimTransfer(product) },
+                            // Movimientos: historial de cesiones/préstamos, solo si hay algo que mostrar
+                            tieneMovimientos &&
+                              { icon: History, label: 'Ver movimientos', onClick: () => setMovementsModalProduct(product) },
+                          ]}
+                        />
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {product.ruta ? (
-                        <button
-                          type="button"
-                          onClick={() => setRouteModalProduct(product)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
-                          title="Ver detalle de la ruta"
-                        >
-                          <MapPin className="h-3 w-3" />
-                          Ruta
-                        </button>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.pnr || '—'}</TableCell>
-                    <TableCell>{product.ficha || '—'}</TableCell>
-                    <TableCell>{product.servicio || '—'}</TableCell>
-                    <TableCell>
-                      {(product.notas_externas || product.notas_internas) ? (
-                        <button
-                          type="button"
-                          onClick={() => setNotesModalProduct(product)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
-                          title="Ver notas"
-                        >
-                          <StickyNote className="h-3 w-3" />
-                          Notas
-                        </button>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.temporada || '—'}</TableCell>
-                    <TableCell>{product.disponibilidad}</TableCell>
-                    <TableCell>{product.cupo || '—'}</TableCell>
-                    <TableCell>{formatDate(product.fecha_salida)}</TableCell>
-                    <TableCell>{formatDate(product.fecha_regreso)}</TableCell>
-                    <TableCell>{formatDate(product.vencimiento_pago)}</TableCell>
-                    <TableCell>{formatDate(product.nomination_date)}</TableCell>
-                    <TableCell>{formatDate(product.fecha_emision)}</TableCell>
-                    <TableCell>{formatDate(product.fecha_gastos)}</TableCell>
-                    <TableCell>{product.bloqueo_temporal_minutos || '—'}</TableCell>
-                    <TableCell>{formatMoney(product.precio)}</TableCell>
-                    <TableCell>{formatMoney(product.inf_fare)}</TableCell>
-                    <TableCell>{formatMoney(product.chd_fare)}</TableCell>
-                    <TableCell>{formatMoney(product.neto_1)}</TableCell>
-                    <TableCell>{formatMoney(product.op)}</TableCell>
-                    <TableCell>
-                      <BaggageFranchise item={product} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={product.is_blocked_for_sale ? 'danger' : 'success'}>
-                        {product.is_blocked_for_sale ? 'Bloqueado' : 'Disponible'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)} title="Editar">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleOpenTransfer(product)} title="Ceder Disponibilidad">
-                          <ArrowRightLeft className="h-4 w-4" />
-                        </Button>
-                        {/* Compartir: visible/reservable por otras agencias sin forkear stock — solo el dueño (o admin) lo administra */}
-                        {(user.role === 'admin' || product.agencia === user.agencia) && (
-                          <Button variant="outline" size="sm" onClick={() => handleOpenShare(product)} title="Compartir con otras agencias">
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {/* Botón para recuperar cupo cedido (si soy el cedente) */}
-                        {product.restricted_agency && product.source_agency === user.agencia && (
-                          <Button variant="outline" size="sm" onClick={() => handleReclaimTransfer(product)} title="Recuperar cupo cedido" className="text-amber-600 hover:text-amber-800">
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {productColumns.filter((c) => isColumnVisible(c.key)).map((c) => (
+                      <TableCell key={c.key} className={c.cellClassName}>{c.render(product)}</TableCell>
+                    ))}
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </TableComponent>
-          </div>
         </Card>
       ) : products.length > 0 ? (
         <EmptyState
@@ -647,6 +873,16 @@ const GestionProductos = () => {
           }
         />
       )}
+
+      <BulkSelectionBar
+        selectedCount={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        entityLabel="producto"
+        actions={[
+          { label: 'Eliminar', icon: Trash2, variant: 'danger', onClick: handleBulkDelete, loading: isBulkDeleting },
+          { label: 'Duplicar', icon: Copy, variant: 'primary', onClick: handleBulkDuplicate, loading: isBulkDuplicating }
+        ]}
+      />
 
       {/* Modal de Cesión de Disponibilidad */}
       <TransferModal
@@ -722,6 +958,75 @@ const GestionProductos = () => {
                 <p className="whitespace-pre-wrap rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-slate-700">
                   {notesModalProduct.notas_internas || 'Sin notas internas.'}
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Movimientos: cesiones/préstamos de este cupo, con trazabilidad
+          completa (a quién, cuánto, cuándo) en vez de badges apretados en la fila. */}
+      {movementsModalProduct && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setMovementsModalProduct(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <History className="h-5 w-5 text-slate-500" />
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Movimientos del Cupo</h2>
+                  <p className="text-sm text-slate-500">{movementsModalProduct.codigo_cupo} — {movementsModalProduct.destino}</p>
+                </div>
+              </div>
+              <button onClick={() => setMovementsModalProduct(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Estado actual: si soy dueño/cedente, o receptor de un espejo */}
+              {movementsModalProduct.restricted_agency && (user.role === 'admin' || user.agencia === movementsModalProduct.source_agency) && (
+                <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm">
+                  <ArrowRightLeft className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span className="text-slate-700">
+                    Actualmente <strong>prestado a {agencyName(movementsModalProduct.restricted_agency)}</strong> ({movementsModalProduct.disponibilidad} lugares).
+                  </span>
+                </div>
+              )}
+              {movementsModalProduct.source_agency && (user.role === 'admin' || user.agencia === movementsModalProduct.restricted_agency) && (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <ArrowRightLeft className="h-4 w-4 text-slate-500 shrink-0" />
+                  <span className="text-slate-700">
+                    Este cupo es un <strong>préstamo recibido de {agencyName(movementsModalProduct.source_agency)}</strong>.
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Historial de cesiones salientes</h3>
+                {(cedidosByProductId[String(movementsModalProduct.id)] || []).length > 0 ? (
+                  <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 text-xs text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Agencia destino</th>
+                          <th className="px-3 py-2 text-right font-medium">Cantidad</th>
+                          <th className="px-3 py-2 text-right font-medium">Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {cedidosByProductId[String(movementsModalProduct.id)].map((c, i) => (
+                          <tr key={i}>
+                            <td className="px-3 py-2 text-slate-700">{agencyName(c.agencia)}</td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-900">{c.cantidad}</td>
+                            <td className="px-3 py-2 text-right text-slate-500">{formatDate(c.fecha) || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">Este cupo no tiene cesiones registradas.</p>
+                )}
               </div>
             </div>
           </div>

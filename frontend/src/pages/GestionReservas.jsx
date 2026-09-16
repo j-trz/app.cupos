@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Calendar, BarChart3, CheckCircle, Plus, Edit3, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
+import { Calendar, BarChart3, CheckCircle, Plus, Edit, Trash2, RefreshCw, Send, X, CheckCircle2, Search, FileText, AlertCircle, Clock, ArrowRightLeft, Ticket, MapPin, ThumbsUp, ThumbsDown, Lock, BedDouble } from 'lucide-react';
 import ReservationService from '../services/reservationService';
 import { useAuth } from '../contexts/AuthContext';
 import ApiClient from '../services/apiClient';
 import Swal from 'sweetalert2';
 import Button from '../components/ui/Button.jsx';
+import ActionIconButton from '../components/ui/ActionIconButton.jsx';
+import ActionsOverflow from '../components/ui/ActionsOverflow.jsx';
 import { Card } from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import StatsHero from '../components/ui/StatsHero.jsx';
 import Modal from '../components/Modal.jsx';
+import SkeletonTable from '../components/SkeletonTable';
+import EmptyState from '../components/EmptyState';
+import BulkSelectionBar, { XCircle } from '../components/ui/BulkSelectionBar.jsx';
 import TableComponent from '../components/ui/Table.jsx';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '../components/ui/Table.jsx';
 import { useAgencies } from '../hooks/useAgencies';
+import { getEstadoVariant, getEstadoLabel } from '../lib/estadoReserva.js';
 import { formatDateOnly } from '../lib/dateOnly.js';
 import { formatExpiry, useCountdownTick } from '../lib/expiry.js';
 import ItineraryPDF from '../components/ItineraryPDF.jsx';
@@ -28,6 +34,7 @@ const emptyForm = {
   nombre_pasajero: '',
   apellido_pasajero: '',
   documento_pasajero: '',
+  pasaporte_pasajero: '',
   nacimiento_pasajero: '',
   nacionalidad_pasajero: '',
   tipo_pasajero: 'Adulto',
@@ -39,7 +46,14 @@ const emptyForm = {
   vuelo_salida: '',
   bloqueo_expira_at: '',
   ficha_venta: '',
+  estado_interno: '',
+  status_back: '',
+  hotel: '',
+  traslados_incluye: false,
+  traslados_notas: '',
 };
+
+const ESTADO_INTERNO_OPTIONS = ['', 'Pendiente', 'Seña', 'Pagado', 'Emitido'];
 
 const formatDate = formatDateOnly;
 
@@ -48,28 +62,6 @@ const formatMoney = (value) => {
   if (!value || Number.isNaN(n)) return '—';
   return n.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-
-const getEstadoVariant = (estado) => {
-  if (estado === 'confirmado' || estado === 'confirmada') return 'success';
-  if (estado === 'procesando') return 'warning';
-  if (estado === 'cancelado' || estado === 'cancelada' || estado === 'solicitud_cancelacion') return 'danger';
-  if (estado === 'expirada') return 'danger';
-  if (estado === 'cedido') return 'outline';
-  return 'default';
-};
-
-const getEstadoLabel = (estado) => ({
-  bloqueo_temporal: 'Bloqueo Temporal',
-  confirmado: 'Confirmado',
-  confirmada: 'Confirmado',
-  procesando: 'Procesando',
-  completado: 'Completado',
-  cancelado: 'Cancelado',
-  cancelada: 'Cancelado',
-  solicitud_cancelacion: 'Sol. Cancelación',
-  expirada: 'Expirada',
-  cedido: 'Cedido a otra agencia',
-}[estado] || estado || '—');
 
 // Comparación de códigos de agencia case/espacio-insensible — igual que el
 // backend (strings.EqualFold en product_handler.go). Sin esto, una diferencia
@@ -94,6 +86,7 @@ const buildPassengerRows = (r) => {
       documento: p.documento || '—',
       tipoPasajero: p.tipo_pasajero || '—',
       estado: p.estado || r.estado || '',
+      estadoInterno: r.estado_interno || '',
       docContable: p.doc_contable || r.doc_contable || '',
       numeroTicket: p.numero_ticket || '',
       precioVenta: p.precio_venta || r.precio_venta,
@@ -109,6 +102,7 @@ const buildPassengerRows = (r) => {
     documento: r.documento_pasajero || '—',
     tipoPasajero: r.tipo_pasajero || '—',
     estado: r.estado || '',
+    estadoInterno: r.estado_interno || '',
     docContable: r.doc_contable || '',
     numeroTicket: '',
     precioVenta: r.precio_venta,
@@ -133,12 +127,19 @@ function Field({ label, required, hint, children }) {
 const inputCls = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200';
 
 export default function GestionReservas() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const myAgencia = user?.agencia;
   useCountdownTick(); // hace que la cuenta regresiva de vencimiento avance sola
   const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Multi-selección
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [isBulkCanceling, setIsBulkCanceling] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editReservation, setEditReservation] = useState(null);
   const [editPassengerId, setEditPassengerId] = useState(null);
@@ -153,6 +154,7 @@ export default function GestionReservas() {
   const [ticketValue, setTicketValue] = useState('');
   const [pdfModalData, setPdfModalData] = useState(null); // { reservation, passengers, product }
   const [routeModalProduct, setRouteModalProduct] = useState(null); // { codigo_cupo, destino, ruta }
+  const [serviciosModal, setServiciosModal] = useState(null); // reserva con hotel/traslados a mostrar
 
   const { data: agencies = [] } = useAgencies();
 
@@ -198,6 +200,7 @@ export default function GestionReservas() {
         x.vuelo_destino?.toLowerCase().includes(q) ||
         x.agencia?.toLowerCase().includes(q) ||
         x.nombre_pasajero?.toLowerCase().includes(q) ||
+        x.ficha_venta?.toLowerCase().includes(q) ||
         (x.passengers || []).some(p => `${p.nombre} ${p.apellido}`.toLowerCase().includes(q))
       );
     }
@@ -205,7 +208,15 @@ export default function GestionReservas() {
   }, [reservations, estadoFilter, searchTerm]);
 
   const agencyName = (code) => agencies.find(a => a.code === code)?.name || code || '—';
-  const productOp = (productId) => products.find(p => String(p.id) === String(productId))?.op ?? '—';
+  // OP según el tipo real del pasajero (ADT/CHD/INF) — ya no es un valor
+  // único por producto.
+  const productOp = (productId, tipoPasajero) => {
+    const p = products.find(pr => String(pr.id) === String(productId));
+    if (!p) return '—';
+    if (tipoPasajero === 'Menor') return p.op_chd ?? p.op ?? 0;
+    if (tipoPasajero === 'Infante') return p.op_inf ?? p.op ?? 0;
+    return p.op_adt ?? p.op ?? 0;
+  };
 
   // ─── Producto lookup ─────────────────────────
   const lookupProduct = useCallback(async (id) => {
@@ -256,6 +267,7 @@ export default function GestionReservas() {
       nombre_pasajero: primaryPassenger?.nombre || r.nombre_pasajero || '',
       apellido_pasajero: primaryPassenger?.apellido || r.apellido_pasajero || '',
       documento_pasajero: primaryPassenger?.documento || r.documento_pasajero || '',
+      pasaporte_pasajero: primaryPassenger?.pasaporte || '',
       nacimiento_pasajero: (primaryPassenger?.nacimiento || r.nacimiento_pasajero)
         ? String(primaryPassenger?.nacimiento || r.nacimiento_pasajero).slice(0, 10)
         : '',
@@ -269,6 +281,11 @@ export default function GestionReservas() {
       vuelo_salida: r.vuelo_salida ? String(r.vuelo_salida).slice(0, 10) : '',
       bloqueo_expira_at: r.bloqueo_expira_at ? String(r.bloqueo_expira_at).slice(0, 16) : '',
       ficha_venta: r.ficha_venta || '',
+      estado_interno: r.estado_interno || '',
+      status_back: r.status_back || '',
+      hotel: r.hotel || '',
+      traslados_incluye: r.traslados_incluye || false,
+      traslados_notas: r.traslados_notas || '',
     });
     setProductInfo(null);
     setDialogOpen(true);
@@ -315,6 +332,7 @@ export default function GestionReservas() {
         nombre: payload.nombre_pasajero,
         apellido: payload.apellido_pasajero,
         documento: payload.documento_pasajero,
+        pasaporte: payload.pasaporte_pasajero,
         nacimiento: payload.nacimiento_pasajero || null,
         nacionalidad: payload.nacionalidad_pasajero,
         tipo_pasajero: payload.tipo_pasajero,
@@ -323,9 +341,25 @@ export default function GestionReservas() {
       delete payload.nombre_pasajero;
       delete payload.apellido_pasajero;
       delete payload.documento_pasajero;
+      delete payload.pasaporte_pasajero;
       delete payload.nacimiento_pasajero;
       delete payload.nacionalidad_pasajero;
       delete payload.tipo_pasajero;
+    } else {
+      // pasaporte no es un campo de Reservation (solo existe a nivel
+      // Passenger) — si no se manda un pasajero explícito, el backend lo
+      // sintetiza a partir de los campos *_pasajero de arriba, pero ese
+      // fallback no conoce "pasaporte". Se manda armado para que no se pierda.
+      payload.passengers = [{
+        nombre: payload.nombre_pasajero,
+        apellido: payload.apellido_pasajero,
+        documento: payload.documento_pasajero,
+        pasaporte: payload.pasaporte_pasajero,
+        nacimiento: payload.nacimiento_pasajero || null,
+        nacionalidad: payload.nacionalidad_pasajero,
+        tipo_pasajero: payload.tipo_pasajero,
+      }];
+      delete payload.pasaporte_pasajero;
     }
     delete payload.numero_ticket;
     // Quitar campos vacíos
@@ -418,7 +452,7 @@ export default function GestionReservas() {
         ? 'Es el único pasajero de este pedido: se eliminará también la reserva.'
         : 'Se libera su lugar. El resto de los pasajeros de este mismo pedido no se ven afectados.',
       showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
     });
     if (!res.isConfirmed) return;
     try {
@@ -455,6 +489,70 @@ export default function GestionReservas() {
       fetchReservations();
     } catch (err) {
       Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+    }
+  };
+
+  // kind: 'confirmar' → Reservation.Estado='confirmada'; 'emitir' →
+  // Reservation.EstadoInterno='Emitido' (dispara la generación de tickets en
+  // la Bandeja de Tickets, ver GenerateTicketsForReservationInternal). Son
+  // dos campos independientes del backend, no el mismo valor.
+  const handleBulkUpdate = async (kind) => {
+    const isEmitir = kind === 'emitir';
+    const result = await Swal.fire({
+      title: isEmitir ? '¿Marcar como Emitido?' : '¿Confirmar reservas?',
+      text: `Se actualizarán ${selectedIds.length} reservas.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cambiar',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkUpdating(true);
+    try {
+      if (isEmitir) {
+        await ReservationService.bulkEmitReservations(selectedIds);
+      } else {
+        await ReservationService.bulkConfirmReservations(selectedIds);
+      }
+      Swal.fire({ icon: 'success', title: 'Actualizadas', timer: 1500, showConfirmButton: false });
+      setSelectedIds([]);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al actualizar masivamente.' });
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkCancel = async () => {
+    const result = await Swal.fire({
+      title: `¿Cancelar ${selectedIds.length} reservas?`,
+      html: '<textarea id="motivo-cancel" class="swal2-textarea" placeholder="Motivo de cancelación (requerido)"></textarea>',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cancelar',
+      cancelButtonText: 'Volver',
+      confirmButtonColor: '#dc2626',
+      preConfirm: () => {
+        const motivo = document.getElementById('motivo-cancel').value;
+        if (!motivo) {
+          Swal.showValidationMessage('Debe ingresar un motivo');
+          return false;
+        }
+        return motivo;
+      }
+    });
+    if (!result.isConfirmed) return;
+    setIsBulkCanceling(true);
+    try {
+      await ReservationService.bulkCancelReservations(selectedIds, result.value);
+      Swal.fire({ icon: 'success', title: 'Canceladas', timer: 1500, showConfirmButton: false });
+      setSelectedIds([]);
+      fetchReservations();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al cancelar masivamente.' });
+    } finally {
+      setIsBulkCanceling(false);
     }
   };
 
@@ -536,80 +634,139 @@ export default function GestionReservas() {
         ]}
       />
 
-      <Card>
-        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Lista de Reservas</h2>
-              <p className="text-sm text-slate-500">Cada fila es un pasajero individual; varios pasajeros pueden compartir el mismo pedido.</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero..."
-              value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              className="w-full max-w-md rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
-          </div>
-          {estados.length > 1 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Estado:</span>
-              {estados.map(est => (
-                <button key={est} type="button" onClick={() => setEstadoFilter(est)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                  {est === 'Todas' ? 'Todas' : getEstadoLabel(est)}
-                </button>
-              ))}
-            </div>
-          )}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input type="text" placeholder="Buscar por pedido, contacto, destino, pasajero, ficha..."
+            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200" />
         </div>
+      </div>
+      {estados.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Estado:</span>
+          {estados.map(est => (
+            <button key={est} type="button" onClick={() => setEstadoFilter(est)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${estadoFilter === est ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              {est === 'Todas' ? 'Todas' : getEstadoLabel(est)}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {loading ? (
+        <SkeletonTable columns={10} rows={6} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon="🧳"
+          title="No hay reservas"
+          description={searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
+        />
+      ) : (
+      <Card className="overflow-hidden">
         <TableComponent>
           <TableHeader>
             <TableRow>
-              <TableHead>ID Pedido</TableHead>
-              <TableHead>Agencia</TableHead>
-              <TableHead>Contacto</TableHead>
+              <TableHead className="w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-b border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(filtered.map(r => r.id));
+                    else setSelectedIds([]);
+                  }}
+                  className="rounded border-gray-300 w-4 h-4"
+                />
+              </TableHead>
+              <TableHead className="text-center sticky left-10 z-20 bg-slate-50 border-r border-b border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Acciones</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Cía</TableHead>
+              <TableHead>Salida</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Apellido</TableHead>
+              <TableHead>Ficha</TableHead>
               <TableHead>Documento</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead>Destino</TableHead>
               <TableHead className="text-center">Ruta</TableHead>
-              <TableHead>Salida</TableHead>
+              <TableHead className="text-center">Servicios</TableHead>
               <TableHead>Vencimiento</TableHead>
-              <TableHead>Ficha</TableHead>
               <TableHead>Cesión</TableHead>
+              <TableHead>Contacto</TableHead>
               <TableHead>Doc.Contable</TableHead>
               <TableHead>Ticket</TableHead>
-              <TableHead>Precio Venta</TableHead>
-              <TableHead>Neto 1</TableHead>
-              <TableHead>OP</TableHead>
+              <TableHead className="text-right">Precio Venta</TableHead>
+              <TableHead className="text-right">Neto 1</TableHead>
+              <TableHead className="text-right">OP</TableHead>
               <TableHead>Vendedor</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-center">Acciones</TableHead>
+              <TableHead>ID Pedido</TableHead>
+              <TableHead>Agencia</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={21} className="text-center py-10">Cargando...</TableCell></TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={21} className="text-center py-10 text-slate-400">
-                {searchTerm || estadoFilter !== 'Todas' ? 'Sin resultados con los filtros aplicados.' : 'No hay reservas registradas.'}
-              </TableCell></TableRow>
-            ) : filtered.flatMap(r => {
+            {filtered.flatMap(r => {
               const expiry = r.estado === 'bloqueo_temporal' ? formatExpiry(r.bloqueo_expira_at) : null;
               return buildPassengerRows(r).map(row => (
-                <TableRow key={row.key}>
-                  <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
-                  <TableCell>{agencyName(r.agencia)}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">{r.contacto_nombre || '—'}</div>
-                    <div className="text-xs text-slate-400">{r.contacto_email}</div>
+                <TableRow key={row.key} className={selectedIds.includes(r.id) ? 'bg-blue-50/50' : ''}>
+                  <TableCell className="w-10 text-center sticky left-0 z-10 bg-white border-r border-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(r.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(prev => [...prev, r.id]);
+                        else setSelectedIds(prev => prev.filter(id => id !== r.id));
+                      }}
+                      className="rounded border-gray-300 w-4 h-4"
+                    />
                   </TableCell>
+                  <TableCell className="sticky left-10 z-10 bg-white border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                    <div className="flex items-center justify-center gap-1">
+                      <ActionIconButton icon={Edit} onClick={() => openEdit(r)} title="Editar reserva" />
+                      <ActionIconButton icon={Trash2} variant="danger" onClick={() => handleDeletePassenger(row)} title="Eliminar este pasajero" />
+                      <ActionsOverflow
+                        items={[
+                          r.estado === 'solicitud_cancelacion' &&
+                            { icon: ThumbsUp, label: 'Aprobar cancelación', onClick: () => handleResolveCancellation(r, 'approve') },
+                          r.estado === 'solicitud_cancelacion' &&
+                            { icon: ThumbsDown, label: 'Rechazar cancelación', onClick: () => handleResolveCancellation(r, 'decline'), danger: true },
+                          r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && r.estado !== 'expirada' && r.estado !== 'cancelada' &&
+                            { icon: CheckCircle2, label: 'Confirmar pedido completo', onClick: () => handleConfirm(r) },
+                          { icon: Send, label: 'Reenviar email', onClick: () => handleResendEmail(r) },
+                          row.numeroTicket &&
+                            {
+                              icon: FileText,
+                              label: 'Generar itinerario',
+                              onClick: () => {
+                                const reservation = r;
+                                const passengers = [row]; // Pasamos el pasajero de esta fila
+                                const liveProduct = products.find(p => p.id === r.product_id);
+                                const product = {
+                                  ruta: r.vuelo_ruta,
+                                  destino: r.vuelo_destino,
+                                  fecha_salida: r.vuelo_salida,
+                                  pnr: liveProduct?.pnr,
+                                  carryon: liveProduct?.carryon,
+                                  handbag: liveProduct?.handbag,
+                                  checkedbag: liveProduct?.checkedbag,
+                                };
+                                setPdfModalData({ reservation, passengers, product });
+                              },
+                            },
+                        ]}
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getEstadoVariant(row.estado, row.estadoInterno)}>{getEstadoLabel(row.estado, row.estadoInterno)}</Badge>
+                  </TableCell>
+                  <TableCell>{r.vuelo_destino || '—'}</TableCell>
+                  <TableCell>{r.vuelo_compania || '—'}</TableCell>
+                  <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
                   <TableCell className="font-medium text-slate-900">{row.nombre}</TableCell>
                   <TableCell>{row.apellido}</TableCell>
+                  <TableCell className="text-xs">{r.ficha_venta || '—'}</TableCell>
                   <TableCell>{row.documento}</TableCell>
                   <TableCell>{row.tipoPasajero}</TableCell>
-                  <TableCell>{r.vuelo_destino || '—'}</TableCell>
                   <TableCell className="text-center">
                     {r.vuelo_ruta || (products.find(p => p.id === r.product_id)?.ruta) ? (
                       <button
@@ -632,7 +789,21 @@ export default function GestionReservas() {
                       <span className="text-slate-400">—</span>
                     )}
                   </TableCell>
-                  <TableCell>{formatDate(r.vuelo_salida)}</TableCell>
+                  <TableCell className="text-center">
+                    {(r.hotel || r.traslados_incluye) ? (
+                      <button
+                        type="button"
+                        onClick={() => setServiciosModal(r)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+                        title="Ver hotel / traslados"
+                      >
+                        <BedDouble className="h-3 w-3" />
+                        Servicios
+                      </button>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs text-slate-600">{formatDate(r.bloqueo_expira_at) || '—'}</span>
@@ -643,7 +814,6 @@ export default function GestionReservas() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs">{r.ficha_venta || '—'}</TableCell>
                   {/* Cesión: en la agencia cedente muestra la salida de stock;
                       en la reserva real hecha con ese cupo, de qué agencia vino */}
                   <TableCell>
@@ -651,13 +821,19 @@ export default function GestionReservas() {
                       <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
                         <ArrowRightLeft className="h-3 w-3" /> Cesión saliente
                       </Badge>
-                    ) : r.original_agency ? (
+                    ) : r.original_agency && !sameAgency(r.original_agency, myAgencia) ? (
                       <div className="flex flex-col gap-1">
                         <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
                           <ArrowRightLeft className="h-3 w-3" /> Cupo cedido
                         </Badge>
                         <span className="text-[10px] text-slate-500">de {agencyName(r.original_agency)}</span>
                       </div>
+                    ) : r.original_agency ? (
+                      // Soy la agencia cedente: esta venta la hizo la agencia
+                      // receptora sobre un cupo que yo cedí.
+                      <Badge variant="outline" className="inline-flex items-center gap-1 w-fit">
+                        <ArrowRightLeft className="h-3 w-3" /> Cedido a {agencyName(r.agencia)}
+                      </Badge>
                     ) : (() => {
                       // Producto compartido (visibilidad multi-agencia, mismo
                       // stock, sin fila espejo): esta reserva la tomó otra
@@ -669,6 +845,10 @@ export default function GestionReservas() {
                         </Badge>
                       ) : '—';
                     })()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">{r.contacto_nombre || '—'}</div>
+                    <div className="text-xs text-slate-400">{r.contacto_email}</div>
                   </TableCell>
                   <TableCell>
                     {row.docContable ? (
@@ -692,66 +872,30 @@ export default function GestionReservas() {
                       </button>
                     ) : <span className="text-xs text-slate-300">—</span>}
                   </TableCell>
-                  <TableCell>{formatMoney(row.precioVenta)}</TableCell>
-                  <TableCell>{formatMoney(row.neto1)}</TableCell>
-                  <TableCell>{productOp(r.product_id)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(row.precioVenta)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(row.neto1)}</TableCell>
+                  <TableCell className="text-right font-mono">{productOp(r.product_id, row.tipoPasajero)}</TableCell>
                   <TableCell className="text-xs text-slate-500">{r.vendedor_email || '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant={getEstadoVariant(row.estado)}>{getEstadoLabel(row.estado)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      {r.estado === 'solicitud_cancelacion' && (
-                        <>
-                          <Button variant="ghost" size="sm" onClick={() => handleResolveCancellation(r, 'approve')} title="Aprobar cancelación">
-                            <ThumbsUp className="h-4 w-4 text-emerald-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleResolveCancellation(r, 'decline')} title="Rechazar cancelación">
-                            <ThumbsDown className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </>
-                      )}
-                      {r.estado !== 'confirmado' && r.estado !== 'confirmada' && r.estado !== 'solicitud_cancelacion' && r.estado !== 'expirada' && r.estado !== 'cancelada' && (
-                        <Button variant="ghost" size="sm" onClick={() => handleConfirm(r)} title="Confirmar pedido completo">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => handleResendEmail(r)} title="Reenviar email">
-                        <Send className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(r)} title="Editar reserva">
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeletePassenger(row)} title="Eliminar este pasajero" className="text-red-500 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      {row.numeroTicket && (
-                        <Button variant="ghost" size="sm" onClick={() => {
-                          const reservation = r;
-                          const passengers = [row]; // Pasamos el pasajero de esta fila
-                          const liveProduct = products.find(p => p.id === r.product_id);
-                          const product = {
-                            ruta: r.vuelo_ruta,
-                            destino: r.vuelo_destino,
-                            fecha_salida: r.vuelo_salida,
-                            pnr: liveProduct?.pnr,
-                            carryon: liveProduct?.carryon,
-                            handbag: liveProduct?.handbag,
-                            checkedbag: liveProduct?.checkedbag,
-                          };
-                          setPdfModalData({ reservation, passengers, product });
-                        }} title="Generar Itinerario">
-                          <FileText className="h-4 w-4 text-blue-600" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+                  <TableCell className="font-mono text-xs font-medium">{r.pedido_id}</TableCell>
+                  <TableCell>{agencyName(r.agencia)}</TableCell>
                 </TableRow>
               ));
             })}
           </TableBody>
         </TableComponent>
       </Card>
+      )}
+
+      <BulkSelectionBar
+        selectedCount={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        entityLabel="reserva"
+        actions={[
+          { label: 'Confirmar', icon: CheckCircle2, variant: 'success', onClick: () => handleBulkUpdate('confirmar'), loading: isBulkUpdating },
+          { label: 'Emitir', icon: Ticket, variant: 'primary', onClick: () => handleBulkUpdate('emitir'), loading: isBulkUpdating },
+          { label: 'Cancelar', icon: XCircle, variant: 'danger', onClick: handleBulkCancel, loading: isBulkCanceling }
+        ]}
+      />
 
       {/* ─── Modal Crear / Editar ─── */}
       <Modal title={editReservation ? 'Editar Reserva' : 'Nueva Reserva'} open={dialogOpen} onClose={closeDialog} size="xl">
@@ -838,6 +982,17 @@ export default function GestionReservas() {
                   <input type="text" value={form.ficha_venta} onChange={e => setField('ficha_venta', e.target.value)}
                     className={inputCls} placeholder="Ficha de venta" />
                 </Field>
+                <Field label="Estado interno" hint="Seguimiento de pago/emisión, independiente del estado de arriba">
+                  <select value={form.estado_interno} onChange={e => setField('estado_interno', e.target.value)} className={inputCls + ' bg-white'}>
+                    {ESTADO_INTERNO_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>{opt || 'Sin definir'}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Status BACK" hint='Ej: "BO OK" — si ya se cargó en el backoffice'>
+                  <input type="text" value={form.status_back} onChange={e => setField('status_back', e.target.value)}
+                    className={inputCls} placeholder="BO OK" />
+                </Field>
               </div>
             </section>
           )}
@@ -892,10 +1047,15 @@ export default function GestionReservas() {
                   disabled={editReservation && !editPassengerId}
                   className={inputCls} placeholder="Apellido" />
               </Field>
-              <Field label="Documento">
+              <Field label="CI">
                 <input type="text" value={form.documento_pasajero} onChange={e => setField('documento_pasajero', e.target.value)}
                   disabled={editReservation && !editPassengerId}
-                  className={inputCls} placeholder="CI / Pasaporte" />
+                  className={inputCls} placeholder="CI" />
+              </Field>
+              <Field label="Pasaporte">
+                <input type="text" value={form.pasaporte_pasajero} onChange={e => setField('pasaporte_pasajero', e.target.value)}
+                  disabled={editReservation && !editPassengerId}
+                  className={inputCls} placeholder="Pasaporte" />
               </Field>
               <Field label="Nacimiento">
                 <input type="date" value={form.nacimiento_pasajero} onChange={e => setField('nacimiento_pasajero', e.target.value)}
@@ -920,6 +1080,28 @@ export default function GestionReservas() {
                     className={inputCls} placeholder="Ej: 075-1234567890" />
                 </Field>
               )}
+            </div>
+          </section>
+
+          {/* SERVICIOS */}
+          <section>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Servicios</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Hotel">
+                <input type="text" value={form.hotel} onChange={e => setField('hotel', e.target.value)}
+                  className={inputCls} placeholder="Ej: Hotel Playa Sol" />
+              </Field>
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                  <input type="checkbox" checked={form.traslados_incluye} onChange={e => setField('traslados_incluye', e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300" />
+                  Incluye traslados
+                </label>
+                {form.traslados_incluye && (
+                  <input type="text" value={form.traslados_notas} onChange={e => setField('traslados_notas', e.target.value)}
+                    className={inputCls} placeholder="Notas de traslados — ej: aeropuerto-hotel ida y vuelta" />
+                )}
+              </div>
             </div>
           </section>
 
@@ -994,6 +1176,26 @@ export default function GestionReservas() {
             passengers={pdfModalData.passengers} 
             product={pdfModalData.product} 
           />
+        )}
+      </Modal>
+
+      {/* ─── Modal Servicios (Hotel/Traslados) ─── */}
+      <Modal title="Servicios" open={!!serviciosModal} onClose={() => setServiciosModal(null)} size="sm">
+        {serviciosModal && (
+          <div className="space-y-3 text-sm">
+            <div>
+              <span className="text-xs font-medium text-slate-500">Hotel</span>
+              <p className="text-slate-800">{serviciosModal.hotel || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs font-medium text-slate-500">Traslados</span>
+              <p className="text-slate-800">
+                {serviciosModal.traslados_incluye
+                  ? (serviciosModal.traslados_notas || 'Incluidos, sin notas adicionales')
+                  : 'No incluidos'}
+              </p>
+            </div>
+          </div>
         )}
       </Modal>
 
